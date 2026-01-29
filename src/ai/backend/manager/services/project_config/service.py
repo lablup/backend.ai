@@ -1,3 +1,11 @@
+"""Service for project configuration (dotfiles) operations.
+
+As there is an ongoing migration of renaming group to project,
+there are some occurrences where "group" is being used as "project"
+(e.g., GroupMembershipNotFoundError, InsufficientPrivilege).
+It will be fixed in the future; for now understand them as the same concept.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -6,8 +14,7 @@ import uuid
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
-from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, InsufficientPrivilege
 from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.repositories.project_config.repository import ProjectConfigRepository
@@ -45,10 +52,10 @@ class ProjectConfigService:
     ) -> None:
         self._project_config_repository = project_config_repository
 
-    async def _resolve_group_for_admin(
+    async def _resolve_project_for_admin(
         self,
         domain_name: str | None,
-        group_id_or_name: uuid.UUID | str,
+        project_id_or_name: uuid.UUID | str,
     ) -> uuid.UUID:
         """
         Resolve project for admin operations (create, update, delete dotfiles).
@@ -58,18 +65,22 @@ class ProjectConfigService:
         user = current_user()
         assert user is not None
 
-        group = await self._project_config_repository.resolve_group(domain_name, group_id_or_name)
+        project = await self._project_config_repository.resolve_project(
+            domain_name, project_id_or_name
+        )
 
         if not user.is_superadmin:
-            if user.domain_name != group.domain_name:
-                raise GenericForbidden("Admins cannot modify project dotfiles of other domains")
+            if user.domain_name != project.domain_name:
+                raise InsufficientPrivilege(
+                    "Admins cannot modify project dotfiles of other domains"
+                )
 
-        return group.id
+        return project.id
 
-    async def _resolve_group_for_user(
+    async def _resolve_project_for_user(
         self,
         domain_name: str | None,
-        group_id_or_name: uuid.UUID | str,
+        project_id_or_name: uuid.UUID | str,
     ) -> uuid.UUID:
         """
         Resolve project for user operations (list, get dotfiles).
@@ -79,83 +90,85 @@ class ProjectConfigService:
         user = current_user()
         assert user is not None
 
-        group = await self._project_config_repository.resolve_group(domain_name, group_id_or_name)
+        project = await self._project_config_repository.resolve_project(
+            domain_name, project_id_or_name
+        )
 
         if user.is_superadmin:
-            return group.id
+            return project.id
 
         if user.is_admin:
-            if user.domain_name != group.domain_name:
-                raise GenericForbidden(
+            if user.domain_name != project.domain_name:
+                raise InsufficientPrivilege(
                     "Domain admins cannot access project dotfiles of other domains"
                 )
-            return group.id
+            return project.id
 
         # Regular user: check if they are a member of the project
-        is_member = await self._project_config_repository.check_user_in_group(
-            user.user_id, group.id
+        is_member = await self._project_config_repository.check_user_in_project(
+            user.user_id, project.id
         )
         if not is_member:
             raise GroupMembershipNotFoundError(
                 "User cannot access project dotfiles of non-member projects"
             )
 
-        return group.id
+        return project.id
 
     async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
         if not verify_dotfile_name(action.path):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
 
-        group_id = await self._resolve_group_for_admin(
+        project_id = await self._resolve_project_for_admin(
             action.domain_name,
-            action.group_id_or_name,
+            action.project_id_or_name,
         )
 
         await self._project_config_repository.add_dotfile(
-            group_id,
+            project_id,
             DotfileInput(path=action.path, permission=action.permission, data=action.data),
         )
-        return CreateDotfileActionResult(group_id=group_id)
+        return CreateDotfileActionResult(project_id=project_id)
 
     async def list_dotfiles(self, action: ListDotfilesAction) -> ListDotfilesActionResult:
-        group_id = await self._resolve_group_for_user(
+        project_id = await self._resolve_project_for_user(
             action.domain_name,
-            action.group_id_or_name,
+            action.project_id_or_name,
         )
 
-        result = await self._project_config_repository.get_dotfiles(group_id)
+        result = await self._project_config_repository.get_dotfiles(project_id)
         return ListDotfilesActionResult(dotfiles=result.dotfiles)
 
     async def get_dotfile(self, action: GetDotfileAction) -> GetDotfileActionResult:
-        group_id = await self._resolve_group_for_user(
+        project_id = await self._resolve_project_for_user(
             action.domain_name,
-            action.group_id_or_name,
+            action.project_id_or_name,
         )
 
-        result = await self._project_config_repository.get_dotfiles(group_id)
+        result = await self._project_config_repository.get_dotfiles(project_id)
         for dotfile in result.dotfiles:
             if dotfile["path"] == action.path:
                 return GetDotfileActionResult(dotfile=dotfile)
         raise DotfileNotFound
 
     async def update_dotfile(self, action: UpdateDotfileAction) -> UpdateDotfileActionResult:
-        group_id = await self._resolve_group_for_admin(
+        project_id = await self._resolve_project_for_admin(
             action.domain_name,
-            action.group_id_or_name,
+            action.project_id_or_name,
         )
 
         await self._project_config_repository.modify_dotfile(
-            group_id,
+            project_id,
             DotfileInput(path=action.path, permission=action.permission, data=action.data),
         )
-        return UpdateDotfileActionResult(group_id=group_id)
+        return UpdateDotfileActionResult(project_id=project_id)
 
     async def delete_dotfile(self, action: DeleteDotfileAction) -> DeleteDotfileActionResult:
-        group_id = await self._resolve_group_for_admin(
+        project_id = await self._resolve_project_for_admin(
             action.domain_name,
-            action.group_id_or_name,
+            action.project_id_or_name,
         )
 
-        await self._project_config_repository.remove_dotfile(group_id, action.path)
+        await self._project_config_repository.remove_dotfile(project_id, action.path)
 
         return DeleteDotfileActionResult(success=True)
