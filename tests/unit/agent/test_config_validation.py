@@ -25,7 +25,7 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.common.types import DeviceId, DeviceName, SlotName
+from ai.backend.common.types import DeviceId, DeviceName
 from ai.backend.logging.config import LoggingConfig, default_pkg_ns
 from ai.backend.logging.types import LogLevel
 
@@ -1256,7 +1256,7 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "8G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.5,
+                            DeviceName("cuda"): [DeviceId("cuda0")],
                         },
                     },
                 },
@@ -1497,7 +1497,7 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.7,
+                            DeviceName("cuda"): [DeviceId("cuda0")],
                         },
                     },
                 },
@@ -1507,7 +1507,7 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.shares"): 0.6,
+                            DeviceName("rocm"): [DeviceId("rocm0")],
                         },
                     },
                 },
@@ -1516,13 +1516,13 @@ class TestResourceAllocationModes:
         with pytest.raises(ValidationError) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "All agents must have the same slots defined" in str(exc_info.value)
+        assert "All agents must have the same device names defined" in str(exc_info.value)
 
-    def test_manual_mode_agents_with_subset_of_slots_rejected(
+    def test_manual_mode_agents_with_subset_of_device_names_rejected(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
-        """Test that agents where one has a subset of slots are rejected in MANUAL mode."""
+        """Test that agents where one has a subset of device names are rejected in MANUAL mode."""
         raw_config = {
             **default_raw_config,
             "resource": {
@@ -1536,8 +1536,8 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.5,
-                            SlotName("cuda.shares"): 1.0,
+                            DeviceName("cuda"): [DeviceId("cuda0")],
+                            DeviceName("rocm"): [DeviceId("rocm0")],
                         },
                     },
                 },
@@ -1547,7 +1547,7 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.5,
+                            DeviceName("cuda"): [DeviceId("cuda1")],
                         },
                     },
                 },
@@ -1556,7 +1556,7 @@ class TestResourceAllocationModes:
         with pytest.raises(ValidationError) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "All agents must have the same slots defined" in str(exc_info.value)
+        assert "All agents must have the same device names defined" in str(exc_info.value)
 
     def test_manual_mode_agents_with_empty_devices_on_some_agents(
         self,
@@ -1576,7 +1576,7 @@ class TestResourceAllocationModes:
                         "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.5,
+                            DeviceName("cuda"): [DeviceId("cuda0")],
                         },
                     },
                 },
@@ -1593,7 +1593,7 @@ class TestResourceAllocationModes:
         with pytest.raises(ValidationError) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "All agents must have the same slots defined" in str(exc_info.value)
+        assert "All agents must have the same device names defined" in str(exc_info.value)
 
     def test_manual_mode_agents_all_with_empty_devices_allowed(
         self,
@@ -1706,6 +1706,9 @@ class TestResourceAllocationModes:
                     "resource": {
                         "cpu": 8,
                         "mem": "32G",
+                        "devices": {
+                            DeviceName("cuda"): [],  # Empty list is valid
+                        },
                     },
                 },
             ],
@@ -1714,3 +1717,5 @@ class TestResourceAllocationModes:
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].resource.allocations is not None
         assert list(agent_configs[0].resource.allocations.devices[DeviceName("cuda")]) == []
+        assert agent_configs[1].resource.allocations is not None
+        assert list(agent_configs[1].resource.allocations.devices[DeviceName("cuda")]) == []
