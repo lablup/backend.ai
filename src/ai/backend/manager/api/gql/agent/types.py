@@ -423,7 +423,7 @@ class AgentV2GQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            base_conditions=[KernelConditions.by_agent_ids([str(self._agent_id)])],
+            base_conditions=[KernelConditions.by_agent_id(str(self._agent_id))],
         )
 
     @classmethod

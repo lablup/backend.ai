@@ -255,11 +255,11 @@ class KernelConditions:
         return inner
 
     @staticmethod
-    def by_agent_ids(agent_ids: Collection[str]) -> QueryCondition:
-        """Filter kernels by agent IDs."""
+    def by_agent_id(agent_id: str) -> QueryCondition:
+        """Filter kernels by agent ID."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelRow.agent.in_(agent_ids)
+            return KernelRow.agent == agent_id
 
         return inner
 
