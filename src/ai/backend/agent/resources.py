@@ -23,6 +23,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
+    Protocol,
     Self,
     TextIO,
     cast,
@@ -94,6 +95,156 @@ def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotNa
             )
         combined = {**combined, **mapping}
     return combined
+
+
+# Type alias for unified device assignments structure
+# Both AUTO_SPLIT (generated) and MANUAL (from config) produce this
+type DeviceAssignments = Mapping[AgentId, Mapping[DeviceName, Sequence[DeviceId]]]
+
+
+def _natural_sort_key(device_id: DeviceId) -> list[str | int]:
+    """
+    Generate a sort key for natural sorting of device IDs.
+
+    Splits the string into alternating text/number chunks, converting numbers
+    to integers for proper numeric comparison. This is the standard natural sort
+    algorithm used by file explorers (Finder, Explorer, etc.).
+
+    Handles numbers anywhere in the string, not just suffixes.
+
+    Examples:
+        "0" -> ["", 0, ""]
+        "10" -> ["", 10, ""]
+        "cuda0" -> ["cuda", 0, ""]
+        "cuda10" -> ["cuda", 10, ""]
+        "nvme0n1p1" -> ["nvme", 0, "n", 1, "p", 1, ""]
+        "device" -> ["device"]
+    """
+    import re
+
+    parts = re.split(r"(\d+)", str(device_id))
+    return [int(part) if part.isdigit() else part.lower() for part in parts]
+
+
+def distribute_devices(
+    device_ids: Sequence[DeviceId],
+    agent_ids: Sequence[AgentId],
+) -> dict[AgentId, list[DeviceId]]:
+    """
+    Distribute devices across agents using divmod fill-from-front.
+
+    For N devices across M agents:
+    - q, r = divmod(N, M)
+    - First r agents get (q + 1) devices
+    - Remaining agents get q devices
+    - Devices are assigned in natural sorted order, filling agents from front
+
+    Natural sort handles both numeric IDs (0, 1, 10) and prefixed IDs (cuda0, cuda10).
+
+    Args:
+        device_ids: Device IDs to distribute
+        agent_ids: Agent IDs to distribute to
+
+    Returns:
+        Mapping of agent_id -> assigned device IDs
+    """
+    if not agent_ids:
+        return {}
+
+    sorted_ids = sorted(device_ids, key=_natural_sort_key)
+    num_devices = len(sorted_ids)
+    q, r = divmod(num_devices, len(agent_ids))
+
+    result: dict[AgentId, list[DeviceId]] = {}
+    device_idx = 0
+
+    for i, agent_id in enumerate(agent_ids):
+        count = q + 1 if i < r else q
+        end_idx = min(device_idx + count, num_devices)
+        result[agent_id] = sorted_ids[device_idx:end_idx]
+        device_idx = end_idx
+
+    return result
+
+
+class DevicePartitioner(Protocol):
+    """
+    Protocol for generating device assignments in AUTO_SPLIT mode.
+
+    NOTE: This is ONLY used for AUTO_SPLIT. For MANUAL mode, assignments
+    are read directly from config. Both modes then use the same
+    _apply_device_assignments() function.
+    """
+
+    device_name: DeviceName
+
+    def generate_assignments(
+        self,
+        devices: Sequence[AbstractComputeDevice],
+        agent_ids: Sequence[AgentId],
+    ) -> Mapping[AgentId, Sequence[DeviceId]]:
+        """
+        Generate device assignments for AUTO_SPLIT mode.
+        Returns mapping of agent_id -> list of assigned device IDs.
+        """
+        ...
+
+
+class WholeDevicePartitioner:
+    """
+    Base partitioner for whole-device assignment.
+    Uses fill-from-front with divmod distribution.
+    """
+
+    def __init__(self, device_name: DeviceName) -> None:
+        self.device_name = device_name
+
+    def generate_assignments(
+        self,
+        devices: Sequence[AbstractComputeDevice],
+        agent_ids: Sequence[AgentId],
+    ) -> Mapping[AgentId, Sequence[DeviceId]]:
+        device_ids = [d.device_id for d in devices]
+        return distribute_devices(device_ids, agent_ids)
+
+
+class SharedDevicePartitioner:
+    """
+    Partitioner for devices shared by all agents.
+
+    All agents get the same device IDs.
+    Slot amount splitting is handled separately in _apply_device_assignments().
+    """
+
+    def __init__(self, device_name: DeviceName) -> None:
+        self.device_name = device_name
+
+    def generate_assignments(
+        self,
+        devices: Sequence[AbstractComputeDevice],
+        agent_ids: Sequence[AgentId],
+    ) -> Mapping[AgentId, Sequence[DeviceId]]:
+        if not devices:
+            raise ResourceError(
+                f"No devices found for {self.device_name} plugin. "
+                "This is a fatal configuration error."
+            )
+        if len(devices) > 1:
+            log.warning(
+                "Plugin {} has multiple devices ({}), using only the first one",
+                self.device_name,
+                [d.device_id for d in devices],
+            )
+        device_id = devices[0].device_id
+        return {agent_id: [device_id] for agent_id in agent_ids}
+
+
+@dataclass
+class GlobalDeviceInfo:
+    """Global device info without alloc_map - used for system-wide view."""
+
+    plugin: AbstractComputePlugin
+    devices: Collection[AbstractComputeDevice]
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -519,6 +670,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 type ComputersMap = Mapping[DeviceName, ComputerContext]
+type GlobalDeviceMap = Mapping[DeviceName, GlobalDeviceInfo]
 type SlotsMap = Mapping[SlotName, Decimal]
 
 
@@ -527,7 +679,7 @@ class ResourceAllocator(aobject):
     etcd: AsyncEtcd
     agent_configs: Sequence[AgentUnifiedConfig]
 
-    computers: ComputersMap
+    global_devices: GlobalDeviceMap
     available_total_slots: SlotsMap
 
     agent_computers: Mapping[AgentId, ComputersMap]
@@ -545,39 +697,34 @@ class ResourceAllocator(aobject):
 
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
-        computers = await self._load_resources()
+        self.global_devices = await self._create_global_devices()
 
-        computer_contexts: dict[DeviceName, ComputerContext] = {}
-        for name, computer in computers.items():
-            devices = await computer.list_devices()
-            alloc_map = await computer.create_alloc_map()
-            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
-        self.computers = computer_contexts
-        total_slots = self._calculate_total_slots()
+        total_slots = await self._calculate_total_slots()
         self.available_total_slots = self._calculate_available_total_slots(total_slots)
 
-        agent_computers = {}
-        agent_reserved_slots = {}
-        agent_resource_scaling_factor = {}
-        for agent_idx, agent_config in enumerate(self.agent_configs):
-            res = await self._calculate_agent_partition(agent_idx, agent_config, total_slots)
-            agent_computer, reserved_slots, resource_scaling_factor = res
+        # Build agent computers with device assignments (new flow)
+        self.agent_computers = await self._build_agent_computers()
 
+        # Calculate reserved slots and resource scaling factor from allocated slots
+        agent_reserved_slots: dict[AgentId, SlotsMap] = {}
+        agent_resource_scaling_factor: dict[AgentId, SlotsMap] = {}
+        for agent_config in self.agent_configs:
             agent_id = AgentId(agent_config.agent.defaulted_id)
-            agent_computers[agent_id] = agent_computer
+            allocated_slots = self._get_agent_allocated_slots(agent_id)
+            reserved_slots = self._calculate_reserved_slots(allocated_slots, total_slots)
+            resource_scaling_factor = self._calculate_resource_scaling_factor(allocated_slots)
+
             agent_reserved_slots[agent_id] = reserved_slots
             agent_resource_scaling_factor[agent_id] = resource_scaling_factor
 
-        self.agent_computers = agent_computers
         self.agent_reserved_slots = agent_reserved_slots
         self.agent_resource_scaling_factor = agent_resource_scaling_factor
-
         self._ensure_slots_are_not_overallocated()
 
     async def __aexit__(self, *exc_info) -> None:
-        for _, computer in self.computers.items():
+        for _, device_info in self.global_devices.items():
             try:
-                await computer.instance.cleanup()
+                await device_info.plugin.cleanup()
             except Exception:
                 log.exception("Failed to clean up computer instance:")
 
@@ -625,11 +772,51 @@ class ResourceAllocator(aobject):
             raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
         return self.agent_resource_scaling_factor[agent_id]
 
-    def _calculate_total_slots(self) -> SlotsMap:
+    @cached_property
+    def _cpu_device_name(self) -> DeviceName:
+        """Find CPU device name by checking for SlotTypes.COUNT in plugin's slot_types."""
+        for device_info in self.global_devices.values():
+            slot_types_dict = dict(device_info.plugin.slot_types)
+            if SlotTypes.COUNT in slot_types_dict.values():
+                return device_info.plugin.key
+        raise InvalidResourceConfigError("CPU plugin not found")
+
+    @cached_property
+    def _mem_device_name(self) -> DeviceName:
+        """Find memory device name by checking for SlotName('mem') with SlotTypes.BYTES."""
+        for device_info in self.global_devices.values():
+            slot_types_dict = dict(device_info.plugin.slot_types)
+            if (
+                SlotName("mem") in slot_types_dict
+                and slot_types_dict[SlotName("mem")] == SlotTypes.BYTES
+            ):
+                return device_info.plugin.key
+        raise InvalidResourceConfigError("Memory plugin not found")
+
+    def _is_memory_plugin(self, plugin: AbstractComputePlugin) -> bool:
+        """Check if a plugin is the memory plugin by examining its slot types."""
+        slot_types_dict = dict(plugin.slot_types)
+        return (
+            SlotName("mem") in slot_types_dict
+            and slot_types_dict[SlotName("mem")] == SlotTypes.BYTES
+        )
+
+    async def _create_global_devices(self) -> GlobalDeviceMap:
+        """Load plugins and list devices - no alloc_map creation."""
+        computer_plugins = await self._load_resources()
+
+        devices: dict[DeviceName, GlobalDeviceInfo] = {}
+        for name, plugin in computer_plugins.items():
+            device_list = await plugin.list_devices()
+            devices[name] = GlobalDeviceInfo(plugin, device_list)
+        return devices
+
+    async def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for device in self.computers.values():
-            for slot_info in device.alloc_map.device_slots.values():
-                total_slots[slot_info.slot_name] += slot_info.amount
+        for device_info in self.global_devices.values():
+            slots = await device_info.plugin.available_slots()
+            for slot_name, amount in slots.items():
+                total_slots[slot_name] += amount
         return total_slots
 
     def _calculate_available_total_slots(self, total_slots: SlotsMap) -> SlotsMap:
@@ -649,106 +836,6 @@ class ResourceAllocator(aobject):
                 )
             available_slots[slot_name] = total_slot - reserved_slot
         return available_slots
-
-    async def _calculate_agent_partition(
-        self,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
-        total_slots: SlotsMap,
-    ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
-        agent_computers: dict[DeviceName, ComputerContext] = {}
-        devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
-        devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
-        for device_name, ctx in self.computers.items():
-            device_allocated_slots = self._calculate_device_slots(
-                ctx.alloc_map, agent_idx, agent_config
-            )
-            devices_allocated_slots.append(device_allocated_slots)
-
-            agent_alloc_map = await ctx.instance.create_alloc_map()
-            agent_computers[device_name] = ComputerContext(
-                ctx.instance, ctx.devices, agent_alloc_map
-            )
-
-            device_reserved_slots = self._calculate_reserved_slots(
-                device_allocated_slots, total_slots
-            )
-            devices_reserved_slots.append(device_reserved_slots)
-
-        reserved_slots = _combine_mappings(devices_reserved_slots)
-        resource_scaling_factor = self._calculate_resource_scaling_factor(
-            allocated_slots=_combine_mappings(devices_allocated_slots)
-        )
-
-        return agent_computers, reserved_slots, resource_scaling_factor
-
-    def _calculate_device_slots(
-        self,
-        alloc_map: AbstractAllocMap,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
-    ) -> SlotsMap:
-        return {
-            device_slot.slot_name: self._calculate_device_slot(
-                device_slot.slot_name,
-                agent_idx,
-                agent_config,
-                type(alloc_map),
-            )
-            for device_slot in alloc_map.device_slots.values()
-        }
-
-    def _calculate_device_slot(
-        self,
-        slot_name: SlotName,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
-        alloc_map_type: type[AbstractAllocMap],
-    ) -> Decimal:
-        match agent_config.resource.allocation_mode:
-            case ResourceAllocationMode.SHARED:
-                return self._calculate_device_slot_shared(slot_name)
-            case ResourceAllocationMode.AUTO_SPLIT:
-                return self._calculate_device_slot_auto_split(slot_name, alloc_map_type, agent_idx)
-            case ResourceAllocationMode.MANUAL:
-                return self._calculate_device_slot_manual(slot_name, agent_config)
-
-    def _calculate_device_slot_shared(self, slot_name: SlotName) -> Decimal:
-        return self.available_total_slots[slot_name]
-
-    def _calculate_device_slot_auto_split(
-        self,
-        slot_name: SlotName,
-        alloc_map_type: type[AbstractAllocMap],
-        agent_idx: int,
-    ) -> Decimal:
-        available_total_slot = self.available_total_slots[slot_name]
-        if alloc_map_type is DiscretePropertyAllocMap:
-            slot, slot_extra = divmod(available_total_slot, self.num_agents)
-            remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
-            return slot + remainder_value
-        if alloc_map_type is FractionAllocMap:
-            return available_total_slot / self.num_agents
-        raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
-
-    def _calculate_device_slot_manual(
-        self,
-        slot_name: SlotName,
-        agent_config: AgentUnifiedConfig,
-    ) -> Decimal:
-        resource_config = agent_config.resource
-        if resource_config.allocations is None:
-            raise InvalidResourceConfigError("Resource allocations are not configured.")
-
-        if slot_name == SlotName("cpu"):
-            return Decimal(resource_config.allocations.cpu)
-        if slot_name == SlotName("mem"):
-            return Decimal(resource_config.allocations.mem)
-        if slot_name not in resource_config.allocations.devices:
-            raise ValueError(
-                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
-            )
-        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -798,6 +885,355 @@ class ResourceAllocator(aobject):
                     f"all agents when total capacity is {available_total_slot}."
                 )
 
+    async def _build_agent_computers(self) -> Mapping[AgentId, ComputersMap]:
+        """Build agent computer contexts with device partitioning."""
+
+        # Create base computer contexts for all agents
+        agent_computers = await self._create_base_agent_computers()
+
+        match self.local_config.resource.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                # No partitioning needed - all agents share all devices
+                return agent_computers
+
+            case ResourceAllocationMode.AUTO_SPLIT:
+                # Generate assignments via partitioners
+                assignments = self._generate_auto_split_assignments()
+                return self._apply_device_assignments(agent_computers, assignments)
+
+            case ResourceAllocationMode.MANUAL:
+                # Read assignments from config
+                assignments = self._read_manual_assignments()
+                self._validate_assignments(assignments)
+                return self._apply_device_assignments(agent_computers, assignments)
+
+    async def _create_base_agent_computers(self) -> dict[AgentId, ComputersMap]:
+        """Create base ComputerContext for each agent with all devices."""
+        agent_computers: dict[AgentId, ComputersMap] = {}
+
+        for agent_config in self.agent_configs:
+            agent_id = AgentId(agent_config.agent.defaulted_id)
+            computers: dict[DeviceName, ComputerContext] = {}
+            for device_name, device_info in self.global_devices.items():
+                computers[device_name] = ComputerContext(
+                    instance=device_info.plugin,
+                    devices=list(device_info.devices),
+                    alloc_map=await device_info.plugin.create_alloc_map(),
+                )
+            agent_computers[agent_id] = computers
+
+        return agent_computers
+
+    def _generate_auto_split_assignments(self) -> DeviceAssignments:
+        """
+        Generate device assignments for AUTO_SPLIT mode.
+        Uses partitioners to compute fill-from-front distribution.
+        """
+        agent_ids = [AgentId(cfg.agent.defaulted_id) for cfg in self.agent_configs]
+        assignments: dict[AgentId, dict[DeviceName, list[DeviceId]]] = {
+            agent_id: {} for agent_id in agent_ids
+        }
+
+        for device_name, device_info in self.global_devices.items():
+            partitioner = self._get_partitioner(device_info)
+            device_assignments = partitioner.generate_assignments(
+                list(device_info.devices), agent_ids
+            )
+
+            for agent_id, device_ids in device_assignments.items():
+                assignments[agent_id][device_name] = list(device_ids)
+
+        return assignments
+
+    def _get_partitioner(self, device_info: GlobalDeviceInfo) -> DevicePartitioner:
+        """Get the appropriate partitioner for a device type based on plugin characteristics."""
+        plugin = device_info.plugin
+
+        # Memory is special: all agents share the same device ID
+        if self._is_memory_plugin(plugin):
+            return SharedDevicePartitioner(plugin.key)
+
+        # Everything else (CPU, accelerators) uses whole-device assignment
+        return WholeDevicePartitioner(plugin.key)
+
+    def _read_manual_assignments(self) -> DeviceAssignments:
+        """
+        Read device assignments from config for MANUAL mode.
+
+        CPU: count-based allocation, fill from front
+        Memory: all agents share the same device
+        Accelerators: explicit device IDs from config
+        """
+        # Pre-sort CPU devices for fill-from-front allocation
+        cpu_devices = sorted(
+            self.global_devices[self._cpu_device_name].devices, key=lambda d: d.device_id
+        )
+        cpu_offset = 0
+
+        # Get memory device ID (all agents share this)
+        mem_info = self.global_devices[self._mem_device_name]
+        mem_devices = list(mem_info.devices)
+        if not mem_devices:
+            raise ResourceError("No memory devices found. This is a fatal configuration error.")
+        mem_device_id = mem_devices[0].device_id
+
+        assignments: dict[AgentId, dict[DeviceName, list[DeviceId]]] = {}
+
+        for agent_config in self.agent_configs:
+            allocations = agent_config.resource.allocations
+            if allocations is None:
+                continue
+
+            agent_id = AgentId(agent_config.agent.defaulted_id)
+            assignments[agent_id] = {}
+
+            # CPU: count-based, fill from front
+            if allocations.cpu is not None:
+                cpu_count = allocations.cpu
+                end_idx = min(cpu_offset + cpu_count, len(cpu_devices))
+                assignments[agent_id][self._cpu_device_name] = [
+                    d.device_id for d in cpu_devices[cpu_offset:end_idx]
+                ]
+                cpu_offset = end_idx
+
+            # Memory: shared device
+            if allocations.mem is not None:
+                assignments[agent_id][self._mem_device_name] = [mem_device_id]
+
+            # Accelerators: explicit device IDs from config
+            for device_name, device_ids in allocations.devices.items():
+                assignments[agent_id][device_name] = list(device_ids)
+
+        return assignments
+
+    def _validate_assignments(self, assignments: DeviceAssignments) -> None:
+        """Validate device assignments from MANUAL mode config."""
+        # Collect all device IDs per device type across all agents
+        all_assignments_by_device: dict[DeviceName, dict[AgentId, Sequence[DeviceId]]] = (
+            defaultdict(dict)
+        )
+        for agent_id, agent_assignments in assignments.items():
+            for device_name, device_ids in agent_assignments.items():
+                all_assignments_by_device[device_name][agent_id] = device_ids
+
+        for device_name, agent_device_assignments in all_assignments_by_device.items():
+            self._validate_device_names_exist(device_name)
+            for device_ids in agent_device_assignments.values():
+                self._validate_device_ids_exist(device_name, device_ids)
+            self._validate_device_mutual_exclusivity(device_name, agent_device_assignments)
+            self._warn_unassigned_devices(device_name, agent_device_assignments)
+
+    def _validate_device_names_exist(self, device_name: DeviceName) -> None:
+        """Raises InvalidResourceConfigError if DeviceName doesn't exist."""
+        if device_name not in self.global_devices:
+            raise InvalidResourceConfigError(f"Unknown device type: {device_name}")
+
+    def _validate_device_ids_exist(
+        self,
+        device_name: DeviceName,
+        device_ids: Sequence[DeviceId],
+    ) -> None:
+        """Raises InvalidResourceConfigError if any DeviceId doesn't exist."""
+        available = {d.device_id for d in self.global_devices[device_name].devices}
+        for dev_id in device_ids:
+            if dev_id not in available:
+                raise InvalidResourceConfigError(
+                    f"Device {dev_id} not found in {device_name}. Available: {sorted(available)}"
+                )
+
+    def _validate_device_mutual_exclusivity(
+        self,
+        device_name: DeviceName,
+        all_assignments: Mapping[AgentId, Sequence[DeviceId]],
+    ) -> None:
+        """Raises InvalidResourceConfigError if any device is assigned to multiple agents."""
+        # Memory is special - all agents can share the same "root" device ID
+        # (Memory plugin: DeviceName="mem", DeviceId="root")
+        device_info = self.global_devices[device_name]
+        if self._is_memory_plugin(device_info.plugin):
+            return
+
+        seen: dict[DeviceId, AgentId] = {}
+        for agent_id, device_ids in all_assignments.items():
+            for dev_id in device_ids:
+                if dev_id in seen:
+                    raise InvalidResourceConfigError(
+                        f"Device {dev_id} assigned to both {seen[dev_id]} and {agent_id}"
+                    )
+                seen[dev_id] = agent_id
+
+    def _warn_unassigned_devices(
+        self,
+        device_name: DeviceName,
+        all_assignments: Mapping[AgentId, Sequence[DeviceId]],
+    ) -> None:
+        """Logs warning for devices not assigned to any agent."""
+        # Memory is special - "root" is always assigned to all
+        device_info = self.global_devices[device_name]
+        if self._is_memory_plugin(device_info.plugin):
+            return
+
+        assigned: set[DeviceId] = set()
+        for device_ids in all_assignments.values():
+            assigned.update(device_ids)
+
+        available = {d.device_id for d in device_info.devices}
+        unassigned = available - assigned
+        if unassigned:
+            log.warning(
+                "Devices not assigned to any agent: {}={}",
+                device_name,
+                sorted(unassigned),
+            )
+
+    def _apply_device_assignments(
+        self,
+        agent_computers: Mapping[AgentId, ComputersMap],
+        assignments: DeviceAssignments,
+    ) -> Mapping[AgentId, ComputersMap]:
+        """
+        Apply device assignments to agent computers.
+
+        SHARED CODE for both AUTO_SPLIT and MANUAL modes.
+
+        For most devices (CPU, accelerators):
+        - Filter devices to only assigned ones
+        - Keep original slot amounts (each device = one slot)
+
+        For memory:
+        - All agents share the same device ID
+        - Slot AMOUNT must be divided among agents (AUTO_SPLIT)
+          or set to configured value (MANUAL)
+        - This is why memory needs _calculate_memory_slot_amounts()
+        """
+        result: dict[AgentId, dict[DeviceName, ComputerContext]] = {}
+
+        log.debug(
+            "_apply_device_assignments: assignments={}",
+            {
+                str(k): {str(dn): [str(d) for d in dv] for dn, dv in v.items()}
+                for k, v in assignments.items()
+            },
+        )
+
+        for agent_id, computers in agent_computers.items():
+            agent_assignments = assignments.get(agent_id, {})
+            result[agent_id] = {}
+
+            for device_name, ctx in computers.items():
+                assigned_ids = set(agent_assignments.get(device_name, []))
+
+                log.debug(
+                    "_apply_device_assignments: agent={}, device={}, assigned_ids={}, "
+                    "original_device_slots={}",
+                    agent_id,
+                    device_name,
+                    sorted(str(d) for d in assigned_ids),
+                    sorted(str(d) for d in ctx.alloc_map.device_slots.keys()),
+                )
+
+                # Filter devices to only assigned ones
+                filtered_devices = [d for d in ctx.devices if d.device_id in assigned_ids]
+
+                # Build new device_slots with only assigned devices
+                # Memory: amounts need to be recalculated (divided for AUTO_SPLIT)
+                # Other devices: keep original amounts
+                if self._is_memory_plugin(ctx.instance) and assigned_ids:
+                    new_amounts = self._calculate_memory_slot_amounts(agent_id)
+                    new_device_slots = {
+                        dev_id: DeviceSlotInfo(
+                            slot_type=ctx.alloc_map.device_slots[dev_id].slot_type,
+                            slot_name=ctx.alloc_map.device_slots[dev_id].slot_name,
+                            amount=new_amounts[dev_id],
+                        )
+                        for dev_id in assigned_ids
+                        if dev_id in ctx.alloc_map.device_slots
+                    }
+                else:
+                    new_device_slots = {
+                        dev_id: slot_info
+                        for dev_id, slot_info in ctx.alloc_map.device_slots.items()
+                        if dev_id in assigned_ids
+                    }
+
+                log.debug(
+                    "_apply_device_assignments: agent={}, device={}, new_device_slots={}",
+                    agent_id,
+                    device_name,
+                    {str(k): str(v.amount) for k, v in new_device_slots.items()},
+                )
+
+                # Update alloc_map with filtered device slots
+                ctx.alloc_map.set_device_slots(new_device_slots)
+
+                result[agent_id][device_name] = ComputerContext(
+                    instance=ctx.instance,
+                    devices=filtered_devices,
+                    alloc_map=ctx.alloc_map,
+                )
+
+        return result
+
+    def _calculate_memory_slot_amounts(
+        self,
+        agent_id: AgentId,
+    ) -> dict[DeviceId, Decimal]:
+        """
+        Calculate memory slot amount for an agent.
+
+        Memory is special: single shared device, amount-based splitting.
+        """
+        mem_info = self.global_devices[self._mem_device_name]
+        mem_devices = list(mem_info.devices)
+        if not mem_devices:
+            raise ResourceError("No memory devices found. This is a fatal configuration error.")
+        device_id = mem_devices[0].device_id
+        total_mem = Decimal(sum(d.memory_size for d in mem_devices))
+
+        match self.local_config.resource.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                return {device_id: total_mem}
+
+            case ResourceAllocationMode.AUTO_SPLIT:
+                per_agent = total_mem / self.num_agents
+                return {device_id: per_agent}
+
+            case ResourceAllocationMode.MANUAL:
+                # Find agent config and get configured memory
+                for cfg in self.agent_configs:
+                    if AgentId(cfg.agent.defaulted_id) == agent_id:
+                        if cfg.resource.allocations and cfg.resource.allocations.mem:
+                            return {device_id: Decimal(cfg.resource.allocations.mem)}
+                return {device_id: Decimal(0)}
+
+    def _get_agent_allocated_slots(self, agent_id: AgentId) -> SlotsMap:
+        """
+        Get allocated slots for an agent by summing up slot amounts from assigned devices.
+
+        The result is capped by available_total_slots (total - system reserved).
+        This ensures that reserved_slots correctly reflects what the agent cannot use,
+        including system-reserved resources.
+        """
+        if agent_id not in self.agent_computers:
+            raise AgentIdNotFoundError(f"Agent ID {agent_id} not found in computers")
+
+        allocated_slots: dict[SlotName, Decimal] = {}
+        for device_name, ctx in self.agent_computers[agent_id].items():
+            for device_id, slot_info in ctx.alloc_map.device_slots.items():
+                slot_name = slot_info.slot_name
+                if slot_name not in allocated_slots:
+                    allocated_slots[slot_name] = Decimal(0)
+                allocated_slots[slot_name] += slot_info.amount
+
+        # Cap by available_total_slots so reserved_slots correctly includes system reserve
+        for slot_name in allocated_slots:
+            if slot_name in self.available_total_slots:
+                allocated_slots[slot_name] = min(
+                    allocated_slots[slot_name], self.available_total_slots[slot_name]
+                )
+
+        return allocated_slots
+
     @cached_property
     def _agent_discovery(self) -> AbstractAgentDiscovery:
         backend = self.local_config.agent_common.backend
@@ -811,7 +1247,7 @@ class ResourceAllocator(aobject):
 
     async def _scan_available_resources(self) -> Mapping[SlotName, Decimal]:
         return await self._agent_discovery.scan_available_resources({
-            name: cctx.instance for name, cctx in self.computers.items()
+            name: device_info.plugin for name, device_info in self.global_devices.items()
         })
 
 
