@@ -338,7 +338,7 @@ Added in 26.2.0.
 
 Input for creating an alias for an image by ID.
 """
-input AliasImageByIdInputGQL {
+input AliasImageInputGQL {
   """The ID of the image to alias."""
   imageId: ID!
 
@@ -351,7 +351,7 @@ Added in 26.2.0.
 
 Result of creating an alias for an image.
 """
-type AliasImageByIdResult {
+type AliasImageResult {
   """The ID of the aliased image."""
   imageId: ID!
 
@@ -1023,7 +1023,7 @@ Added in 26.2.0.
 
 Input for clearing custom resource limits for an image.
 """
-input ClearImageResourceLimitByIdInputGQL {
+input ClearImageResourceLimitInputGQL {
   """The ID of the image to clear resource limits for."""
   imageId: ID!
 }
@@ -1033,7 +1033,7 @@ Added in 26.2.0.
 
 Result of clearing custom resource limits for an image.
 """
-type ClearImageResourceLimitByIdResult {
+type ClearImageResourceLimitResult {
   """The image with cleared resource limits."""
   image: ImageV2!
 }
@@ -2041,7 +2041,7 @@ Added in 26.2.0.
 
 Input for forgetting an image by ID.
 """
-input ForgetImageByIdInputGQL {
+input ForgetImageInputGQL {
   """The ID of the image to forget."""
   imageId: ID!
 }
@@ -2052,7 +2052,7 @@ Added in 26.2.0.
 Result of forgetting an image by ID. The image is marked as DELETED
 but not removed from the database.
 """
-type ForgetImageByIdResult {
+type ForgetImageResult {
   """The forgotten image."""
   image: ImageV2!
 }
@@ -3012,7 +3012,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  forgetImage(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult!
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
 
   """
   Added in 26.2.0.
@@ -3024,7 +3024,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  purgeImage(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult!
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
 
   """
   Added in 26.2.0.
@@ -3036,7 +3036,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN
   """
-  aliasImage(input: AliasImageByIdInputGQL!): AliasImageByIdResult!
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult!
 
   """
   Added in 26.2.0.
@@ -3057,7 +3057,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN
   """
-  clearImageResourceLimit(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult!
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
 }
 
 """An object with a Globally Unique ID"""
@@ -3496,12 +3496,12 @@ Added in 26.2.0.
 
 Input for purging an image by ID.
 """
-input PurgeImageByIdInputGQL {
+input PurgeImageInputGQL {
   """The ID of the image to purge."""
   imageId: ID!
 
   """Options for purging the image."""
-  options: PurgeImageByIdOptionsGQL = null
+  options: PurgeImageOptionsGQL = null
 }
 
 """
@@ -3509,7 +3509,7 @@ Added in 26.2.0.
 
 Options for purging an image.
 """
-input PurgeImageByIdOptionsGQL {
+input PurgeImageOptionsGQL {
   """
   Untag the deleted image from the registry. Only available for HarborV2 registries.
   """
@@ -3522,7 +3522,7 @@ Added in 26.2.0.
 Result of purging an image by ID. The image is completely removed
 from the database.
 """
-type PurgeImageByIdResult {
+type PurgeImageResult {
   """The purged image data."""
   image: ImageV2!
 }

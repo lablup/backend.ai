@@ -553,7 +553,7 @@ Added in 26.2.0.
 
 Input for creating an alias for an image by ID.
 """
-input AliasImageByIdInputGQL
+input AliasImageInputGQL
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the image to alias."""
@@ -568,7 +568,7 @@ Added in 26.2.0.
 
 Result of creating an alias for an image.
 """
-type AliasImageByIdResult
+type AliasImageResult
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the aliased image."""
@@ -1598,7 +1598,7 @@ Added in 26.2.0.
 
 Input for clearing custom resource limits for an image.
 """
-input ClearImageResourceLimitByIdInputGQL
+input ClearImageResourceLimitInputGQL
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the image to clear resource limits for."""
@@ -1610,7 +1610,7 @@ Added in 26.2.0.
 
 Result of clearing custom resource limits for an image.
 """
-type ClearImageResourceLimitByIdResult
+type ClearImageResourceLimitResult
   @join__type(graph: STRAWBERRY)
 {
   """The image with cleared resource limits."""
@@ -3932,7 +3932,7 @@ Added in 26.2.0.
 
 Input for forgetting an image by ID.
 """
-input ForgetImageByIdInputGQL
+input ForgetImageInputGQL
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the image to forget."""
@@ -3945,7 +3945,7 @@ Added in 26.2.0.
 Result of forgetting an image by ID. The image is marked as DELETED
 but not removed from the database.
 """
-type ForgetImageByIdResult
+type ForgetImageResult
   @join__type(graph: STRAWBERRY)
 {
   """The forgotten image."""
@@ -6423,7 +6423,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  forgetImage(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult! @join__field(graph: STRAWBERRY)
+  forgetImage(input: ForgetImageInputGQL!): ForgetImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6435,7 +6435,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  purgeImage(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult! @join__field(graph: STRAWBERRY)
+  purgeImage(input: PurgeImageInputGQL!): PurgeImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6447,7 +6447,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN
   """
-  aliasImage(input: AliasImageByIdInputGQL!): AliasImageByIdResult! @join__field(graph: STRAWBERRY)
+  aliasImage(input: AliasImageInputGQL!): AliasImageResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6468,7 +6468,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN
   """
-  clearImageResourceLimit(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult! @join__field(graph: STRAWBERRY)
+  clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -7109,14 +7109,24 @@ Added in 26.2.0.
 
 Input for purging an image by ID.
 """
-input PurgeImageByIdInputGQL
+input PurgeImageInputGQL
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the image to purge."""
   imageId: ID!
 
   """Options for purging the image."""
-  options: PurgeImageByIdOptionsGQL = null
+  options: PurgeImageOptionsGQL = null
+}
+
+"""Added in 25.10.0."""
+input PurgeImageOptions
+  @join__type(graph: GRAPHENE)
+{
+  """
+  Untag the deleted image from the registry. Only available in the HarborV2 registry.
+  """
+  remove_from_registry: Boolean = false
 }
 
 """
@@ -7124,7 +7134,7 @@ Added in 26.2.0.
 
 Options for purging an image.
 """
-input PurgeImageByIdOptionsGQL
+input PurgeImageOptionsGQL
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -7139,21 +7149,11 @@ Added in 26.2.0.
 Result of purging an image by ID. The image is completely removed
 from the database.
 """
-type PurgeImageByIdResult
+type PurgeImageResult
   @join__type(graph: STRAWBERRY)
 {
   """The purged image data."""
   image: ImageV2!
-}
-
-"""Added in 25.10.0."""
-input PurgeImageOptions
-  @join__type(graph: GRAPHENE)
-{
-  """
-  Untag the deleted image from the registry. Only available in the HarborV2 registry.
-  """
-  remove_from_registry: Boolean = false
 }
 
 """Added in 25.6.0."""
