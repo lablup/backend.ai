@@ -1988,17 +1988,16 @@ input DomainUserV2Scope {
 }
 
 """
-Added in 26.1.0. Information about a dotfile to be provisioned in a container.
+Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
 """
-type DotfileInfo {
-  """The file path where the dotfile will be placed (relative or absolute)."""
-  path: String!
+input DomainWeightInputItem {
+  """Name of the domain to update weight for."""
+  domainName: String!
 
-  """The content of the dotfile."""
-  data: String!
-
-  """The file permission in octal string format (e.g., '0644')."""
-  perm: String!
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
 }
 
 """Input for email message settings"""
@@ -2560,36 +2559,9 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
-Added in 26.1.0. A collection of devices of a specific type attached to a kernel. Groups devices by their device type (e.g., 'cuda', 'rocm').
-"""
-type KernelAttachedDeviceEntry {
-  """Type of the device (e.g., 'cuda', 'rocm', 'tpu')."""
-  deviceType: String!
-
-  """List of device instances of this type."""
-  devices: [KernelDeviceModelInfo!]!
-}
-
-"""
-Added in 26.1.0. A collection of all devices attached to a kernel. Organized by device type, each containing multiple device instances.
-"""
-type KernelAttachedDevices {
-  """
-  List of device type entries, each containing attached device instances.
-  """
-  entries: [KernelAttachedDeviceEntry!]!
-}
-
-"""
 Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
 """
 type KernelClusterInfo {
-  """The clustering mode (e.g., single-node, multi-node)."""
-  clusterMode: String!
-
-  """Total number of nodes in the cluster."""
-  clusterSize: Int!
-
   """The role of this kernel in the cluster (e.g., main, sub)."""
   clusterRole: String!
 
@@ -2613,74 +2585,11 @@ type KernelConnectionV2 {
   count: Int!
 }
 
-"""
-Added in 26.1.0. Information about a specific device model attached to a kernel. Contains device identification and capacity information.
-"""
-type KernelDeviceModelInfo {
-  """Unique identifier for the device instance."""
-  deviceId: String!
-
-  """Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."""
-  modelName: String!
-
-  """Device-specific capacity and capability information."""
-  data: JSON!
-}
-
 """Added in 26.1.0. Filter criteria for querying kernels."""
 input KernelFilter {
   id: UUID = null
   status: KernelStatusFilter = null
   sessionId: UUID = null
-}
-
-"""Added in 26.1.0. Container image information for a kernel."""
-type KernelImageInfo {
-  """
-  The canonical reference of the container image (e.g., registry/repo:tag). May be null for legacy kernels with missing image data.
-  """
-  reference: String
-
-  """The container registry hosting the image."""
-  registry: String
-
-  """The tag of the container image."""
-  tag: String
-
-  """
-  The CPU architecture the image is built for (e.g., x86_64, aarch64). May be null for legacy kernels.
-  """
-  architecture: String
-}
-
-"""Added in 26.1.0. Internal data stored with the kernel for system use."""
-type KernelInternalData {
-  """List of dotfiles to be provisioned in the kernel's filesystem."""
-  dotfiles: [DotfileInfo!]
-
-  """SSH keypair for secure access to the kernel."""
-  sshKeypair: SSHKeypair
-
-  """Path to the model definition file for inference services."""
-  modelDefinitionPath: String
-
-  """Runtime variant identifier (e.g., 'custom')."""
-  runtimeVariant: String
-
-  """Whether sudo is enabled for this session."""
-  sudoSessionEnabled: Boolean
-
-  """Whether to block service ports. If true, no services can be started."""
-  blockServicePorts: Boolean
-
-  """Whether to prevent vfolder mounts (except .logs directory)."""
-  preventVfolderMounts: Boolean
-
-  """Docker credentials for private registry access."""
-  dockerCredentials: JSON
-
-  """List of domain socket paths to proxy into the container."""
-  domainSocketProxies: [String!]
 }
 
 """Added in 26.1.0. Lifecycle and status information for a kernel."""
@@ -2694,20 +2603,6 @@ type KernelLifecycleInfo {
   """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
   result: SessionResult!
 
-  """Timestamp when the kernel last changed status."""
-  statusChanged: DateTime
-
-  """Human-readable information about the current status."""
-  statusInfo: String
-
-  """
-  Structured data about the current status including error, scheduler, or lifecycle information.
-  """
-  statusData: KernelStatusData
-
-  """History of status transitions with timestamps."""
-  statusHistory: KernelStatusHistory
-
   """Timestamp when the kernel was created."""
   createdAt: DateTime
 
@@ -2716,50 +2611,15 @@ type KernelLifecycleInfo {
 
   """Scheduled start time for the kernel, if applicable."""
   startsAt: DateTime
-
-  """Timestamp when the kernel was last seen active."""
-  lastSeen: DateTime
-}
-
-"""Added in 26.1.0. Additional metadata for a kernel."""
-type KernelMetadataInfo {
-  """URL to call back when kernel status changes."""
-  callbackUrl: String
-
-  """Internal data stored with the kernel for system use."""
-  internalData: KernelInternalData
-}
-
-"""Added in 26.1.0. Metrics and statistics for a kernel."""
-type KernelMetricsInfo {
-  """The number of queries/executions performed by this kernel."""
-  numQueries: Int!
-
-  """
-  The last collected statistics for this kernel including CPU, memory, I/O, and network metrics.
-  """
-  lastStat: KernelStat
 }
 
 """Added in 26.1.0. Network configuration for a kernel."""
 type KernelNetworkInfo {
-  """The hostname or IP address where the kernel is accessible."""
-  kernelHost: String
-
-  """The port for REPL input stream."""
-  replInPort: Int!
-
-  """The port for REPL output stream."""
-  replOutPort: Int!
-
   """Collection of service ports exposed by this kernel."""
   servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
   preopenPorts: [Int!]
-
-  """Whether the kernel uses host network mode."""
-  useHostNetwork: Boolean!
 }
 
 """Added in 26.1.0. Ordering specification for kernels."""
@@ -2775,59 +2635,27 @@ enum KernelOrderField {
 
 """Added in 26.1.0. Resource allocation information for a kernel."""
 type KernelResourceInfo {
-  """The scaling group this kernel is assigned to."""
-  scalingGroup: String
-
   """
   The ID of the agent running this kernel. Null if not yet assigned or hidden.
   """
   agentId: String
 
-  """The network address of the agent. Null if not yet assigned or hidden."""
-  agentAddr: String
+  """The resource group (scaling group) this kernel is assigned to."""
+  resourceGroupName: String
 
   """
   The container ID on the agent. Null if container not yet created or hidden.
   """
   containerId: String
 
-  """
-  The resource slots currently occupied by this kernel.
-  Contains entries with resource types (e.g., cpu, mem, cuda.shares) and their quantities.
-  """
-  occupiedSlots: ResourceSlot!
-
-  """
-  The resource slots originally requested for this kernel.
-  May differ from occupied_slots due to scheduling adjustments.
-  """
-  requestedSlots: ResourceSlot!
+  """Resource allocation with requested and used slots."""
+  allocation: ResourceAllocation!
 
   """The fractional resource shares occupied by this kernel."""
-  occupiedShares: ResourceSlot!
-
-  """
-  Information about attached devices (e.g., GPUs) allocated to this kernel.
-  """
-  attachedDevices: KernelAttachedDevices
+  shares: ResourceSlot!
 
   """Additional resource options and configurations for this kernel."""
   resourceOpts: ResourceOpts
-}
-
-"""Added in 26.1.0. Runtime configuration for a kernel."""
-type KernelRuntimeInfo {
-  """Environment variables set for this kernel."""
-  environ: [String!]
-
-  """List of virtual folders mounted to this kernel."""
-  vfolderMounts: [VFolderMount!]
-
-  """Bootstrap script executed when the kernel starts."""
-  bootstrapScript: String
-
-  """Startup command executed after bootstrap."""
-  startupCommand: String
 }
 
 """Added in 26.1.0. Information about the session this kernel belongs to."""
@@ -2843,33 +2671,6 @@ type KernelSessionInfo {
 
   """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
   sessionType: SessionTypes!
-}
-
-"""
-Added in 26.1.0. Session-specific status data during kernel lifecycle transitions.
-"""
-type KernelSessionStatusData {
-  """Status string of the session (e.g., 'terminating')."""
-  status: String
-}
-
-"""
-Added in 26.1.0. Collection of kernel resource statistics. Contains utilization metrics for CPU, memory, I/O, network, and accelerators.
-"""
-type KernelStat {
-  """List of metric entries for this kernel."""
-  entries: [KernelStatEntry!]!
-}
-
-"""
-Added in 26.1.0. A single kernel statistic entry with metric key and value. Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx.
-"""
-type KernelStatEntry {
-  """Metric key name (e.g., 'cpu_util', 'mem', 'io_read')."""
-  key: String!
-
-  """The metric measurement value."""
-  value: MetricValue!
 }
 
 """Added in 26.1.0"""
@@ -2891,101 +2692,25 @@ enum KernelStatus {
   CANCELLED
 }
 
-"""
-Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
-"""
-type KernelStatusData {
-  """Error information when the kernel is in an error state."""
-  error: KernelStatusErrorInfo
-
-  """Scheduler information during pending/scheduling states."""
-  scheduler: SchedulerInfo
-
-  """Kernel-specific status data during lifecycle transitions."""
-  kernel: KernelStatusDataKernel
-
-  """Session-specific status data during lifecycle transitions."""
-  session: KernelSessionStatusData
-}
-
-"""
-Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
-"""
-type KernelStatusDataKernel {
-  """Exit code of the kernel process. Null if not yet terminated."""
-  exitCode: Int
-}
-
-"""
-Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
-"""
-type KernelStatusErrorInfo {
-  """
-  Source of the error: 'agent' for agent errors, 'other' for other errors.
-  """
-  src: String!
-
-  """
-  ID of the agent where the error occurred. Only present for agent errors in debug mode.
-  """
-  agentId: String
-
-  """Name of the exception class."""
-  name: String!
-
-  """String representation of the exception."""
-  repr: String!
-}
-
 """Added in 26.1.0. Filter for kernel status."""
 input KernelStatusFilter {
   in: [KernelStatus!] = null
   notIn: [KernelStatus!] = null
 }
 
-"""
-Added in 26.1.0. A collection of status history entries for a kernel. Records the progression of status changes throughout the kernel's lifecycle.
-"""
-type KernelStatusHistory {
-  """List of status history entries in chronological order."""
-  entries: [KernelStatusHistoryEntry!]!
-}
-
-"""
-Added in 26.1.0. A single status history entry recording a status transition. Contains the status name and the timestamp when the kernel entered that status.
-"""
-type KernelStatusHistoryEntry {
-  """The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."""
-  status: String!
-
-  """Timestamp when the kernel entered this status."""
-  timestamp: DateTime!
-}
-
-"""
-Added in 26.1.0. User permission and ownership information for a kernel.
-"""
-type KernelUserPermissionInfo {
+"""Added in 26.1.0. User and ownership information for a kernel."""
+type KernelUserInfo {
   """The UUID of the user who owns this kernel."""
-  userUuid: UUID!
+  userId: UUID
 
   """The access key used to create this kernel."""
-  accessKey: String!
+  accessKey: String
 
   """The domain this kernel belongs to."""
-  domainName: String!
+  domainName: String
 
   """The group (project) ID this kernel belongs to."""
-  groupId: UUID!
-
-  """The Unix user ID for the kernel's container process."""
-  uid: Int
-
-  """The primary Unix group ID for the kernel's container process."""
-  mainGid: Int
-
-  """Additional Unix group IDs for the kernel's container process."""
-  gids: [Int!]
+  groupId: UUID
 }
 
 """
@@ -2995,14 +2720,17 @@ type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """The UUID of the container image used by this kernel."""
+  imageId: UUID
+
+  """Startup command executed when the kernel starts."""
+  startupCommand: String
+
   """Information about the session this kernel belongs to."""
   session: KernelSessionInfo!
 
-  """User permission and ownership information."""
-  userPermission: KernelUserPermissionInfo!
-
-  """Container image information."""
-  image: KernelImageInfo!
+  """User and ownership information."""
+  user: KernelUserInfo!
 
   """Network configuration and exposed ports."""
   network: KernelNetworkInfo!
@@ -3013,17 +2741,8 @@ type KernelV2 implements Node {
   """Resource allocation and agent information."""
   resource: KernelResourceInfo!
 
-  """Runtime configuration (environment, scripts)."""
-  runtime: KernelRuntimeInfo!
-
   """Lifecycle status and timestamps."""
   lifecycle: KernelLifecycleInfo!
-
-  """Execution metrics and statistics."""
-  metrics: KernelMetricsInfo!
-
-  """Additional metadata and internal data."""
-  metadata: KernelMetadataInfo!
 }
 
 """An edge in a connection."""
@@ -3043,49 +2762,6 @@ enum LivenessStatus {
   HEALTHY
   UNHEALTHY
   DEGRADED
-}
-
-"""
-Added in 26.1.0. Statistical aggregation values for a metric over time. Contains min, max, sum, average, difference, and rate calculations.
-"""
-type MetricStat {
-  """Minimum observed value."""
-  min: String
-
-  """Maximum observed value."""
-  max: String
-
-  """Sum of all observed values."""
-  sum: String
-
-  """Average of observed values."""
-  avg: String
-
-  """Difference from previous measurement."""
-  diff: String
-
-  """Rate of change per second."""
-  rate: String
-}
-
-"""
-Added in 26.1.0. A metric measurement with current value, capacity, and statistics. Used for resource utilization metrics like CPU, memory, and I/O.
-"""
-type MetricValue {
-  """Current measured value."""
-  current: String!
-
-  """Maximum capacity for this metric. Null for unbounded metrics."""
-  capacity: String
-
-  """Percentage utilization (current/capacity * 100)."""
-  pct: String
-
-  """Unit hint for display (e.g., 'bytes', 'msec', 'percent')."""
-  unitHint: String
-
-  """Statistical aggregation values over time."""
-  stats: MetricStat
 }
 
 type ModelDeployment implements Node {
@@ -3311,12 +2987,6 @@ If revision is not specified, defaults to 'main' revision.
 input ModelTarget {
   modelId: String!
   revision: String = null
-}
-
-enum MountPermission {
-  READ_ONLY
-  READ_WRITE
-  RW_DELETE
 }
 
 type Mutation {
@@ -5032,6 +4702,17 @@ type ReservoirRegistryEdge {
   node: ReservoirRegistry!
 }
 
+"""Added in 26.2.0. Resource allocation with requested and used slots."""
+type ResourceAllocation {
+  """The resource slots originally requested for this kernel."""
+  requested: ResourceSlot!
+
+  """
+  The resource slots currently used by this kernel. May be null if not yet allocated.
+  """
+  used: ResourceSlot
+}
+
 type ResourceConfig {
   """
   Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
@@ -5545,15 +5226,6 @@ input SMTPConnectionInput {
   timeout: Int! = 30
 }
 
-"""Added in 26.1.0. SSH keypair for secure access."""
-type SSHKeypair {
-  """The public key in OpenSSH format."""
-  publicKey: String!
-
-  """The private key in PEM format."""
-  privateKey: String!
-}
-
 extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
 }
@@ -5668,6 +5340,7 @@ enum SchedulerType {
   DRF
   FAIR_SHARE
 }
+
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
 type SchedulingBroadcastEventPayload {
@@ -7032,38 +6705,6 @@ type VFSStorageEdge {
 
   """The item at the end of the edge"""
   node: VFSStorage!
-}
-
-"""
-Added in 26.1.0. Information about a mounted virtual folder. Contains mount path, permissions, and usage mode details.
-"""
-type VFolderMount {
-  """Name of the virtual folder."""
-  name: String!
-
-  """Unique identifier of the virtual folder."""
-  vfid: String!
-
-  """Subpath within the virtual folder to mount."""
-  vfsubpath: String!
-
-  """Path on the host where the virtual folder is stored."""
-  hostPath: String!
-
-  """Path inside the container where the folder is mounted."""
-  kernelPath: String!
-
-  """Permission level for this mount (ro, rw, wd)."""
-  mountPerm: MountPermission!
-
-  """Usage mode of the virtual folder (general, model, data)."""
-  usageMode: VFolderUsageMode!
-}
-
-enum VFolderUsageMode {
-  GENERAL
-  MODEL
-  DATA
 }
 
 """Input for validate notification channel mutation"""
