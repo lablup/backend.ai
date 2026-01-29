@@ -24,9 +24,11 @@ from typing import (
 
 import aiohttp_cors
 import janus
+import jwt
 import trafaret as t
 import zipstream
 from aiohttp import hdrs, web
+from pydantic import ValidationError
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
@@ -37,6 +39,11 @@ from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.services.file_stream.zip import (
+    ArchiveDownloadTokenData,
+    ZipArchiveStreamReader,
+    stream_archive_response,
+)
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import CheckParamSource, check_params
 
@@ -454,6 +461,41 @@ async def prepare_tus_session_headers(
     return headers
 
 
+async def download_archive(request: web.Request) -> web.StreamResponse:
+    """Stream multiple files/directories as a ZIP archive."""
+    ctx: RootContext = request.app["ctx"]
+    secret = ctx.local_config.storage_proxy.secret
+    raw_token = request.query.get("token")
+    if not raw_token:
+        raise InvalidAPIParameters(extra_msg="Missing 'token' query parameter")
+    try:
+        payload = jwt.decode(raw_token, secret, algorithms=["HS256"])
+        token_data = ArchiveDownloadTokenData.model_validate(payload)
+    except jwt.ExpiredSignatureError as e:
+        raise web.HTTPUnauthorized(reason="Token expired") from e
+    except jwt.InvalidTokenError as e:
+        raise web.HTTPUnauthorized(reason="Invalid token") from e
+    except ValidationError as e:
+        raise InvalidAPIParameters(extra_msg=str(e)) from e
+    # TODO: We need to implement pydantic jwt decorder to avoid this manual validation. include extract secret key from ctx.
+
+    async with ctx.get_volume(token_data.volume) as volume:
+        vfolder_root = volume.sanitize_vfpath(token_data.vfolder_id)
+        sanitized: list[Path] = [(vfolder_root / relpath).resolve() for relpath in token_data.files]
+        for file_path, relpath in zip(sanitized, token_data.files, strict=True):
+            if not file_path.is_relative_to(vfolder_root):
+                raise InvalidAPIParameters(extra_msg=f"Path escapes vfolder boundary: {relpath}")
+            if not file_path.exists():
+                raise web.HTTPNotFound(reason=f"File not found: {relpath}")
+
+        reader = ZipArchiveStreamReader(vfolder_root)
+        try:
+            reader.add_entries(sanitized)
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg=str(e)) from e
+        return await stream_archive_response(request, reader, "archive.zip")
+
+
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -475,6 +517,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
+    r = cors.add(app.router.add_resource("/download-archive"))
+    r.add_route("GET", download_archive)
     # tus handlers handle CORS by themselves
     r = app.router.add_resource("/upload")
     r.add_route("OPTIONS", tus_options)
