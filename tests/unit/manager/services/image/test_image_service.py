@@ -40,25 +40,27 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
-from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
-from ai.backend.manager.services.image.actions.alias_image_by_id import AliasImageByIdAction
+from ai.backend.manager.services.image.actions.alias_image import (
+    AliasImageAction,
+    AliasImageByIdAction,
+)
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
-)
-from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit_by_id import (
     ClearImageCustomResourceLimitByIdAction,
 )
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
-from ai.backend.manager.services.image.actions.forget_image import ForgetImageAction
-from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.get_images_by_ids import GetImagesByIdsAction
+from ai.backend.manager.services.image.actions.forget_image import (
+    ForgetImageAction,
+    ForgetImageByIdAction,
+)
+from ai.backend.manager.services.image.actions.get_images import GetImagesByIdsAction
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
 )
 from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
-from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
+    PurgeImageByIdAction,
     PurgeImagesAction,
     PurgeImagesKeyData,
 )
