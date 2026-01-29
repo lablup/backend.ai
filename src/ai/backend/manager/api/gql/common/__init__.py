@@ -2,44 +2,31 @@
 
 from __future__ import annotations
 
+from ai.backend.common.types import (
+    ServicePortProtocols,
+    SessionResult,
+    SessionTypes,
+)
+
 from .types import (
-    DotfileInfoGQL,
-    MetricStatGQL,
-    MetricValueGQL,
-    MountPermissionGQL,
     ResourceOptsEntryGQL,
     ResourceOptsEntryInput,
     ResourceOptsGQL,
     ResourceOptsInput,
-    SchedulerInfoGQL,
-    SchedulerPredicateGQL,
     ServicePortEntryGQL,
-    ServicePortProtocolGQL,
     ServicePortsGQL,
-    SessionResultGQL,
-    SessionTypesGQL,
-    SSHKeypairGQL,
-    VFolderMountGQL,
-    VFolderUsageModeGQL,
 )
 
 __all__ = [
-    "DotfileInfoGQL",
-    "MetricStatGQL",
-    "MetricValueGQL",
-    "MountPermissionGQL",
+    # Re-exported enums from ai.backend.common.types
+    "ServicePortProtocols",
+    "SessionResult",
+    "SessionTypes",
+    # GQL types
     "ResourceOptsEntryGQL",
     "ResourceOptsEntryInput",
     "ResourceOptsGQL",
     "ResourceOptsInput",
-    "SchedulerInfoGQL",
-    "SchedulerPredicateGQL",
     "ServicePortEntryGQL",
-    "ServicePortProtocolGQL",
     "ServicePortsGQL",
-    "SessionResultGQL",
-    "SessionTypesGQL",
-    "SSHKeypairGQL",
-    "VFolderMountGQL",
-    "VFolderUsageModeGQL",
 ]
