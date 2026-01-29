@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Optional, TypeVar
+from typing import Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -11,7 +11,7 @@ DEFAULT_PAGE_SIZE = 25
 
 
 @dataclass(frozen=True)
-class PaginationResult(Generic[T]):
+class PaginationResult[T]:
     """Result of in-memory pagination."""
 
     items: list[T]
@@ -20,7 +20,7 @@ class PaginationResult(Generic[T]):
     total_count: int
 
 
-def paginate_in_memory(
+def paginate_in_memory[T](
     items: list[T],
     first: Optional[int],
     after: Optional[str],

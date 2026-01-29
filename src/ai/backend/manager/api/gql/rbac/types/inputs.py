@@ -18,7 +18,7 @@ from ai.backend.manager.repositories.permission_controller.creators import RoleC
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
-from .enums import EntityTypeGQL, OperationTypeGQL, ScopeTypeGQL
+from .enums import ScopeTypeGQL
 
 
 @strawberry.input(description="Added in 26.2.0. Input for specifying a scope in mutations")
@@ -55,7 +55,9 @@ class UpdateRoleInput:
         """Convert to Updater for repository."""
         return Updater(
             spec=RoleUpdaterSpec(
-                name=OptionalState.update(self.name) if self.name else OptionalState.nop(),
+                name=OptionalState.update(self.name)
+                if self.name is not None
+                else OptionalState.nop(),
                 description=TriState.update(self.description)
                 if self.description
                 else TriState.nop(),
@@ -64,26 +66,9 @@ class UpdateRoleInput:
         )
 
 
-@strawberry.input(description="Added in 26.2.0. Input for scoped permissions")
-class ScopedPermissionInput:
-    scope_type: ScopeTypeGQL
-    scope_id: ID
-    entity_type: EntityTypeGQL
-    operation: OperationTypeGQL
-
-
-@strawberry.input(description="Added in 26.2.0. Input for object permissions")
-class ObjectPermissionInput:
-    entity_type: EntityTypeGQL
-    entity_id: ID
-    operation: OperationTypeGQL
-
-
 @strawberry.input(description="Added in 26.2.0. Input for updating role permissions")
 class UpdateRolePermissionsInput:
     role_id: ID
-    scoped_permissions_to_add: Optional[list[ScopedPermissionInput]] = None
-    object_permissions_to_add: Optional[list[ObjectPermissionInput]] = None
     scoped_permission_ids_to_delete: Optional[list[ID]] = None
     object_permission_ids_to_delete: Optional[list[ID]] = None
 
