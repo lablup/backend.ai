@@ -172,3 +172,33 @@ class ImageOrders:
         if ascending:
             return ImageRow.created_at.asc()
         return ImageRow.created_at.desc()
+
+    @staticmethod
+    def architecture(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ImageRow.architecture.asc()
+        return ImageRow.architecture.desc()
+
+    @staticmethod
+    def size_bytes(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ImageRow.size_bytes.asc()
+        return ImageRow.size_bytes.desc()
+
+    @staticmethod
+    def registry(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ImageRow.registry.asc()
+        return ImageRow.registry.desc()
+
+    @staticmethod
+    def tag(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ImageRow.tag.asc()
+        return ImageRow.tag.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ImageRow.status.asc()
+        return ImageRow.status.desc()

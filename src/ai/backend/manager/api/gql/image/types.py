@@ -492,6 +492,11 @@ class ImageFilterGQL(GQLFilter):
 class ImageOrderFieldGQL(enum.Enum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    ARCHITECTURE = "ARCHITECTURE"
+    SIZE_BYTES = "SIZE_BYTES"
+    REGISTRY = "REGISTRY"
+    TAG = "TAG"
+    STATUS = "STATUS"
 
 
 @strawberry.input(
@@ -513,3 +518,13 @@ class ImageOrderByGQL(GQLOrderBy):
                 return ImageOrders.name(ascending)
             case ImageOrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
+            case ImageOrderFieldGQL.ARCHITECTURE:
+                return ImageOrders.architecture(ascending)
+            case ImageOrderFieldGQL.SIZE_BYTES:
+                return ImageOrders.size_bytes(ascending)
+            case ImageOrderFieldGQL.REGISTRY:
+                return ImageOrders.registry(ascending)
+            case ImageOrderFieldGQL.TAG:
+                return ImageOrders.tag(ascending)
+            case ImageOrderFieldGQL.STATUS:
+                return ImageOrders.status(ascending)
