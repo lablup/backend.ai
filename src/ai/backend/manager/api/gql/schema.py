@@ -91,8 +91,13 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    alias_image_by_id,
+    clear_image_resource_limit_by_id,
+    dealias_image,
+    forget_image_by_id,
     image_v2,
     images_v2,
+    purge_image_by_id,
 )
 from .notification import (
     create_notification_channel,
@@ -270,6 +275,12 @@ class Mutation:
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # Image
+    forget_image_by_id = forget_image_by_id
+    purge_image_by_id = purge_image_by_id
+    alias_image_by_id = alias_image_by_id
+    dealias_image = dealias_image
+    clear_image_resource_limit_by_id = clear_image_resource_limit_by_id
 
 
 @strawberry.type
