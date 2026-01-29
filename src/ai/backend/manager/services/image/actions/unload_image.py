@@ -9,12 +9,12 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class UnloadImageAction(ImageAction):
-    image_ids: list[UUID]
+    image_id: UUID
     agents: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_id)
 
     @override
     @classmethod
@@ -24,8 +24,8 @@ class UnloadImageAction(ImageAction):
 
 @dataclass
 class UnloadImageActionResult(BaseActionResult):
-    images: list[ImageData]
+    image: ImageData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image.id)
