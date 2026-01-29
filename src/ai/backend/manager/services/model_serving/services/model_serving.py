@@ -194,9 +194,9 @@ class ModelServingService:
             SessionStatus.ERROR: "session_cancelled",
         }
 
-    async def _get_validated_model_vfolder(self, model_id: uuid.UUID) -> VFolderRow:
+    async def _get_validated_model_vfolder(self, model_vfolder_id: uuid.UUID) -> VFolderRow:
         """Get and validate model vfolder for service creation."""
-        model_vfolder_row = await self._repository.get_vfolder_by_id(model_id)
+        model_vfolder_row = await self._repository.get_vfolder_by_id(model_vfolder_id)
         if not model_vfolder_row:
             raise InvalidAPIParameters("Model vfolder not found")
         if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
@@ -245,13 +245,7 @@ class ModelServingService:
             ),
         )
         revision = await self._generate_revision(draft, model_vfolder_row.id)
-
-        # Apply revision results to action
-        action.creator.image = revision.image_identifier.canonical
-        action.creator.architecture = revision.image_identifier.architecture
-        action.creator.config.resources = dict(revision.resource_spec.resource_slots)
-        if revision.execution.environ:
-            action.creator.config.environ = revision.execution.environ
+        action.apply_revision(revision)
 
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
@@ -459,13 +453,7 @@ class ModelServingService:
             ),
         )
         revision = await self._generate_revision(draft, model_vfolder_row.id)
-
-        # Apply revision results to action
-        action.image = revision.image_identifier.canonical
-        action.architecture = revision.image_identifier.architecture
-        action.config.resources = dict(revision.resource_spec.resource_slots)
-        if revision.execution.environ:
-            action.config.environ = revision.execution.environ
+        action.apply_revision(revision)
 
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)

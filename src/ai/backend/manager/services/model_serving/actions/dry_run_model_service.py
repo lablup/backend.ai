@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import TYPE_CHECKING, Optional, override
 
 from pydantic import AnyUrl
 
@@ -8,6 +10,9 @@ from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 
 
 @dataclass
@@ -42,6 +47,14 @@ class DryRunModelServiceAction(ModelServiceAction):
     @classmethod
     def operation_type(cls) -> str:
         return "start"
+
+    def apply_revision(self, revision: ModelRevisionSpec) -> None:
+        """Apply revision results to this action."""
+        self.image = revision.image_identifier.canonical
+        self.architecture = revision.image_identifier.architecture
+        self.config.resources = dict(revision.resource_spec.resource_slots)
+        if revision.execution.environ:
+            self.config.environ = revision.execution.environ
 
 
 @dataclass

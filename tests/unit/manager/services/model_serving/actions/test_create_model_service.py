@@ -61,7 +61,7 @@ def mock_get_vfolder_by_id(mocker, mock_repositories):
 
 
 @pytest.fixture
-def mock_revision_generator_create(mock_revision_generator_registry: MagicMock) -> MagicMock:
+def mock_revision_generator(mock_revision_generator_registry: MagicMock) -> MagicMock:
     """Mock RevisionGenerator.generate_revision for create tests."""
     mock_generator = MagicMock()
     mock_generator.generate_revision = AsyncMock(
@@ -541,7 +541,7 @@ class TestCreateModelService:
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_by_id: MagicMock,
-        mock_revision_generator_create: MagicMock,
+        mock_revision_generator: MagicMock,
         mock_resolve_image_for_endpoint_creation: MagicMock,
         mock_resolve_group_id: MagicMock,
         mock_create_session: AsyncMock,
