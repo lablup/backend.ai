@@ -1,4 +1,10 @@
-"""Type definitions for project configuration repository."""
+"""Type definitions for project configuration repository.
+
+As there is an ongoing migration of renaming group to project,
+there are some occurrences where "group" is being used as "project"
+(e.g., GroupDotfile).
+It will be fixed in the future; for now understand them as the same concept.
+"""
 
 from __future__ import annotations
 
@@ -6,8 +12,6 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.manager.models.group import GroupDotfile
-
-# NOTE: GroupDotfile is a DB model type that retains the "group" naming from the database schema.
 
 
 @dataclass

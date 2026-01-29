@@ -1,3 +1,7 @@
+# As there is an ongoing migration of renaming group to project,
+# there are some occurrences where "group" is being used as "project"
+# (e.g., GroupDotfile).
+# It will be fixed in the future; for now understand them as the same concept.
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,7 +18,7 @@ class GetDotfileAction(ProjectConfigAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.group_id_or_name)
+        return str(self.project_id_or_name)
 
     @override
     @classmethod

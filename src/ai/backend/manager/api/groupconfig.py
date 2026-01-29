@@ -1,3 +1,11 @@
+"""API endpoints for project configuration (dotfiles) operations.
+
+As there is an ongoing migration of renaming group to project,
+there are some occurrences where "group" is being used as "project"
+(e.g., query_group_dotfiles, query_group_domain, groups table).
+It will be fixed in the future; for now understand them as the same concept.
+"""
+
 import logging
 import re
 from collections.abc import Iterable

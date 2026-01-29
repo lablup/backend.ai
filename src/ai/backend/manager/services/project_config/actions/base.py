@@ -11,7 +11,7 @@ from ai.backend.manager.actions.action import BaseAction
 class ProjectConfigAction(BaseAction):
     """Base action for project config operations."""
 
-    group_id_or_name: uuid.UUID | str
+    project_id_or_name: uuid.UUID | str
     domain_name: Optional[str]
 
     @override

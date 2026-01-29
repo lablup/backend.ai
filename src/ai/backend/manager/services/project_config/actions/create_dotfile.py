@@ -16,7 +16,7 @@ class CreateDotfileAction(ProjectConfigAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.group_id_or_name)
+        return str(self.project_id_or_name)
 
     @override
     @classmethod
@@ -26,8 +26,8 @@ class CreateDotfileAction(ProjectConfigAction):
 
 @dataclass
 class CreateDotfileActionResult(BaseActionResult):
-    group_id: uuid.UUID
+    project_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.group_id)
+        return str(self.project_id)

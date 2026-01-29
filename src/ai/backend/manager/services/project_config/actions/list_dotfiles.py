@@ -12,7 +12,7 @@ from ai.backend.manager.services.project_config.actions.base import ProjectConfi
 class ListDotfilesAction(ProjectConfigAction):
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.group_id_or_name)
+        return str(self.project_id_or_name)
 
     @override
     @classmethod
