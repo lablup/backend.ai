@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
@@ -126,7 +126,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def rescan_images(cls, registry: str, project: Optional[str] = None) -> dict[str, Any]:
+    async def rescan_images(cls, registry: str, project: str | None = None) -> dict[str, Any]:
         q = _d("""
             mutation($registry: String, $project: String) {
                 rescan_images(registry:$registry, project: $project) {
@@ -228,7 +228,7 @@ class Image(BaseFunction):
         cls,
         alias: str,
         target: str,
-        arch: Optional[str] = None,
+        arch: str | None = None,
     ) -> dict:
         q = _d("""
             mutation($alias: String!, $target: String!) {

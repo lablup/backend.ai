@@ -1,7 +1,7 @@
 import inspect
 from collections.abc import Awaitable, Callable, Mapping
 from time import monotonic
-from typing import Any, Optional
+from typing import Any
 
 import zmq
 import zmq.asyncio
@@ -13,10 +13,10 @@ async def aexecute_interactive(
     code: str,
     silent: bool = False,
     store_history: bool = True,
-    user_expressions: Optional[Mapping[str, Any]] = None,
-    allow_stdin: Optional[bool] = None,
+    user_expressions: Mapping[str, Any] | None = None,
+    allow_stdin: bool | None = None,
     stop_on_error: bool = True,
-    timeout_seconds: Optional[float] = None,
+    timeout_seconds: float | None = None,
     output_hook: Callable[[Mapping[str, Any]], Any]
     | Callable[[Mapping[str, Any]], Awaitable[Any]]
     | None = None,

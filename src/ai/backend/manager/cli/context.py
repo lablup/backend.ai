@@ -5,7 +5,7 @@ import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
 from pprint import pformat
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 
 class CLIContext:
-    _bootstrap_config: Optional[BootstrapConfig]
+    _bootstrap_config: BootstrapConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, log_level: LogLevel, config_path: Optional[Path] = None) -> None:
+    def __init__(self, log_level: LogLevel, config_path: Path | None = None) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._bootstrap_config = None

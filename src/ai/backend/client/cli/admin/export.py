@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -97,15 +96,15 @@ def list_reports(ctx: CLIContext) -> None:
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding (default: utf-8).")
 def export_users(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_username: Optional[str],
-    filter_email: Optional[str],
-    filter_domain: Optional[str],
-    filter_role: Optional[str],
-    filter_status: Optional[str],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_username: str | None,
+    filter_email: str | None,
+    filter_domain: str | None,
+    filter_role: str | None,
+    filter_status: str | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -124,7 +123,7 @@ def export_users(
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    user_filter: Optional[UserExportFilter] = None
+    user_filter: UserExportFilter | None = None
     if any([
         filter_username,
         filter_email,
@@ -146,7 +145,7 @@ def export_users(
         )
 
     # Build orders
-    user_orders: Optional[list[UserExportOrder]] = None
+    user_orders: list[UserExportOrder] | None = None
     if orders:
         user_orders = []
         for order_spec in orders:
@@ -232,18 +231,18 @@ def export_users(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_sessions(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_name: Optional[str],
-    filter_type: Optional[str],
-    filter_domain: Optional[str],
-    filter_access_key: Optional[str],
-    filter_status: Optional[str],
-    filter_scaling_group: Optional[str],
-    filter_created_after: Optional[datetime],
-    filter_created_before: Optional[datetime],
-    filter_terminated_after: Optional[datetime],
-    filter_terminated_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_name: str | None,
+    filter_type: str | None,
+    filter_domain: str | None,
+    filter_access_key: str | None,
+    filter_status: str | None,
+    filter_scaling_group: str | None,
+    filter_created_after: datetime | None,
+    filter_created_before: datetime | None,
+    filter_terminated_after: datetime | None,
+    filter_terminated_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -262,7 +261,7 @@ def export_sessions(
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    session_filter: Optional[SessionExportFilter] = None
+    session_filter: SessionExportFilter | None = None
     if any([
         filter_name,
         filter_type,
@@ -295,7 +294,7 @@ def export_sessions(
         )
 
     # Build orders
-    session_orders: Optional[list[SessionExportOrder]] = None
+    session_orders: list[SessionExportOrder] | None = None
     if orders:
         session_orders = []
         for order_spec in orders:
@@ -369,13 +368,13 @@ def export_sessions(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_projects(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_name: Optional[str],
-    filter_domain: Optional[str],
-    filter_active: Optional[bool],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_name: str | None,
+    filter_domain: str | None,
+    filter_active: bool | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -395,7 +394,7 @@ def export_projects(
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    project_filter: Optional[ProjectExportFilter] = None
+    project_filter: ProjectExportFilter | None = None
     if any([filter_name, filter_domain, filter_active is not None, filter_after, filter_before]):
         project_filter = ProjectExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
@@ -407,7 +406,7 @@ def export_projects(
         )
 
     # Build orders
-    project_orders: Optional[list[ProjectExportOrder]] = None
+    project_orders: list[ProjectExportOrder] | None = None
     if orders:
         project_orders = []
         for order_spec in orders:
@@ -486,16 +485,16 @@ def export_projects(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_audit_logs(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_entity_type: Optional[str],
-    filter_entity_id: Optional[str],
-    filter_operation: Optional[str],
-    filter_status: Optional[str],
-    filter_triggered_by: Optional[str],
-    filter_request_id: Optional[str],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_entity_type: str | None,
+    filter_entity_id: str | None,
+    filter_operation: str | None,
+    filter_status: str | None,
+    filter_triggered_by: str | None,
+    filter_request_id: str | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -514,7 +513,7 @@ def export_audit_logs(
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    audit_log_filter: Optional[AuditLogExportFilter] = None
+    audit_log_filter: AuditLogExportFilter | None = None
     if any([
         filter_entity_type,
         filter_entity_id,
@@ -540,7 +539,7 @@ def export_audit_logs(
         )
 
     # Build orders
-    audit_log_orders: Optional[list[AuditLogExportOrder]] = None
+    audit_log_orders: list[AuditLogExportOrder] | None = None
     if orders:
         audit_log_orders = []
         for order_spec in orders:

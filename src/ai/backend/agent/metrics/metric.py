@@ -5,7 +5,7 @@ import enum
 import functools
 import uuid
 from collections.abc import Iterable, MutableMapping
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -34,7 +34,7 @@ class StatScope(enum.StrEnum):
 
 
 class RPCMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _rpc_requests: Counter
     _rpc_failure_requests: Counter
@@ -78,7 +78,7 @@ class RPCMetricObserver:
 
 
 class UtilizationMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
     _removal_tasks: dict[KernelId, asyncio.Task[None]]
 
     _container_metric: Gauge
@@ -138,9 +138,9 @@ class UtilizationMetricObserver:
         *,
         agent_id: AgentId,
         kernel_id: KernelId,
-        session_id: Optional[SessionId],
-        owner_user_id: Optional[uuid.UUID],
-        project_id: Optional[uuid.UUID],
+        session_id: SessionId | None,
+        owner_user_id: uuid.UUID | None,
+        project_id: uuid.UUID | None,
         keys: Iterable[MetricKey],
     ) -> None:
         async def remove_later() -> None:
@@ -183,7 +183,7 @@ class UtilizationMetricObserver:
 
 
 class SyncContainerLifecycleObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _task_trigger_count: Counter
     _task_success_count: Counter
@@ -238,7 +238,7 @@ class SyncContainerLifecycleObserver:
 
 
 class StatTaskObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _task_trigger_count: Counter
     _task_success_count: Counter

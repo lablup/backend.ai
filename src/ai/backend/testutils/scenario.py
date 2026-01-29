@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Optional, Self, TypeVar
+from typing import Self, TypeVar
 
 import pytest
 
@@ -12,15 +12,15 @@ TException = type[E] | tuple[type[E], ...]
 class ScenarioBase[TInput, TResult]:
     description: str
     input: TInput
-    expected: Optional[TResult]
-    expected_exception: Optional[TException]
+    expected: TResult | None
+    expected_exception: TException | None
 
     def __init__(
         self,
         description: str,
         input: TInput,
-        expected: Optional[TResult],
-        expected_exception: Optional[TException],
+        expected: TResult | None,
+        expected_exception: TException | None,
     ) -> None:
         self.description = description
         self.input = input
@@ -35,7 +35,7 @@ class ScenarioBase[TInput, TResult]:
     def failure(cls, description: str, input: TInput, expected_exception: TException) -> Self:
         return cls(description, input, None, expected_exception)
 
-    async def test(self, fn: Callable[[TInput], Awaitable[Optional[TResult]]]) -> None:
+    async def test(self, fn: Callable[[TInput], Awaitable[TResult | None]]) -> None:
         if self.expected_exception is not None:
             with pytest.raises(self.expected_exception):
                 await fn(self.input)

@@ -7,7 +7,7 @@ import urllib.parse
 from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 from aiohttp import web
@@ -25,10 +25,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class WekaQuota:
     quota_id: str
     inode_id: int
-    hard_limit: Optional[int]
-    soft_limit: Optional[int]
-    grace_seconds: Optional[int]
-    used_bytes: Optional[int]
+    hard_limit: int | None
+    soft_limit: int | None
+    grace_seconds: int | None
+    used_bytes: int | None
 
     @classmethod
     def from_json(cls, quota_id: str, data: Any) -> WekaQuota:
@@ -110,8 +110,8 @@ class WekaAPIClient:
     organization: str
     ssl_context: ssl.SSLContext | bool
 
-    _access_token: Optional[str]
-    _refresh_token: Optional[str]
+    _access_token: str | None
+    _refresh_token: str | None
     _valid_until: int
 
     def __init__(
@@ -169,7 +169,7 @@ class WekaAPIClient:
         sess: aiohttp.ClientSession,
         method: str,
         path: str,
-        body: Optional[Any] = None,
+        body: Any | None = None,
     ) -> aiohttp.ClientResponse:
         match method:
             case "GET":
@@ -319,8 +319,8 @@ class WekaAPIClient:
         self,
         path: str,
         inode_id: int,
-        hard_limit: Optional[int] = None,
-        soft_limit: Optional[int] = None,
+        hard_limit: int | None = None,
+        soft_limit: int | None = None,
     ) -> None:
         """
         Sets quota using undocumented V1 API. Should be considered deprecated
@@ -383,8 +383,8 @@ class WekaAPIClient:
         self,
         metrics: Iterable[str],
         start_time: datetime,
-        end_time: Optional[datetime] = None,
-        category: Optional[str] = None,
+        end_time: datetime | None = None,
+        category: str | None = None,
     ) -> Mapping[str, Any]:
         params = [("start_time", start_time.isoformat() + "Z")]
         if end_time is not None:

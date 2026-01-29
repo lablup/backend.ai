@@ -27,7 +27,6 @@ from typing import (
     Annotated,
     Any,
     Concatenate,
-    Optional,
     ParamSpec,
     Protocol,
     TypeAlias,
@@ -73,12 +72,12 @@ def method_placeholder(orig_method: str) -> Callable[[web.Request], Awaitable[we
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Optional[Any] = None
+    request: web.Request, params: Any | None = None
 ) -> tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
-    owner_access_key: Optional[AccessKey] = (params or {}).get("owner_access_key", None)
+    owner_access_key: AccessKey | None = (params or {}).get("owner_access_key", None)
     if owner_access_key is None or owner_access_key == request["keypair"]["access_key"]:
         return request["keypair"]["access_key"], request["keypair"]["access_key"]
     async with root_ctx.db.begin_readonly() as conn:
@@ -97,12 +96,12 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Optional[Any] = None
+    request: web.Request, params: Any | None = None
 ) -> tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
     root_ctx: RootContext = request.app["_root.context"]
-    owner_uuid: Optional[uuid.UUID] = (params or {}).get("owner_uuid", None)
+    owner_uuid: uuid.UUID | None = (params or {}).get("owner_uuid", None)
     if owner_uuid is None or owner_uuid == request["user"]["uuid"]:
         return request["user"]["uuid"], request["user"]["uuid"]
     async with root_ctx.db.begin_readonly() as conn:
@@ -122,7 +121,7 @@ async def get_user_uuid_scopes(
 
 async def get_user_scopes(
     request: web.Request,
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
 ) -> tuple[uuid.UUID, UserRole]:
     root_ctx: RootContext = request.app["_root.context"]
     if not request["is_authorized"]:

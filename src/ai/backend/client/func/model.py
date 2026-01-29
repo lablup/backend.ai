@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.client.output.fields import vfolder_fields
@@ -40,8 +40,8 @@ class Model(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult:
         if filter:
             composed_filter = f'({filter}) & (usage_mode == "MODEL")'
@@ -80,9 +80,9 @@ class Model(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: Optional[str] = None,
-        unmanaged_path: Optional[str] = None,
-        group: Optional[str] = None,
+        host: str | None = None,
+        unmanaged_path: str | None = None,
+        group: str | None = None,
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,

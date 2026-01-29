@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
@@ -15,7 +15,7 @@ class UpdateReservoirRegistryAction(ArtifactRegistryAction):
     meta: ArtifactRegistryModifierMeta
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
     @override
@@ -29,5 +29,5 @@ class UpdateReservoirRegistryActionResult(BaseActionResult):
     result: ReservoirRegistryData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

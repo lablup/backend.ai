@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -572,7 +572,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    agent_list = cast(Optional[list[str]], params["config"]["agent_list"])
+    agent_list = cast(list[str] | None, params["config"]["agent_list"])
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
@@ -874,7 +874,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-    filename: Optional[str] = params["filename"]
+    filename: str | None = params["filename"]
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -896,7 +896,7 @@ class ConvertSessionToImageRequesteModel(LegacyBaseRequestModel):
         pattern=r"[a-zA-Z0-9\.\-_]+",
         description="Name of the image to be created.",
     )
-    login_session_token: Annotated[Optional[str], Field(default=None)]
+    login_session_token: Annotated[str | None, Field(default=None)]
     image_visibility: CustomizedImageVisibilityScope = Field(
         default=CustomizedImageVisibilityScope.USER,
         description="Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error.",
@@ -1536,11 +1536,11 @@ async def list_files(request: web.Request) -> web.Response:
 
 
 class ContainerLogRequestModel(LegacyBaseRequestModel):
-    owner_access_key: Optional[str] = Field(
+    owner_access_key: str | None = Field(
         default=None,
         alias="ownerAccessKey",
     )
-    kernel_id: Optional[UUID] = Field(
+    kernel_id: UUID | None = Field(
         description="Target kernel to get container logs.",
         default=None,
         alias="kernelId",

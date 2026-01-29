@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class DeleteAutoScalingRuleAction(AutoScalingRuleBaseAction):
     auto_scaling_rule_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.auto_scaling_rule_id)
 
     @override
@@ -27,5 +27,5 @@ class DeleteAutoScalingRuleActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

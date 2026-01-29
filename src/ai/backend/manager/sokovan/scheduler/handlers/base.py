@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.defs import LockID
@@ -45,7 +44,7 @@ class SessionLifecycleHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Get the target kernel statuses for session filtering.
 
         Sessions are included only if ALL their kernels match these statuses.
@@ -70,7 +69,7 @@ class SessionLifecycleHandler(ABC):
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:

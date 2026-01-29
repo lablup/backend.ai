@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.session.types import KernelMatchType
@@ -20,8 +19,8 @@ class SessionStartResult:
 
     session_id: SessionId
     success: bool
-    error: Optional[str] = None
-    error_info: Optional[ErrorStatusInfo] = None
+    error: str | None = None
+    error_info: ErrorStatusInfo | None = None
 
 
 @dataclass

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -16,7 +15,7 @@ from ai.backend.manager.services.storage_namespace.processors import StorageName
 async def load_storage_namespaces_by_ids(
     processor: StorageNamespaceProcessors,
     namespace_ids: Sequence[uuid.UUID],
-) -> list[Optional[StorageNamespaceData]]:
+) -> list[StorageNamespaceData | None]:
     """Batch load storage namespaces by their IDs.
 
     Args:

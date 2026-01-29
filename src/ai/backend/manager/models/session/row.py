@@ -12,7 +12,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
     override,
@@ -517,8 +516,8 @@ def _build_session_fetch_query(
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select:
     cond = base_cond
     if access_key:
@@ -551,8 +550,8 @@ async def _match_sessions_by_id(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
     cond: sa.sql.elements.ColumnElement[bool]
     if isinstance(session_id_or_list, list):
@@ -583,8 +582,8 @@ async def _match_sessions_by_name(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
     cond: sa.sql.elements.ColumnElement[bool]
     if allow_prefix:
@@ -959,7 +958,7 @@ class SessionRow(Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
+    def to_dataclass(self, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -1139,7 +1138,7 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> Optional[datetime]:
+    def status_changed(self) -> datetime | None:
         if self.status_history is None:
             return None
         try:
@@ -1305,9 +1304,9 @@ class SessionRow(Base):
         session_id: SessionId,
         status: SessionStatus,
         *,
-        status_data: Optional[Mapping[str, Any]] = None,
-        reason: Optional[str] = None,
-        status_changed_at: Optional[datetime] = None,
+        status_data: Mapping[str, Any] | None = None,
+        reason: str | None = None,
+        status_changed_at: datetime | None = None,
     ) -> None:
         if status_changed_at is None:
             now = datetime.now(tzutc())
@@ -1361,13 +1360,13 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_reference: str | UUID | list[UUID],
-        access_key: Optional[AccessKey],
+        access_key: AccessKey | None,
         *,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
-        max_matches: Optional[int] = 10,
-        eager_loading_op: Optional[Sequence] = None,
+        max_matches: int | None = 10,
+        eager_loading_op: Sequence | None = None,
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
@@ -1432,7 +1431,7 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_name_or_id: str | UUID,
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -1503,13 +1502,13 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_ids: list[UUID],
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
-        max_load_count: Optional[int] = None,
+        max_load_count: int | None = None,
     ) -> Iterable[SessionRow]:
         _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
@@ -1551,7 +1550,7 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_id: SessionId,
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         max_matches: int | None = None,
         allow_stale: bool = True,

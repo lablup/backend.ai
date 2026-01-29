@@ -11,7 +11,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
     override,
@@ -150,7 +149,7 @@ def _apply_loading_option(
 
 async def load_configured_registries(
     db: ExtendedAsyncSAEngine,
-    project: Optional[str],
+    project: str | None,
 ) -> dict[str, ContainerRegistryRow]:
     join = functools.partial(join_non_empty, sep="/")
 
@@ -177,7 +176,7 @@ async def load_configured_registries(
 async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
-    reporter: Optional[ProgressReporter] = None,
+    reporter: ProgressReporter | None = None,
 ) -> RescanImagesResult:
     """
     Performs an image rescan for all images in the registries.
@@ -259,10 +258,10 @@ def filter_registries_by_registry_name(
 
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
-    registry_or_image: Optional[str] = None,
-    project: Optional[str] = None,
+    registry_or_image: str | None = None,
+    project: str | None = None,
     *,
-    reporter: Optional[ProgressReporter] = None,
+    reporter: ProgressReporter | None = None,
 ) -> RescanImagesResult:
     """
     Rescan container registries and the update images table.
@@ -453,7 +452,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -481,7 +480,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -515,7 +514,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
         """
@@ -593,7 +592,7 @@ class ImageRow(Base):
         return image_row
 
     @classmethod
-    def from_optional_dataclass(cls, image_data: Optional[ImageData]) -> Optional[Self]:
+    def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
         if image_data is None:
             return None
         return cls.from_dataclass(image_data)
@@ -605,7 +604,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -700,9 +699,9 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         image_id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
@@ -718,7 +717,7 @@ class ImageRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
     ) -> list[Self]:
         if filter_by_statuses is None:
@@ -864,7 +863,7 @@ class ImageRow(Base):
     def set_resource_limit(
         self,
         slot_type: str,
-        value_range: tuple[Optional[Decimal], Optional[Decimal]],
+        value_range: tuple[Decimal | None, Decimal | None],
     ) -> None:
         resources = self._resources
         if resources.get(slot_type) is None:
@@ -1020,7 +1019,7 @@ class ImageAliasRow(Base):
         alias: str,
         target: ImageRow,
     ) -> Self:
-        existing_alias: Optional[ImageRow] = await session.scalar(
+        existing_alias: ImageRow | None = await session.scalar(
             sa.select(ImageAliasRow)
             .where(ImageAliasRow.alias == alias)
             .options(selectinload(ImageAliasRow.image)),
@@ -1070,11 +1069,11 @@ MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
 @dataclass
 class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow, UUID]):
     @property
-    def query_condition(self) -> Optional[WhereClauseType]:
+    def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
 
         def _OR_coalesce(
-            base_cond: Optional[WhereClauseType],
+            base_cond: WhereClauseType | None,
             _cond: sa.sql.expression.BinaryExpression,
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
@@ -1089,7 +1088,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
             )
         return cond
 
-    async def build_query(self) -> Optional[sa.sql.Select]:
+    async def build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -1237,7 +1236,7 @@ class ImagePermissionContextBuilder(
         user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
-        user_row = cast(Optional[UserRow], await self.db_session.scalar(user_query_stmt))
+        user_row = cast(UserRow | None, await self.db_session.scalar(user_query_stmt))
         if user_row is None:
             raise InvalidScope(f"User not found (id:{user_id})")
         if user_row.domain is None:
@@ -1301,7 +1300,7 @@ class ImagePermissionContextBuilder(
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
         domain_query_stmt = sa.select(DomainRow).where(DomainRow.name == scope.domain_name)
-        domain_row = cast(Optional[DomainRow], await self.db_session.scalar(domain_query_stmt))
+        domain_row = cast(DomainRow | None, await self.db_session.scalar(domain_query_stmt))
         if domain_row is None:
             raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
 
@@ -1361,7 +1360,7 @@ class ImagePermissionContextBuilder(
         from ai.backend.manager.models.group import GroupRow
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
-        group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
+        group_row = cast(GroupRow | None, await self.db_session.scalar(group_query_stmt))
         if group_row is None:
             raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
 

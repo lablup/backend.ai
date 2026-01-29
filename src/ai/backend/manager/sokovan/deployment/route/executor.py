@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -357,7 +357,7 @@ class RouteExecutor:
         self,
         route: RouteData,
         deployment_map: Mapping[UUID, DeploymentInfo],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         """Provision a single route by creating a session.
 
         Returns:

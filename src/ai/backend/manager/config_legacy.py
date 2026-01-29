@@ -13,7 +13,6 @@ from pprint import pformat
 from typing import (
     Any,
     Final,
-    Optional,
 )
 
 import click
@@ -384,7 +383,7 @@ class AbstractConfig(UserDict):
 
     _watch_callbacks: list[ConfigWatchCallback]
 
-    def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(self, initial_data: Mapping[str, Any] | None = None) -> None:
         super().__init__(initial_data)
         self._watch_callbacks = []
 
@@ -406,7 +405,7 @@ class LocalConfig(AbstractConfig):
 
 
 def load(
-    config_path: Optional[Path] = None,
+    config_path: Path | None = None,
     log_level: LogLevel = LogLevel.NOTSET,
 ) -> LocalConfig:
     """

@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.actions.action import BaseActionResult
@@ -12,7 +12,7 @@ class GetImageInstalledAgentsAction(ImageAction):
     image_ids: list[ImageID]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -26,5 +26,5 @@ class GetImageInstalledAgentsActionResult(BaseActionResult):
     data: Mapping[ImageID, set[AgentId]]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

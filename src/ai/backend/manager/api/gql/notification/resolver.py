@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
-from typing import Optional
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -117,7 +116,7 @@ class NotificationRuleConnection(Connection[NotificationRule]):
 @strawberry.field(description="Get a notification channel by ID")
 async def notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
-) -> Optional[NotificationChannel]:
+) -> NotificationChannel | None:
     processors = info.context.processors
     action_result = await processors.notification.get_channel.wait_for_complete(
         GetChannelAction(channel_id=uuid.UUID(id))
@@ -128,14 +127,14 @@ async def notification_channel(
 @strawberry.field(description="List notification channels")
 async def notification_channels(
     info: Info[StrawberryGQLContext],
-    filter: Optional[NotificationChannelFilter] = None,
-    order_by: Optional[list[NotificationChannelOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: NotificationChannelFilter | None = None,
+    order_by: list[NotificationChannelOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> NotificationChannelConnection:
     processors = info.context.processors
 
@@ -177,7 +176,7 @@ async def notification_channels(
 
 
 @strawberry.field(description="Get a notification rule by ID")
-async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Optional[NotificationRule]:
+async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
     processors = info.context.processors
     action_result = await processors.notification.get_rule.wait_for_complete(
         GetRuleAction(rule_id=uuid.UUID(id))
@@ -188,14 +187,14 @@ async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
 @strawberry.field(description="List notification rules")
 async def notification_rules(
     info: Info[StrawberryGQLContext],
-    filter: Optional[NotificationRuleFilter] = None,
-    order_by: Optional[list[NotificationRuleOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: NotificationRuleFilter | None = None,
+    order_by: list[NotificationRuleOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> NotificationRuleConnection:
     processors = info.context.processors
 

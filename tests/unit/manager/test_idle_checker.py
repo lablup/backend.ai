@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -30,7 +30,7 @@ class _RemainingTimeCalculationTestConfig:
     now: datetime
     idle_baseline: datetime
     timeout_period: timedelta
-    grace_period_end: Optional[datetime]
+    grace_period_end: datetime | None
     expected_remaining: float
 
 
@@ -1207,7 +1207,7 @@ class TestUtilizationIdleChecker:
         util_first_collected_time = base_time.timestamp()
 
         # Setup side_effect using key inspection
-        def mock_get_live_data_side_effect(key: str) -> Optional[bytes]:
+        def mock_get_live_data_side_effect(key: str) -> bytes | None:
             if ".util_first_collected" in key:
                 return f"{util_first_collected_time:.06f}".encode()
             if ".util_series" in key:

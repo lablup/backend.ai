@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path, PurePath
-from typing import Optional, override
+from typing import override
 from unittest.mock import AsyncMock
 
 import pytest
@@ -55,7 +55,7 @@ class MockVFolderService(VFolderServiceProtocol):
 
     @override
     async def create_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
         pass
 
@@ -68,7 +68,7 @@ class MockVFolderService(VFolderServiceProtocol):
 
     @override
     async def update_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
         pass
 

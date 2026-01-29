@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import tomli
 from pydantic import HttpUrl
@@ -96,8 +96,8 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class AutoScalingMetricsData:
     """Container for all metrics data needed for auto-scaling calculations."""
 
-    kernel_statistics: dict[KernelId, Optional[Mapping[str, Any]]] = field(default_factory=dict)
-    endpoint_statistics: dict[uuid.UUID, Optional[Mapping[str, Any]]] = field(default_factory=dict)
+    kernel_statistics: dict[KernelId, Mapping[str, Any] | None] = field(default_factory=dict)
+    endpoint_statistics: dict[uuid.UUID, Mapping[str, Any] | None] = field(default_factory=dict)
     routes_by_endpoint: Mapping[uuid.UUID, list[RouteInfo]] = field(default_factory=dict)
     kernels_by_session: dict[SessionId, list[KernelId]] = field(default_factory=dict)
 
@@ -322,7 +322,7 @@ class DeploymentRepository:
     async def get_service_endpoint(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[HttpUrl]:
+    ) -> HttpUrl | None:
         """Get service endpoint URL."""
         try:
             endpoint = await self._db_source.get_endpoint(endpoint_id)
@@ -408,7 +408,7 @@ class DeploymentRepository:
     async def fetch_model_definition(
         self,
         vfolder_id: uuid.UUID,
-        model_definition_path: Optional[str],
+        model_definition_path: str | None,
     ) -> dict[str, Any]:
         """
         Fetch model definition file from model vfolder.
@@ -445,7 +445,7 @@ class DeploymentRepository:
     async def fetch_service_definition(
         self,
         vfolder_id: uuid.UUID,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Fetch service definition file from model vfolder.
 
@@ -461,7 +461,7 @@ class DeploymentRepository:
             )
 
         # Read service definition from storage
-        service_definition_content: Optional[dict[str, Any]] = None
+        service_definition_content: dict[str, Any] | None = None
         try:
             service_definition_bytes = await self._storage_source.fetch_definition_file(
                 vfolder_location,
@@ -478,7 +478,7 @@ class DeploymentRepository:
     async def fetch_definition_files(
         self,
         vfolder_id: uuid.UUID,
-        model_definition_path: Optional[str],
+        model_definition_path: str | None,
     ) -> DefinitionFiles:
         """
         Fetch definition files(Both service and model definitions) from model vfolder.
@@ -492,7 +492,7 @@ class DeploymentRepository:
         model_definition_content: dict[str, Any] = await self.fetch_model_definition(
             vfolder_id, model_definition_path
         )
-        service_definition_content: Optional[dict[str, Any]] = await self.fetch_service_definition(
+        service_definition_content: dict[str, Any] | None = await self.fetch_service_definition(
             vfolder_id
         )
 
@@ -529,7 +529,7 @@ class DeploymentRepository:
     async def fetch_scaling_group_proxy_targets(
         self,
         scaling_group: set[str],
-    ) -> Mapping[str, Optional[ScalingGroupProxyTarget]]:
+    ) -> Mapping[str, ScalingGroupProxyTarget | None]:
         """Fetch the proxy target URL for a scaling group endpoint."""
         return await self._db_source.fetch_scaling_group_proxy_targets(scaling_group)
 
@@ -744,8 +744,8 @@ class DeploymentRepository:
                 metric_requested_kernels.append(kernel_id)
 
         # Batch fetch metrics from Valkey
-        kernel_statistics_by_id: dict[KernelId, Optional[Mapping[str, Any]]] = {}
-        endpoint_statistics_by_id: dict[uuid.UUID, Optional[Mapping[str, Any]]] = {}
+        kernel_statistics_by_id: dict[KernelId, Mapping[str, Any] | None] = {}
+        endpoint_statistics_by_id: dict[uuid.UUID, Mapping[str, Any] | None] = {}
 
         if metric_requested_kernels:
             kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
@@ -784,7 +784,7 @@ class DeploymentRepository:
         deployment: DeploymentInfo,
         auto_scaling_rules: Sequence[AutoScalingRule],
         metrics_data: AutoScalingMetricsData,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Calculate desired replicas for a deployment based on auto-scaling rules.
 
         Args:
@@ -804,7 +804,7 @@ class DeploymentRepository:
 
         for rule in auto_scaling_rules:
             # Calculate current metric value based on source
-            current_value: Optional[Decimal] = None
+            current_value: Decimal | None = None
             should_trigger = False
 
             if rule.condition.metric_source == AutoScalingMetricSource.KERNEL:
@@ -972,7 +972,7 @@ class DeploymentRepository:
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, Optional[SessionStatus]]:
+    ) -> Mapping[uuid.UUID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
 
@@ -998,7 +998,7 @@ class DeploymentRepository:
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """
         Get endpoint ID associated with a session.
 
@@ -1028,7 +1028,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def get_default_architecture_from_scaling_group(
         self, scaling_group_name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Get the default (most common) architecture from active agents in a scaling group.
         Returns None if no active agents exist.
@@ -1101,7 +1101,7 @@ class DeploymentRepository:
     async def get_latest_revision_number(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Get the latest revision number for an endpoint.
 
         Returns None if no revisions exist for the endpoint.
@@ -1278,7 +1278,7 @@ class DeploymentRepository:
     async def get_route(
         self,
         route_id: uuid.UUID,
-    ) -> Optional[RouteInfo]:
+    ) -> RouteInfo | None:
         """Get a route by ID.
 
         Args:

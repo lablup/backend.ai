@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
@@ -187,9 +186,9 @@ class ArtifactRepository:
     async def list_artifacts_with_revisions_paginated(
         self,
         *,
-        pagination: Optional[PaginationOptions] = None,
-        ordering: Optional[ArtifactOrderingOptions] = None,
-        filters: Optional[ArtifactFilterOptions] = None,
+        pagination: PaginationOptions | None = None,
+        ordering: ArtifactOrderingOptions | None = None,
+        filters: ArtifactFilterOptions | None = None,
     ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
         # Legacy
         return await self._db_source.list_artifacts_with_revisions_paginated(

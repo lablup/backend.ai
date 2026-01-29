@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Final, Optional, cast
+from typing import Final, cast
 from uuid import UUID
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -265,7 +265,7 @@ class ArtifactRevisionService:
         )
 
         # 4. Query remote progress when delegation is enabled
-        remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
+        remote_download_progress: ArtifactRevisionDownloadProgress | None = None
 
         # Only set remote for RESERVOIR type
         if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
@@ -780,7 +780,7 @@ class ArtifactRevisionService:
         )
 
     async def _resolve_artifact_registry_meta(
-        self, _artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: ArtifactType | None, registry_id_or_none: uuid.UUID | None
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             artifact_registry_cfg = self._config_provider.config.artifact_registry
@@ -803,7 +803,7 @@ class ArtifactRevisionService:
         return registry_meta
 
     def _is_latest_commit_hash(
-        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: Optional[str]
+        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: str | None
     ) -> bool:
         """
         Used in huggingface import to check if the latest commit hash matches the stored digest.

@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -66,7 +65,7 @@ class RejectArtifactRevisionResponse(BaseResponseModel):
 
 
 class ArtifactRevisionImportTask(BaseResponseModel):
-    task_id: Optional[str]
+    task_id: str | None
     artifact_revision: ArtifactRevisionResponseData
 
 
@@ -83,7 +82,7 @@ class UpdateArtifactResponse(BaseResponseModel):
 
 
 class GetArtifactRevisionReadmeResponse(BaseResponseModel):
-    readme: Optional[str]
+    readme: str | None
 
 
 class VFSStorage(BaseModel):

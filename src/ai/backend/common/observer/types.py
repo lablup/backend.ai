@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class AbstractObserver(ABC):
@@ -31,7 +30,7 @@ class AbstractObserver(ABC):
 
     @classmethod
     @abstractmethod
-    def timeout(cls) -> Optional[float]:
+    def timeout(cls) -> float | None:
         """
         Return the timeout for the observer.
         If None, the observer will not timeout.

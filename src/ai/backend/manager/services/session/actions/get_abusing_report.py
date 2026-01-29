@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import AbuseReport, AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class GetAbusingReportAction(SessionAction):
     owner_access_key: AccessKey
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -24,9 +24,9 @@ class GetAbusingReportAction(SessionAction):
 
 @dataclass
 class GetAbusingReportActionResult(BaseActionResult):
-    abuse_report: Optional[AbuseReport]
+    abuse_report: AbuseReport | None
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

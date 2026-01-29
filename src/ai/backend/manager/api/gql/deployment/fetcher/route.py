@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -27,15 +26,15 @@ from ai.backend.manager.services.deployment.actions.route import (
 
 async def fetch_routes(
     info: Info[StrawberryGQLContext],
-    filter: Optional[RouteFilter] = None,
-    order_by: Optional[list[RouteOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: RouteFilter | None = None,
+    order_by: list[RouteOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> RouteConnection:
     """Fetch routes with optional filtering, ordering, and pagination.
 
@@ -87,7 +86,7 @@ async def fetch_routes(
 async def fetch_route(
     info: Info[StrawberryGQLContext],
     route_id: UUID,
-) -> Optional[Route]:
+) -> Route | None:
     """Fetch a specific route by ID."""
     route_info = await info.context.data_loaders.route_loader.load(route_id)
     if route_info is None:

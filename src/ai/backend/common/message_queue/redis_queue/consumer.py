@@ -8,7 +8,7 @@ import socket
 import time
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 import glide
 from aiotools.server import process_index
@@ -55,10 +55,10 @@ class RedisConsumerArgs:
     node_id: str
     db: int = 0
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
-    autoclaim_start_id: Optional[str] = None
+    autoclaim_start_id: str | None = None
     backoff_initial_delay: float = 0.1  # 100ms first retry
     backoff_max_delay: float = 30.0  # cap at 30 seconds
-    backoff_max_attempts: Optional[int] = None  # None = infinite retry
+    backoff_max_attempts: int | None = None  # None = infinite retry
 
 
 class RedisConsumer(AbstractConsumer):
@@ -80,7 +80,7 @@ class RedisConsumer(AbstractConsumer):
     _loop_tasks: list[asyncio.Task]
     _backoff_initial_delay: float
     _backoff_max_delay: float
-    _backoff_max_attempts: Optional[int]
+    _backoff_max_attempts: int | None
     _backoff_state: dict[str, _BackoffState]
 
     def __init__(
@@ -447,7 +447,7 @@ class RedisConsumer(AbstractConsumer):
             log.exception("Error while reading messages from stream {}: {}", stream_key, e)
 
 
-def _generate_consumer_id(node_id: Optional[str]) -> str:
+def _generate_consumer_id(node_id: str | None) -> str:
     """
     Generate a unique consumer ID based on node ID, installation path, and process index.
 

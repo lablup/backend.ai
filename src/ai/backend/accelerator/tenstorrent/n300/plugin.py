@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -70,7 +69,7 @@ class TTn300Plugin(AbstractComputePlugin):
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[list[TTn300Device]]
+    _all_devices: list[TTn300Device] | None
 
     _tt_devices: list[PciChip]
     _tt_backend: TTSMIBackend

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -22,7 +22,7 @@ class ValidateChannelAction(NotificationAction):
         return "validate_channel"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.channel_id)
 
 
@@ -31,5 +31,5 @@ class ValidateChannelActionResult(BaseActionResult):
     """Result of validating a notification channel."""
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

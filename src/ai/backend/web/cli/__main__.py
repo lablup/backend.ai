@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Optional
 
 import click
 
@@ -43,7 +42,7 @@ def main(
     ctx: click.Context,
     log_level: str,
     debug: bool,
-    config_path: Optional[pathlib.Path] = None,
+    config_path: pathlib.Path | None = None,
 ) -> None:
     """The root entrypoint for unified CLI of the web server"""
     from setproctitle import setproctitle

@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
 )
 
@@ -251,15 +250,15 @@ class GroupNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         scope: ScopeType,
-        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        container_registry_scope: ContainerRegistryScope | None = None,
         permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -359,7 +358,7 @@ class Group(graphene.ObjectType):
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Optional[Group]:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Group | None:
         if row is None:
             return None
         return cls(
@@ -381,7 +380,7 @@ class Group(graphene.ObjectType):
         )
 
     @classmethod
-    def from_dto(cls, dto: Optional[GroupData]) -> Optional[Self]:
+    def from_dto(cls, dto: GroupData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -416,8 +415,8 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
         type: list[ProjectType] | None = None,
     ) -> Sequence[Group]:
         if type is None:
@@ -440,8 +439,8 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_ids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
     ) -> Sequence[Group | None]:
         query = sa.select(groups).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
@@ -464,8 +463,8 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_names: Sequence[str],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select(groups).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
@@ -489,7 +488,7 @@ class Group(graphene.ObjectType):
         user_ids: Sequence[uuid.UUID],
         *,
         type: list[ProjectType] | None = None,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
         if type is None:
             _type = [ProjectType.GENERAL]

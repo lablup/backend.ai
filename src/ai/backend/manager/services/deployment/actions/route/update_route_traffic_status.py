@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -20,7 +20,7 @@ class UpdateRouteTrafficStatusAction(RouteBaseAction):
     traffic_status: RouteTrafficStatus
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.route_id)
 
     @override
@@ -36,5 +36,5 @@ class UpdateRouteTrafficStatusActionResult(BaseActionResult):
     route: RouteInfo
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.route.route_id)

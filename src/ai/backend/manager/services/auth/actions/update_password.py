@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from aiohttp import web
 
@@ -19,7 +19,7 @@ class UpdatePasswordAction(AuthAction):
     new_password_confirm: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -42,5 +42,5 @@ class UpdatePasswordActionResult(BaseActionResult):
     message: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -47,7 +46,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PENDING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for sweep check."""
         return None
 
@@ -71,7 +70,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for sweeping stale sessions."""
         return None
 

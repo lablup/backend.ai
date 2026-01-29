@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -54,7 +53,7 @@ class PaginationInfo(BaseModel):
 
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
+    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class ResourceSlotEntryDTO(BaseModel):
@@ -73,7 +72,7 @@ class ResourceSlotDTO(BaseModel):
 class FairShareSpecDTO(BaseModel):
     """Fair share specification parameters."""
 
-    weight: Optional[Decimal] = Field(
+    weight: Decimal | None = Field(
         default=None,
         description="Base weight for this entity. None means use resource group's default_weight.",
     )
@@ -121,7 +120,7 @@ class DomainFairShareDTO(BaseResponseModel):
 class GetDomainFairShareResponse(BaseResponseModel):
     """Response for getting a single domain fair share."""
 
-    item: Optional[DomainFairShareDTO] = Field(default=None, description="Domain fair share data")
+    item: DomainFairShareDTO | None = Field(default=None, description="Domain fair share data")
 
 
 class SearchDomainFairSharesResponse(BaseResponseModel):
@@ -159,7 +158,7 @@ class ProjectFairShareDTO(BaseResponseModel):
 class GetProjectFairShareResponse(BaseResponseModel):
     """Response for getting a single project fair share."""
 
-    item: Optional[ProjectFairShareDTO] = Field(default=None, description="Project fair share data")
+    item: ProjectFairShareDTO | None = Field(default=None, description="Project fair share data")
 
 
 class SearchProjectFairSharesResponse(BaseResponseModel):
@@ -199,7 +198,7 @@ class UserFairShareDTO(BaseResponseModel):
 class GetUserFairShareResponse(BaseResponseModel):
     """Response for getting a single user fair share."""
 
-    item: Optional[UserFairShareDTO] = Field(default=None, description="User fair share data")
+    item: UserFairShareDTO | None = Field(default=None, description="User fair share data")
 
 
 class SearchUserFairSharesResponse(BaseResponseModel):

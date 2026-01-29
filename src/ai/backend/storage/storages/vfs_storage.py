@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 import aiofiles
 import aiofiles.os
@@ -60,7 +60,7 @@ class VFSFileDownloadServerStreamReader(StreamReader):
                 yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/octet-stream"
 
 
@@ -69,7 +69,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
 
     _directory_path: Path
     _chunk_size: int
-    _temp_file: Optional[Path]
+    _temp_file: Path | None
 
     def __init__(self, directory_path: Path, chunk_size: int) -> None:
         self._directory_path = directory_path
@@ -107,7 +107,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
                 log.debug(f"Cleaned up temp file: {self._temp_file}")
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/x-tar"
 
     def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
@@ -133,7 +133,7 @@ class VFSStorage(AbstractStorage):
     _upload_chunk_size: int
     _download_chunk_size: int
     _temporary: bool
-    _max_file_size: Optional[int]
+    _max_file_size: int | None
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
         self._name = name
@@ -199,7 +199,7 @@ class VFSStorage(AbstractStorage):
 
         return full_path
 
-    def _validate_upload_constraints(self, filepath: str, file_size: Optional[int] = None) -> None:
+    def _validate_upload_constraints(self, filepath: str, file_size: int | None = None) -> None:
         """Validate upload constraints (file extension, size, read-only mode)."""
         # Check file size
         if self._max_file_size and file_size and file_size > self._max_file_size:

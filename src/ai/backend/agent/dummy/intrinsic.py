@@ -1,7 +1,7 @@
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiodocker
 
@@ -59,7 +59,7 @@ class CPUPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -210,7 +210,7 @@ class MemoryPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:

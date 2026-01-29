@@ -4,7 +4,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Optional
 
 from aiotools import cancel_and_wait
 
@@ -41,10 +40,10 @@ class RegisteredChecker:
     """
 
     checker: ServiceHealthChecker
-    result: Optional[ServiceHealth] = None
+    result: ServiceHealth | None = None
 
     @property
-    def current_result(self) -> Optional[ServiceHealth]:
+    def current_result(self) -> ServiceHealth | None:
         """
         Get the current health check result.
 
@@ -65,7 +64,7 @@ class HealthProbe:
 
     _checkers: dict[ServiceGroup, RegisteredChecker]
     _lock: asyncio.Lock
-    _loop_task: Optional[asyncio.Task]
+    _loop_task: asyncio.Task | None
     _running: bool
     _options: HealthProbeOptions
 

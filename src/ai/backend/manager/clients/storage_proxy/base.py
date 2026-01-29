@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 import aiohttp
 import yarl
@@ -178,7 +178,7 @@ class StorageProxyHTTPClient:
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
         request_timeout: ClientTimeout,
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         """
         Make an HTTP request using the session client.
 

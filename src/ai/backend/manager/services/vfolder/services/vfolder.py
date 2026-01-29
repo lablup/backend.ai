@@ -2,7 +2,6 @@ import logging
 import uuid
 from pathlib import PurePosixPath
 from typing import (
-    Optional,
     cast,
 )
 
@@ -154,11 +153,11 @@ class VFolderService:
             if action.group_id_or_name is not None:
                 raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
 
-        group_uuid: Optional[uuid.UUID] = None
-        group_type: Optional[ProjectType] = None
+        group_uuid: uuid.UUID | None = None
+        group_type: ProjectType | None = None
         max_vfolder_count: int
         max_quota_scope_size: int
-        container_uid: Optional[int] = None
+        container_uid: int | None = None
 
         # Get resource information using repository
         match group_id_or_name:

@@ -1,6 +1,5 @@
 import logging
 from typing import (
-    Optional,
     Self,
 )
 
@@ -67,7 +66,7 @@ class ValkeyContainerLogClient:
         *,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> Self:
         """
         Create a ValkeyContainerLogClient instance.
@@ -157,7 +156,7 @@ class ValkeyContainerLogClient:
         self,
         container_id: str,
         count: int = 1,
-    ) -> Optional[list[ContainerLogData]]:
+    ) -> list[ContainerLogData] | None:
         """
         Pop logs for a specific container.
 

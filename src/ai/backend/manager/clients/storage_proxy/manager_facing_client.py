@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 import aiohttp
@@ -395,7 +395,7 @@ class StorageProxyManagerFacingClient:
         vfid: str,
         relpath: str | list[str],
         exist_ok: bool,
-        parents: Optional[bool] = None,
+        parents: bool | None = None,
     ) -> Mapping[str, Any]:
         """
         Create a directory in a folder.
@@ -563,7 +563,7 @@ class StorageProxyManagerFacingClient:
         vfid: str,
         relpath: str,
         archive: bool = False,
-        unmanaged_path: Optional[str] = None,
+        unmanaged_path: str | None = None,
     ) -> Mapping[str, Any]:
         """
         Download a file from the storage proxy.

@@ -3,7 +3,7 @@ import os
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.json import dump_json
@@ -21,15 +21,15 @@ from ai.backend.common.types import (
 @dataclass
 class SSHSpec:
     config_dir: Path
-    ssh_keypair: Optional[ClusterSSHKeyPair]
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
+    ssh_keypair: ClusterSSHKeyPair | None
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
 
     agent_kernel_features: frozenset[KernelFeatures]
     agent_kernel_uid: int
     agent_kernel_gid: int
 
-    overriding_uid: Optional[int]
-    overriding_gid: Optional[int]
+    overriding_uid: int | None
+    overriding_gid: int | None
     supplementary_gids: set[int]
 
 
@@ -39,9 +39,9 @@ class SSHSpecGenerator(ArgsSpecGenerator[SSHSpec]):
 
 @dataclass
 class SSHResult:
-    pub_key_path: Optional[Path]
-    priv_key_path: Optional[Path]
-    port_mapping_json_path: Optional[Path]
+    pub_key_path: Path | None
+    priv_key_path: Path | None
+    port_mapping_json_path: Path | None
 
 
 class Chowner:
@@ -49,9 +49,7 @@ class Chowner:
         self._spec = spec
         self._euid = os.geteuid()
 
-    def chown_paths_if_root(
-        self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]
-    ) -> None:
+    def chown_paths_if_root(self, paths: Iterable[Path], uid: int | None, gid: int | None) -> None:
         if self._euid == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self._spec.agent_kernel_features:

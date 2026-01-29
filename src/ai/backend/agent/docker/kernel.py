@@ -13,7 +13,7 @@ import subprocess
 import textwrap
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Final, Optional, cast, override
+from typing import Any, Final, cast, override
 
 import aiohttp
 import janus
@@ -482,7 +482,7 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, Optional[str]]:
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, str | None]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.observer.types import AbstractObserver
@@ -58,7 +58,7 @@ class KernelPresenceObserver(AbstractObserver):
 
     @classmethod
     @override
-    def timeout(cls) -> Optional[float]:
+    def timeout(cls) -> float | None:
         return 10.0
 
     @override

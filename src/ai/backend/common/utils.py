@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     TypeVar,
 )
 
@@ -178,7 +177,7 @@ def pprint_with_type(
 def nmget(
     o: Mapping[str, Any],
     key_path: str,
-    def_val: Optional[Any] = None,
+    def_val: Any | None = None,
     path_delimiter: str = ".",
     null_as_default: bool = True,
 ) -> Any:
@@ -538,7 +537,7 @@ async def umount(
     return True
 
 
-async def chown(path: Path | str, uid_gid: str, mount_prefix: Optional[str | Path] = None) -> None:
+async def chown(path: Path | str, uid_gid: str, mount_prefix: str | Path | None = None) -> None:
     mounted = Path(mount_prefix or "/", path)
     await asyncio.create_subprocess_exec(
         "chown",
@@ -557,7 +556,7 @@ def is_ip_address_format(str: str) -> bool:
         return False
 
 
-def join_non_empty(*args: Optional[str], sep: str) -> str:
+def join_non_empty(*args: str | None, sep: str) -> str:
     """
     Joins non-empty strings from the given arguments using the specified separator.
     """

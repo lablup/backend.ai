@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Optional
 from uuid import UUID
 
 import click
@@ -44,8 +43,8 @@ def domain() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def domain_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -147,9 +146,9 @@ def project() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def project_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    project_id: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    project_id: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -254,10 +253,10 @@ def user() -> None:
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def user_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    user_uuid: Optional[str],
-    project_id: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    user_uuid: str | None,
+    project_id: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,

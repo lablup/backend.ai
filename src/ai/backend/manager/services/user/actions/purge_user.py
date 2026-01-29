@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -14,7 +14,7 @@ class PurgeUserAction(UserAction):
     purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState.nop)
     delegate_endpoint_ownership: OptionalState[bool] = field(default_factory=OptionalState.nop)
 
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -25,5 +25,5 @@ class PurgeUserAction(UserAction):
 
 @dataclass
 class PurgeUserActionResult(BaseActionResult):
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

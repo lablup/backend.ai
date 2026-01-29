@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ResultSet
@@ -122,7 +122,7 @@ class JsonOutputHandler(BaseOutputHandler):
         self,
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
-        page_size: Optional[int] = None,
+        page_size: int | None = None,
         plain: bool = False,
     ) -> None:
         page_size = page_size or 20
@@ -151,8 +151,8 @@ class JsonOutputHandler(BaseOutputHandler):
     def print_mutation_result(
         self,
         item: Mapping[str, Any],
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         data = {
@@ -174,10 +174,10 @@ class JsonOutputHandler(BaseOutputHandler):
 
     def print_mutation_error(
         self,
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
         msg: str = "Failed",
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         data = {

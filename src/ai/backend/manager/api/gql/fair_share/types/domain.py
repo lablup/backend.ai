@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Optional, override
+from typing import Any, override
 
 import strawberry
 from strawberry import ID, Info
@@ -71,14 +71,14 @@ class DomainFairShareGQL(Node):
     async def project_fair_shares(
         self,
         info: Info,
-        filter: Optional[ProjectFairShareFilter] = None,
-        order_by: Optional[list[ProjectFairShareOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: ProjectFairShareFilter | None = None,
+        order_by: list[ProjectFairShareOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ProjectFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher import fetch_project_fair_shares
         from ai.backend.manager.repositories.fair_share.options import ProjectFairShareConditions
@@ -152,14 +152,14 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
 class DomainFairShareFilter(GQLFilter):
     """Filter for domain fair shares."""
 
-    resource_group: Optional[StringFilter] = strawberry.field(
+    resource_group: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define resource pool boundaries "
             "where domains compete for resources. Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
-    domain_name: Optional[StringFilter] = strawberry.field(
+    domain_name: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by domain name. Domains are organizational units containing projects and users. "
@@ -167,15 +167,15 @@ class DomainFairShareFilter(GQLFilter):
         ),
     )
 
-    AND: Optional[list[DomainFairShareFilter]] = strawberry.field(
+    AND: list[DomainFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: Optional[list[DomainFairShareFilter]] = strawberry.field(
+    OR: list[DomainFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: Optional[list[DomainFairShareFilter]] = strawberry.field(
+    NOT: list[DomainFairShareFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

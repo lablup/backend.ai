@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, override
+from typing import Any, override
 
 import strawberry
 from strawberry import ID, Info
@@ -99,14 +99,14 @@ class DomainUsageBucketGQL(Node):
     async def project_usage_buckets(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[ProjectUsageBucketFilter] = None,
-        order_by: Optional[list[ProjectUsageBucketOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: ProjectUsageBucketFilter | None = None,
+        order_by: list[ProjectUsageBucketOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ProjectUsageBucketConnection:
         from ai.backend.manager.api.gql.resource_usage.fetcher.project_usage import (
             fetch_project_usage_buckets,
@@ -160,14 +160,14 @@ class DomainUsageBucketConnection(Connection[DomainUsageBucketGQL]):
 class DomainUsageBucketFilter(GQLFilter):
     """Filter for domain usage buckets."""
 
-    resource_group: Optional[StringFilter] = strawberry.field(
+    resource_group: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define where usage was recorded. "
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
-    domain_name: Optional[StringFilter] = strawberry.field(
+    domain_name: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by domain name. This filters usage buckets for a specific domain. "
@@ -175,15 +175,15 @@ class DomainUsageBucketFilter(GQLFilter):
         ),
     )
 
-    AND: Optional[list[DomainUsageBucketFilter]] = strawberry.field(
+    AND: list[DomainUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: Optional[list[DomainUsageBucketFilter]] = strawberry.field(
+    OR: list[DomainUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: Optional[list[DomainUsageBucketFilter]] = strawberry.field(
+    NOT: list[DomainUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

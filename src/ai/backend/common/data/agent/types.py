@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -14,10 +14,10 @@ class ImageOpts(BaseModel):
 
 class AgentInfo(BaseModel):
     ip: str
-    region: Optional[str]
+    region: str | None
     scaling_group: str
     addr: str
-    public_key: Optional[PublicKey]
+    public_key: PublicKey | None
     public_host: str
     available_resource_slots: ResourceSlot
     slot_key_and_units: dict[SlotName, SlotTypes]

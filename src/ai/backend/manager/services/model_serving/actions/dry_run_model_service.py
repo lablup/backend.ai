@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from pydantic import AnyUrl
 
@@ -21,11 +21,11 @@ class DryRunModelServiceAction(ModelServiceAction):
     domain_name: str
     cluster_size: int
     cluster_mode: ClusterMode
-    tag: Optional[str]
-    startup_command: Optional[str]
-    bootstrap_script: Optional[str]
-    callback_url: Optional[AnyUrl]
-    owner_access_key: Optional[str]
+    tag: str | None
+    startup_command: str | None
+    bootstrap_script: str | None
+    callback_url: AnyUrl | None
+    owner_access_key: str | None
     open_to_public: bool
     config: ServiceConfig
 
@@ -35,7 +35,7 @@ class DryRunModelServiceAction(ModelServiceAction):
     model_service_prepare_ctx: ModelServicePrepareCtx
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -49,5 +49,5 @@ class DryRunModelServiceActionResult(BaseActionResult):
     task_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

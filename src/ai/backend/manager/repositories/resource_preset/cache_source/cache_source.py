@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -29,7 +28,7 @@ class ResourcePresetCacheSource:
     def __init__(self, valkey_stat: ValkeyStatClient) -> None:
         self._valkey_stat = valkey_stat
 
-    async def get_preset_by_id(self, preset_id: UUID) -> Optional[ResourcePresetData]:
+    async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData | None:
         """
         Get a preset from cache by ID.
         Returns None if not in cache.
@@ -39,7 +38,7 @@ class ResourcePresetCacheSource:
             return ResourcePresetData.from_cache(load_json(data))
         return None
 
-    async def get_preset_by_name(self, name: str) -> Optional[ResourcePresetData]:
+    async def get_preset_by_name(self, name: str) -> ResourcePresetData | None:
         """
         Get a preset from cache by name.
         Returns None if not in cache.
@@ -62,8 +61,8 @@ class ResourcePresetCacheSource:
         )
 
     async def get_preset_list(
-        self, scaling_group: Optional[str] = None
-    ) -> Optional[list[ResourcePresetData]]:
+        self, scaling_group: str | None = None
+    ) -> list[ResourcePresetData] | None:
         """
         Get cached preset list for a scaling group.
         """
@@ -74,7 +73,7 @@ class ResourcePresetCacheSource:
         return None
 
     async def set_preset_list(
-        self, presets: list[ResourcePresetData], scaling_group: Optional[str] = None
+        self, presets: list[ResourcePresetData], scaling_group: str | None = None
     ) -> None:
         """
         Cache a list of presets for a scaling group.
@@ -89,8 +88,8 @@ class ResourcePresetCacheSource:
         access_key: AccessKey,
         group: str,
         domain: str,
-        scaling_group: Optional[str] = None,
-    ) -> Optional[bytes]:
+        scaling_group: str | None = None,
+    ) -> bytes | None:
         """
         Get cached check presets data as JSON string.
         Returns the raw JSON string to avoid complex deserialization.
@@ -104,7 +103,7 @@ class ResourcePresetCacheSource:
         access_key: AccessKey,
         group: str,
         domain: str,
-        scaling_group: Optional[str],
+        scaling_group: str | None,
         data: bytes,
     ) -> None:
         """
@@ -116,7 +115,7 @@ class ResourcePresetCacheSource:
         )
 
     async def invalidate_preset(
-        self, preset_id: Optional[UUID] = None, name: Optional[str] = None
+        self, preset_id: UUID | None = None, name: str | None = None
     ) -> None:
         """
         Invalidate a cached preset.

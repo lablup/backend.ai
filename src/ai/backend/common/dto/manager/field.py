@@ -1,5 +1,4 @@
 import enum
-from typing import Optional
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.types import VFolderUsageMode
@@ -41,8 +40,8 @@ class VFolderItemField(BaseFieldModel):
     max_size: int
     creator: str
     ownership_type: VFolderOwnershipTypeField
-    user: Optional[str]
-    group: Optional[str]
+    user: str | None
+    group: str | None
     cloneable: bool
     status: VFolderOperationStatusField
     is_owner: bool

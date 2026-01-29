@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -27,7 +27,7 @@ class UserInfo:
 @dataclass
 class DomainData:
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
     created_at: datetime = field(compare=False)
     modified_at: datetime = field(compare=False)
@@ -35,7 +35,7 @@ class DomainData:
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]
     dotfiles: bytes
-    integration_id: Optional[str]
+    integration_id: str | None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(

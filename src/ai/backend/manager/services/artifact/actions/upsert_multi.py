@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
@@ -11,7 +11,7 @@ class UpsertArtifactsAction(ArtifactAction):
     data: list[ArtifactDataWithRevisions]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -25,5 +25,5 @@ class UpsertArtifactsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

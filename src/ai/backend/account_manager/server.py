@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import (
     Any,
     Final,
-    Optional,
     cast,
 )
 
@@ -186,8 +185,8 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    _subapp_pkgs: Optional[Sequence[str]] = None,
-    _scheduler_opts: Optional[Mapping[str, Any]] = None,
+    _subapp_pkgs: Sequence[str] | None = None,
+    _scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
@@ -423,7 +422,7 @@ async def server_main_logwrapper(
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Optional[Path],
+    config_path: Path | None,
     debug: bool,
     log_level: LogLevel,
 ) -> None:

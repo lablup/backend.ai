@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -41,7 +41,7 @@ def main(
     ctx: click.Context,
     debug: bool,
     log_level: str,
-    config_path: Optional[Path] = None,
+    config_path: Path | None = None,
 ) -> None:
     """
     Proxy Worker Administration CLI

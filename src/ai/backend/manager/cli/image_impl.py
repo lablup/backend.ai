@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 from pprint import pformat, pprint
-from typing import Any, Optional
+from typing import Any
 
 import click
 import sqlalchemy as sa
@@ -174,7 +174,7 @@ async def set_image_resource_limit(
 
 
 async def rescan_images(
-    cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None
+    cli_ctx: CLIContext, registry_or_image: str, project: str | None = None
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
@@ -245,7 +245,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
-def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+def _resolve_architecture(current: bool, architecture: str | None) -> str:
     if architecture is not None:
         return architecture
     if current:
@@ -255,7 +255,7 @@ def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
 
 
 async def validate_image_canonical(
-    cli_ctx: CLIContext, canonical: str, current: bool, architecture: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (

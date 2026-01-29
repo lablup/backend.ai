@@ -13,7 +13,6 @@ from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
 from pathlib import Path, PosixPath
-from typing import Optional
 
 import aiodns
 import aiohttp
@@ -77,7 +76,7 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
         return CloudProvider.GCP
 
 
-async def detect_cloud() -> Optional[CloudProvider]:
+async def detect_cloud() -> CloudProvider | None:
     """
     Detect the cloud provider using asyncio.staggered_race()
     to get the fastest returning result from multiple metadata URL detectors.
@@ -167,7 +166,7 @@ else:
 
 _defined: bool = False
 get_instance_id: Callable[[], Awaitable[str]]
-get_instance_ip: Callable[[Optional[BaseIPNetwork]], Awaitable[str]]
+get_instance_ip: Callable[[BaseIPNetwork | None], Awaitable[str]]
 get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
@@ -192,7 +191,7 @@ def _define_functions() -> None:
                     _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
                 )
 
-            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
             async def _get_instance_type() -> str:
@@ -224,7 +223,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
@@ -281,7 +280,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 return await curl(
                     _metadata_prefix + "instance/network-interfaces/0/ip",
                     "127.0.0.1",
@@ -310,7 +309,7 @@ def _define_functions() -> None:
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
 
-            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
                 if _subnet_hint is not None and _subnet_hint.prefixlen > 0:
                     local_ipaddrs = [*fetch_local_ipaddrs(_subnet_hint)]
                     if local_ipaddrs:

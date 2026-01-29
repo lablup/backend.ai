@@ -5,7 +5,6 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from pydantic import Field
@@ -53,16 +52,16 @@ class CreateRoleRequest(BaseRequestModel):
     name: str = Field(description="Role name")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
     status: RoleStatus = Field(default=RoleStatus.ACTIVE, description="Role status")
-    description: Optional[str] = Field(default=None, description="Role description")
+    description: str | None = Field(default=None, description="Role description")
 
 
 class UpdateRoleRequest(BaseRequestModel):
     """Request to update a role."""
 
-    name: Optional[str] = Field(default=None, description="Updated role name")
-    source: Optional[RoleSource] = Field(default=None, description="Updated role source")
-    status: Optional[RoleStatus] = Field(default=None, description="Updated role status")
-    description: Optional[str | Sentinel] = Field(
+    name: str | None = Field(default=None, description="Updated role name")
+    source: RoleSource | None = Field(default=None, description="Updated role source")
+    status: RoleStatus | None = Field(default=None, description="Updated role status")
+    description: str | Sentinel | None = Field(
         default=SENTINEL, description="Updated role description"
     )
 
@@ -84,7 +83,7 @@ class AssignRoleRequest(BaseRequestModel):
 
     user_id: UUID = Field(description="User ID to assign the role to")
     role_id: UUID = Field(description="Role ID to assign")
-    granted_by: Optional[UUID] = Field(
+    granted_by: UUID | None = Field(
         default=None, description="User ID who granted this role assignment"
     )
 
@@ -99,11 +98,9 @@ class RevokeRoleRequest(BaseRequestModel):
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    sources: Optional[list[RoleSource]] = Field(default=None, description="Filter by role sources")
-    statuses: Optional[list[RoleStatus]] = Field(
-        default=None, description="Filter by role statuses"
-    )
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    sources: list[RoleSource] | None = Field(default=None, description="Filter by role sources")
+    statuses: list[RoleStatus] | None = Field(default=None, description="Filter by role statuses")
 
 
 class RoleOrder(BaseRequestModel):
@@ -116,8 +113,8 @@ class RoleOrder(BaseRequestModel):
 class SearchRolesRequest(BaseRequestModel):
     """Request body for searching roles with filters, orders, and pagination."""
 
-    filter: Optional[RoleFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[RoleOrder]] = Field(default=None, description="Order specifications")
+    filter: RoleFilter | None = Field(default=None, description="Filter conditions")
+    order: list[RoleOrder] | None = Field(default=None, description="Order specifications")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )
@@ -127,9 +124,9 @@ class SearchRolesRequest(BaseRequestModel):
 class AssignedUserFilter(BaseRequestModel):
     """Filter for assigned users."""
 
-    username: Optional[StringFilter] = Field(default=None, description="Filter by username")
-    email: Optional[StringFilter] = Field(default=None, description="Filter by email")
-    granted_by: Optional[UUID] = Field(default=None, description="Filter by 'granted_by' user ID")
+    username: StringFilter | None = Field(default=None, description="Filter by username")
+    email: StringFilter | None = Field(default=None, description="Filter by email")
+    granted_by: UUID | None = Field(default=None, description="Filter by 'granted_by' user ID")
 
 
 class AssignedUserOrder(BaseRequestModel):
@@ -142,10 +139,8 @@ class AssignedUserOrder(BaseRequestModel):
 class SearchUsersAssignedToRoleRequest(BaseRequestModel):
     """Request body for searching users assigned to a specific role."""
 
-    filter: Optional[AssignedUserFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[AssignedUserOrder]] = Field(
-        default=None, description="Order specifications"
-    )
+    filter: AssignedUserFilter | None = Field(default=None, description="Filter conditions")
+    order: list[AssignedUserOrder] | None = Field(default=None, description="Order specifications")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )
@@ -178,7 +173,7 @@ class CreateObjectPermissionRequest(BaseRequestModel):
 class ScopeFilter(BaseRequestModel):
     """Filter for scopes."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
+    name: StringFilter | None = Field(default=None, description="Filter by name")
 
 
 class ScopeOrder(BaseRequestModel):
@@ -191,8 +186,8 @@ class ScopeOrder(BaseRequestModel):
 class SearchScopesRequest(BaseRequestModel):
     """Request body for searching scopes with filters and pagination."""
 
-    filter: Optional[ScopeFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[ScopeOrder]] = Field(default=None, description="Order specifications")
+    filter: ScopeFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ScopeOrder] | None = Field(default=None, description="Order specifications")
     limit: int = Field(
         default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -113,8 +112,8 @@ class GetUserFairShareRequest(BaseRequestModel):
 class SearchDomainFairSharesRequest(BaseRequestModel):
     """Request body for searching domain fair shares."""
 
-    filter: Optional[DomainFairShareFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[DomainFairShareOrder]] = Field(
+    filter: DomainFairShareFilter | None = Field(default=None, description="Filter conditions")
+    order: list[DomainFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -124,8 +123,8 @@ class SearchDomainFairSharesRequest(BaseRequestModel):
 class SearchProjectFairSharesRequest(BaseRequestModel):
     """Request body for searching project fair shares."""
 
-    filter: Optional[ProjectFairShareFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[ProjectFairShareOrder]] = Field(
+    filter: ProjectFairShareFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ProjectFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -135,10 +134,8 @@ class SearchProjectFairSharesRequest(BaseRequestModel):
 class SearchUserFairSharesRequest(BaseRequestModel):
     """Request body for searching user fair shares."""
 
-    filter: Optional[UserFairShareFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[UserFairShareOrder]] = Field(
-        default=None, description="Order specifications"
-    )
+    filter: UserFairShareFilter | None = Field(default=None, description="Filter conditions")
+    order: list[UserFairShareOrder] | None = Field(default=None, description="Order specifications")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -146,8 +143,8 @@ class SearchUserFairSharesRequest(BaseRequestModel):
 class SearchDomainUsageBucketsRequest(BaseRequestModel):
     """Request body for searching domain usage buckets."""
 
-    filter: Optional[DomainUsageBucketFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[DomainUsageBucketOrder]] = Field(
+    filter: DomainUsageBucketFilter | None = Field(default=None, description="Filter conditions")
+    order: list[DomainUsageBucketOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -157,10 +154,8 @@ class SearchDomainUsageBucketsRequest(BaseRequestModel):
 class SearchProjectUsageBucketsRequest(BaseRequestModel):
     """Request body for searching project usage buckets."""
 
-    filter: Optional[ProjectUsageBucketFilter] = Field(
-        default=None, description="Filter conditions"
-    )
-    order: Optional[list[ProjectUsageBucketOrder]] = Field(
+    filter: ProjectUsageBucketFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ProjectUsageBucketOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -170,8 +165,8 @@ class SearchProjectUsageBucketsRequest(BaseRequestModel):
 class SearchUserUsageBucketsRequest(BaseRequestModel):
     """Request body for searching user usage buckets."""
 
-    filter: Optional[UserUsageBucketFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[UserUsageBucketOrder]] = Field(
+    filter: UserUsageBucketFilter | None = Field(default=None, description="Filter conditions")
+    order: list[UserUsageBucketOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -224,7 +219,7 @@ class UpsertDomainFairShareWeightRequest(BaseRequestModel):
     Set weight to null to use the resource group's default_weight.
     """
 
-    weight: Optional[Decimal] = Field(
+    weight: Decimal | None = Field(
         default=None,
         description=(
             "Priority weight multiplier. Higher weight = higher priority. "
@@ -240,7 +235,7 @@ class UpsertProjectFairShareWeightRequest(BaseRequestModel):
     """
 
     domain_name: str = Field(description="Domain name the project belongs to")
-    weight: Optional[Decimal] = Field(
+    weight: Decimal | None = Field(
         default=None,
         description=(
             "Priority weight multiplier. Higher weight = higher priority. "
@@ -256,7 +251,7 @@ class UpsertUserFairShareWeightRequest(BaseRequestModel):
     """
 
     domain_name: str = Field(description="Domain name the user belongs to")
-    weight: Optional[Decimal] = Field(
+    weight: Decimal | None = Field(
         default=None,
         description=(
             "Priority weight multiplier. Higher weight = higher priority. "
@@ -275,7 +270,7 @@ class ResourceWeightEntryInput(BaseModel):
     """
 
     resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
-    weight: Optional[Decimal] = Field(
+    weight: Decimal | None = Field(
         default=None,
         description=(
             "Weight multiplier for this resource type. "
@@ -290,23 +285,23 @@ class UpdateResourceGroupFairShareSpecRequest(BaseRequestModel):
     All fields are optional. Only provided fields are updated; others retain existing values.
     """
 
-    half_life_days: Optional[int] = Field(
+    half_life_days: int | None = Field(
         default=None,
         description="Half-life for exponential decay in days. Leave null to keep existing value.",
     )
-    lookback_days: Optional[int] = Field(
+    lookback_days: int | None = Field(
         default=None,
         description="Total lookback period in days. Leave null to keep existing value.",
     )
-    decay_unit_days: Optional[int] = Field(
+    decay_unit_days: int | None = Field(
         default=None,
         description="Granularity of decay buckets in days. Leave null to keep existing value.",
     )
-    default_weight: Optional[Decimal] = Field(
+    default_weight: Decimal | None = Field(
         default=None,
         description="Default weight for entities. Leave null to keep existing value.",
     )
-    resource_weights: Optional[list[ResourceWeightEntryInput]] = Field(
+    resource_weights: list[ResourceWeightEntryInput] | None = Field(
         default=None,
         description=(
             "Resource weights for fair share calculation. "

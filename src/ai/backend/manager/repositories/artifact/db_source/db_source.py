@@ -2,7 +2,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -821,9 +821,9 @@ class ArtifactDBSource:
     async def list_artifacts_with_revisions_paginated(
         self,
         *,
-        pagination: Optional[PaginationOptions] = None,
-        ordering: Optional[ArtifactOrderingOptions] = None,
-        filters: Optional[ArtifactFilterOptions] = None,
+        pagination: PaginationOptions | None = None,
+        ordering: ArtifactOrderingOptions | None = None,
+        filters: ArtifactFilterOptions | None = None,
     ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
         """List artifacts with their revisions using pagination and filtering.
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -34,7 +34,7 @@ class AppConfigDBSource:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-    ) -> Optional[AppConfigData]:
+    ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
         async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(

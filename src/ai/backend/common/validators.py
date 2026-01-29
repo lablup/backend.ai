@@ -2,6 +2,8 @@
 An extension module to Trafaret which provides additional type checkers.
 """
 
+from __future__ import annotations
+
 import datetime
 import enum
 import ipaddress
@@ -18,7 +20,6 @@ from pathlib import PurePath as _PurePath
 from typing import (
     Any,
     Literal,
-    Optional,
     TypeVar,
 )
 
@@ -152,7 +153,7 @@ class DelimiterSeperatedList[TItem](t.Trafaret):
         trafaret: type[t.Trafaret] | t.Trafaret,
         *,
         delimiter: str = ",",
-        min_length: Optional[int] = None,
+        min_length: int | None = None,
         empty_str_as_empty_list: bool = False,
     ) -> None:
         self.delimiter = delimiter
@@ -183,7 +184,7 @@ class StringList(DelimiterSeperatedList[str]):
         *,
         delimiter: str = ",",
         allow_blank: bool = False,
-        min_length: Optional[int] = None,
+        min_length: int | None = None,
         empty_str_as_empty_list: bool = False,
     ) -> None:
         super().__init__(
@@ -223,7 +224,7 @@ class PurePath(t.Trafaret):
     def __init__(
         self,
         *,
-        base_path: Optional[_PurePath] = None,
+        base_path: _PurePath | None = None,
         relative_only: bool = False,
     ) -> None:
         super().__init__()
@@ -251,7 +252,7 @@ class Path(PurePath):
         self,
         *,
         type: Literal["dir", "file"],
-        base_path: Optional[_Path] = None,
+        base_path: _Path | None = None,
         auto_create: bool = False,
         allow_nonexisting: bool = False,
         allow_devnull: bool = False,
@@ -380,7 +381,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: Optional[int] = None) -> None:
+    def __init__(self, *, default_uid: int | None = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -412,7 +413,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: Optional[int] = None) -> None:
+    def __init__(self, *, default_gid: int | None = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
@@ -604,8 +605,8 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
     def __init__(
         self,
         *,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
+        min_length: int | None = None,
+        max_length: int | None = None,
         allow_dot: bool = False,
         allow_space: bool = False,
         allow_unicode: bool = False,
@@ -657,7 +658,7 @@ if jwt_available:
             self,
             *,
             secret: str,
-            inner_iv: Optional[t.Trafaret] = None,
+            inner_iv: t.Trafaret | None = None,
             algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret

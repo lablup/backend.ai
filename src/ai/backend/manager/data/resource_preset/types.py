@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.types import BinarySize, ResourceSlot
@@ -12,8 +12,8 @@ class ResourcePresetData:
     id: UUID
     name: str
     resource_slots: ResourceSlot
-    shared_memory: Optional[int]
-    scaling_group_name: Optional[str]
+    shared_memory: int | None
+    scaling_group_name: str | None
 
     def to_cache(self) -> dict[str, Any]:
         """Serialize to cache-friendly format."""

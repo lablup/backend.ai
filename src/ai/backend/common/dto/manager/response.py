@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from graphql import GraphQLFormattedError
 from graphql.language.location import FormattedSourceLocation
@@ -37,15 +37,15 @@ class GraphQLResponse(BaseResponseModel):
     Used in V2 API for handling GraphQL requests.
     """
 
-    data: Optional[dict[str, Any]] = Field(
+    data: dict[str, Any] | None = Field(
         default=None,
         description="The data returned from the GraphQL query.",
     )
-    errors: Optional[list[GraphQLFormattedError]] = Field(
+    errors: list[GraphQLFormattedError] | None = Field(
         default=None,
         description="A list of errors that occurred during the GraphQL query.",
     )
-    extensions: Optional[dict[str, Any]] = Field(
+    extensions: dict[str, Any] | None = Field(
         default=None,
         description="Additional information about the GraphQL response.",
     )

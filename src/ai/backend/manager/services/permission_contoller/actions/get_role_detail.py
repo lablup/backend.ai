@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -12,7 +12,7 @@ class GetRoleDetailAction(RoleAction):
     role_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.role_id)
 
     @override
@@ -26,5 +26,5 @@ class GetRoleDetailActionResult(BaseActionResult):
     role: RoleDetailData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.role.id)

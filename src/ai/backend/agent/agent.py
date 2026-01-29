@@ -38,7 +38,6 @@ from typing import (
     Concatenate,
     Final,
     Literal,
-    Optional,
     ParamSpec,
     cast,
 )
@@ -402,7 +401,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     @abstractmethod
     async def prepare_resource_spec(
         self,
-    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         """
         Generates base resource spec lacking non agent backend agnostic information
         (e.g. unified device allocation). Do not call this method directly outside
@@ -489,7 +488,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         src: str | Path,
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         """
         Return mount object to mount target krunner file/folder/volume.
@@ -511,7 +510,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts: Optional[Mapping[str, Any]],
+        resource_opts: Mapping[str, Any] | None,
         preopen_ports: list[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
@@ -644,7 +643,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary(f"bssh.{arch}.bin", "/usr/local/bin/bssh")
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
 
-        jail_path: Optional[Path]
+        jail_path: Path | None
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
             jail_candidates = find_artifacts(
                 f"jail.*.{arch}.bin"
@@ -742,11 +741,11 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         self.additional_allowed_syscalls = sorted(additional_allowed_syscalls_set)
         update_additional_gids(environ, list(additional_gid_set))
 
-    def get_overriding_uid(self) -> Optional[int]:
+    def get_overriding_uid(self) -> int | None:
         # TODO(BA-3073): This should be separated out to its own class/module.
         return self.uid
 
-    def get_overriding_gid(self) -> Optional[int]:
+    def get_overriding_gid(self) -> int | None:
         # TODO(BA-3073): This should be separated out to its own class/module.
         return self.main_gid
 
@@ -834,7 +833,7 @@ class AbstractAgent[
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
-    agent_public_key: Optional[PublicKey]
+    agent_public_key: PublicKey | None
 
     stat_ctx: StatContext
     stat_sync_sockpath: Path
@@ -896,7 +895,7 @@ class AbstractAgent[
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
@@ -1192,7 +1191,7 @@ class AbstractAgent[
 
     async def produce_error_event(
         self,
-        exc_info: Optional[tuple[type[BaseException], BaseException, TracebackType]] = None,
+        exc_info: tuple[type[BaseException], BaseException, TracebackType] | None = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -1720,12 +1719,12 @@ class AbstractAgent[
         event: LifecycleEvent,
         reason: KernelLifecycleEventReason,
         *,
-        container_id: Optional[ContainerId] = None,
-        exit_code: Optional[int] = None,
-        done_future: Optional[asyncio.Future] = None,
+        container_id: ContainerId | None = None,
+        exit_code: int | None = None,
+        done_future: asyncio.Future | None = None,
         suppress_events: bool = False,
     ) -> None:
-        cid: Optional[ContainerId] = None
+        cid: ContainerId | None = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
         except KeyError:
@@ -2343,7 +2342,7 @@ class AbstractAgent[
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> AbstractKernelCreationContext:
         raise NotImplementedError
 
@@ -2411,7 +2410,7 @@ class AbstractAgent[
         session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
-        timeout_seconds: Optional[float] = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         kernel_obj = self.kernel_registry.get(kernel_id, None)
         if kernel_obj is None:
@@ -2506,7 +2505,7 @@ class AbstractAgent[
         session_id: SessionId,
         kernel_id: KernelId,
         code_to_execute: str,
-        timeout_seconds: Optional[float] = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         self._ongoing_exec_batch_tasks.add(
             asyncio.create_task(
@@ -2522,7 +2521,7 @@ class AbstractAgent[
         cluster_info: ClusterInfo,
         *,
         restarting: bool = False,
-        throttle_sema: Optional[asyncio.Semaphore] = None,
+        throttle_sema: asyncio.Semaphore | None = None,
     ) -> KernelCreationResult:
         """
         Create a new kernel.
@@ -2830,7 +2829,7 @@ class AbstractAgent[
                         "is_inference": False,
                     })
 
-                    model_definition: Optional[Mapping[str, Any]] = None
+                    model_definition: Mapping[str, Any] | None = None
                     # Read model config
                     model_folders = [
                         folder
@@ -3456,7 +3455,7 @@ class AbstractAgent[
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
     ) -> None:
         """
         Initiate destruction of the kernel.
@@ -3470,7 +3469,7 @@ class AbstractAgent[
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         """
@@ -3610,7 +3609,7 @@ class AbstractAgent[
         self,
         session_id: SessionId,
         kernel_id: KernelId,
-        run_id: Optional[str],
+        run_id: str | None,
         mode: Literal["query", "batch", "input", "continue"],
         text: str,
         *,

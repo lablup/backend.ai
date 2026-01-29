@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import aiotools
@@ -20,8 +20,8 @@ class Tester:
     _spec_manager: TestSpecManager
     _exporter_type: type[TestExporter]
     _config_file_path: Path
-    _config: Optional[TesterConfig]
-    _semaphore_instance: Optional[asyncio.Semaphore]
+    _config: TesterConfig | None
+    _semaphore_instance: asyncio.Semaphore | None
 
     def __init__(
         self,
@@ -51,7 +51,7 @@ class Tester:
             content = tomli.loads(raw_content)
             return TesterConfig.model_validate(content, by_alias=True, by_name=True)
 
-    async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
+    async def _run_single_spec(self, spec: TestSpec, sub_name: str | None = None) -> None:
         async with self._semaphore:
             exporter = await self._exporter_type.create(sub_name)
             runner = TestRunner(spec, exporter)
@@ -67,7 +67,7 @@ class Tester:
                     local_stack.enter_context(ctx_mgr)
             await self._run_single_spec(spec, self._param_to_name(param))
 
-    def _param_to_name(self, param: Mapping[ContextName, Any]) -> Optional[str]:
+    def _param_to_name(self, param: Mapping[ContextName, Any]) -> str | None:
         if not param:
             return None
         param_str = "_".join(f"{key}={value}" for key, value in sorted(param.items()))

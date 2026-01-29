@@ -1,6 +1,6 @@
 import enum
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,20 +27,20 @@ class AllowedGroupsModel(BaseFieldModel):
 class ContainerRegistryModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[uuid.UUID] = None
-    url: Optional[str] = None
-    registry_name: Optional[str] = None
-    type: Optional[ContainerRegistryType] = None
-    project: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-    ssl_verify: Optional[bool] = None
-    is_global: Optional[bool] = None
-    extra: Optional[dict[str, Any]] = None
+    id: uuid.UUID | None = None
+    url: str | None = None
+    registry_name: str | None = None
+    type: ContainerRegistryType | None = None
+    project: str | None = None
+    username: str | None = None
+    password: str | None = None
+    ssl_verify: bool | None = None
+    is_global: bool | None = None
+    extra: dict[str, Any] | None = None
 
 
 class PatchContainerRegistryRequestModel(ContainerRegistryModel, BaseRequestModel):
-    allowed_groups: Optional[AllowedGroupsModel] = None
+    allowed_groups: AllowedGroupsModel | None = None
 
 
 class PatchContainerRegistryResponseModel(ContainerRegistryModel, BaseResponseModel):

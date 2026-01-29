@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID
 
 import aiohttp
@@ -55,9 +55,9 @@ class ResponseFailed(Exception):
 
 class VFolderByName(BaseFunction):
     name: str
-    id: Optional[UUID] = None
+    id: UUID | None = None
 
-    def __init__(self, name: str, id: Optional[UUID] = None) -> None:
+    def __init__(self, name: str, id: UUID | None = None) -> None:
         self.name = name
         self.id = id
 
@@ -66,9 +66,9 @@ class VFolderByName(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: Optional[str] = None,
-        unmanaged_path: Optional[str] = None,
-        group: Optional[str] = None,
+        host: str | None = None,
+        unmanaged_path: str | None = None,
+        group: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
         cloneable: bool = False,
@@ -106,13 +106,13 @@ class VFolderByName(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        group: Optional[str] = None,
+        group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
@@ -140,8 +140,8 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of own vfolders.
@@ -167,8 +167,8 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -194,8 +194,8 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -435,11 +435,11 @@ class VFolderByName(BaseFunction):
         self,
         relative_paths: Sequence[str | Path],
         *,
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
         max_retries: int = 20,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
@@ -476,10 +476,10 @@ class VFolderByName(BaseFunction):
     async def _upload_files(
         self,
         file_paths: Sequence[Path],
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         await self.update_id_by_name()
@@ -528,10 +528,10 @@ class VFolderByName(BaseFunction):
     async def _upload_recursively(
         self,
         source: Sequence[Path],
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
     ) -> None:
         dir_list: list[Path] = []
         file_list: list[Path] = []
@@ -553,11 +553,11 @@ class VFolderByName(BaseFunction):
         self,
         sources: Sequence[str | Path],
         *,
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         recursive: bool = False,
-        dst_dir: Optional[str | Path] = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
         show_progress: bool = False,
     ) -> None:
         if basedir:
@@ -572,8 +572,8 @@ class VFolderByName(BaseFunction):
     async def _mkdir(
         self,
         path: str | Path | list_[str | Path],
-        parents: Optional[bool] = False,
-        exist_ok: Optional[bool] = False,
+        parents: bool | None = False,
+        exist_ok: bool | None = False,
     ) -> ResultSet:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/mkdir")
@@ -590,8 +590,8 @@ class VFolderByName(BaseFunction):
     async def mkdir(
         self,
         path: str | Path | list_[str | Path],
-        parents: Optional[bool] = False,
-        exist_ok: Optional[bool] = False,
+        parents: bool | None = False,
+        exist_ok: bool | None = False,
     ) -> ResultSet:
         return await self._mkdir(path, parents, exist_ok)
 
@@ -671,7 +671,7 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_fstab_contents(cls, agent_id: Optional[str] = None) -> dict[str, Any]:
+    async def get_fstab_contents(cls, agent_id: str | None = None) -> dict[str, Any]:
         params: dict[str, str | int] = {}
         if agent_id is not None:
             params["agent_id"] = agent_id
@@ -703,7 +703,7 @@ class VFolderByName(BaseFunction):
         cls,
         name: str,
         fs_location: str,
-        options: Optional[dict[str, Any]] = None,
+        options: dict[str, Any] | None = None,
         edit_fstab: bool = False,
     ) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/mounts")
@@ -749,7 +749,7 @@ class VFolderByName(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def leave(self, shared_user_uuid: Optional[str] = None) -> dict[str, Any]:
+    async def leave(self, shared_user_uuid: str | None = None) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/leave")
         rqst.set_json({"shared_user_uuid": shared_user_uuid})
@@ -760,7 +760,7 @@ class VFolderByName(BaseFunction):
     async def clone(
         self,
         target_name: str,
-        target_host: Optional[str] = None,
+        target_host: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
     ) -> dict[str, Any]:
@@ -777,7 +777,7 @@ class VFolderByName(BaseFunction):
 
     @api_function
     async def update_options(
-        self, name: str, permission: Optional[str] = None, cloneable: Optional[bool] = None
+        self, name: str, permission: str | None = None, cloneable: bool | None = None
     ) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/update-options")
@@ -805,7 +805,7 @@ class VFolderByName(BaseFunction):
     @api_function
     @classmethod
     async def update_shared_vfolder(
-        cls, vfolder: str, user: str, perm: Optional[str] = None
+        cls, vfolder: str, user: str, perm: str | None = None
     ) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/shared")
         rqst.set_json({

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from decimal import Decimal
-from typing import Optional
 
 import click
 
@@ -100,7 +99,7 @@ def set_resource_limit(
     "-p", "--project", default=None, help="The name of the project to which the images belong."
 )
 @click.pass_obj
-def rescan(cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None) -> None:
+def rescan(cli_ctx: CLIContext, registry_or_image: str, project: str | None = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
 
@@ -154,7 +153,7 @@ def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
 )
 @click.pass_obj
 def validate_image_canonical(
-    cli_ctx: CLIContext, canonical: str, current: bool, arch: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, arch: str | None = None
 ) -> None:
     """
     Validate a local/remote image's labels and platform tag formats by image canonical.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -18,7 +17,7 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 async def load_huggingface_registries_by_ids(
     processor: ArtifactRegistryProcessors,
     registry_ids: Sequence[uuid.UUID],
-) -> list[Optional[HuggingFaceRegistryData]]:
+) -> list[HuggingFaceRegistryData | None]:
     """Batch load HuggingFace registries by their IDs.
 
     Args:

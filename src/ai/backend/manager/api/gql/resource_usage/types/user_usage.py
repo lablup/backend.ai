@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 import strawberry
@@ -119,28 +119,28 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
 class UserUsageBucketFilter(GQLFilter):
     """Filter for user usage buckets."""
 
-    resource_group: Optional[StringFilter] = strawberry.field(
+    resource_group: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define where usage was recorded. "
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
-    user_uuid: Optional[UUIDFilter] = strawberry.field(
+    user_uuid: UUIDFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by user UUID. This filters usage buckets for a specific user. "
             "Supports equals operation for exact match."
         ),
     )
-    project_id: Optional[UUIDFilter] = strawberry.field(
+    project_id: UUIDFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by project UUID. This filters usage buckets for users within a specific project. "
             "Supports equals operation for exact match."
         ),
     )
-    domain_name: Optional[StringFilter] = strawberry.field(
+    domain_name: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by domain name. This filters usage buckets for users within a specific domain. "
@@ -148,15 +148,15 @@ class UserUsageBucketFilter(GQLFilter):
         ),
     )
 
-    AND: Optional[list[UserUsageBucketFilter]] = strawberry.field(
+    AND: list[UserUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: Optional[list[UserUsageBucketFilter]] = strawberry.field(
+    OR: list[UserUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: Optional[list[UserUsageBucketFilter]] = strawberry.field(
+    NOT: list[UserUsageBucketFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

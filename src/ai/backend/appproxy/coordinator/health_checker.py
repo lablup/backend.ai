@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import aiohttp
@@ -64,7 +64,7 @@ class HealthCheckEngine:
         self.circuit_manager = circuit_manager
         self.health_check_timer_interval = health_check_timer_interval
         self.valkey_schedule = valkey_schedule
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def start(self) -> None:
         """Initialize the health check engine"""
@@ -141,7 +141,7 @@ class HealthCheckEngine:
             return
 
         # Check health for each individual container in the circuit's route_info
-        route_health_results: dict[UUID, tuple[Optional[ModelServiceStatus], float, int]] = {}
+        route_health_results: dict[UUID, tuple[ModelServiceStatus | None, float, int]] = {}
         status_changed = False
         for route in circuit.route_info:
             if not route.route_id:
@@ -167,7 +167,7 @@ class HealthCheckEngine:
             else:
                 # Health check failed - increment consecutive failures
                 new_consecutive_failures = route.consecutive_failures + 1
-                new_status: Optional[ModelServiceStatus]
+                new_status: ModelServiceStatus | None
 
                 # Only mark as UNHEALTHY if consecutive failures exceed max_retries
                 if new_consecutive_failures > config.max_retries:

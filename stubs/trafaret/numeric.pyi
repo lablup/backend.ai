@@ -1,5 +1,3 @@
-from typing import Optional
-
 from .base import Trafaret, TrafaretMeta
 
 class NumberMeta(TrafaretMeta):
@@ -10,10 +8,10 @@ class NumberMeta(TrafaretMeta):
 class Float(Trafaret, metaclass=NumberMeta):
     def __init__(
         self,
-        gte: Optional[float] = None,
-        lte: Optional[float] = None,
-        gt: Optional[float] = None,
-        lt: Optional[float] = None,
+        gte: float | None = None,
+        lte: float | None = None,
+        gt: float | None = None,
+        lt: float | None = None,
     ): ...
 
 class ToFloat(Float): ...

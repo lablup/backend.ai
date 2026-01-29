@@ -1,7 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ai.backend.manager.api.gql.base import IntFilter, StringFilter
 from ai.backend.manager.data.artifact.types import (
@@ -50,13 +49,13 @@ class ArtifactRemoteStatusFilter:
 class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
 
-    artifact_id: Optional[uuid.UUID] = None
-    status_filter: Optional[ArtifactStatusFilter] = None
-    remote_status_filter: Optional[ArtifactRemoteStatusFilter] = None
-    version_filter: Optional[StringFilter] = None
-    size_filter: Optional[IntFilter] = None
+    artifact_id: uuid.UUID | None = None
+    status_filter: ArtifactStatusFilter | None = None
+    remote_status_filter: ArtifactRemoteStatusFilter | None = None
+    version_filter: StringFilter | None = None
+    size_filter: IntFilter | None = None
 
     # Logical operations
-    AND: Optional[list["ArtifactRevisionFilterOptions"]] = None
-    OR: Optional[list["ArtifactRevisionFilterOptions"]] = None
-    NOT: Optional[list["ArtifactRevisionFilterOptions"]] = None
+    AND: list["ArtifactRevisionFilterOptions"] | None = None
+    OR: list["ArtifactRevisionFilterOptions"] | None = None
+    NOT: list["ArtifactRevisionFilterOptions"] | None = None

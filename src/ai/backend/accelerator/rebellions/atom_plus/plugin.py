@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Iterable, Sequence
-from typing import Optional
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -27,7 +26,7 @@ class ATOMPlusPlugin(AbstractATOMPlugin[ATOMPlusDevice]):
     )
     exclusive_slot_types: set[str] = {"atom-plus.device"}
 
-    _all_devices: Optional[list[ATOMPlusDevice]]
+    _all_devices: list[ATOMPlusDevice] | None
 
     async def _list_devices(self) -> list[ATOMPlusDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)

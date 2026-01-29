@@ -9,7 +9,6 @@ from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     TypedDict,
     cast,
@@ -653,12 +652,12 @@ class KernelRow(Base):
         return self.cluster_role + str(self.cluster_idx)
 
     @property
-    def used_time(self) -> Optional[str]:
+    def used_time(self) -> str | None:
         if self.terminated_at is not None and self.created_at is not None:
             return str(self.terminated_at - self.created_at)
         return None
 
-    def get_used_days(self, local_tz: tzinfo) -> Optional[int]:
+    def get_used_days(self, local_tz: tzinfo) -> int | None:
         if self.terminated_at is not None and self.created_at is not None:
             return (
                 self.terminated_at.astimezone(local_tz).toordinal()
@@ -815,9 +814,9 @@ class KernelRow(Base):
         kernel_id: KernelId,
         status: KernelStatus,
         *,
-        status_data: Optional[Mapping[str, Any]] = None,
-        reason: Optional[str] = None,
-        status_changed_at: Optional[datetime] = None,
+        status_data: Mapping[str, Any] | None = None,
+        reason: str | None = None,
+        status_changed_at: datetime | None = None,
     ) -> None:
         from ai.backend.manager.errors.kernel import InvalidKernelStatus
 
@@ -855,7 +854,7 @@ class KernelRow(Base):
         db: ExtendedAsyncSAEngine,
         kernel_id: KernelId,
         new_status: KernelStatus,
-        update_data: Optional[Mapping[str, Any]] = None,
+        update_data: Mapping[str, Any] | None = None,
     ) -> bool:
         """
         Update kernel by given id and data.

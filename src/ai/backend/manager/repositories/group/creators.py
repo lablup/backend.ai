@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -16,15 +16,15 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
     name: str
     domain_name: str
-    type: Optional[ProjectType] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    total_resource_slots: Optional[ResourceSlot] = None
-    allowed_vfolder_hosts: Optional[VFolderHostPermissionMap] = None
-    integration_id: Optional[str] = None
-    resource_policy: Optional[str] = None
-    container_registry: Optional[dict[str, str]] = None
-    dotfiles: Optional[bytes] = None
+    type: ProjectType | None = None
+    description: str | None = None
+    is_active: bool | None = None
+    total_resource_slots: ResourceSlot | None = None
+    allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
+    integration_id: str | None = None
+    resource_policy: str | None = None
+    container_registry: dict[str, str] | None = None
+    dotfiles: bytes | None = None
 
     @override
     def build_row(self) -> GroupRow:

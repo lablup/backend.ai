@@ -1,6 +1,6 @@
 import uuid
 from http import HTTPStatus
-from typing import Optional, Protocol
+from typing import Protocol
 
 from ai.backend.common.api_handlers import (
     APIResponse,
@@ -41,7 +41,7 @@ class VFolderServiceProtocol(Protocol):
     ) -> VFolderItem: ...
 
     async def get_vfolders(
-        self, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
+        self, user_identity: UserIdentity, group_id: uuid.UUID | None
     ) -> list[VFolderItem]: ...
 
     async def rename_vfolder(

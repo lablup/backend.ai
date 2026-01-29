@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import (
     AccessKey,
@@ -21,10 +21,10 @@ class CheckResourcePresetsAction(ResourcePresetAction):
     domain_name: str
     user_id: uuid.UUID
     group: str
-    scaling_group: Optional[str]
+    scaling_group: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -47,5 +47,5 @@ class CheckResourcePresetsActionResult(BaseActionResult):
 
     # TODO: Should return preset row ids after changing to batching.
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

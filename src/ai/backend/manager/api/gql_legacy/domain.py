@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -235,7 +234,7 @@ class DomainNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         from ai.backend.manager.models.domain import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
@@ -262,13 +261,13 @@ class DomainNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope: ScopeType,
         permission: DomainPermission,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         from ai.backend.manager.models.domain import DomainModel
 
@@ -457,7 +456,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     client_mutation_id = graphene.String(required=False)
 
     def _convert_field(
-        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+        self, field_value: Any, converter: Callable[[Any], Any] | None = None
     ) -> Any | Sentinel:
         if field_value is graphql.Undefined:
             return Sentinel.TOKEN
@@ -559,7 +558,7 @@ class Domain(graphene.ObjectType):
         return [sg.name for sg in sgroups]
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[Domain]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Domain | None:
         if row is None:
             return None
         return cls(
@@ -597,7 +596,7 @@ class Domain(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[Domain]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select(domains).select_from(domains)
@@ -615,8 +614,8 @@ class Domain(graphene.ObjectType):
         ctx: GraphQueryContext,
         names: Sequence[str],
         *,
-        is_active: Optional[bool] = None,
-    ) -> Sequence[Optional[Domain]]:
+        is_active: bool | None = None,
+    ) -> Sequence[Domain | None]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select(domains).select_from(domains).where(domains.c.name.in_(names))
             if is_active is not None:
@@ -671,7 +670,7 @@ class ModifyDomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
 
     def _convert_field(
-        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+        self, field_value: Any, converter: Callable[[Any], Any] | None = None
     ) -> Any | Sentinel:
         if field_value is Undefined:
             return Sentinel.TOKEN

@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -123,7 +123,7 @@ class AgentSelectionConfig:
     """Configuration for agent selection."""
 
     # Maximum number of containers allowed per agent
-    max_container_count: Optional[int]
+    max_container_count: int | None
     # Whether to enforce endpoint replica spreading (from sgroup_opts)
     enforce_spreading_endpoint_replica: bool = False
 
@@ -170,7 +170,7 @@ class AgentSelectionCriteria:
     # Mapping of kernel IDs to their resource specifications
     kernel_requirements: Mapping[UUID, KernelResourceSpec]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
-    kernel_counts_at_endpoint: Optional[Mapping[AgentId, int]] = None
+    kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
@@ -305,7 +305,7 @@ class AgentSelector:
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> list[AgentSelection]:
         """
         Select agents for a batch of resource requirements.
@@ -378,7 +378,7 @@ class AgentSelector:
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
         arch_compatible_trackers: list[AgentStateTracker] = []

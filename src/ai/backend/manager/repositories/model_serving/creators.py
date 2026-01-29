@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 
 import yarl
 
@@ -24,7 +24,7 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     """CreatorSpec for endpoint creation."""
 
     name: str
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     created_user: uuid.UUID
     session_owner: uuid.UUID
     image: uuid.UUID  # Image row ID
@@ -35,16 +35,16 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     resource_slots: Mapping[str, Any]
     replicas: int = 0
     lifecycle_stage: EndpointLifecycle = EndpointLifecycle.CREATED
-    tag: Optional[str] = None
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    callback_url: Optional[yarl.URL] = None
-    environ: Optional[dict[str, str]] = None
+    tag: str | None = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    callback_url: yarl.URL | None = None
+    environ: dict[str, str] | None = None
     open_to_public: bool = False
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     model_mount_destination: str = "/models"
-    url: Optional[str] = None
-    resource_opts: Optional[dict[str, Any]] = None
+    url: str | None = None
+    resource_opts: dict[str, Any] | None = None
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE
     cluster_size: int = 1
     extra_mounts: list[VFolderMount] = field(default_factory=list)

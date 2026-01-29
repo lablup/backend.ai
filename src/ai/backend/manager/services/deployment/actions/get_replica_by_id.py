@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -12,7 +12,7 @@ class GetReplicaByIdAction(DeploymentBaseAction):
     replica_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.replica_id)
 
     @override
@@ -23,8 +23,8 @@ class GetReplicaByIdAction(DeploymentBaseAction):
 
 @dataclass
 class GetReplicaByIdActionResult(BaseActionResult):
-    data: Optional[ModelReplicaData]
+    data: ModelReplicaData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data else None

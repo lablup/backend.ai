@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import graphene
 import sqlalchemy as sa
@@ -64,7 +64,7 @@ class UserInfo(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> Optional[UserInfo]:
+    ) -> UserInfo | None:
         if row is None:
             return None
         return cls(email=row.email, full_name=row.full_name)
@@ -74,7 +74,7 @@ class UserInfo(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
-    ) -> Sequence[Optional[UserInfo]]:
+    ) -> Sequence[UserInfo | None]:
         from ai.backend.manager.models.user.row import users
 
         async with ctx.db.begin_readonly() as conn:
@@ -199,7 +199,7 @@ class KeyPair(graphene.ObjectType):
         return await loader.load(self.access_key)
 
     async def resolve_compute_sessions(
-        self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
+        self, info: graphene.ResolveInfo, raw_status: str | None = None
     ) -> list[ComputeSession]:
         ctx: GraphQueryContext = info.context
 
@@ -231,9 +231,9 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        limit: Optional[int] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        limit: int | None = None,
     ) -> Sequence[KeyPair]:
         from ai.backend.manager.models.user.row import users
 
@@ -291,10 +291,10 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.group.row import association_groups_users, groups
         from ai.backend.manager.models.user.row import users
@@ -325,11 +325,11 @@ class KeyPair(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[KeyPair]:
         from ai.backend.manager.models.group.row import association_groups_users, groups
         from ai.backend.manager.models.user.row import users
@@ -378,9 +378,9 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-    ) -> Sequence[Sequence[Optional[KeyPair]]]:
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+    ) -> Sequence[Sequence[KeyPair | None]]:
         from ai.backend.manager.models.group.row import association_groups_users, groups
         from ai.backend.manager.models.user.row import users
 
@@ -420,8 +420,8 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         access_keys: Sequence[AccessKey],
         *,
-        domain_name: Optional[str] = None,
-    ) -> Sequence[Optional[KeyPair]]:
+        domain_name: str | None = None,
+    ) -> Sequence[KeyPair | None]:
         from ai.backend.manager.models.group.row import association_groups_users, groups
         from ai.backend.manager.models.user.row import users
 

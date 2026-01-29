@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import graphql
@@ -224,13 +224,13 @@ class ContainerRegistryNode(graphene.ObjectType):
     async def resolve_allowed_groups(
         self,
         info: graphene.ResolveInfo,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
         scope = SystemScope()
 
@@ -352,7 +352,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
             ContainerRegistryValidatorArgs(
                 url=url,
                 type=type,
-                project=cast(Optional[str], project if project is not Undefined else None),
+                project=cast(str | None, project if project is not Undefined else None),
             )
         )
 

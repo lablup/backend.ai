@@ -11,7 +11,7 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional, final, override
+from typing import Any, final, override
 
 import aiofiles.os
 import janus
@@ -90,8 +90,8 @@ class BaseQuotaModel(AbstractQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -103,7 +103,7 @@ class BaseQuotaModel(AbstractQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
@@ -150,8 +150,8 @@ class SetGIDQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -164,7 +164,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
         # TODO: setgid impl.
@@ -204,7 +204,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 class BaseFSOpModel(AbstractFSOpModel):
     def __init__(
-        self, mount_path: Path, scandir_limit: int, watcher: Optional[WatcherClient] = None
+        self, mount_path: Path, scandir_limit: int, watcher: WatcherClient | None = None
     ) -> None:
         self.mount_path = mount_path
         self.scandir_limit = scandir_limit

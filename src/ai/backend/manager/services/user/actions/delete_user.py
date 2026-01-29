@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.user.actions.base import UserAction
@@ -10,7 +10,7 @@ class DeleteUserAction(UserAction):
     email: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -22,5 +22,5 @@ class DeleteUserAction(UserAction):
 @dataclass
 class DeleteUserActionResult(BaseActionResult):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

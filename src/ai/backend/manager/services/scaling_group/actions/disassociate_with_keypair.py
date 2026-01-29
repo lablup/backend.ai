@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
@@ -22,7 +22,7 @@ class DisassociateScalingGroupWithKeypairsAction(ScalingGroupAction):
         return "disassociate_with_keypairs"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -31,5 +31,5 @@ class DisassociateScalingGroupWithKeypairsActionResult(BaseActionResult):
     """Result of disassociating a scaling group from keypairs."""
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -335,14 +335,14 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
     from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContext
 
-    sgroup_permission_ctx: Optional[ScalingGroupPermissionContext] = None
+    sgroup_permission_ctx: ScalingGroupPermissionContext | None = None
 
     @property
-    def query_condition(self) -> Optional[WhereClauseType]:
+    def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
 
         def _OR_coalesce(
-            base_cond: Optional[WhereClauseType],
+            base_cond: WhereClauseType | None,
             _cond: sa.sql.expression.BinaryExpression,
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
@@ -367,7 +367,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
-    async def build_query(self) -> Optional[sa.sql.Select]:
+    async def build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
         if cond is None:
             return None

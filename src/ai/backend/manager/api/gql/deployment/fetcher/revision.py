@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 from uuid import UUID
 
 from strawberry import Info
@@ -41,15 +40,15 @@ def get_revision_pagination_spec() -> PaginationSpec:
 
 async def fetch_revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ModelRevisionFilter] = None,
-    order_by: Optional[list[ModelRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: ModelRevisionFilter | None = None,
+    order_by: list[ModelRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> ModelRevisionConnection:
     """Fetch revisions with optional filtering, ordering, and pagination.
 
@@ -101,7 +100,7 @@ async def fetch_revisions(
 async def fetch_revision(
     info: Info[StrawberryGQLContext],
     revision_id: UUID,
-) -> Optional[ModelRevision]:
+) -> ModelRevision | None:
     """Fetch a specific revision by ID."""
     revision_data = await info.context.data_loaders.revision_loader.load(revision_id)
     if revision_data is None:

@@ -2,7 +2,7 @@ import asyncio
 import functools
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, overload
+from typing import Any, overload
 from unittest.mock import AsyncMock
 
 import pytest
@@ -25,7 +25,7 @@ class DummyPlugin(AbstractPlugin):
     def __init__(self, plugin_config, local_config) -> None:
         super().__init__(plugin_config, local_config)
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -48,8 +48,8 @@ class DummyEntrypoint:
 
 def mock_entrypoints_with_instance(
     plugin_group_name: str,
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     mocked_plugin,
 ):
@@ -65,8 +65,8 @@ def mock_entrypoints_with_instance(
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls: list[type[AbstractPlugin]],
 ) -> Iterator[DummyEntrypoint]: ...
@@ -75,8 +75,8 @@ def mock_entrypoints_with_class(
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls: type[AbstractPlugin],
 ) -> DummyEntrypoint: ...
@@ -84,8 +84,8 @@ def mock_entrypoints_with_class(
 
 def mock_entrypoints_with_class(
     plugin_group_name: str,
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
     *,
     plugin_cls,
 ):
@@ -209,7 +209,7 @@ class DummyHookPassingPlugin(HookPlugin):
             ("HOOK2", self.hook2_handler),
         ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -240,7 +240,7 @@ class DummyHookRejectingPlugin(HookPlugin):
             ("HOOK2", self.hook2_handler),
         ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -270,7 +270,7 @@ class DummyHookErrorPlugin(HookPlugin):
             ("HOOK3", self.hook3_handler),
         ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:

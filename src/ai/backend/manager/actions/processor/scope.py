@@ -2,7 +2,6 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
@@ -30,8 +29,8 @@ class ScopeActionProcessor[
     def __init__(
         self,
         func: Callable[[TScopeAction], Awaitable[TScopeActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]] = None,
-        validators: Optional[Sequence[ScopeActionValidator]] = None,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[ScopeActionValidator] | None = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
         self._validators = validators or []

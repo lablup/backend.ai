@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
@@ -52,7 +52,7 @@ class SessionEventPropagator(EventPropagator):
     """
 
     _id: uuid.UUID
-    _queue: asyncio.Queue[Optional[AbstractEvent]]
+    _queue: asyncio.Queue[AbstractEvent | None]
     _closed: bool
     _response: EventSourceResponse
     _db: ExtendedAsyncSAEngine
@@ -131,9 +131,7 @@ class SessionEventPropagator(EventPropagator):
             log.warning("Failed to send SSE event: {}", e)
             await self.close()
 
-    async def _get_event_data(
-        self, event: AbstractEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    async def _get_event_data(self, event: AbstractEvent) -> tuple[str, Mapping[str, Any]] | None:
         """Get event data from database based on event type."""
         match event:
             case SchedulingBroadcastEvent():
@@ -163,7 +161,7 @@ class SessionEventPropagator(EventPropagator):
 
     async def _fetch_kernel_data(
         self, event: BaseKernelEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch kernel data from database."""
         try:
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
@@ -198,7 +196,7 @@ class SessionEventPropagator(EventPropagator):
 
     async def _fetch_session_data(
         self, event: BaseSessionEvent | SchedulingBroadcastEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch session data from database."""
         event_name = event.event_name()
         try:

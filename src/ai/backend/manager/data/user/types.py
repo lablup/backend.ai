@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -33,7 +33,7 @@ class UserStatus(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[UserStatus]:
+    def _missing_(cls, value: Any) -> UserStatus | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(
                 f"UserStatus value must be a string, got {type(value).__name__}"
@@ -61,27 +61,27 @@ class UserInfoContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: Optional[str]
+    username: str | None
     email: str
-    need_password_change: Optional[bool]
-    full_name: Optional[str]
-    description: Optional[str]
+    need_password_change: bool | None
+    full_name: str | None
+    description: str | None
     is_active: bool  # legacy
     status: str
-    status_info: Optional[str]
-    created_at: Optional[datetime] = field(compare=False)
-    modified_at: Optional[datetime] = field(compare=False)
-    domain_name: Optional[str]
-    role: Optional[UserRole]
+    status_info: str | None
+    created_at: datetime | None = field(compare=False)
+    modified_at: datetime | None = field(compare=False)
+    domain_name: str | None
+    role: UserRole | None
     resource_policy: str
-    allowed_client_ip: Optional[list[str]]
-    totp_activated: Optional[bool]
-    totp_activated_at: Optional[datetime] = field(compare=False)
+    allowed_client_ip: list[str] | None
+    totp_activated: bool | None
+    totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
-    main_access_key: Optional[str] = field(compare=False)
-    container_uid: Optional[int] = field(compare=False)
-    container_main_gid: Optional[int] = field(compare=False)
-    container_gids: Optional[list[int]] = field(compare=False)
+    main_access_key: str | None = field(compare=False)
+    container_uid: int | None = field(compare=False)
+    container_main_gid: int | None = field(compare=False)
+    container_gids: list[int] | None = field(compare=False)
 
     def scope_id(self) -> ScopeId:
         return ScopeId(

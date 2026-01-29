@@ -8,7 +8,6 @@ including filters for session name, type, status, access key, and timestamps.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -77,7 +76,7 @@ class SessionExportFilter(BaseRequestModel):
     Use this to narrow down the exported session data to specific criteria.
     """
 
-    name: Optional[StringFilter] = Field(
+    name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by name. Supports various match modes: "
@@ -85,42 +84,42 @@ class SessionExportFilter(BaseRequestModel):
             "Can be case-insensitive and/or negated."
         ),
     )
-    session_type: Optional[list[str]] = Field(
+    session_type: list[str] | None = Field(
         default=None,
         description=(
             "Filter sessions by type(s). Accepts a list of type values "
             "(e.g., ['interactive', 'batch', 'inference']). Uses IN query."
         ),
     )
-    domain_name: Optional[StringFilter] = Field(
+    domain_name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by domain name. "
             "Use this to export sessions belonging to a specific domain."
         ),
     )
-    access_key: Optional[StringFilter] = Field(
+    access_key: StringFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by the owning access key. "
             "Use this to export sessions created by a specific user/keypair."
         ),
     )
-    status: Optional[list[str]] = Field(
+    status: list[str] | None = Field(
         default=None,
         description=(
             "Filter sessions by status(es). Accepts a list of status values "
             "(e.g., ['PENDING', 'RUNNING', 'TERMINATED']). Uses IN query."
         ),
     )
-    scaling_group_name: Optional[StringFilter] = Field(
+    scaling_group_name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by scaling group name. "
             "Use this to export sessions running on specific resource pools."
         ),
     )
-    created_at: Optional[DateTimeRangeFilter] = Field(
+    created_at: DateTimeRangeFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by creation timestamp. "
@@ -128,7 +127,7 @@ class SessionExportFilter(BaseRequestModel):
             "Useful for exporting sessions created within a specific period."
         ),
     )
-    terminated_at: Optional[DateTimeRangeFilter] = Field(
+    terminated_at: DateTimeRangeFilter | None = Field(
         default=None,
         description=(
             "Filter sessions by termination timestamp. "
@@ -147,7 +146,7 @@ class SessionExportCSVRequest(BaseRequestModel):
     All parameters are optional to allow flexible export configurations.
     """
 
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         description=(
             "List of field keys to include in the export. "
@@ -156,7 +155,7 @@ class SessionExportCSVRequest(BaseRequestModel):
             "If not specified or empty, all available fields will be exported."
         ),
     )
-    filter: Optional[SessionExportFilter] = Field(
+    filter: SessionExportFilter | None = Field(
         default=None,
         description=(
             "Filter conditions to apply before export. "
@@ -164,7 +163,7 @@ class SessionExportCSVRequest(BaseRequestModel):
             "If not specified, all sessions (up to max_rows limit) will be exported."
         ),
     )
-    order: Optional[list[SessionExportOrder]] = Field(
+    order: list[SessionExportOrder] | None = Field(
         default=None,
         description=(
             "List of ordering specifications for sorting the exported data. "

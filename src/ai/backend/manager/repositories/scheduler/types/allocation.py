@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -98,7 +97,7 @@ class SchedulingFailure:
     # Error message describing the failure
     msg: str
     # Timestamp of the last scheduling attempt
-    last_try: Optional[datetime] = None
+    last_try: datetime | None = None
 
     def to_status_data(self, current_retries: int) -> dict:
         """Convert failure to status data dictionary for storage."""

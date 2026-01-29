@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.group.types import GroupData
@@ -16,7 +16,7 @@ class ModifyGroupAction(GroupAction):
     user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
     @override
@@ -24,7 +24,7 @@ class ModifyGroupAction(GroupAction):
     def operation_type(cls) -> str:
         return "modify"
 
-    def update_mode(self) -> Optional[str]:
+    def update_mode(self) -> str | None:
         if self.user_uuids.optional_value():
             return self.user_update_mode.optional_value()
         return None
@@ -32,8 +32,8 @@ class ModifyGroupAction(GroupAction):
 
 @dataclass
 class ModifyGroupActionResult(BaseActionResult):
-    data: Optional[GroupData]
+    data: GroupData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data else None

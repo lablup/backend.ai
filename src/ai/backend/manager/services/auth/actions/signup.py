@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from aiohttp import web
 
@@ -14,12 +14,12 @@ class SignupAction(AuthAction):
     domain_name: str
     email: str
     password: str
-    username: Optional[str]
-    full_name: Optional[str]
-    description: Optional[str]
+    username: str | None
+    full_name: str | None
+    description: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -50,5 +50,5 @@ class SignupActionResult(BaseActionResult):
     secret_key: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_id)

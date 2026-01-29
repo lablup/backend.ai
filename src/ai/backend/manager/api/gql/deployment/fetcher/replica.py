@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 from uuid import UUID
 
 from strawberry import Info
@@ -46,15 +45,15 @@ def get_replica_pagination_spec() -> PaginationSpec:
 
 async def fetch_replicas(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ReplicaFilter] = None,
-    order_by: Optional[list[ReplicaOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: ReplicaFilter | None = None,
+    order_by: list[ReplicaOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> ModelReplicaConnection:
     """Fetch replicas with optional filtering, ordering, and pagination.
 
@@ -106,7 +105,7 @@ async def fetch_replicas(
 async def fetch_replica(
     info: Info[StrawberryGQLContext],
     replica_id: UUID,
-) -> Optional[ModelReplica]:
+) -> ModelReplica | None:
     """Fetch a specific replica by ID."""
     replica_data = await info.context.data_loaders.replica_loader.load(replica_id)
     if replica_data is None:

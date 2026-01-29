@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -34,7 +33,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         return "service-discovery-sync"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for service discovery sync."""
         return None
 
@@ -44,17 +43,17 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         return [RouteStatus.HEALTHY]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """No status transition for service discovery sync."""
         return None
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """No failure status for service discovery sync."""
         return None
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
 

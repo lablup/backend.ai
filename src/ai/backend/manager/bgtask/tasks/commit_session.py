@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Optional, cast, override
+from typing import TYPE_CHECKING, cast, override
 
 from pydantic import Field
 
@@ -47,10 +47,10 @@ class CommitSessionResult(BaseBackgroundTaskResult):
     Contains the rescanned image ID or error message.
     """
 
-    image_id: Optional[uuid.UUID] = Field(
+    image_id: uuid.UUID | None = Field(
         default=None, description="ID of the rescanned image after commit"
     )
-    error_message: Optional[str] = Field(default=None, description="Error message if task failed")
+    error_message: str | None = Field(default=None, description="Error message if task failed")
 
 
 class CommitSessionManifest(BaseBackgroundTaskManifest):

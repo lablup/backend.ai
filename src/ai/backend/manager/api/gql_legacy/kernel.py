@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     TypeVar,
     cast,
@@ -177,7 +176,7 @@ class KernelNode(graphene.ObjectType):
             preopen_ports=row.preopen_ports,
         )
 
-    async def resolve_image(self, info: graphene.ResolveInfo) -> Optional[ImageNode]:
+    async def resolve_image(self, info: graphene.ResolveInfo) -> ImageNode | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, ImageNode.batch_load_by_name_and_arch
@@ -303,7 +302,7 @@ class ComputeContainer(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: KernelRow | None) -> Optional[ComputeContainer]:
+    def from_row(cls, ctx: GraphQueryContext, row: KernelRow | None) -> ComputeContainer | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -312,19 +311,19 @@ class ComputeContainer(graphene.ObjectType):
     # last_stat also fetches data from Redis, meaning that
     # both live_stat and last_stat will reference same data from same source
     # we can leave last_stat value for legacy support, as an alias to last_stat
-    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
         return await loader.load(self.id)
 
-    async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
 
     async def resolve_abusing_report(
         self,
         info: graphene.ResolveInfo,
         access_key: AccessKey | None,
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
@@ -370,11 +369,11 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_id: SessionId,
         *,
-        cluster_role: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[str] = None,
-        filter: Optional[str] = None,
+        cluster_role: str | None = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: str | None = None,
+        filter: str | None = None,
     ) -> int:
         query = (
             sa.select(sa.func.count())
@@ -404,13 +403,13 @@ class ComputeContainer(graphene.ObjectType):
         offset: int,
         session_id: SessionId,
         *,
-        cluster_role: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> Sequence[Optional[ComputeContainer]]:
+        cluster_role: str | None = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> Sequence[ComputeContainer | None]:
         query = (
             sa.select(KernelRow)
             .where(KernelRow.session_id == session_id)
@@ -465,7 +464,7 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        status: Optional[KernelStatus] = None,
+        status: KernelStatus | None = None,
     ) -> Sequence[Sequence[ComputeContainer]]:
         query_stmt = (
             sa.select(KernelRow)
@@ -494,9 +493,9 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         container_ids: Sequence[KernelId],
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[AccessKey] = None,
-    ) -> Sequence[Optional[ComputeContainer]]:
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
+    ) -> Sequence[ComputeContainer | None]:
         query = (
             sa.select(KernelRow)
             .where(
@@ -605,12 +604,12 @@ class LegacyComputeSession(graphene.ObjectType):
     # last_stat also fetches data from Redis, meaning that
     # both live_stat and last_stat will reference same data from same source
     # we can leave last_stat value for legacy support, as an alias to last_stat
-    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
         return await loader.load(self.id)
 
-    async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
 
     async def _resolve_legacy_metric(
@@ -619,7 +618,7 @@ class LegacyComputeSession(graphene.ObjectType):
         metric_key: str,
         metric_field: str,
         convert_type: type[MetricValueType],
-    ) -> Optional[MetricValueType]:
+    ) -> MetricValueType | None:
         if not hasattr(self, "status"):
             return None
         graph_ctx: GraphQueryContext = info.context
@@ -645,34 +644,34 @@ class LegacyComputeSession(graphene.ObjectType):
             return convert_type(0)
         return convert_type(value)
 
-    async def resolve_cpu_used(self, info: graphene.ResolveInfo) -> Optional[float]:
+    async def resolve_cpu_used(self, info: graphene.ResolveInfo) -> float | None:
         return await self._resolve_legacy_metric(info, "cpu_used", "current", float)
 
-    async def resolve_cpu_using(self, info: graphene.ResolveInfo) -> Optional[float]:
+    async def resolve_cpu_using(self, info: graphene.ResolveInfo) -> float | None:
         return await self._resolve_legacy_metric(info, "cpu_util", "pct", float)
 
-    async def resolve_mem_max_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_mem_max_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "mem", "stats.max", int)
 
-    async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "mem", "current", int)
 
-    async def resolve_net_rx_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_net_rx_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "net_rx", "stats.rate", int)
 
-    async def resolve_net_tx_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_net_tx_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "net_tx", "stats.rate", int)
 
-    async def resolve_io_read_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_io_read_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "io_read", "current", int)
 
-    async def resolve_io_write_bytes(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_io_write_bytes(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "io_write", "current", int)
 
-    async def resolve_io_max_scratch_size(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_io_max_scratch_size(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "io_scratch_size", "stats.max", int)
 
-    async def resolve_io_cur_scratch_size(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_io_cur_scratch_size(self, info: graphene.ResolveInfo) -> int | None:
         return await self._resolve_legacy_metric(info, "io_scratch_size", "current", int)
 
     @classmethod
@@ -743,7 +742,7 @@ class LegacyComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, context: GraphQueryContext, row: Row) -> Optional[LegacyComputeSession]:
+    def from_row(cls, context: GraphQueryContext, row: Row) -> LegacyComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(context, row)
@@ -754,10 +753,10 @@ class LegacyComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
     ) -> int:
         if isinstance(status, str):
             status_list = [KernelStatus[s] for s in status.split(",")]
@@ -787,11 +786,11 @@ class LegacyComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
-        order_key: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
+        order_key: str | None = None,
         order_asc: bool = True,
     ) -> Sequence[LegacyComputeSession]:
         if isinstance(status, str):
@@ -835,10 +834,10 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         access_keys: AccessKey,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        status: Optional[str] = None,
-    ) -> Sequence[Optional[LegacyComputeSession]]:
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        status: str | None = None,
+    ) -> Sequence[LegacyComputeSession | None]:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
@@ -881,9 +880,9 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         sess_ids: Sequence[SessionId],
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
         status_list = []
         if isinstance(status, str):

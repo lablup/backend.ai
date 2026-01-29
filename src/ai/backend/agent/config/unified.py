@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import (
     Annotated,
     Any,
-    Optional,
     Self,
 )
 from uuid import uuid4
@@ -185,7 +184,7 @@ class CoreDumpConfig(BaseConfigSchema):
             example=ConfigExample(local="64M", prod="256M"),
         ),
     ]
-    _core_path: Optional[Path] = PrivateAttr(default=None)
+    _core_path: Path | None = PrivateAttr(default=None)
 
     @property
     def core_path(self) -> Path:
@@ -547,7 +546,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
@@ -565,7 +564,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     ssl_key: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-key", "ssl_key"),
@@ -583,7 +582,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     advertised_rpc_addr: Annotated[
-        Optional[HostPortPair],
+        HostPortPair | None,
         Field(
             default=None,
             validation_alias=AliasChoices("advertised-rpc-addr", "advertised_rpc_addr"),
@@ -600,7 +599,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices(
@@ -622,7 +621,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
@@ -676,7 +675,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     mount_path: Annotated[
-        Optional[AutoDirectoryPath],
+        AutoDirectoryPath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("mount-path", "mount_path"),
@@ -710,7 +709,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     public_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("public-host", "public_host"),
@@ -727,7 +726,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     region: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -740,7 +739,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     instance_type: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("instance-type", "instance_type"),
@@ -884,7 +883,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     allow_compute_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
@@ -904,7 +903,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     block_compute_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
@@ -921,7 +920,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     allow_network_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
@@ -938,7 +937,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     block_network_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
@@ -973,7 +972,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     abuse_report_path: Annotated[
-        Optional[Path],
+        Path | None,
         Field(
             default=None,
             validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
@@ -1009,7 +1008,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     docker_mode: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("docker-mode", "docker_mode"),
@@ -1026,7 +1025,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     mount_path_uid_gid: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
@@ -1070,7 +1069,7 @@ class OverridableAgentConfig(BaseConfigSchema):
     """
 
     id: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1235,7 +1234,7 @@ class CommonContainerConfig(BaseConfigSchema):
         ),
     ]
     advertised_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("advertised-host", "advertised_host"),
@@ -1252,7 +1251,7 @@ class CommonContainerConfig(BaseConfigSchema):
         ),
     ]
     krunner_volumes: Annotated[
-        Optional[Mapping[str, str]],
+        Mapping[str, str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
@@ -1333,7 +1332,7 @@ class OverridableContainerConfig(BaseConfigSchema):
         ),
     ]
     stats_type: Annotated[
-        Optional[StatModes],
+        StatModes | None,
         Field(
             default=StatModes.DOCKER,
             validation_alias=AliasChoices("stats-type", "stats_type"),
@@ -1439,7 +1438,7 @@ class OverridableContainerConfig(BaseConfigSchema):
         ),
     ]
     scratch_nfs_address: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
@@ -1456,7 +1455,7 @@ class OverridableContainerConfig(BaseConfigSchema):
         ),
     ]
     scratch_nfs_options: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
@@ -1473,7 +1472,7 @@ class OverridableContainerConfig(BaseConfigSchema):
         ),
     ]
     alternative_bridge: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
@@ -1695,7 +1694,7 @@ class ResourceConfig(BaseConfigSchema):
         ),
     ]
     allocations: Annotated[
-        Optional[ResourceAllocationConfig],
+        ResourceAllocationConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1822,7 +1821,7 @@ class ContainerLogsConfig(BaseConfigSchema):
 
 class APIConfig(BaseConfigSchema):
     pull_timeout: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=7200.0,  # 2 hours
             ge=0,
@@ -1840,7 +1839,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     commit_timeout: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             ge=0,
@@ -1858,7 +1857,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     push_timeout: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             ge=0,
@@ -2105,7 +2104,7 @@ class AgentGlobalConfig(BaseConfigSchema):
         ),
     ]
     redis: Annotated[
-        Optional[RedisConfig],
+        RedisConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2202,7 +2201,7 @@ class AgentOverrideConfig(BaseConfigSchema):
         ),
     ]
     container: Annotated[
-        Optional[OverridableContainerConfig],
+        OverridableContainerConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2215,7 +2214,7 @@ class AgentOverrideConfig(BaseConfigSchema):
         ),
     ]
     resource: Annotated[
-        Optional[ResourceAllocationConfig],
+        ResourceAllocationConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2301,8 +2300,8 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def update(
         self,
         *,
-        agent_update: Optional[Mapping[str, Any]] = None,
-        container_update: Optional[Mapping[str, Any]] = None,
+        agent_update: Mapping[str, Any] | None = None,
+        container_update: Mapping[str, Any] | None = None,
     ) -> None:
         # TODO: Replace setting update values with something like LoaderChain used in Manager.
         if agent_update:
@@ -2313,11 +2312,11 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def overwrite(
         self,
         *,
-        container_logs: Optional[ContainerLogsConfig] = None,
-        api: Optional[APIConfig] = None,
-        kernel_lifecycles: Optional[KernelLifecyclesConfig] = None,
-        redis: Optional[RedisConfig] = None,
-        plugins: Optional[Mapping[str, Any]] = None,
+        container_logs: ContainerLogsConfig | None = None,
+        api: APIConfig | None = None,
+        kernel_lifecycles: KernelLifecyclesConfig | None = None,
+        redis: RedisConfig | None = None,
+        plugins: Mapping[str, Any] | None = None,
     ) -> None:
         # TODO: Replace setting update values with something like LoaderChain used in Manager.
         if container_logs:

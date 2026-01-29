@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Optional,
     Self,
     override,
 )
@@ -77,7 +76,7 @@ def merge_resource(
 
 @attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
-    agent_id: Optional[AgentId]
+    agent_id: AgentId | None
     agent_addr: str
     scaling_group: str
 
@@ -108,7 +107,7 @@ class KernelAgentBinding:
 @attrs.define(auto_attribs=True, slots=True)
 class PredicateResult:
     passed: bool
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class AbstractScheduler(ABC):
@@ -156,7 +155,7 @@ class AbstractScheduler(ABC):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         """
         Pick a session to try schedule.
         This is where the queueing semantics is implemented such as prioritization.
@@ -247,7 +246,7 @@ class AbstractAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](AB
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Assign an agent for the entire (single-node) session, only considering
         the total requested slots of the session.
@@ -265,7 +264,7 @@ class AbstractAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](AB
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Assign an agent for a kernel of a multi-node multi-container session.
         This may be called multiple times.
@@ -279,7 +278,7 @@ class AbstractAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](AB
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Select an agent for the pending session or kernel.
         """

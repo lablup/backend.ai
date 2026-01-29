@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles.os
 
@@ -47,7 +47,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         async with aiofiles.open(quota_id_path, "w") as file:
             await file.write(quota_id.rstrip())
 
-    async def _get_quota_id(self, qspath: Path) -> Optional[str]:
+    async def _get_quota_id(self, qspath: Path) -> str | None:
         """
         Read OneFS quota id of the given path.
         Return `None` if no quota is set to the path.
@@ -67,8 +67,8 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath, exist_ok=True)
@@ -78,7 +78,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id = await self._get_quota_id(qspath)
         if quota_id is not None:
@@ -162,8 +162,8 @@ class DellEMCOneFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,

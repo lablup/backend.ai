@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
@@ -38,7 +37,7 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return "destroying-deployments"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for destroying deployments."""
         return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
@@ -48,12 +47,12 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.DESTROYING]
 
     @classmethod
-    def next_status(cls) -> Optional[EndpointLifecycle]:
+    def next_status(cls) -> EndpointLifecycle | None:
         """Get the next deployment status after destroying."""
         return EndpointLifecycle.DESTROYED
 
     @classmethod
-    def failure_status(cls) -> Optional[EndpointLifecycle]:
+    def failure_status(cls) -> EndpointLifecycle | None:
         # No failure status for destroying deployments
         return EndpointLifecycle.DESTROYED
 

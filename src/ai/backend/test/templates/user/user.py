@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Optional, override
+from typing import override
 
 from ai.backend.client.func.user import UserRole, UserStatus
 from ai.backend.client.output.fields import group_fields, keypair_fields, user_fields
@@ -100,7 +100,7 @@ class UserTemplate(WrapperTestTemplate):
         email = f"{username}@tester_email.com"
         description = f"Test user for {test_id}, used in tester package"
 
-        user_meta: Optional[CreatedUserMeta] = None
+        user_meta: CreatedUserMeta | None = None
         user_meta = await self._create_user_with_keypair(
             client_session,
             domain_ctx.name,

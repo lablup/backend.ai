@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from aiohttp import web
 
@@ -95,8 +95,8 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
 
     def __init__(
         self,
-        extra_msg: Optional[str] = None,
-        extra_data: Optional[dict[str, Any]] = None,
+        extra_msg: str | None = None,
+        extra_data: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
@@ -170,10 +170,10 @@ class BackendAgentError(BackendAIError):
     def __init__(
         self,
         agent_error_type: str,
-        exc_info: str | AgentError | Exception | Mapping[str, Optional[str]] | None = None,
+        exc_info: str | AgentError | Exception | Mapping[str, str | None] | None = None,
     ) -> None:
         super().__init__()
-        agent_details: Mapping[str, Optional[str]]
+        agent_details: Mapping[str, str | None]
         if not agent_error_type.startswith("https://"):
             agent_error_type = self._short_type_map[agent_error_type.upper()]
         self.args = (

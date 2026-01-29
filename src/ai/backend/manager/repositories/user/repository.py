@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional, cast
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -141,7 +141,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: Optional[list[str]]
+        self, creator: Creator[UserRow], group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
@@ -319,7 +319,7 @@ class UserRepository:
     ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
-        result = cast(Optional[str], result)
+        result = cast(str | None, result)
         return result is not None
 
     async def _check_resource_policy_exists(
@@ -330,7 +330,7 @@ class UserRepository:
             UserResourcePolicyRow.name == policy_name
         )
         result = await session.scalar(query)
-        result = cast(Optional[str], result)
+        result = cast(str | None, result)
         return result is not None
 
     async def _check_user_exists_with_email_or_username(
@@ -340,7 +340,7 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
-        result = cast(Optional[UUID], result)
+        result = cast(UUID | None, result)
         return result is not None
 
     async def _check_username_exists_for_other_user(
@@ -351,7 +351,7 @@ class UserRepository:
             sa.and_(UserRow.username == username, UserRow.email != exclude_email)
         )
         result = await conn.scalar(query)
-        result = cast(Optional[UUID], result)
+        result = cast(UUID | None, result)
         return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
@@ -376,7 +376,7 @@ class UserRepository:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    def _validate_user_access(self, _user_row: UserRow, _requester_uuid: Optional[UUID]) -> bool:
+    def _validate_user_access(self, _user_row: UserRow, _requester_uuid: UUID | None) -> bool:
         """Private method to validate user access - can be extended for ownership logic."""
         # For now, allow access - this can be extended with ownership validation
         return True
@@ -535,7 +535,7 @@ class UserRepository:
 
     async def _get_time_binned_monthly_stats(
         self,
-        user_uuid: Optional[UUID],
+        user_uuid: UUID | None,
         valkey_stat_client: ValkeyStatClient,
     ) -> list[dict[str, Any]]:
         """

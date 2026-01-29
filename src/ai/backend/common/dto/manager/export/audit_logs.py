@@ -8,7 +8,6 @@ including filters for entity type, operation, status, triggered_by, and timestam
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -72,48 +71,48 @@ class AuditLogExportFilter(BaseRequestModel):
     Use this to narrow down the exported audit log data to specific criteria.
     """
 
-    entity_type: Optional[StringFilter] = Field(
+    entity_type: StringFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by entity type (e.g., 'session', 'user', 'keypair'). "
             "Use exact match (equals) to filter by specific entity type."
         ),
     )
-    entity_id: Optional[StringFilter] = Field(
+    entity_id: StringFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by entity ID. Use this to export audit logs for a specific entity."
         ),
     )
-    operation: Optional[StringFilter] = Field(
+    operation: StringFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by operation type (e.g., 'create', 'update', 'delete'). "
             "Use exact match (equals) to filter by specific operation."
         ),
     )
-    status: Optional[list[str]] = Field(
+    status: list[str] | None = Field(
         default=None,
         description=(
             "Filter audit logs by status(es). Accepts a list of status values "
             "(e.g., ['success', 'failure']). Uses IN query."
         ),
     )
-    triggered_by: Optional[StringFilter] = Field(
+    triggered_by: StringFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by the user or system that triggered the action. "
             "Use this to export audit logs initiated by a specific actor."
         ),
     )
-    request_id: Optional[StringFilter] = Field(
+    request_id: StringFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by request ID. "
             "Use this to export audit logs for a specific API request."
         ),
     )
-    created_at: Optional[DateTimeRangeFilter] = Field(
+    created_at: DateTimeRangeFilter | None = Field(
         default=None,
         description=(
             "Filter audit logs by creation timestamp. "
@@ -131,7 +130,7 @@ class AuditLogExportCSVRequest(BaseRequestModel):
     All parameters are optional to allow flexible export configurations.
     """
 
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         description=(
             "List of field keys to include in the export. "
@@ -140,7 +139,7 @@ class AuditLogExportCSVRequest(BaseRequestModel):
             "If not specified or empty, all available fields will be exported."
         ),
     )
-    filter: Optional[AuditLogExportFilter] = Field(
+    filter: AuditLogExportFilter | None = Field(
         default=None,
         description=(
             "Filter conditions to apply before export. "
@@ -148,7 +147,7 @@ class AuditLogExportCSVRequest(BaseRequestModel):
             "If not specified, all audit logs (up to max_rows limit) will be exported."
         ),
     )
-    order: Optional[list[AuditLogExportOrder]] = Field(
+    order: list[AuditLogExportOrder] | None = Field(
         default=None,
         description=(
             "List of ordering specifications for sorting the exported data. "

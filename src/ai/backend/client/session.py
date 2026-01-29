@@ -11,7 +11,6 @@ from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
     Literal,
-    Optional,
     TypeVar,
 )
 
@@ -286,7 +285,7 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         self._closed = False
@@ -427,7 +426,7 @@ class Session(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
@@ -515,9 +514,9 @@ class AsyncSession(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
-        aiohttp_session: Optional[aiohttp.ClientSession] = None,
+        aiohttp_session: aiohttp.ClientSession | None = None,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
         if aiohttp_session is not None:

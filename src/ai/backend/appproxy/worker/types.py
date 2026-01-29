@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Optional,
     Self,
     TypeVar,
 )
@@ -52,7 +51,7 @@ if TYPE_CHECKING:
 
 
 class ProxyMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _upstream_request_sent_http: prometheus_client.Counter
     _upstream_response_received_http: prometheus_client.Counter
@@ -230,7 +229,7 @@ class ProxyMetricObserver:
 
 
 class CircuitMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     @classmethod
     def instance(cls) -> Self:
@@ -264,7 +263,7 @@ class CircuitMetricObserver:
 
 
 class WorkerMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     proxy: ProxyMetricObserver
@@ -442,14 +441,14 @@ class MetricTypes(enum.Enum):
 @dataclass
 class Measurement:
     value: Decimal
-    capacity: Optional[Decimal] = dataclasses.field(default=None)
+    capacity: Decimal | None = dataclasses.field(default=None)
 
 
 @dataclass
 class HistogramMeasurement:
     buckets: Mapping[str, Decimal]
-    count: Optional[int] = dataclasses.field(default=None)
-    sum: Optional[Decimal] = dataclasses.field(default=None)
+    count: int | None = dataclasses.field(default=None)
+    sum: Decimal | None = dataclasses.field(default=None)
 
 
 TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
@@ -487,7 +486,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
+    def __init__(self, initial_value: Decimal | None = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -564,8 +563,8 @@ class Metric:
     stats: MovingStatistics
     stats_filter: frozenset[str]
     current: Decimal
-    capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    capacity: Decimal | None = None
+    current_hook: Callable[[Metric], Decimal] | None = None
 
     def update(self, value: Measurement) -> None:
         if value.capacity is not None:
@@ -609,16 +608,16 @@ class HistogramMetric:
     key: str
     threshold_unit: str
     buckets: Mapping[str, Decimal]
-    count: Optional[int]
-    sum: Optional[Decimal]
+    count: int | None
+    sum: Decimal | None
 
     type = MetricTypes.HISTOGRAM
 
     def update(
         self,
         buckets: Mapping[str, Decimal],
-        count: Optional[int] = None,
-        sum: Optional[Decimal] = None,
+        count: int | None = None,
+        sum: Decimal | None = None,
     ) -> None:
         self.buckets = buckets
         self.count = count

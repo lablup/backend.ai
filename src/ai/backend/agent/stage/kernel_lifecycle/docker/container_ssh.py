@@ -7,7 +7,7 @@ This stage handles SSH key setup inside containers for inter-container communica
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from ai.backend.agent.resources import Mount
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
@@ -30,8 +30,8 @@ class ContainerSSHSpec:
     mounts: list[Mount]
 
     # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
+    uid_override: int | None
+    gid_override: int | None
 
     agent_config: AgentConfig
 
@@ -42,7 +42,7 @@ class ContainerSSHSpecGenerator(ArgsSpecGenerator[ContainerSSHSpec]):
 
 @dataclass
 class ContainerSSHResult:
-    ssh_dir: Optional[Path]
+    ssh_dir: Path | None
 
 
 class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult]):

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -111,14 +110,14 @@ from .types import (
 )
 async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = None,
-    order_by: Optional[list[ArtifactOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ArtifactFilter | None = None,
+    order_by: list[ArtifactOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ArtifactConnection:
     if filter is None:
         filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
@@ -145,7 +144,7 @@ async def artifacts(
     registry information, and availability status.
     """)
 )
-async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
+async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     return await fetch_artifact(info, UUID(id))
 
 
@@ -164,14 +163,14 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
 )
 async def artifact_revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter] = None,
-    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ArtifactRevisionFilter | None = None,
+    order_by: list[ArtifactRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ArtifactRevisionConnection:
     return await fetch_artifact_revisions(
         info,
@@ -196,7 +195,7 @@ async def artifact_revisions(
     version, file size, and README content.
     """)
 )
-async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
+async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
     return await fetch_artifact_revision(info, UUID(id))
 
 

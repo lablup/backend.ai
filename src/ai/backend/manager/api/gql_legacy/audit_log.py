@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import timedelta
-from typing import TYPE_CHECKING, Optional, Self, cast
+from typing import TYPE_CHECKING, Self, cast
 
 import graphene
 from dateutil.parser import parse as dtparse
@@ -121,13 +121,13 @@ class AuditLogNode(graphene.ObjectType):
     async def get_connection(
         cls,
         info: graphene.ResolveInfo,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

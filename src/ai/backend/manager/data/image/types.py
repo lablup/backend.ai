@@ -2,7 +2,7 @@ import enum
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple
 from uuid import UUID
 
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
@@ -45,10 +45,10 @@ class ImageResourcesData:
 class ImageData:
     id: ImageID = field(compare=False)
     name: ImageCanonical
-    project: Optional[str]
+    project: str | None
     image: str
-    created_at: Optional[datetime] = field(compare=False)
-    tag: Optional[str]
+    created_at: datetime | None = field(compare=False)
+    tag: str | None
     registry: str
     registry_id: UUID
     architecture: str
@@ -56,7 +56,7 @@ class ImageData:
     size_bytes: int
     is_local: bool
     type: ImageType
-    accelerators: Optional[str]
+    accelerators: str | None
     labels: ImageLabelsData
     resources: ImageResourcesData
     status: ImageStatus
@@ -83,9 +83,9 @@ class ImageDataWithDetails:
     base_image_name: str
     project: str
     humanized_name: str
-    tag: Optional[str]
+    tag: str | None
     tags: list[KVPair]
-    version: Optional[str]
+    version: str | None
     registry: str
     registry_id: UUID
     type: ImageType
@@ -94,12 +94,12 @@ class ImageDataWithDetails:
     status: ImageStatus
     resource_limits: list[ResourceLimit]
     supported_accelerators: list[str] = field(default_factory=list)
-    digest: Optional[str] = field(default=None)
+    digest: str | None = field(default=None)
     labels: list[KVPair] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
     # legacy
-    hash: Optional[str] = field(default=None)
+    hash: str | None = field(default=None)
 
 
 @dataclass

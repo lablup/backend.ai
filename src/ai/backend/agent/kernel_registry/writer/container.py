@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
@@ -31,7 +31,7 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
     def _parse_recovery_data_from_kernel(
         self,
         kernel: AbstractKernel,
-    ) -> Optional[KernelRecoveryData]:
+    ) -> KernelRecoveryData | None:
         from ai.backend.agent.docker.kernel import DockerKernel
 
         match kernel:

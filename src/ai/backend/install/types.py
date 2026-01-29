@@ -4,7 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, cast
+from typing import cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -63,8 +63,8 @@ class CliArgs:
     show_guide: bool
     non_interactive: bool
     public_facing_address: str
-    accelerator: Optional[str] = None
-    fqdn_prefix: Optional[str] = None
+    accelerator: str | None = None
+    fqdn_prefix: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -115,7 +115,7 @@ class InstallInfo(BaseModel):
     base_path: Path
     halfstack_config: HalfstackConfig
     service_config: ServiceConfig
-    accelerator: Optional[Accelerator] = None
+    accelerator: Accelerator | None = None
 
 
 @dataclasses.dataclass()
@@ -200,8 +200,8 @@ class ServiceConfig:
 @dataclasses.dataclass
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
-    accelerator: Optional[Accelerator] = None
-    fqdn_prefix: Optional[str] = None
+    accelerator: Accelerator | None = None
+    fqdn_prefix: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -221,7 +221,7 @@ class InstallVariable:
         return self.public_facing_address
 
     @property
-    def wildcard_domain(self) -> Optional[str]:
+    def wildcard_domain(self) -> str | None:
         if self.fqdn_prefix:
             return f".{self.fqdn_prefix}.app.backend.ai"
         return None

@@ -1,4 +1,4 @@
-from typing import Optional, Self, override
+from typing import Self, override
 
 from aiohttp import MultipartReader, web
 from pydantic import ConfigDict, Field
@@ -10,9 +10,7 @@ class MultipartUploadCtx(MiddlewareParam):
     file_reader: MultipartReader = Field(
         ..., description="Multipart file reader for handling file uploads"
     )
-    content_type: Optional[str] = Field(
-        default=None, description="Content type from request headers"
-    )
+    content_type: str | None = Field(default=None, description="Content type from request headers")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

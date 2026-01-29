@@ -3,7 +3,7 @@
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Optional, Self
+from typing import Self
 
 from prometheus_client import Counter, Histogram
 
@@ -11,7 +11,7 @@ from prometheus_client import Counter, Histogram
 class SchedulerOperationMetricObserver:
     """Metrics for high-level scheduler operations (schedule, start, terminate, etc.)."""
 
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _operation_count: Counter
     _operation_success_count: Counter
@@ -93,7 +93,7 @@ class SchedulerOperationMetricObserver:
 class SchedulerPhaseMetricObserver:
     """Metrics for scheduler and scheduling controller execution phases."""
 
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _phase_count: Counter
     _phase_duration_sec: Histogram

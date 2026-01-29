@@ -3,7 +3,6 @@ Base handler class for schedule and deployment operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.base import SokovanHandler
@@ -26,7 +25,7 @@ class ScheduleHandler(ABC):
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:

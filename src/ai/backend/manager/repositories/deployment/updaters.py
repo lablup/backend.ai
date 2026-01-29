@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -141,11 +141,11 @@ class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
     Combines metadata, replica_spec, network, mount, and revision_state updates.
     """
 
-    metadata: Optional[DeploymentMetadataUpdaterSpec] = None
-    replica_spec: Optional[ReplicaSpecUpdaterSpec] = None
-    network: Optional[DeploymentNetworkSpecUpdaterSpec] = None
-    mount: Optional[MountUpdaterSpec] = None
-    revision_state: Optional[RevisionStateUpdaterSpec] = None
+    metadata: DeploymentMetadataUpdaterSpec | None = None
+    replica_spec: ReplicaSpecUpdaterSpec | None = None
+    network: DeploymentNetworkSpecUpdaterSpec | None = None
+    mount: MountUpdaterSpec | None = None
+    revision_state: RevisionStateUpdaterSpec | None = None
 
     @property
     @override

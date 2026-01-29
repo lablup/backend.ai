@@ -3,7 +3,6 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import aiohttp
 from huggingface_hub import (
@@ -40,15 +39,15 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 @dataclass
 class HuggingFaceClientArgs:
-    token: Optional[str]
-    endpoint: Optional[str]
+    token: str | None
+    endpoint: str | None
 
 
 class HuggingFaceClient:
     """Client for HuggingFace Hub API operations."""
 
-    _token: Optional[str]
-    _endpoint: Optional[str]
+    _token: str | None
+    _endpoint: str | None
     _api: HfApi
 
     def __init__(self, args: HuggingFaceClientArgs) -> None:
@@ -62,7 +61,7 @@ class HuggingFaceClient:
         self._api = HfApi(token=args.token, endpoint=args.endpoint)
 
     async def scan_models(
-        self, limit: int, sort: ModelSortKey, search: Optional[str] = None
+        self, limit: int, sort: ModelSortKey, search: str | None = None
     ) -> list[HfModelInfo]:
         """List models from HuggingFace Hub.
 
@@ -138,7 +137,7 @@ class HuggingFaceClient:
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {e!s}") from e
 
-    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+    async def get_model_commit_hash(self, model: ModelTarget) -> str | None:
         """Get the commit hash for a specific model revision.
 
         Args:
@@ -236,7 +235,7 @@ class HuggingFaceScanner:
         self,
         limit: int,
         sort: ModelSortKey,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[ModelData]:
         """Scan HuggingFace models concurrently and retrieve metadata for all revisions."""
         try:
@@ -379,7 +378,7 @@ class HuggingFaceScanner:
         """
         return self._client.get_download_url(model, filename)
 
-    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+    async def get_model_commit_hash(self, model: ModelTarget) -> str | None:
         """Get the commit hash for a specific model revision.
 
         Args:
@@ -486,7 +485,7 @@ class HuggingFaceScanner:
         tasks = [download_metadata(model) for model in models]
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
+    async def _download_readme(self, model: ModelTarget) -> str | None:
         """Download README content for a model.
 
         Args:

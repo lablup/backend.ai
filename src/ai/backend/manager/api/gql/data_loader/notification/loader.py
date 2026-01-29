@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -18,7 +17,7 @@ from ai.backend.manager.services.notification.processors import NotificationProc
 async def load_channels_by_ids(
     processor: NotificationProcessors,
     channel_ids: Sequence[uuid.UUID],
-) -> list[Optional[NotificationChannelData]]:
+) -> list[NotificationChannelData | None]:
     """Batch load notification channels by their IDs.
 
     Args:
@@ -47,7 +46,7 @@ async def load_channels_by_ids(
 async def load_rules_by_ids(
     processor: NotificationProcessors,
     rule_ids: Sequence[uuid.UUID],
-) -> list[Optional[NotificationRuleData]]:
+) -> list[NotificationRuleData | None]:
     """Batch load notification rules by their IDs.
 
     Args:

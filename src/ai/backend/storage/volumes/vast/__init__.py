@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, Literal, Optional, cast
+from typing import Any, Final, Literal, cast
 
 import aiofiles
 import aiofiles.os
@@ -102,8 +102,8 @@ class VASTQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
 
@@ -118,7 +118,7 @@ class VASTQuotaModel(BaseQuotaModel):
                 # Check if quota has already been set to the quota scope path
                 quota_name = str(qspath)
                 quotas = await self.api_client.list_quotas(quota_name)
-                existing_quota: Optional[VASTQuota] = None
+                existing_quota: VASTQuota | None = None
                 for q in quotas:
                     if q.name == quota_name:
                         existing_quota = q
@@ -175,7 +175,7 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         await self._modify_quota_scope(vast_quota_id, config)
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if (vast_quota_id := await self._get_vast_quota_id(quota_scope_id)) is None:
             return None
         if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
@@ -222,8 +222,8 @@ class VASTVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,

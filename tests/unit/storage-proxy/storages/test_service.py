@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterator
-from typing import Optional
 
 import pytest
 
@@ -27,7 +26,7 @@ class TestStreamReader(StreamReader):
         for chunk in self._data_chunks:
             yield chunk
 
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return None
 
 

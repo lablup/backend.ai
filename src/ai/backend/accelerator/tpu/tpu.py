@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from asyncio import subprocess
-from typing import ClassVar, Optional, TypedDict
+from typing import ClassVar, TypedDict
 
 import aiohttp
 
@@ -15,7 +15,7 @@ class TPUDeviceProps(TypedDict):
 
 
 class libtpu:
-    zone: ClassVar[Optional[str]] = None
+    zone: ClassVar[str | None] = None
 
     @classmethod
     async def _run_ctpu(cls, cmd: list[str]) -> str:

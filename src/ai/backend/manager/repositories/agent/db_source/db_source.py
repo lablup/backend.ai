@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -77,7 +77,7 @@ class AgentDBSource:
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session() as db_session:
-            agent_row: Optional[AgentRow] = await db_session.scalar(
+            agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
                 .options(selectinload(AgentRow.kernels))
@@ -104,7 +104,7 @@ class AgentDBSource:
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
-            row: Optional[AgentRow] = await session.scalar(query)
+            row: AgentRow | None = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 

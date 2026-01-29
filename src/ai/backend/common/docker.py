@@ -17,7 +17,6 @@ from typing import (
     Final,
     Literal,
     NamedTuple,
-    Optional,
     Self,
 )
 
@@ -285,7 +284,7 @@ async def login(
     Some registry servers only rely on HTTP Basic Authentication without token-based access controls
     (usually via nginx proxy). We do support them also. :)
     """
-    basic_auth: Optional[aiohttp.BasicAuth]
+    basic_auth: aiohttp.BasicAuth | None
 
     if credentials.get("username") and credentials.get("password"):
         basic_auth = aiohttp.BasicAuth(
@@ -366,7 +365,7 @@ class PlatformTagSet(Mapping):
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str], value: Optional[str] = None) -> None:
+    def __init__(self, tags: Iterable[str], value: str | None = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
@@ -387,7 +386,7 @@ class PlatformTagSet(Mapping):
     def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
-    def has(self, key: str, version: Optional[str] = None) -> bool:
+    def has(self, key: str, version: str | None = None) -> bool:
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)

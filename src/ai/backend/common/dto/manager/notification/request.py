@@ -5,7 +5,7 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -48,7 +48,7 @@ class CreateNotificationChannelRequest(BaseRequestModel):
     """Request to create a notification channel."""
 
     name: str = Field(description="Channel name")
-    description: Optional[str] = Field(default=None, description="Channel description")
+    description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
     spec: WebhookSpec | EmailSpec = Field(description="Channel specification")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
@@ -57,22 +57,22 @@ class CreateNotificationChannelRequest(BaseRequestModel):
 class UpdateNotificationChannelRequest(BaseRequestModel):
     """Request to update a notification channel."""
 
-    name: Optional[str] = Field(default=None, description="Updated channel name")
-    description: Optional[str] = Field(default=None, description="Updated channel description")
+    name: str | None = Field(default=None, description="Updated channel name")
+    description: str | None = Field(default=None, description="Updated channel description")
     spec: WebhookSpec | EmailSpec | None = Field(
         default=None, description="Updated channel specification"
     )
-    enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
+    enabled: bool | None = Field(default=None, description="Updated enabled status")
 
 
 class NotificationChannelFilter(BaseRequestModel):
     """Filter for notification channels."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    channel_types: Optional[list[NotificationChannelType]] = Field(
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    channel_types: list[NotificationChannelType] | None = Field(
         default=None, description="Filter by channel types"
     )
-    enabled: Optional[bool] = Field(default=None, description="Filter by enabled status")
+    enabled: bool | None = Field(default=None, description="Filter by enabled status")
 
 
 class NotificationChannelOrder(BaseRequestModel):
@@ -85,19 +85,17 @@ class NotificationChannelOrder(BaseRequestModel):
 class ListNotificationChannelsRequest(BaseRequestModel):
     """Request to list notification channels."""
 
-    filter: Optional[NotificationChannelFilter] = Field(default=None, description="Filter criteria")
-    order: Optional[NotificationChannelOrder] = Field(default=None, description="Order by")
-    limit: Optional[int] = Field(default=None, ge=1, le=1000, description="Maximum items")
-    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
+    filter: NotificationChannelFilter | None = Field(default=None, description="Filter criteria")
+    order: NotificationChannelOrder | None = Field(default=None, description="Order by")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")
 
 
 class SearchNotificationChannelsRequest(BaseRequestModel):
     """Request body for searching notification channels with filters, orders, and pagination."""
 
-    filter: Optional[NotificationChannelFilter] = Field(
-        default=None, description="Filter conditions"
-    )
-    order: Optional[list[NotificationChannelOrder]] = Field(
+    filter: NotificationChannelFilter | None = Field(default=None, description="Filter conditions")
+    order: list[NotificationChannelOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
@@ -108,7 +106,7 @@ class CreateNotificationRuleRequest(BaseRequestModel):
     """Request to create a notification rule."""
 
     name: str = Field(description="Rule name")
-    description: Optional[str] = Field(default=None, description="Rule description")
+    description: str | None = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
     channel_id: UUID = Field(description="ID of the channel to use")
     message_template: str = Field(
@@ -120,22 +118,22 @@ class CreateNotificationRuleRequest(BaseRequestModel):
 class UpdateNotificationRuleRequest(BaseRequestModel):
     """Request to update a notification rule."""
 
-    name: Optional[str] = Field(default=None, description="Updated rule name")
-    description: Optional[str] = Field(default=None, description="Updated rule description")
-    message_template: Optional[str] = Field(
+    name: str | None = Field(default=None, description="Updated rule name")
+    description: str | None = Field(default=None, description="Updated rule description")
+    message_template: str | None = Field(
         default=None, max_length=65536, description="Updated message template (max 64KB)"
     )
-    enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
+    enabled: bool | None = Field(default=None, description="Updated enabled status")
 
 
 class NotificationRuleFilter(BaseRequestModel):
     """Filter for notification rules."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    rule_types: Optional[list[NotificationRuleType]] = Field(
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    rule_types: list[NotificationRuleType] | None = Field(
         default=None, description="Filter by rule types"
     )
-    enabled: Optional[bool] = Field(default=None, description="Filter by enabled status")
+    enabled: bool | None = Field(default=None, description="Filter by enabled status")
 
 
 class NotificationRuleOrder(BaseRequestModel):
@@ -148,17 +146,17 @@ class NotificationRuleOrder(BaseRequestModel):
 class ListNotificationRulesRequest(BaseRequestModel):
     """Request to list notification rules."""
 
-    filter: Optional[NotificationRuleFilter] = Field(default=None, description="Filter criteria")
-    order: Optional[NotificationRuleOrder] = Field(default=None, description="Order by")
-    limit: Optional[int] = Field(default=None, ge=1, le=1000, description="Maximum items")
-    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
+    filter: NotificationRuleFilter | None = Field(default=None, description="Filter criteria")
+    order: NotificationRuleOrder | None = Field(default=None, description="Order by")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")
 
 
 class SearchNotificationRulesRequest(BaseRequestModel):
     """Request body for searching notification rules with filters, orders, and pagination."""
 
-    filter: Optional[NotificationRuleFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[NotificationRuleOrder]] = Field(
+    filter: NotificationRuleFilter | None = Field(default=None, description="Filter conditions")
+    order: list[NotificationRuleOrder] | None = Field(
         default=None, description="Order specifications"
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")

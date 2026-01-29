@@ -182,7 +182,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AliasChoices,
@@ -303,7 +303,7 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     password: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -427,7 +427,7 @@ class DistributedLockType(enum.StrEnum):
 
 class AuthConfig(BaseConfigSchema):
     max_password_age: Annotated[
-        Optional[TimeDuration],
+        TimeDuration | None,
         Field(
             default=None,
             validation_alias=AliasChoices("max_password_age", "max-password-age"),
@@ -559,7 +559,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     user: Annotated[
-        Optional[UserID],
+        UserID | None,
         Field(default=UserID(_file_perm.st_uid)),
         BackendAIConfigMeta(
             description=(
@@ -573,7 +573,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     group: Annotated[
-        Optional[GroupID],
+        GroupID | None,
         Field(default=GroupID(_file_perm.st_gid)),
         BackendAIConfigMeta(
             description=(
@@ -729,7 +729,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
@@ -746,7 +746,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     ssl_privkey: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
@@ -940,7 +940,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     allowed_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("allowed-plugins", "allowed_plugins"),
@@ -961,7 +961,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     disabled_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("disabled-plugins", "disabled_plugins"),
@@ -1060,7 +1060,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     aiomonitor_port: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1136,7 +1136,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     status_update_interval: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             ge=0,
@@ -1154,7 +1154,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     status_lifetime: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=0,
@@ -1172,7 +1172,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     public_metrics_port: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1644,7 +1644,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     max_gql_query_depth: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1662,7 +1662,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     max_gql_connection_page_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1682,7 +1682,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     resources: Annotated[
-        Optional[ResourcesConfig],
+        ResourcesConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1794,7 +1794,7 @@ class PluginsConfig(BaseConfigSchema):
 
 class InterContainerNetworkConfig(BaseConfigSchema):
     default_driver: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default="overlay",
             validation_alias=AliasChoices("default_driver", "default-driver"),
@@ -1824,7 +1824,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
         ),
     ]
     plugin: Annotated[
-        Optional[Any],
+        Any | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1932,7 +1932,7 @@ class NetworkConfig(BaseConfigSchema):
 
 class WatcherConfig(BaseConfigSchema):
     token: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1966,7 +1966,7 @@ class WatcherConfig(BaseConfigSchema):
 
 class HangToleranceThresholdConfig(BaseConfigSchema):
     PREPARING: Annotated[
-        Optional[datetime],
+        datetime | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1979,7 +1979,7 @@ class HangToleranceThresholdConfig(BaseConfigSchema):
         ),
     ]
     TERMINATING: Annotated[
-        Optional[datetime],
+        datetime | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2065,7 +2065,7 @@ class MetricConfig(BaseConfigSchema):
     ]
 
     @field_serializer("address")
-    def _serialize_addr(self, addr: Optional[HostPortPair], _info: Any) -> Optional[str]:
+    def _serialize_addr(self, addr: HostPortPair | None, _info: Any) -> str | None:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
@@ -2125,7 +2125,7 @@ class IdleCheckerConfig(BaseConfigSchema):
 
 class VolumeTypeConfig(BaseConfigSchema):
     user: Annotated[
-        Optional[dict[str, Any] | str],
+        dict[str, Any] | str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2138,7 +2138,7 @@ class VolumeTypeConfig(BaseConfigSchema):
         ),
     ]
     group: Annotated[
-        Optional[dict[str, Any] | str],
+        dict[str, Any] | str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2846,7 +2846,7 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     sftp_scaling_groups: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(
             default=None,
             validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
@@ -2898,7 +2898,7 @@ class VolumesConfig(BaseConfigSchema):
         ),
     ]
     default_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("default_host", "default-host"),
@@ -3584,7 +3584,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         ),
     ]
     artifact_registry: Annotated[
-        Optional[ArtifactRegistryConfig],
+        ArtifactRegistryConfig | None,
         Field(
             default=None,
             validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
@@ -3601,7 +3601,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         ),
     ]
     reservoir: Annotated[
-        Optional[ReservoirConfig],
+        ReservoirConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
