@@ -6423,7 +6423,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  forgetImageById(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult! @join__field(graph: STRAWBERRY)
+  forgetImage(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6435,7 +6435,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  purgeImageById(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult! @join__field(graph: STRAWBERRY)
+  purgeImage(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6447,7 +6447,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN
   """
-  aliasImageById(input: AliasImageByIdInputGQL!): AliasImageByIdResult! @join__field(graph: STRAWBERRY)
+  aliasImage(input: AliasImageByIdInputGQL!): AliasImageByIdResult! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0.
@@ -6468,7 +6468,7 @@ type Mutation
   
   **Required Role:** SUPERADMIN
   """
-  clearImageResourceLimitById(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult! @join__field(graph: STRAWBERRY)
+  clearImageResourceLimit(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""

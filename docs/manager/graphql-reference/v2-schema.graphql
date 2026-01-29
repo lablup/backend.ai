@@ -3012,7 +3012,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  forgetImageById(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult!
+  forgetImage(input: ForgetImageByIdInputGQL!): ForgetImageByIdResult!
 
   """
   Added in 26.2.0.
@@ -3024,7 +3024,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN, ADMIN, or USER
   """
-  purgeImageById(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult!
+  purgeImage(input: PurgeImageByIdInputGQL!): PurgeImageByIdResult!
 
   """
   Added in 26.2.0.
@@ -3036,7 +3036,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN
   """
-  aliasImageById(input: AliasImageByIdInputGQL!): AliasImageByIdResult!
+  aliasImage(input: AliasImageByIdInputGQL!): AliasImageByIdResult!
 
   """
   Added in 26.2.0.
@@ -3057,7 +3057,7 @@ type Mutation {
   
   **Required Role:** SUPERADMIN
   """
-  clearImageResourceLimitById(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult!
+  clearImageResourceLimit(input: ClearImageResourceLimitByIdInputGQL!): ClearImageResourceLimitByIdResult!
 }
 
 """An object with a Globally Unique ID"""
