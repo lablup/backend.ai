@@ -18,6 +18,19 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleFilter,
     RoleOrderBy,
 )
+from ai.backend.manager.api.gql.rbac.types.permission import (
+    ObjectPermission,
+    ObjectPermissionConnection,
+    ObjectPermissionEdge,
+    ScopedPermission,
+    ScopedPermissionConnection,
+    ScopedPermissionEdge,
+)
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    Scope,
+    ScopeConnection,
+    ScopeEdge,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.repositories.permission_controller.options import (
     RoleConditions,
@@ -77,16 +90,7 @@ async def fetch_roles(
         SearchRolesAction(querier=querier)
     )
 
-    # Convert RoleData to RoleDetailData by fetching details for each role
-    roles_with_details = []
-    for role_data in action_result.items:
-        detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=role_data.id)
-        )
-        if detail_result.role:
-            roles_with_details.append(detail_result.role)
-
-    nodes = [Role.from_dataclass(data) for data in roles_with_details]
+    nodes = [Role.from_data(data) for data in action_result.items]
     edges = [RoleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return RoleConnection(
@@ -114,4 +118,88 @@ async def fetch_role(
     if action_result.role is None:
         return None
 
-    return Role.from_dataclass(action_result.role)
+    return Role.from_detail_data(action_result.role)
+
+
+async def fetch_role_scopes(
+    info: Info[StrawberryGQLContext],
+    role_id: UUID,
+) -> ScopeConnection:
+    """Fetch scopes (permission groups) for a specific role."""
+    processors = info.context.processors
+    detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
+        GetRoleDetailAction(role_id=role_id)
+    )
+
+    scopes = [Scope.from_permission_group(pg) for pg in detail_result.role.permission_groups]
+    edges = [ScopeEdge(node=scope, cursor=encode_cursor(str(scope.id))) for scope in scopes]
+
+    return ScopeConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=len(scopes),
+    )
+
+
+async def fetch_role_object_permissions(
+    info: Info[StrawberryGQLContext],
+    role_id: UUID,
+) -> ObjectPermissionConnection:
+    """Fetch object permissions for a specific role."""
+    processors = info.context.processors
+    detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
+        GetRoleDetailAction(role_id=role_id)
+    )
+
+    perms = [ObjectPermission.from_dataclass(op) for op in detail_result.role.object_permissions]
+    edges = [ObjectPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id))) for perm in perms]
+
+    return ObjectPermissionConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=len(perms),
+    )
+
+
+async def fetch_scope_permissions(
+    info: Info[StrawberryGQLContext],
+    role_id: UUID,
+    scope_id: str,
+) -> ScopedPermissionConnection:
+    """Fetch scoped permissions for a specific scope within a role."""
+    processors = info.context.processors
+    detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
+        GetRoleDetailAction(role_id=role_id)
+    )
+
+    # Find the matching permission group
+    permissions = []
+    for pg in detail_result.role.permission_groups:
+        if pg.scope_id.scope_id == scope_id:
+            permissions = [ScopedPermission.from_dataclass(p) for p in pg.permissions]
+            break
+
+    edges = [
+        ScopedPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id))) for perm in permissions
+    ]
+
+    return ScopedPermissionConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=len(permissions),
+    )

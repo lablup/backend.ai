@@ -16,7 +16,10 @@ from .resolver import (
     delete_role_assignment,
     purge_role,
     role,
+    role_object_permissions,
+    role_scopes,
     roles,
+    scope_permissions,
     update_role,
     update_role_permissions,
 )
@@ -25,6 +28,9 @@ __all__ = [
     # Query resolvers
     "role",
     "roles",
+    "role_scopes",
+    "role_object_permissions",
+    "scope_permissions",
     # Mutation resolvers
     "create_role",
     "update_role",

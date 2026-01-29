@@ -6,6 +6,7 @@ from enum import StrEnum
 
 import strawberry
 
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -35,6 +36,12 @@ RoleSourceGQL: type[RoleSource] = strawberry.enum(
     RoleSource,
     name="RoleSource",
     description="Added in 26.2.0. Role source indicating how the role was created",
+)
+
+RoleStatusGQL: type[RoleStatus] = strawberry.enum(
+    RoleStatus,
+    name="RoleStatus",
+    description="Added in 26.2.0. Status of a role",
 )
 
 

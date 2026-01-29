@@ -11,7 +11,13 @@ from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.rbac import RoleStatus
-from ai.backend.manager.api.gql.rbac.fetcher import fetch_role, fetch_roles
+from ai.backend.manager.api.gql.rbac.fetcher import (
+    fetch_role,
+    fetch_role_object_permissions,
+    fetch_role_scopes,
+    fetch_roles,
+    fetch_scope_permissions,
+)
 from ai.backend.manager.api.gql.rbac.types import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
@@ -25,6 +31,11 @@ from ai.backend.manager.api.gql.rbac.types import (
     UpdateRoleInput,
     UpdateRolePermissionsInput,
 )
+from ai.backend.manager.api.gql.rbac.types.permission import (
+    ObjectPermissionConnection,
+    ScopedPermissionConnection,
+)
+from ai.backend.manager.api.gql.rbac.types.scope import ScopeConnection
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     RolePermissionsUpdateInput,
@@ -96,6 +107,48 @@ async def roles(
     )
 
 
+@strawberry.field(description="Added in 26.2.0. Get scopes (permission groups) for a role")
+async def role_scopes(
+    role_id: ID,
+    info: Info[StrawberryGQLContext],
+) -> ScopeConnection:
+    """Get scopes associated with a role."""
+    me = current_user()
+    if me is None or not me.is_superadmin:
+        raise NotEnoughPermission("Only superadmin can access role scopes")
+
+    return await fetch_role_scopes(info, role_id=uuid.UUID(role_id))
+
+
+@strawberry.field(description="Added in 26.2.0. Get object permissions for a role")
+async def role_object_permissions(
+    role_id: ID,
+    info: Info[StrawberryGQLContext],
+) -> ObjectPermissionConnection:
+    """Get object permissions associated with a role."""
+    me = current_user()
+    if me is None or not me.is_superadmin:
+        raise NotEnoughPermission("Only superadmin can access role object permissions")
+
+    return await fetch_role_object_permissions(info, role_id=uuid.UUID(role_id))
+
+
+@strawberry.field(
+    description="Added in 26.2.0. Get scoped permissions for a specific scope within a role"
+)
+async def scope_permissions(
+    role_id: ID,
+    scope_id: ID,
+    info: Info[StrawberryGQLContext],
+) -> ScopedPermissionConnection:
+    """Get scoped permissions for a specific scope within a role."""
+    me = current_user()
+    if me is None or not me.is_superadmin:
+        raise NotEnoughPermission("Only superadmin can access scope permissions")
+
+    return await fetch_scope_permissions(info, role_id=uuid.UUID(role_id), scope_id=str(scope_id))
+
+
 # ==============================================================================
 # Mutation Resolvers
 # ==============================================================================
@@ -124,7 +177,7 @@ async def create_role(input: CreateRoleInput, info: Info[StrawberryGQLContext]) 
         GetRoleDetailAction(role_id=action_result.data.id)
     )
 
-    return Role.from_dataclass(detail_result.role)
+    return Role.from_detail_data(detail_result.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Update an existing role")
@@ -150,7 +203,7 @@ async def update_role(input: UpdateRoleInput, info: Info[StrawberryGQLContext]) 
         GetRoleDetailAction(role_id=action_result.data.id)
     )
 
-    return Role.from_dataclass(detail_result.role)
+    return Role.from_detail_data(detail_result.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Delete a role (soft delete)")
@@ -182,7 +235,7 @@ async def delete_role(input: DeleteRoleInput, info: Info[StrawberryGQLContext]) 
     )
 
     # Return the deleted role (with original data)
-    return Role.from_dataclass(detail_result_before.role)
+    return Role.from_detail_data(detail_result_before.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Purge a role (hard delete)")
@@ -211,7 +264,7 @@ async def purge_role(input: PurgeRoleInput, info: Info[StrawberryGQLContext]) ->
     )
 
     # Return the deleted role (with original data)
-    return Role.from_dataclass(detail_result_before.role)
+    return Role.from_detail_data(detail_result_before.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Update role permissions")
@@ -249,7 +302,7 @@ async def update_role_permissions(
         )
     )
 
-    return Role.from_dataclass(action_result.role)
+    return Role.from_detail_data(action_result.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Assign a role to a user")
@@ -285,7 +338,7 @@ async def create_role_assignment(
         GetRoleDetailAction(role_id=uuid.UUID(input.role_id))
     )
 
-    return Role.from_dataclass(detail_result.role)
+    return Role.from_detail_data(detail_result.role)
 
 
 @strawberry.field(description="Added in 26.2.0. Revoke a role assignment")
@@ -322,4 +375,4 @@ async def delete_role_assignment(
     )
 
     # Return the revoked role
-    return Role.from_dataclass(detail_result.role)
+    return Role.from_detail_data(detail_result.role)

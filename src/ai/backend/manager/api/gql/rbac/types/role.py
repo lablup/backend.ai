@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional, Self, override
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
-from ai.backend.manager.data.permission.role import RoleDetailData
+from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -22,13 +20,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.permission_controller.options import RoleConditions, RoleOrders
 
 from .enums import EntityTypeGQL, RoleOrderField, RoleSourceGQL, ScopeTypeGQL
-from .helper import paginate_in_memory
-from .permission import (
-    ObjectPermission,
-    ObjectPermissionConnection,
-    ObjectPermissionEdge,
-)
-from .scope import Scope
+from .role_info import RoleIdentityInfo, RoleLifecycleInfo
 
 # ==============================================================================
 # Filter Types
@@ -150,68 +142,45 @@ class RoleOrderBy(GQLOrderBy):
 )
 class Role(Node):
     id: NodeID[str]
-    name: str
-    description: Optional[str]
-    scopes: list[Scope]
-    source: RoleSourceGQL
-    created_at: datetime
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
+    identity: RoleIdentityInfo = strawberry.field(
+        description="Added in 26.2.0. Identity information for this role",
+    )
+    lifecycle: RoleLifecycleInfo = strawberry.field(
+        description="Added in 26.2.0. Lifecycle information for this role",
+    )
 
-    # Private fields for lazy loading
-    # TODO: Refactor to fetch permissions via separate DB queries instead of in-memory pagination.
-    #       Currently, all permissions are loaded upfront and paginated in memory.
-    #       For better performance, implement DB-level pagination.
-    _object_permissions_data: strawberry.Private[list[ObjectPermissionData]]
-
-    @strawberry.field(description="Added in 26.2.0. Object permissions for this role")
-    def object_permissions(
-        self,
-        first: Optional[int] = None,
-        after: Optional[str] = None,
-        last: Optional[int] = None,
-        before: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> ObjectPermissionConnection:
-        """Fetch object permissions with optional pagination."""
-        all_perms = [ObjectPermission.from_dataclass(op) for op in self._object_permissions_data]
-
-        result = paginate_in_memory(all_perms, first, after, last, before, limit, offset)
-
-        edges = [
-            ObjectPermissionEdge(node=perm, cursor=encode_cursor(str(perm.id)))
-            for perm in result.items
-        ]
-
-        return ObjectPermissionConnection(
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
+    @classmethod
+    def from_data(cls, data: RoleData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            identity=RoleIdentityInfo(
+                name=data.name,
+                description=data.description,
+                source=data.source,
             ),
-            count=result.total_count,
+            lifecycle=RoleLifecycleInfo(
+                status=data.status,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+                deleted_at=data.deleted_at,
+            ),
         )
 
     @classmethod
-    def from_dataclass(cls, data: RoleDetailData) -> Self:
-        scopes = [
-            Scope.from_permission_group(permission_group)
-            for permission_group in data.permission_groups
-        ]
-
+    def from_detail_data(cls, data: RoleDetailData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            scopes=scopes,
-            source=data.source,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            deleted_at=data.deleted_at,
-            _object_permissions_data=data.object_permissions,
+            identity=RoleIdentityInfo(
+                name=data.name,
+                description=data.description,
+                source=data.source,
+            ),
+            lifecycle=RoleLifecycleInfo(
+                status=data.status,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+                deleted_at=data.deleted_at,
+            ),
         )
 
 

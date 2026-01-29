@@ -6,6 +6,7 @@ from .enums import (
     OperationTypeGQL,
     RoleOrderField,
     RoleSourceGQL,
+    RoleStatusGQL,
     ScopedPermissionOrderField,
     ScopeTypeGQL,
 )
@@ -36,7 +37,15 @@ from .role import (
     RoleSourceFilter,
     ScopeTypeFilter,
 )
-from .scope import Scope
+from .role_info import (
+    RoleIdentityInfo,
+    RoleLifecycleInfo,
+)
+from .scope import (
+    Scope,
+    ScopeConnection,
+    ScopeEdge,
+)
 
 __all__ = [
     # Enums
@@ -45,6 +54,7 @@ __all__ = [
     "OperationTypeGQL",
     "RoleOrderField",
     "RoleSourceGQL",
+    "RoleStatusGQL",
     "ScopedPermissionOrderField",
     "ScopeTypeGQL",
     # Inputs
@@ -60,7 +70,6 @@ __all__ = [
     "ObjectPermission",
     "ObjectPermissionConnection",
     "ObjectPermissionEdge",
-    "Scope",
     "ScopedPermission",
     "ScopedPermissionConnection",
     "ScopedPermissionEdge",
@@ -72,4 +81,11 @@ __all__ = [
     "RoleOrderBy",
     "RoleSourceFilter",
     "ScopeTypeFilter",
+    # Role Info
+    "RoleIdentityInfo",
+    "RoleLifecycleInfo",
+    # Scope
+    "Scope",
+    "ScopeConnection",
+    "ScopeEdge",
 ]
