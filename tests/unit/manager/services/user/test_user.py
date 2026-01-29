@@ -181,7 +181,6 @@ class TestUserServiceCompatibility:
 
         mock_dependencies["user_repository"].soft_delete_user_validated.assert_called_once_with(
             email="user@example.com",
-            requester_uuid=None,
         )
 
     @pytest.mark.asyncio
