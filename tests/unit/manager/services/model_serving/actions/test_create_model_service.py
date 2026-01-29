@@ -18,11 +18,11 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
-    ImageIdentifier,
     ModelRevisionSpec,
     MountMetadata,
     ResourceSpec,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
@@ -42,6 +42,9 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -222,6 +225,36 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
+    def mock_revision_generator_registry(self) -> MagicMock:
+        mock = MagicMock(spec=RevisionGeneratorRegistry)
+        mock_generator = MagicMock()
+        mock_generator.generate_revision = AsyncMock(
+            return_value=ModelRevisionSpec(
+                image_identifier=ImageIdentifier(
+                    canonical="ai.backend/python:3.9",
+                    architecture="x86_64",
+                ),
+                resource_spec=ResourceSpec(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots=ResourceSlot.from_user_input({"cpu": "2", "memory": "4G"}, None),
+                    resource_opts=None,
+                ),
+                mounts=MountMetadata(
+                    model_vfolder_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                    model_definition_path=None,
+                ),
+                execution=ExecutionSpec(
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                    startup_command=None,
+                    environ={},
+                ),
+            )
+        )
+        mock.get.return_value = mock_generator
+        return mock
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -234,6 +267,7 @@ class TestCreateModelService:
         mock_repositories: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_revision_generator_registry: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -246,6 +280,7 @@ class TestCreateModelService:
             repository=mock_repositories.repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            revision_generator_registry=mock_revision_generator_registry,
         )
 
     @pytest.fixture
