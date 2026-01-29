@@ -597,21 +597,21 @@ class PermissionGroupConditions:
     @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.role_id == role_id  # type: ignore[attr-defined]
+            return PermissionGroupRow.role_id == role_id
 
         return inner
 
     @staticmethod
     def by_scope_type(scope_type: ScopeType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_type == scope_type  # type: ignore[attr-defined]
+            return PermissionGroupRow.scope_type == scope_type
 
         return inner
 
     @staticmethod
     def by_scope_id(scope_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_id == scope_id  # type: ignore[attr-defined]
+            return PermissionGroupRow.scope_id == scope_id
 
         return inner
 
@@ -624,7 +624,7 @@ class PermissionGroupConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.id > cursor_uuid  # type: ignore[attr-defined]
+            return PermissionGroupRow.id > cursor_uuid
 
         return inner
 
@@ -637,7 +637,7 @@ class PermissionGroupConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.id < cursor_uuid  # type: ignore[attr-defined]
+            return PermissionGroupRow.id < cursor_uuid
 
         return inner
 
@@ -648,14 +648,14 @@ class PermissionGroupOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return PermissionGroupRow.id.asc()  # type: ignore[attr-defined]
-        return PermissionGroupRow.id.desc()  # type: ignore[attr-defined]
+            return PermissionGroupRow.id.asc()
+        return PermissionGroupRow.id.desc()
 
     @staticmethod
     def scope_type(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return PermissionGroupRow.scope_type.asc()  # type: ignore[attr-defined]
-        return PermissionGroupRow.scope_type.desc()  # type: ignore[attr-defined]
+            return PermissionGroupRow.scope_type.asc()
+        return PermissionGroupRow.scope_type.desc()
 
 
 class ScopedPermissionConditions:
@@ -664,21 +664,21 @@ class ScopedPermissionConditions:
     @staticmethod
     def by_permission_group_id(permission_group_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.permission_group_id == permission_group_id  # type: ignore[attr-defined]
+            return PermissionRow.permission_group_id == permission_group_id
 
         return inner
 
     @staticmethod
     def by_entity_type(entity_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type == entity_type  # type: ignore[attr-defined]
+            return PermissionRow.entity_type == entity_type
 
         return inner
 
     @staticmethod
     def by_operation(operation: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation == operation  # type: ignore[attr-defined]
+            return PermissionRow.operation == operation
 
         return inner
 
@@ -688,7 +688,7 @@ class ScopedPermissionConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.id > cursor_uuid  # type: ignore[attr-defined]
+            return PermissionRow.id > cursor_uuid
 
         return inner
 
@@ -698,7 +698,7 @@ class ScopedPermissionConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.id < cursor_uuid  # type: ignore[attr-defined]
+            return PermissionRow.id < cursor_uuid
 
         return inner
 
@@ -709,14 +709,14 @@ class ScopedPermissionOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return PermissionRow.id.asc()  # type: ignore[attr-defined]
-        return PermissionRow.id.desc()  # type: ignore[attr-defined]
+            return PermissionRow.id.asc()
+        return PermissionRow.id.desc()
 
     @staticmethod
     def entity_type(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return PermissionRow.entity_type.asc()  # type: ignore[attr-defined]
-        return PermissionRow.entity_type.desc()  # type: ignore[attr-defined]
+            return PermissionRow.entity_type.asc()
+        return PermissionRow.entity_type.desc()
 
 
 class ObjectPermissionConditions:
@@ -725,28 +725,28 @@ class ObjectPermissionConditions:
     @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.role_id == role_id  # type: ignore[attr-defined]
+            return ObjectPermissionRow.role_id == role_id
 
         return inner
 
     @staticmethod
     def by_entity_type(entity_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type  # type: ignore[attr-defined]
+            return ObjectPermissionRow.entity_type == entity_type
 
         return inner
 
     @staticmethod
     def by_entity_id(entity_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_id == entity_id  # type: ignore[attr-defined]
+            return ObjectPermissionRow.entity_id == entity_id
 
         return inner
 
     @staticmethod
     def by_operation(operation: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.operation == operation  # type: ignore[attr-defined]
+            return ObjectPermissionRow.operation == operation
 
         return inner
 
@@ -756,7 +756,7 @@ class ObjectPermissionConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.id > cursor_uuid  # type: ignore[attr-defined]
+            return ObjectPermissionRow.id > cursor_uuid
 
         return inner
 
@@ -766,7 +766,7 @@ class ObjectPermissionConditions:
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.id < cursor_uuid  # type: ignore[attr-defined]
+            return ObjectPermissionRow.id < cursor_uuid
 
         return inner
 
@@ -777,11 +777,11 @@ class ObjectPermissionOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return ObjectPermissionRow.id.asc()  # type: ignore[attr-defined]
-        return ObjectPermissionRow.id.desc()  # type: ignore[attr-defined]
+            return ObjectPermissionRow.id.asc()
+        return ObjectPermissionRow.id.desc()
 
     @staticmethod
     def entity_type(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return ObjectPermissionRow.entity_type.asc()  # type: ignore[attr-defined]
-        return ObjectPermissionRow.entity_type.desc()  # type: ignore[attr-defined]
+            return ObjectPermissionRow.entity_type.asc()
+        return ObjectPermissionRow.entity_type.desc()
