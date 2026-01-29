@@ -172,8 +172,6 @@ The implementation is split across multiple tickets/PRs for incremental review a
 
 **Breaking**: Yes - `AUTO_SPLIT` and `MANUAL` modes will not partition resources. This is intentional to establish a clean baseline.
 
-**PR**: TBD
-
 ### Ticket 2: Add device discovery and global device map
 
 **Goal**: Introduce `GlobalDeviceInfo` and `GlobalDeviceMap` to separate device discovery from allocation.
@@ -189,8 +187,6 @@ The implementation is split across multiple tickets/PRs for incremental review a
 - Tests for `_create_global_devices()` with mock plugins
 
 **Breaking**: No
-
-**PR**: TBD
 
 ### Ticket 3: Add DevicePartitioner and AUTO_SPLIT device distribution
 
@@ -213,8 +209,6 @@ The implementation is split across multiple tickets/PRs for incremental review a
 
 **Breaking**: No - restores AUTO_SPLIT functionality with device-based approach
 
-**PR**: TBD
-
 ### Ticket 4: Add device-based MANUAL mode configuration
 
 **Goal**: Change MANUAL mode config from slot-based to device-based.
@@ -232,12 +226,15 @@ The implementation is split across multiple tickets/PRs for incremental review a
 
 **Breaking**: Yes - MANUAL mode config format changes
 
-**PR**: TBD
-
 ## Open Questions
 
-- Should we provide a migration tool or script for existing MANUAL mode configs?
-- How should we handle plugins that don't have discrete device IDs (e.g., shared memory pools)?
+### Resolved
+
+1. ~~**Migration tool for MANUAL mode configs**~~
+   - **Decision: No** - MANUAL mode config format change is a breaking change, but users can update configs manually. A migration tool would be over-engineering given the small number of MANUAL mode users.
+
+2. ~~**Plugins without discrete device IDs**~~
+   - **Decision: Not applicable** - All compute plugins expose devices via `/dev/` or `/sys/` paths which inherently have discrete IDs (e.g., `cuda0`, `cpu0`). Memory is the exception, which is why `SharedDevicePartitioner` exists - it doesn't require device exclusivity and shares the same device ID across all agents.
 
 ## References
 
