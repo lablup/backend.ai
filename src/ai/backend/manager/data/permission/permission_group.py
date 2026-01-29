@@ -39,3 +39,13 @@ class PermissionGroupExtendedData:
     scope_id: ScopeId
 
     permissions: list[PermissionData]
+
+
+@dataclass(frozen=True)
+class PermissionGroupListResult:
+    """Result of permission group search with pagination info."""
+
+    items: list[PermissionGroupData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

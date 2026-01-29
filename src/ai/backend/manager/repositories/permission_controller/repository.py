@@ -11,9 +11,18 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.permission.entity import EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
-from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.data.permission.permission_group import PermissionGroupData
+from ai.backend.manager.data.permission.object_permission import (
+    ObjectPermissionData,
+    ObjectPermissionListResult,
+)
+from ai.backend.manager.data.permission.permission import (
+    PermissionData,
+    ScopedPermissionListResult,
+)
+from ai.backend.manager.data.permission.permission_group import (
+    PermissionGroupData,
+    PermissionGroupListResult,
+)
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
@@ -241,6 +250,30 @@ class PermissionControllerRepository:
     ) -> RoleListResult:
         """Searches roles with pagination and filtering."""
         return await self._db_source.search_roles(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_permission_groups(
+        self,
+        querier: BatchQuerier,
+    ) -> PermissionGroupListResult:
+        """Searches permission groups (scopes) with pagination and filtering."""
+        return await self._db_source.search_permission_groups(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_scoped_permissions(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopedPermissionListResult:
+        """Searches scoped permissions with pagination and filtering."""
+        return await self._db_source.search_scoped_permissions(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_object_permissions(
+        self,
+        querier: BatchQuerier,
+    ) -> ObjectPermissionListResult:
+        """Searches object permissions with pagination and filtering."""
+        return await self._db_source.search_object_permissions(querier=querier)
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
