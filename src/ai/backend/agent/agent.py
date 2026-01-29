@@ -2431,6 +2431,7 @@ class AbstractAgent(
             "exec": startup_command,
         }
         try:
+            # NOTE: asyncio.timeout(0) immediately times out
             async with asyncio.timeout(timeout):
                 while True:
                     try:
