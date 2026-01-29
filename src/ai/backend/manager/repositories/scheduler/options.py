@@ -12,6 +12,7 @@ from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec, UUIDInMatchSpec
+    from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -242,6 +243,17 @@ class KernelConditions:
     def by_statuses(statuses: Collection[KernelStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_filter_in(spec: KernelStatusInMatchSpec) -> QueryCondition:
+        """Factory for status IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.status.notin_(spec.values)
+            return KernelRow.status.in_(spec.values)
 
         return inner
 
