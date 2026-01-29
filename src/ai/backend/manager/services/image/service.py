@@ -16,7 +16,9 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -395,9 +397,13 @@ class ImageService:
         """
         Creates an alias for an image by its ID.
         """
-        image_alias = await self._image_repository.add_image_alias_by_id(
-            action.image_id, action.alias
+        creator = Creator(
+            spec=ImageAliasCreatorSpec(
+                alias=action.alias,
+                image_id=action.image_id,
+            )
         )
+        image_alias = await self._image_repository.add_image_alias_by_id(creator)
         return AliasImageByIdActionResult(
             image_id=action.image_id,
             image_alias=image_alias,
