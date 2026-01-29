@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import SessionTypes
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent.pool import AgentPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -27,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @dataclass
 class HookRegistryArgs:
     repository: DeploymentRepository
-    agent_pool: AgentPool
+    agent_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
@@ -35,7 +35,7 @@ class HookRegistryArgs:
 
 class HookRegistry:
     _repository: DeploymentRepository
-    _agent_pool: AgentPool
+    _agent_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
     _event_producer: EventProducer
