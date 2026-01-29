@@ -442,6 +442,10 @@ class StatContext:
         )
 
         # Removing process metrics associated with the container
+        # Skip if running on macOS
+        if sys.platform == "darwin":
+            return
+
         if container_id is None:
             log.warning(
                 "Skipping process metric removal for kernel {}: container_id is None", kernel_id
