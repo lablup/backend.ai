@@ -4954,6 +4954,8 @@ enum KernelOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  TERMINATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.2.0. Resource allocation information for a kernel."""
@@ -9154,25 +9156,25 @@ input ResourceLimitInput
 }
 
 """
-Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
+Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
 """
 type ResourceOpts
   @join__type(graph: STRAWBERRY)
 {
-  """List of resource option entries."""
+  """List of resource option entries. Each entry contains a key-value pair."""
   entries: [ResourceOptsEntry!]!
 }
 
 """
-Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
+Added in 26.1.0. A single key-value entry representing a resource option. Contains additional resource configuration such as shared memory settings.
 """
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The name of this resource option (e.g., 'shmem')."""
+  """The name of this resource option. Example: 'shmem'."""
   name: String!
 
-  """The value for this resource option (e.g., '64m')."""
+  """The value for this resource option. Example: '64m'."""
   value: String!
 }
 
