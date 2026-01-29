@@ -90,6 +90,7 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .kernel.resolver import kernel_v2, kernels_v2
 from .notification import (
     create_notification_channel,
     create_notification_rule,
@@ -194,6 +195,8 @@ class Query:
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
+    kernel_v2 = kernel_v2
+    kernels_v2 = kernels_v2
     route = route
     routes = routes
     session_scheduling_histories = session_scheduling_histories
