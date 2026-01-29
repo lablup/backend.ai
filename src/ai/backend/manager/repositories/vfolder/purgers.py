@@ -7,10 +7,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
+from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntity,
     RBACEntityPurgerSpec,
