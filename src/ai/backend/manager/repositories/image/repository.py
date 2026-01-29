@@ -301,13 +301,6 @@ class ImageRepository:
         return await self._db_source.set_image_resource_limit_by_id(image_id, resource_limit)
 
     @image_repository_resilience.apply()
-    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
-        """
-        Scans multiple images by their IDs.
-        """
-        return await self._db_source.scan_images_by_ids(image_ids)
-
-    @image_repository_resilience.apply()
     async def delete_image_with_aliases(self, image_id: UUID) -> ImageData:
         """
         Deletes an image and all its aliases.
