@@ -5,7 +5,7 @@ from functools import cached_property, partial
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, KernelId
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.deployment.types import (
@@ -16,6 +16,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -36,6 +37,7 @@ from .deployment import (
 )
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .image import load_images_by_ids
+from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
@@ -173,3 +175,9 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, ImageData | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
+
+    @cached_property
+    def kernel_loader(
+        self,
+    ) -> DataLoader[KernelId, Optional[KernelInfo]]:
+        return DataLoader(load_fn=partial(load_kernels_by_ids, self._processors.session))

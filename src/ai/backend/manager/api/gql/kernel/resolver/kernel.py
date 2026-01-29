@@ -6,8 +6,8 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.base import UUIDFilter
-from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
+from ai.backend.common.types import KernelId
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelFilterGQL,
@@ -15,7 +15,6 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.errors.kernel import TooManyKernelsFound
 
 
 @strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")
@@ -23,12 +22,7 @@ async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> Optional[KernelV2GQL]:
-    result = await fetch_kernels(info, filter=KernelFilterGQL(id=UUIDFilter(equals=id)), limit=1)
-    if len(result.edges) >= 2:
-        raise TooManyKernelsFound
-    if result.edges:
-        return result.edges[0].node
-    return None
+    return await fetch_kernel(info, KernelId(id))
 
 
 @strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")

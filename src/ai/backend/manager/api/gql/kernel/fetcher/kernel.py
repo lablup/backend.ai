@@ -5,6 +5,7 @@ from functools import lru_cache
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.types import KernelId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.kernel.types import (
@@ -71,3 +72,14 @@ async def fetch_kernels(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_kernel(
+    info: Info[StrawberryGQLContext],
+    kernel_id: KernelId,
+) -> KernelV2GQL | None:
+    """Fetch a single kernel by ID using dataloader."""
+    kernel_info = await info.context.data_loaders.kernel_loader.load(kernel_id)
+    if kernel_info is None:
+        return None
+    return KernelV2GQL.from_kernel_info(kernel_info)

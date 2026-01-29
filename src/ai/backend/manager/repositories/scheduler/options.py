@@ -187,6 +187,13 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_ids(kernel_ids: Collection[KernelId]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
     def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         """Factory for id equality filter."""
 
