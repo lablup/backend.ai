@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Optional
-from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -104,13 +104,13 @@ async def fetch_images(
 
 async def fetch_image_by_id(
     info: Info[StrawberryGQLContext],
-    image_id: UUID,
+    image_id: ImageID,
 ) -> Optional[ImageV2GQL]:
     """Fetch a single image by ID.
 
     Args:
         info: GraphQL context info
-        image_id: The UUID of the image to fetch
+        image_id: The ImageID of the image to fetch
 
     Returns:
         ImageV2GQL if found, None otherwise

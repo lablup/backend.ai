@@ -12,6 +12,7 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -77,4 +78,4 @@ async def images_v2(
     """)
 )
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ImageV2GQL]:
-    return await fetch_image_by_id(info, UUID(id))
+    return await fetch_image_by_id(info, ImageID(UUID(id)))
