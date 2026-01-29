@@ -3096,7 +3096,11 @@ class AbstractAgent[
                                     for live_service in live_services["data"]:
                                         for service_port in service_ports:
                                             if live_service["name"] == service_port["name"]:
+                                                # Preserve protocol from image labels, don't overwrite with live_service data
+                                                original_protocol = service_port.get("protocol")
                                                 service_port.update(live_service)
+                                                if original_protocol is not None:
+                                                    service_port["protocol"] = original_protocol
                                                 break
                                 else:
                                     log.warning(
