@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.request import Request
 
@@ -16,9 +16,9 @@ class Dotfile(BaseFunction):
         data: str,
         path: str,
         permission: str,
-        owner_access_key: Optional[str] = None,
-        domain: Optional[str] = None,
-        group: Optional[str] = None,
+        owner_access_key: str | None = None,
+        domain: str | None = None,
+        group: str | None = None,
     ) -> "Dotfile":
         body = {
             "data": data,
@@ -48,9 +48,9 @@ class Dotfile(BaseFunction):
     @classmethod
     async def list_dotfiles(
         cls,
-        owner_access_key: Optional[str] = None,
-        domain: Optional[str] = None,
-        group: Optional[str] = None,
+        owner_access_key: str | None = None,
+        domain: str | None = None,
+        group: str | None = None,
     ) -> "list[Mapping[str, str]]":
         params = {}
         if group:
@@ -73,9 +73,9 @@ class Dotfile(BaseFunction):
     def __init__(
         self,
         path: str,
-        owner_access_key: Optional[str] = None,
-        group: Optional[str] = None,
-        domain: Optional[str] = None,
+        owner_access_key: str | None = None,
+        group: str | None = None,
+        domain: str | None = None,
     ) -> None:
         self.path = path
         self.owner_access_key = owner_access_key

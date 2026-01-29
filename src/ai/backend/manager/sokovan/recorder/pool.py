@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Optional
 from uuid import UUID
 
 from .recorder import TransitionRecorder
@@ -22,8 +21,8 @@ class _SharedPhaseContext[EntityIdT: UUID]:
 
     name: str
     started_at: datetime
-    success_detail: Optional[str]
-    entity_ids: Optional[set[EntityIdT]] = None  # None means all entities
+    success_detail: str | None
+    entity_ids: set[EntityIdT] | None = None  # None means all entities
     steps: list[StepRecord] = field(default_factory=list)
     failed: bool = False
 
@@ -33,7 +32,7 @@ class _SharedPhaseRecord[EntityIdT: UUID]:
     """Internal record for a shared phase with entity filtering info."""
 
     phase: PhaseRecord
-    entity_ids: Optional[set[EntityIdT]]  # None means all entities
+    entity_ids: set[EntityIdT] | None  # None means all entities
 
 
 class RecordPool[EntityIdT: UUID]:
@@ -57,7 +56,7 @@ class RecordPool[EntityIdT: UUID]:
         self.records: dict[EntityIdT, ExecutionRecord] = {}
         self._recorders: dict[EntityIdT, TransitionRecorder[EntityIdT]] = {}
         self._shared_phases: list[_SharedPhaseRecord[EntityIdT]] = []
-        self._current_shared_phase: Optional[_SharedPhaseContext[EntityIdT]] = None
+        self._current_shared_phase: _SharedPhaseContext[EntityIdT] | None = None
         self._built = False
 
         # Create recorders for all entity IDs upfront
@@ -131,7 +130,7 @@ class RecordPool[EntityIdT: UUID]:
                 self.records[entity_id] = recorder.build_execution_record(build_data)
         return dict(self.records)
 
-    def get_record(self, entity_id: EntityIdT) -> Optional[ExecutionRecord]:
+    def get_record(self, entity_id: EntityIdT) -> ExecutionRecord | None:
         """Get the execution record for an entity."""
         return self.records.get(entity_id)
 

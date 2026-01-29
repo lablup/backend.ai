@@ -1,176 +1,176 @@
 import enum
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from dataclasses_json import DataClassJsonMixin
 
 
 @dataclass
 class GPFSFilesystemBlock(DataClassJsonMixin):
-    pools: Optional[str]
-    disks: Optional[str]
-    blockSize: Optional[int]
-    metaDataBlockSize: Optional[int]
-    indirectBlockSize: Optional[int]
-    minFragmentSize: Optional[int]
-    inodeSize: Optional[int]
-    logfileSize: Optional[int]
-    writeCacheThreshold: Optional[int]
+    pools: str | None
+    disks: str | None
+    blockSize: int | None
+    metaDataBlockSize: int | None
+    indirectBlockSize: int | None
+    minFragmentSize: int | None
+    inodeSize: int | None
+    logfileSize: int | None
+    writeCacheThreshold: int | None
 
 
 @dataclass
 class GPFSFilesystemMount(DataClassJsonMixin):
-    mountPoint: Optional[str]
-    automaticMountOption: Optional[str]
-    additionalMountOptions: Optional[str]
-    mountPriority: Optional[int]
-    driveLetter: Optional[str]
-    remoteDeviceName: Optional[str]
-    readOnly: Optional[bool]
-    nodesMountedReadWrite: Optional[list[str]]
-    nodesMountedReadOnly: Optional[list[str]]
-    nodesMountedInternally: Optional[list[str]]
-    status: Optional[str]
+    mountPoint: str | None
+    automaticMountOption: str | None
+    additionalMountOptions: str | None
+    mountPriority: int | None
+    driveLetter: str | None
+    remoteDeviceName: str | None
+    readOnly: bool | None
+    nodesMountedReadWrite: list[str] | None
+    nodesMountedReadOnly: list[str] | None
+    nodesMountedInternally: list[str] | None
+    status: str | None
 
 
 @dataclass
 class GPFSFilesystemReplication(DataClassJsonMixin):
-    defaultMetadataReplicas: Optional[int]
-    maxMetadataReplicas: Optional[int]
-    defaultDataReplicas: Optional[int]
-    maxDataReplicas: Optional[int]
-    strictReplication: Optional[str]
-    logReplicas: Optional[int]
+    defaultMetadataReplicas: int | None
+    maxMetadataReplicas: int | None
+    defaultDataReplicas: int | None
+    maxDataReplicas: int | None
+    strictReplication: str | None
+    logReplicas: int | None
 
 
 @dataclass
 class GPFSFilesystemQuota(DataClassJsonMixin):
-    quotasAccountingEnabled: Optional[str]
-    quotasEnforced: Optional[str]
-    defaultQuotasEnabled: Optional[str]
-    perfilesetQuotas: Optional[bool]
-    filesetdfEnabled: Optional[bool]
+    quotasAccountingEnabled: str | None
+    quotasEnforced: str | None
+    defaultQuotasEnabled: str | None
+    perfilesetQuotas: bool | None
+    filesetdfEnabled: bool | None
 
 
 @dataclass
 class GPFSFilesystemSettings(DataClassJsonMixin):
-    blockAllocationType: Optional[str]
-    fileLockingSemantics: Optional[str]
-    aclSemantics: Optional[str]
-    numNodes: Optional[int]
-    dmapiEnabled: Optional[bool]
-    exactMTime: Optional[bool]
-    suppressATime: Optional[str]
-    fastEAEnabled: Optional[bool]
-    encryption: Optional[bool]
-    maxNumberOfInodes: Optional[int]
-    is4KAligned: Optional[bool]
-    rapidRepairEnabled: Optional[bool]
-    stripeMethod: Optional[str]
-    stripedLogs: Optional[bool]
-    fileAuditLogEnabled: Optional[bool]
+    blockAllocationType: str | None
+    fileLockingSemantics: str | None
+    aclSemantics: str | None
+    numNodes: int | None
+    dmapiEnabled: bool | None
+    exactMTime: bool | None
+    suppressATime: str | None
+    fastEAEnabled: bool | None
+    encryption: bool | None
+    maxNumberOfInodes: int | None
+    is4KAligned: bool | None
+    rapidRepairEnabled: bool | None
+    stripeMethod: str | None
+    stripedLogs: bool | None
+    fileAuditLogEnabled: bool | None
 
 
 @dataclass
 class GPFSFileAuditLogConfig(DataClassJsonMixin):
-    auditFilesetDeviceName: Optional[str]
-    auditFilesetName: Optional[str]
-    auditRetention: Optional[int]
-    topicGenNum: Optional[int]
-    eventTypes: Optional[str]
+    auditFilesetDeviceName: str | None
+    auditFilesetName: str | None
+    auditRetention: int | None
+    topicGenNum: int | None
+    eventTypes: str | None
 
 
 @dataclass
 class GPFSFilesystem(DataClassJsonMixin):
-    oid: Optional[int]
-    uuid: Optional[str]
-    name: Optional[str]
-    version: Optional[str]
-    type: Optional[str]
-    createTime: Optional[str]
-    block: Optional[GPFSFilesystemBlock]
-    mount: Optional[GPFSFilesystemMount]
-    replication: Optional[GPFSFilesystemReplication]
-    quota: Optional[GPFSFilesystemQuota]
-    settings: Optional[GPFSFilesystemSettings]
-    fileAuditLogConfig: Optional[GPFSFileAuditLogConfig]
+    oid: int | None
+    uuid: str | None
+    name: str | None
+    version: str | None
+    type: str | None
+    createTime: str | None
+    block: GPFSFilesystemBlock | None
+    mount: GPFSFilesystemMount | None
+    replication: GPFSFilesystemReplication | None
+    quota: GPFSFilesystemQuota | None
+    settings: GPFSFilesystemSettings | None
+    fileAuditLogConfig: GPFSFileAuditLogConfig | None
 
 
 @dataclass
 class GPFSQuota(DataClassJsonMixin):
-    quotaId: Optional[int]
-    filesystemName: Optional[str]
-    quotaType: Optional[str]
-    objectName: Optional[str]  # This represents fileset name you query quota of filesets.
-    objectId: Optional[int]
-    blockUsage: Optional[int]
-    blockQuota: Optional[int]
-    blockLimit: Optional[int]
-    blockInDoubt: Optional[int]
-    blockGrace: Optional[str]
-    filesUsage: Optional[int]
-    filesQuota: Optional[int]
-    filesLimit: Optional[int]
-    filesInDoubt: Optional[int]
-    filesGrace: Optional[str]
-    isDefaultQuota: Optional[bool]
+    quotaId: int | None
+    filesystemName: str | None
+    quotaType: str | None
+    objectName: str | None  # This represents fileset name you query quota of filesets.
+    objectId: int | None
+    blockUsage: int | None
+    blockQuota: int | None
+    blockLimit: int | None
+    blockInDoubt: int | None
+    blockGrace: str | None
+    filesUsage: int | None
+    filesQuota: int | None
+    filesLimit: int | None
+    filesInDoubt: int | None
+    filesGrace: str | None
+    isDefaultQuota: bool | None
 
 
 @dataclass
 class GPFSStoragePoolUsage(DataClassJsonMixin):
     storagePoolName: str
     filesystemName: str
-    totalDataInKB: Optional[int] = None
-    freeDataInKB: Optional[int] = None
-    totalMetaInKB: Optional[int] = None
-    freeMetaInKB: Optional[int] = None
+    totalDataInKB: int | None = None
+    freeDataInKB: int | None = None
+    totalMetaInKB: int | None = None
+    freeMetaInKB: int | None = None
 
 
 @dataclass
 class GPFSSystemHealthState(DataClassJsonMixin):
-    oid: Optional[int]
-    component: Optional[str]
-    reportingNode: Optional[str]
-    activeSince: Optional[str]
-    entityType: Optional[str]
-    entityName: Optional[str]
-    parentName: Optional[str]
-    state: Optional[str]
-    reasons: Optional[list[str]]
+    oid: int | None
+    component: str | None
+    reportingNode: str | None
+    activeSince: str | None
+    entityType: str | None
+    entityName: str | None
+    parentName: str | None
+    state: str | None
+    reasons: list[str] | None
 
 
 @dataclass
 class GPFSDisk(DataClassJsonMixin):
     name: str
     fileSystem: str
-    failureGroup: Optional[str] = None
-    type: Optional[str] = None
-    storagePool: Optional[str] = None
-    status: Optional[str] = None
-    availability: Optional[str] = None
-    quorumDisk: Optional[bool] = None
-    remarks: Optional[str] = None
-    size: Optional[int] = None
-    availableBlocks: Optional[int] = None
-    availableFragments: Optional[int] = None
-    nsdServers: Optional[str] = None
-    nsdVolumeId: Optional[str] = None
+    failureGroup: str | None = None
+    type: str | None = None
+    storagePool: str | None = None
+    status: str | None = None
+    availability: str | None = None
+    quorumDisk: bool | None = None
+    remarks: str | None = None
+    size: int | None = None
+    availableBlocks: int | None = None
+    availableFragments: int | None = None
+    nsdServers: str | None = None
+    nsdVolumeId: str | None = None
 
 
 @dataclass
 class GPFSJobResult(DataClassJsonMixin):
-    commands: Optional[list[str]] = None
-    progress: Optional[list[str]] = None
-    exitCode: Optional[int] = None
-    stderr: Optional[list[str]] = None
-    stdout: Optional[list[str]] = None
+    commands: list[str] | None = None
+    progress: list[str] | None = None
+    exitCode: int | None = None
+    stderr: list[str] | None = None
+    stdout: list[str] | None = None
 
 
 @dataclass
 class GPFSJobRequest(DataClassJsonMixin):
-    type: Optional[str] = None
-    url: Optional[str] = None
-    data: Optional[Any] = None
+    type: str | None = None
+    url: str | None = None
+    data: Any | None = None
 
 
 class GPFSJobStatus(enum.StrEnum):
@@ -185,12 +185,12 @@ class GPFSJobStatus(enum.StrEnum):
 class GPFSJob(DataClassJsonMixin):
     jobId: int
     status: GPFSJobStatus
-    result: Optional[GPFSJobResult] = None
-    request: Optional[GPFSJobRequest] = None
-    submitted: Optional[str] = None
-    completed: Optional[str] = None
-    runtime: Optional[int] = None
-    pids: Optional[list[int]] = None
+    result: GPFSJobResult | None = None
+    request: GPFSJobRequest | None = None
+    submitted: str | None = None
+    completed: str | None = None
+    runtime: int | None = None
+    pids: list[int] | None = None
 
 
 class GPFSQuotaType(enum.StrEnum):

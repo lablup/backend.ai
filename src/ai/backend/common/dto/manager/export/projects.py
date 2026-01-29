@@ -8,7 +8,6 @@ including filters for project name, domain, and active status.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -89,7 +88,7 @@ class ProjectExportFilter(BaseRequestModel):
     Use this to narrow down the exported project data to specific criteria.
     """
 
-    name: Optional[StringFilter] = Field(
+    name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter projects by name. Supports various match modes: "
@@ -97,14 +96,14 @@ class ProjectExportFilter(BaseRequestModel):
             "Can be case-insensitive and/or negated."
         ),
     )
-    domain_name: Optional[StringFilter] = Field(
+    domain_name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter projects by domain name. "
             "Use this to export projects belonging to a specific domain."
         ),
     )
-    is_active: Optional[BooleanFilter] = Field(
+    is_active: BooleanFilter | None = Field(
         default=None,
         description=(
             "Filter projects by active status. "
@@ -112,7 +111,7 @@ class ProjectExportFilter(BaseRequestModel):
             "or false for inactive/archived projects only."
         ),
     )
-    created_at: Optional[DateTimeRangeFilter] = Field(
+    created_at: DateTimeRangeFilter | None = Field(
         default=None,
         description=(
             "Filter projects by creation timestamp. "
@@ -130,7 +129,7 @@ class ProjectExportCSVRequest(BaseRequestModel):
     All parameters are optional to allow flexible export configurations.
     """
 
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         description=(
             "List of field keys to include in the export. "
@@ -139,7 +138,7 @@ class ProjectExportCSVRequest(BaseRequestModel):
             "If not specified or empty, all available fields will be exported."
         ),
     )
-    filter: Optional[ProjectExportFilter] = Field(
+    filter: ProjectExportFilter | None = Field(
         default=None,
         description=(
             "Filter conditions to apply before export. "
@@ -147,7 +146,7 @@ class ProjectExportCSVRequest(BaseRequestModel):
             "If not specified, all projects (up to max_rows limit) will be exported."
         ),
     )
-    order: Optional[list[ProjectExportOrder]] = Field(
+    order: list[ProjectExportOrder] | None = Field(
         default=None,
         description=(
             "List of ordering specifications for sorting the exported data. "

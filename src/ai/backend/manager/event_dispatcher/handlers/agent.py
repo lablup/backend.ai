@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Optional
 
 import sqlalchemy as sa
 
@@ -43,7 +42,7 @@ class AgentEventHandler:
     _db: ExtendedAsyncSAEngine
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     _processor_factory: Callable[[], Processors]
-    _processors: Optional[Processors]
+    _processors: Processors | None
 
     def __init__(
         self,

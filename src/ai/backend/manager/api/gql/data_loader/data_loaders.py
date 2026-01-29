@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from functools import cached_property, partial
-from typing import Optional
 
 from strawberry.dataloader import DataLoader
 
@@ -62,7 +61,7 @@ class DataLoaders:
     @cached_property
     def resource_group_loader(
         self,
-    ) -> DataLoader[str, Optional[ScalingGroupData]]:
+    ) -> DataLoader[str, ScalingGroupData | None]:
         return DataLoader(
             load_fn=partial(load_resource_groups_by_names, self._processors.scaling_group)
         )
@@ -70,19 +69,19 @@ class DataLoaders:
     @cached_property
     def notification_channel_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[NotificationChannelData]]:
+    ) -> DataLoader[uuid.UUID, NotificationChannelData | None]:
         return DataLoader(load_fn=partial(load_channels_by_ids, self._processors.notification))
 
     @cached_property
     def notification_rule_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[NotificationRuleData]]:
+    ) -> DataLoader[uuid.UUID, NotificationRuleData | None]:
         return DataLoader(load_fn=partial(load_rules_by_ids, self._processors.notification))
 
     @cached_property
     def artifact_registry_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ArtifactRegistryData]]:
+    ) -> DataLoader[uuid.UUID, ArtifactRegistryData | None]:
         return DataLoader(
             load_fn=partial(load_artifact_registries_by_ids, self._processors.artifact_registry)
         )
@@ -90,7 +89,7 @@ class DataLoaders:
     @cached_property
     def huggingface_registry_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[HuggingFaceRegistryData]]:
+    ) -> DataLoader[uuid.UUID, HuggingFaceRegistryData | None]:
         return DataLoader(
             load_fn=partial(load_huggingface_registries_by_ids, self._processors.artifact_registry)
         )
@@ -98,7 +97,7 @@ class DataLoaders:
     @cached_property
     def reservoir_registry_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ReservoirRegistryData]]:
+    ) -> DataLoader[uuid.UUID, ReservoirRegistryData | None]:
         return DataLoader(
             load_fn=partial(load_reservoir_registries_by_ids, self._processors.artifact_registry)
         )
@@ -106,7 +105,7 @@ class DataLoaders:
     @cached_property
     def storage_namespace_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[StorageNamespaceData]]:
+    ) -> DataLoader[uuid.UUID, StorageNamespaceData | None]:
         return DataLoader(
             load_fn=partial(load_storage_namespaces_by_ids, self._processors.storage_namespace)
         )
@@ -114,7 +113,7 @@ class DataLoaders:
     @cached_property
     def object_storage_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ObjectStorageData]]:
+    ) -> DataLoader[uuid.UUID, ObjectStorageData | None]:
         return DataLoader(
             load_fn=partial(load_object_storages_by_ids, self._processors.object_storage)
         )
@@ -122,19 +121,19 @@ class DataLoaders:
     @cached_property
     def vfs_storage_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[VFSStorageData]]:
+    ) -> DataLoader[uuid.UUID, VFSStorageData | None]:
         return DataLoader(load_fn=partial(load_vfs_storages_by_ids, self._processors.vfs_storage))
 
     @cached_property
     def artifact_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ArtifactData]]:
+    ) -> DataLoader[uuid.UUID, ArtifactData | None]:
         return DataLoader(load_fn=partial(load_artifacts_by_ids, self._processors.artifact))
 
     @cached_property
     def artifact_revision_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ArtifactRevisionData]]:
+    ) -> DataLoader[uuid.UUID, ArtifactRevisionData | None]:
         return DataLoader(
             load_fn=partial(load_artifact_revisions_by_ids, self._processors.artifact_revision)
         )
@@ -142,25 +141,25 @@ class DataLoaders:
     @cached_property
     def route_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[RouteInfo]]:
+    ) -> DataLoader[uuid.UUID, RouteInfo | None]:
         return DataLoader(load_fn=partial(load_routes_by_ids, self._processors.deployment))
 
     @cached_property
     def deployment_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ModelDeploymentData]]:
+    ) -> DataLoader[uuid.UUID, ModelDeploymentData | None]:
         return DataLoader(load_fn=partial(load_deployments_by_ids, self._processors.deployment))
 
     @cached_property
     def revision_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ModelRevisionData]]:
+    ) -> DataLoader[uuid.UUID, ModelRevisionData | None]:
         return DataLoader(load_fn=partial(load_revisions_by_ids, self._processors.deployment))
 
     @cached_property
     def replica_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ModelReplicaData]]:
+    ) -> DataLoader[uuid.UUID, ModelReplicaData | None]:
         return DataLoader(load_fn=partial(load_replicas_by_ids, self._processors.deployment))
 
     @cached_property
@@ -172,5 +171,5 @@ class DataLoaders:
     @cached_property
     def image_loader(
         self,
-    ) -> DataLoader[uuid.UUID, Optional[ImageData]]:
+    ) -> DataLoader[uuid.UUID, ImageData | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))

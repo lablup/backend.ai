@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.contexts.request_id import current_request_id
@@ -114,7 +114,7 @@ class ImportStepContext:
     storage_pool: AbstractStoragePool
     storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget]
     step_metadata: dict[str, Any]
-    custom_storage_prefix: Optional[str] = None
+    custom_storage_prefix: str | None = None
 
 
 class StorageMappingResolver:

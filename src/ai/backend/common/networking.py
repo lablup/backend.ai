@@ -3,7 +3,7 @@ from __future__ import annotations
 import socket
 from collections.abc import Callable, Mapping
 from contextlib import closing
-from typing import TYPE_CHECKING, Optional, TypeVar, overload
+from typing import TYPE_CHECKING, TypeVar, overload
 
 import aiohttp
 
@@ -23,10 +23,10 @@ async def curl(
     url: str | yarl.URL,
     default_value: None = None,
     *,
-    params: Optional[Mapping[str, str]] = None,
-    headers: Optional[Mapping[str, str]] = None,
+    params: Mapping[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
     timeout_seconds: float = 0.2,
-) -> Optional[str]: ...
+) -> str | None: ...
 
 
 @overload
@@ -34,8 +34,8 @@ async def curl(
     url: str | yarl.URL,
     default_value: str | Callable[[], str],
     *,
-    params: Optional[Mapping[str, str]] = None,
-    headers: Optional[Mapping[str, str]] = None,
+    params: Mapping[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
     timeout_seconds: float = 0.2,
 ) -> str: ...
 
@@ -44,10 +44,10 @@ async def curl(
     url: str | yarl.URL,
     default_value: str | Callable[[], str] | None = None,
     *,
-    params: Optional[Mapping[str, str]] = None,
-    headers: Optional[Mapping[str, str]] = None,
+    params: Mapping[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
     timeout_seconds: float = 0.2,
-) -> Optional[str]:
+) -> str | None:
     """
     A simple curl-like helper function that uses aiohttp to fetch some string/data
     from a remote HTTP endpoint.

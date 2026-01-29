@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from glide import Batch, ExpirySet, ExpiryType
 
@@ -48,7 +48,7 @@ class AppConfigCacheSource:
         """Generate Redis Set key for tracking users in a domain."""
         return f"app_config:domain:{domain_name}:users"
 
-    async def get_merged_config(self, user_id: str) -> Optional[Mapping[str, Any]]:
+    async def get_merged_config(self, user_id: str) -> Mapping[str, Any] | None:
         """
         Get merged configuration from cache.
 

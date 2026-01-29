@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from jinja2 import nodes
 from jinja2.ext import Extension
@@ -48,14 +48,14 @@ class TOMLField(Extension):
             lineno=lineno,
         )
 
-    def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
+    def _transform(self, field_value: nodes.Expr, lineno: int | None = None) -> nodes.Expr:
         return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 
 class TOMLStringListField(TOMLField):
     tags = {"toml_strlist_field"}
 
-    def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
+    def _transform(self, field_value: nodes.Expr, lineno: int | None = None) -> nodes.Expr:
         return nodes.Filter(field_value, "toml_scalar", [], [], None, None, lineno=lineno)
 
 

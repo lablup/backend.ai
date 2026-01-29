@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional, TypeVar, override
+from typing import TypeVar, override
 
 from ai.backend.manager.data.permission.types import OperationType
 
@@ -8,7 +8,7 @@ from .base import BaseAction, BaseActionResult
 
 class BaseScopeAction(BaseAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod
@@ -27,7 +27,7 @@ class BaseScopeAction(BaseAction):
 
 class BaseScopeActionResult(BaseActionResult):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod

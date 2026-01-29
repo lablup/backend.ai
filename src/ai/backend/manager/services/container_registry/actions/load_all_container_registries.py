@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -9,7 +9,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class LoadAllContainerRegistriesAction(ContainerRegistryAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -23,5 +23,5 @@ class LoadAllContainerRegistriesActionResult(BaseActionResult):
     registries: list[ContainerRegistryData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
@@ -20,10 +20,10 @@ class GetAllImagesAction(ImageAction):
             If None, images of all statuses will be included.
     """
 
-    status_filter: Optional[list[ImageStatus]]
+    status_filter: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -37,5 +37,5 @@ class GetAllImagesActionResult(BaseActionResult):
     data: Mapping[ImageID, ImageWithAgentInstallStatus]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
@@ -40,10 +40,10 @@ class AutoScalingDecision:
     """Decision made by autoscaling evaluation."""
 
     should_scale: bool
-    new_replica_count: Optional[int] = None
-    triggered_rule_id: Optional[UUID] = None
-    scaling_direction: Optional[str] = None  # "up" or "down"
-    reason: Optional[str] = None
+    new_replica_count: int | None = None
+    triggered_rule_id: UUID | None = None
+    scaling_direction: str | None = None  # "up" or "down"
+    reason: str | None = None
 
 
 @dataclass

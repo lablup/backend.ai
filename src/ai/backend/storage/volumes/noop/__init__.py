@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd
@@ -43,15 +43,15 @@ class NoopQuotaModel(AbstractQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         pass
 
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         pass
 
     async def update_quota_scope(

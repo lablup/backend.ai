@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, TypeVar
+from typing import TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ class StepRecord(BaseModel):
     status: StepStatus
     started_at: datetime
     ended_at: datetime
-    detail: Optional[str]
+    detail: str | None
 
 
 class PhaseRecord(BaseModel):
@@ -39,7 +39,7 @@ class PhaseRecord(BaseModel):
     status: StepStatus  # Phase's own status
     started_at: datetime
     ended_at: datetime
-    detail: Optional[str]
+    detail: str | None
     steps: list[StepRecord]
 
 

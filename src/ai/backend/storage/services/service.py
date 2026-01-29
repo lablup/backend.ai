@@ -4,7 +4,6 @@ import uuid
 import weakref
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Optional
 
 from aiohttp import web
 
@@ -136,7 +135,7 @@ class VolumeService:
         ]
 
     async def create_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
         await log_manager_api_entry_new(log, "create_quota_scope", quota_scope_key)
@@ -165,7 +164,7 @@ class VolumeService:
             )
 
     async def update_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
         await log_manager_api_entry_new(log, "update_quota_scope", quota_scope_key)

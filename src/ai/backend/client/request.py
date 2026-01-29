@@ -15,7 +15,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    Optional,
     cast,
 )
 
@@ -113,9 +112,9 @@ class Request:
     )
 
     _content: RequestContent
-    _attached_files: Optional[Sequence[AttachedFile]]
+    _attached_files: Sequence[AttachedFile] | None
 
-    date: Optional[datetime]
+    date: datetime | None
     api_version: str
 
     _allowed_methods = frozenset(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -123,13 +122,13 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: Optional[str] = None,
-        content: Optional[RequestContent] = None,
+        path: str | None = None,
+        content: RequestContent | None = None,
         *,
-        content_type: Optional[str] = None,
-        params: Optional[Mapping[str, str | int]] = None,
-        reporthook: Optional[Callable] = None,
-        override_api_version: Optional[str] = None,
+        content_type: str | None = None,
+        params: Mapping[str, str | int] | None = None,
+        reporthook: Callable | None = None,
+        override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
         """
@@ -185,7 +184,7 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> None:
         """
         Sets the content of the request.
@@ -224,9 +223,9 @@ class Request:
     def _sign(
         self,
         rel_url: URL,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
-        hash_type: Optional[str] = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        hash_type: str | None = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the
@@ -535,7 +534,7 @@ class BaseResponse:
         return self._raw_response.content_type
 
     @property
-    def content_length(self) -> Optional[int]:
+    def content_length(self) -> int | None:
         return self._raw_response.content_length
 
     @property
@@ -564,7 +563,7 @@ class FetchContextManager:
         "session",
     )
 
-    _rqst_ctx: Optional[_RequestContextManager]
+    _rqst_ctx: _RequestContextManager | None
 
     def __init__(
         self,
@@ -586,7 +585,7 @@ class FetchContextManager:
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
         retry_count = 0
-        raw_resp: Optional[aiohttp.ClientResponse] = None
+        raw_resp: aiohttp.ClientResponse | None = None
         while True:
             try:
                 retry_count += 1
@@ -622,7 +621,7 @@ class FetchContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *exc_info) -> Optional[bool]:
+    async def __aexit__(self, *exc_info) -> bool | None:
         if self._rqst_ctx is None:
             raise RuntimeError("Request context is not initialized")
         await self._rqst_ctx.__aexit__(*exc_info)
@@ -653,7 +652,7 @@ class WebSocketResponse(BaseResponse):
         raise AttributeError("WebSocketResponse does not have an explicit content type.")
 
     @property
-    def content_length(self) -> Optional[int]:
+    def content_length(self) -> int | None:
         raise AttributeError("WebSocketResponse does not have a fixed content length.")
 
     @property
@@ -674,7 +673,7 @@ class WebSocketResponse(BaseResponse):
     def __aiter__(self) -> AsyncIterator[aiohttp.WSMessage]:
         return self._raw_ws.__aiter__()
 
-    def exception(self) -> Optional[BaseException]:
+    def exception(self) -> BaseException | None:
         return self._raw_ws.exception()
 
     async def send_str(self, raw_str: str) -> None:
@@ -721,14 +720,14 @@ class WebSocketContextManager:
         "ws_ctx_builder",
     )
 
-    _ws_ctx: Optional[_WSRequestContextManager]
+    _ws_ctx: _WSRequestContextManager | None
 
     def __init__(
         self,
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Optional[Callable] = None,
+        on_enter: Callable | None = None,
         response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
@@ -770,7 +769,7 @@ class WebSocketContextManager:
             await self.on_enter(wrapped_ws)
         return wrapped_ws
 
-    async def __aexit__(self, *args) -> Optional[bool]:
+    async def __aexit__(self, *args) -> bool | None:
         if self._ws_ctx is None:
             raise RuntimeError("WebSocket context is not initialized")
         await self._ws_ctx.__aexit__(*args)
@@ -782,8 +781,8 @@ class WebSocketContextManager:
 class SSEMessage:
     event: str
     data: str
-    id: Optional[str] = None
-    retry: Optional[int] = None
+    id: str | None = None
+    retry: int | None = None
 
 
 class SSEResponse(BaseResponse):
@@ -876,7 +875,7 @@ class SSEContextManager:
         "session",
     )
 
-    _rqst_ctx: Optional[_RequestContextManager]
+    _rqst_ctx: _RequestContextManager | None
 
     def __init__(
         self,
@@ -926,7 +925,7 @@ class SSEContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *args) -> Optional[bool]:
+    async def __aexit__(self, *args) -> bool | None:
         if self._rqst_ctx is None:
             raise RuntimeError("SSE request context is not initialized")
         await self._rqst_ctx.__aexit__(*args)

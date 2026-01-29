@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 import strawberry
 from aiohttp import web
@@ -35,7 +34,7 @@ async def project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group: str,
     project_id: uuid.UUID,
-) -> Optional[ProjectFairShareGQL]:
+) -> ProjectFairShareGQL | None:
     """Get a single project fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -57,14 +56,14 @@ async def project_fair_share(
 @strawberry.field(description="Added in 26.1.0. List project fair shares (superadmin only).")
 async def project_fair_shares(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ProjectFairShareFilter] = None,
-    order_by: Optional[list[ProjectFairShareOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ProjectFairShareFilter | None = None,
+    order_by: list[ProjectFairShareOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ProjectFairShareConnection:
     """Search project fair shares with pagination."""
     me = current_user()

@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -115,7 +115,7 @@ class ContainerRegistryRepository:
     async def get_by_registry_and_project(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryData:
         async with self._db.begin_readonly_session() as session:
             result = await self._get_by_registry_and_project(session, registry_name, project)
@@ -145,7 +145,7 @@ class ContainerRegistryRepository:
     async def clear_images(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryData:
         async with self._db.begin_session() as session:
             # Clear images
@@ -185,7 +185,7 @@ class ContainerRegistryRepository:
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryRow:
         """
         Get the raw ContainerRegistryRow object needed for container registry scanner.
@@ -199,7 +199,7 @@ class ContainerRegistryRepository:
             if project:
                 stmt = stmt.where(ContainerRegistryRow.project == project)
 
-            row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
+            row: ContainerRegistryRow | None = await session.scalar(stmt)
             if not row:
                 raise ContainerRegistryNotFound()
             return row
@@ -208,13 +208,13 @@ class ContainerRegistryRepository:
         self,
         session: SASession,
         registry_name: str,
-        project: Optional[str] = None,
-    ) -> Optional[ContainerRegistryData]:
+        project: str | None = None,
+    ) -> ContainerRegistryData | None:
         stmt = sa.select(ContainerRegistryRow).where(
             ContainerRegistryRow.registry_name == registry_name,
         )
         if project:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
-        row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
+        row: ContainerRegistryRow | None = await session.scalar(stmt)
         return row.to_dataclass() if row else None

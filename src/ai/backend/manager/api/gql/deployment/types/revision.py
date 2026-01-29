@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, cast, override
 from uuid import UUID
 
 import strawberry
@@ -139,11 +139,11 @@ class ModelRuntimeConfig:
     runtime_variant: str = strawberry.field(
         description="The inference runtime variant (e.g., vllm, triton)."
     )
-    inference_runtime_config: Optional[JSON] = strawberry.field(
+    inference_runtime_config: JSON | None = strawberry.field(
         description="Framework-specific configuration in JSON format.",
         default=None,
     )
-    environ: Optional[EnvironmentVariablesGQL] = strawberry.field(
+    environ: EnvironmentVariablesGQL | None = strawberry.field(
         description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
     )
@@ -213,7 +213,7 @@ class ResourceConfig:
     resource_slots: ResourceSlotGQL = strawberry.field(
         description="Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators."
     )
-    resource_opts: Optional[ResourceOptsGQL] = strawberry.field(
+    resource_opts: ResourceOptsGQL | None = strawberry.field(
         description="Added in 26.1.0. Additional resource options such as shared memory.",
         default=None,
     )
@@ -281,7 +281,7 @@ class ModelRevision(Node):
     model_runtime_config: ModelRuntimeConfig = strawberry.field(
         description="Runtime configuration for the inference framework."
     )
-    model_mount_config: Optional[ModelMountConfig] = strawberry.field(
+    model_mount_config: ModelMountConfig | None = strawberry.field(
         description="Model data mount configuration."
     )
     extra_mounts: ExtraVFolderMountConnection = strawberry.field(
@@ -312,13 +312,13 @@ class ModelRevision(Node):
 # Filter and Order Types
 @strawberry.input(description="Added in 25.19.0")
 class ModelRevisionFilter(GQLFilter):
-    name: Optional[StringFilter] = None
-    deployment_id: Optional[ID] = None
-    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
+    name: StringFilter | None = None
+    deployment_id: ID | None = None
+    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
-    AND: Optional[list[ModelRevisionFilter]] = None
-    OR: Optional[list[ModelRevisionFilter]] = None
-    NOT: Optional[list[ModelRevisionFilter]] = None
+    AND: list[ModelRevisionFilter] | None = None
+    OR: list[ModelRevisionFilter] | None = None
+    NOT: list[ModelRevisionFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -413,7 +413,7 @@ class ActivateRevisionInputGQL:
 )
 class ActivateRevisionPayloadGQL:
     deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
-    previous_revision_id: Optional[ID]
+    previous_revision_id: ID | None
     activated_revision_id: ID
 
 
@@ -481,7 +481,7 @@ class ResourceConfigInput:
     resource_slots: ResourceSlotInput = strawberry.field(
         description="Added in 26.1.0. Resources allocated for the deployment."
     )
-    resource_opts: Optional[ResourceOptsInput] = strawberry.field(
+    resource_opts: ResourceOptsInput | None = strawberry.field(
         description="Added in 26.1.0. Additional options for the resources such as shared memory.",
         default=None,
     )
@@ -520,8 +520,8 @@ class EnvironmentVariablesInputGQL:
 @strawberry.input(description="Added in 25.19.0")
 class ModelRuntimeConfigInput:
     runtime_variant: str
-    inference_runtime_config: Optional[JSON] = None
-    environ: Optional[EnvironmentVariablesInputGQL] = strawberry.field(
+    inference_runtime_config: JSON | None = None
+    environ: EnvironmentVariablesInputGQL | None = strawberry.field(
         description="Environment variables for the service.",
         default=None,
     )
@@ -537,20 +537,20 @@ class ModelMountConfigInput:
 @strawberry.input(description="Added in 25.19.0")
 class ExtraVFolderMountInput:
     vfolder_id: ID
-    mount_destination: Optional[str]
+    mount_destination: str | None
 
 
 @strawberry.input(
     description="Added in 25.19.0. Input for creating a revision without attaching to a deployment."
 )
 class CreateRevisionInput:
-    name: Optional[str] = None
+    name: str | None = None
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    extra_mounts: Optional[list[ExtraVFolderMountInput]]
+    extra_mounts: list[ExtraVFolderMountInput] | None
 
     def to_model_revision_creator(self) -> ModelRevisionCreator:
         resource_spec = ResourceSpec(
@@ -587,7 +587,7 @@ class CreateRevisionInput:
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
             inference_runtime_config=cast(
-                Optional[dict[str, Any]], self.model_runtime_config.inference_runtime_config
+                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
             ),
         )
 
@@ -601,14 +601,14 @@ class CreateRevisionInput:
 
 @strawberry.input(description="Added in 25.19.0")
 class AddRevisionInput:
-    name: Optional[str] = None
+    name: str | None = None
     deployment_id: ID
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    extra_mounts: Optional[list[ExtraVFolderMountInput]]
+    extra_mounts: list[ExtraVFolderMountInput] | None
 
     def to_model_revision_creator(self) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from input fields."""
@@ -646,7 +646,7 @@ class AddRevisionInput:
             else None,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
             inference_runtime_config=cast(
-                Optional[dict[str, Any]], self.model_runtime_config.inference_runtime_config
+                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
             ),
         )
 

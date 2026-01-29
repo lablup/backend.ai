@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
@@ -11,7 +11,7 @@ class DeleteReservoirRegistryAction(ArtifactRegistryAction):
     reservoir_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.reservoir_id)
 
     @override
@@ -25,5 +25,5 @@ class DeleteReservoirActionResult(BaseActionResult):
     deleted_reservoir_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.deleted_reservoir_id)

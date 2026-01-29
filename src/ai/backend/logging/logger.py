@@ -10,7 +10,7 @@ import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Optional, Self, override
+from typing import Self, override
 
 import msgpack
 import yarl
@@ -60,7 +60,7 @@ class NoopLogger(AbstractLogger):
 class LocalLogger(AbstractLogger):
     def __init__(
         self,
-        config: Optional[LoggingConfig] = None,
+        config: LoggingConfig | None = None,
         *,
         log_level: LogLevel = LogLevel.NOTSET,
     ) -> None:

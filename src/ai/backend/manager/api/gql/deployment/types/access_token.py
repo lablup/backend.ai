@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Self, override
+from typing import Self, override
 from uuid import UUID
 
 import strawberry
@@ -28,9 +28,9 @@ from ai.backend.manager.repositories.deployment.options import (
 class AccessTokenFilter(GQLFilter):
     """Filter for access tokens."""
 
-    token: Optional[StringFilter] = None
-    valid_until: Optional[DateTimeFilter] = None
-    created_at: Optional[DateTimeFilter] = None
+    token: StringFilter | None = None
+    valid_until: DateTimeFilter | None = None
+    created_at: DateTimeFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

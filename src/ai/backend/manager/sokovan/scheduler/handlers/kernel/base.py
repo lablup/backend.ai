@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
@@ -57,7 +56,7 @@ class KernelLifecycleHandler(ABC):
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:

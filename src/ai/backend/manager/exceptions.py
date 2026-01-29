@@ -6,7 +6,6 @@ from typing import (
     Any,
     Literal,
     NotRequired,
-    Optional,
     TypedDict,
 )
 
@@ -70,7 +69,7 @@ class AgentError(RuntimeError):
         exc_name: str,
         exc_repr: str,
         exc_args: tuple[Any, ...],
-        exc_tb: Optional[str] = None,
+        exc_tb: str | None = None,
     ) -> None:
         super().__init__(agent_id, exc_name, exc_repr, exc_args, exc_tb)
         self.agent_id = agent_id

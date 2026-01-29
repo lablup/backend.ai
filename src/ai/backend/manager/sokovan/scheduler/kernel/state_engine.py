@@ -6,7 +6,6 @@ All database operations go through the repository pattern.
 """
 
 import logging
-from typing import Optional
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -136,7 +135,7 @@ class KernelStateEngine:
         self,
         kernel_id: KernelId,
         reason: str,
-        exit_code: Optional[int] = None,
+        exit_code: int | None = None,
     ) -> bool:
         """
         Mark a kernel as TERMINATED when it's terminated.
@@ -154,7 +153,7 @@ class KernelStateEngine:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -175,7 +174,7 @@ class KernelStateEngine:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -195,7 +194,7 @@ class KernelStateEngine:
         agent_id: AgentId,
         image: str,
         error_msg: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Cancel kernels for an image that failed to be available on an agent.

@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.types import (
     BinarySize,
@@ -294,7 +294,7 @@ class ResourceCalculator:
         resource_opts = resource_opts.copy()
 
         # Get shared memory size
-        raw_shmem: Optional[str] = resource_opts.get("shmem")
+        raw_shmem: str | None = resource_opts.get("shmem")
         if raw_shmem is None:
             raw_shmem = image_labels.get("ai.backend.resource.preferred.shmem")
         if not raw_shmem:
@@ -330,7 +330,7 @@ class ResourceCalculator:
         requested_slots: ResourceSlot,
         image_min_slots: ResourceSlot,
         _image_max_slots: ResourceSlot,
-        shmem: Optional[BinarySize],
+        shmem: BinarySize | None,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> None:
         """Validate requested resources against image limits."""

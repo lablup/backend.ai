@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationChannelData
@@ -23,7 +23,7 @@ class UpdateChannelAction(NotificationAction):
         return "update_channel"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
 
@@ -34,5 +34,5 @@ class UpdateChannelActionResult(BaseActionResult):
     channel_data: NotificationChannelData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.channel_data.id)

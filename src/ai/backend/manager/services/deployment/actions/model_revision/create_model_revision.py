@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
@@ -14,7 +14,7 @@ class CreateModelRevisionAction(ModelRevisionBaseAction):
     creator: ModelRevisionCreator
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,5 +28,5 @@ class CreateModelRevisionActionResult(BaseActionResult):
     revision: ModelRevisionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.revision.id)

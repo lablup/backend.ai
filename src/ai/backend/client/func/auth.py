@@ -1,5 +1,5 @@
 import json
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.auth import encrypt_payload
 from ai.backend.client.request import Request
@@ -26,7 +26,7 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
-    async def login(cls, user_id: str, password: str, otp: Optional[str] = None) -> dict:
+    async def login(cls, user_id: str, password: str, otp: str | None = None) -> dict:
         """
         Log-in into the endpoint with the given user ID and password.
         It creates a server-side web session and return

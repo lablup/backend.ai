@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -10,10 +10,10 @@ from ai.backend.manager.services.group.actions.base import GroupAction
 @dataclass
 class UsagePerMonthAction(GroupAction):
     month: str
-    group_ids: Optional[list[UUID]] = None
+    group_ids: list[UUID] | None = None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,5 +28,5 @@ class UsagePerMonthActionResult(BaseActionResult):
     result: list[Any]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

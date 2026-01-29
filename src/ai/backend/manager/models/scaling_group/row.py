@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
     overload,
@@ -397,13 +396,13 @@ scaling_groups = ScalingGroupRow.__table__
 @dataclass
 class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
     is_public: bool
     created_at: datetime
 
-    wsproxy_addr: Optional[str]
-    wsproxy_api_token: Optional[str]
+    wsproxy_addr: str | None
+    wsproxy_api_token: str | None
     driver: str
     driver_opts: dict
     scheduler: str
@@ -565,11 +564,11 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
         return self.object_id_to_additional_permission_map
 
     @property
-    def query_condition(self) -> Optional[WhereClauseType]:
-        cond: Optional[WhereClauseType] = None
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
 
         def _OR_coalesce(
-            base_cond: Optional[WhereClauseType],
+            base_cond: WhereClauseType | None,
             _cond: sa.sql.expression.BinaryExpression,
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
@@ -584,7 +583,7 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
             )
         return cond
 
-    async def build_query(self) -> Optional[sa.sql.Select]:
+    async def build_query(self) -> sa.sql.Select | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -771,7 +770,7 @@ class ScalingGroupPermissionContextBuilder(
 async def get_scaling_groups(
     target_scope: ScopeType,
     requested_permission: ScalingGroupPermission,
-    sgroup_names: Optional[Iterable[str]] = None,
+    sgroup_names: Iterable[str] | None = None,
     *,
     ctx: ClientContext,
     db_session: SASession,

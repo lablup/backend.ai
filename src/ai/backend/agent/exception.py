@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
 
 from aiohttp import web
 
@@ -54,7 +53,7 @@ class InsufficientResource(ResourceError):
     requested_alloc: Decimal
     total_allocatable: Decimal | int
     allocation: dict[SlotName, dict[DeviceId, Decimal]]
-    context_tag: Optional[str] = None
+    context_tag: str | None = None
 
     def __str__(self) -> str:
         return (
@@ -83,7 +82,7 @@ class FractionalResourceFragmented(ResourceError):
     slot_name: SlotName
     requested_alloc: Decimal
     dev_allocs: Sequence[tuple[DeviceId, Decimal]]
-    context_tag: Optional[str] = None
+    context_tag: str | None = None
 
     def __str__(self) -> str:
         return (
@@ -133,7 +132,7 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: Optional[str] = None) -> None:
+    def __init__(self, *args, exc_repr: str | None = None) -> None:
         super().__init__(*args)
         self.exc_repr = exc_repr
 

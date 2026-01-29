@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from aiohttp import web
 from strawberry import Info
@@ -21,14 +19,14 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 @strawberry.field(description="Added in 26.1.0. List project usage buckets (superadmin only).")
 async def project_usage_buckets(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ProjectUsageBucketFilter] = None,
-    order_by: Optional[list[ProjectUsageBucketOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ProjectUsageBucketFilter | None = None,
+    order_by: list[ProjectUsageBucketOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ProjectUsageBucketConnection:
     """Search project usage buckets with pagination."""
     me = current_user()

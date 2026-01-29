@@ -3,7 +3,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
@@ -22,8 +22,8 @@ class EndpointCreationArgs:
     is_public: bool
     runtime_variant: str
     desired_session_count: int
-    resource_opts: Optional[dict[str, Any]] = None
-    scaling_group: Optional[str] = None
+    resource_opts: dict[str, Any] | None = None
+    scaling_group: str | None = None
 
 
 @dataclass
@@ -41,8 +41,8 @@ class EndpointData:
     runtime_variant: str
     desired_session_count: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    service_endpoint: Optional[str] = None
+    updated_at: datetime | None = None
+    service_endpoint: str | None = None
     resource_opts: dict[str, Any] = field(default_factory=dict)
 
 
@@ -52,11 +52,11 @@ class RouteData:
 
     route_id: uuid.UUID
     endpoint_id: uuid.UUID
-    session_id: Optional[SessionId]
+    session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
 

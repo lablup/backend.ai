@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.object_permission import (
@@ -26,7 +26,7 @@ class CreateRoleAction(RoleAction):
     )
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -40,5 +40,5 @@ class CreateRoleActionResult(BaseActionResult):
     data: RoleData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data else None

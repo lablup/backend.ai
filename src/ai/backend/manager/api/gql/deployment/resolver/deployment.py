@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -45,14 +44,14 @@ from ai.backend.manager.services.deployment.actions.update_deployment import Upd
 @strawberry.field(description="Added in 25.16.0")
 async def deployments(
     info: Info[StrawberryGQLContext],
-    filter: Optional[DeploymentFilter] = None,
-    order_by: Optional[list[DeploymentOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: DeploymentFilter | None = None,
+    order_by: list[DeploymentOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ModelDeploymentConnection:
     """List deployments with optional filtering and pagination."""
     return await fetch_deployments(
@@ -69,7 +68,7 @@ async def deployments(
 
 
 @strawberry.field(description="Added in 25.16.0")
-async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
+async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
     processor = info.context.processors.deployment

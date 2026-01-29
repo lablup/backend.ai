@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -34,14 +33,14 @@ from ai.backend.manager.services.deployment.actions.route import (
 async def routes(
     info: Info[StrawberryGQLContext],
     deployment_id: ID,
-    filter: Optional[RouteFilter] = None,
-    order_by: Optional[list[RouteOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: RouteFilter | None = None,
+    order_by: list[RouteOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> RouteConnection:
     """List routes for a deployment with optional filters."""
     _, endpoint_id = resolve_global_id(deployment_id)
@@ -60,7 +59,7 @@ async def routes(
 
 
 @strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")
-async def route(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Route]:
+async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
 

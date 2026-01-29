@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
@@ -45,7 +45,7 @@ class PaginationQueryResult:
     """Result of a pagination query."""
 
     data_query: Select
-    pagination_order: Optional[ConnectionPaginationOrder] = None
+    pagination_order: ConnectionPaginationOrder | None = None
 
 
 class PaginatableModel(Protocol):
@@ -103,7 +103,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         self,
         order_clauses: list[tuple[sa.Column, bool]],
         cursor_uuid: uuid.UUID,
-        pagination_order: Optional[ConnectionPaginationOrder],
+        pagination_order: ConnectionPaginationOrder | None,
     ) -> list[ColumnElement[bool]]:
         """
         Build lexicographic cursor conditions for multiple ordering fields.
@@ -181,9 +181,9 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
     def build_pagination_queries(
         self,
         pagination: PaginationOptions,
-        ordering: Optional[TOrdering] = None,
-        filters: Optional[TFilters] = None,
-        select_options: Optional[list] = None,
+        ordering: TOrdering | None = None,
+        filters: TFilters | None = None,
+        select_options: list | None = None,
     ) -> PaginationQueryResult:
         """
         Returns:
@@ -292,7 +292,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         return PaginationQueryResult(data_query=stmt, pagination_order=pagination_order)
 
     def convert_rows_to_data(
-        self, rows: list[TModel], pagination_order: Optional[ConnectionPaginationOrder] = None
+        self, rows: list[TModel], pagination_order: ConnectionPaginationOrder | None = None
     ) -> list[TData]:
         """
         Convert model instances to data objects.
@@ -309,9 +309,9 @@ T = TypeVar("T", bound="BaseFilterOptions")
 class BaseFilterOptions(Protocol):
     """Protocol for filter options that support logical operations"""
 
-    AND: Optional[list[Any]]
-    OR: Optional[list[Any]]
-    NOT: Optional[list[Any]]
+    AND: list[Any] | None
+    OR: list[Any] | None
+    NOT: list[Any] | None
 
 
 class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
@@ -324,7 +324,7 @@ class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
             stmt = stmt.where(condition)
         return stmt
 
-    def _build_filter_condition(self, stmt: Select, filters: T) -> tuple[Optional[Any], Select]:
+    def _build_filter_condition(self, stmt: Select, filters: T) -> tuple[Any | None, Select]:
         """Build a filter condition from FilterOptions, handling logical operations"""
         conditions = []
 

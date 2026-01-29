@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -240,7 +240,7 @@ class PermissionDBSource:
     async def delete_object_permission(
         self,
         purger: Purger[ObjectPermissionRow],
-    ) -> Optional[ObjectPermissionRow]:
+    ) -> ObjectPermissionRow | None:
         """
         Delete an object permission.
 
@@ -257,7 +257,7 @@ class PermissionDBSource:
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        result = cast(Optional[RoleRow], role_row)
+        result = cast(RoleRow | None, role_row)
         if result is None:
             raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
         return result
@@ -289,7 +289,7 @@ class PermissionDBSource:
             PermissionGroupRow.scope_id == scope_id.scope_id,
         )
         result = await db_session.scalar(stmt)
-        return cast(Optional[PermissionGroupRow], result)
+        return cast(PermissionGroupRow | None, result)
 
     async def _find_permission_groups_by_scopes(
         self,
@@ -587,7 +587,7 @@ class PermissionDBSource:
             await db_session.refresh(role_row)
             return role_row
 
-    async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
+    async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
         async with self._db.begin_readonly_session() as db_session:
             try:
                 result = await self._get_role(db_session, role_id)

@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     cast,
 )
 from uuid import UUID
@@ -381,12 +380,12 @@ class UserRow(Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_main_keypair_row(self) -> Optional[KeyPairRow]:
+    def get_main_keypair_row(self) -> KeyPairRow | None:
         # `cast()` requires import of KeyPairRow
         from ai.backend.manager.models.keypair import KeyPairRow
 
-        keypair_candidate: Optional[KeyPairRow] = None
-        main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
+        keypair_candidate: KeyPairRow | None = None
+        main_keypair_row = cast(KeyPairRow | None, self.main_keypair)
         if main_keypair_row is None:
             keypair_rows = cast(list[KeyPairRow], self.keypairs)
             active_keypairs = [row for row in keypair_rows if row.is_active]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -21,7 +21,7 @@ class DeleteRuleAction(NotificationAction):
         return "delete_rule"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_id)
 
 
@@ -32,5 +32,5 @@ class DeleteRuleActionResult(BaseActionResult):
     deleted: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

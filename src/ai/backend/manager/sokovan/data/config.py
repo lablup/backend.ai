@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.types import AgentSelectionStrategy, ClusterSSHPortMapping
 
@@ -12,7 +12,7 @@ from ai.backend.common.types import AgentSelectionStrategy, ClusterSSHPortMappin
 class SchedulingConfig:
     """Configuration needed for scheduling decisions."""
 
-    max_container_count_per_agent: Optional[int]
+    max_container_count_per_agent: int | None
     enforce_spreading_endpoint_replica: bool
 
 
@@ -28,6 +28,6 @@ class ScalingGroupInfo:
 class NetworkSetup:
     """Network configuration for a session."""
 
-    network_name: Optional[str] = None
+    network_name: str | None = None
     network_config: dict[str, Any] = field(default_factory=dict)
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None

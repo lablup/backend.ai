@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
     overload,
@@ -236,7 +235,7 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> list[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -257,8 +256,8 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_refs: Sequence[ImageRef],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
-    ) -> Sequence[Optional[Image]]:
+        filter_by_statuses: list[ImageStatus] | None = None,
+    ) -> Sequence[Image | None]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         image_names = [x.canonical for x in image_refs]
@@ -269,7 +268,7 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -288,7 +287,7 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         reference: str,
         architecture: str,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -307,7 +306,7 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         types: set[ImageLoadFilter] | None = None,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Image]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -474,7 +473,7 @@ class ImageNode(graphene.ObjectType):
             graph_ctx, self._batch_load_installed_agents
         )
         agent_ids = await loader.load(self.row_id)
-        agent_ids = cast(Optional[set[AgentId]], agent_ids)
+        agent_ids = cast(set[AgentId] | None, agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 
     @classmethod
@@ -482,7 +481,7 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Sequence[ImageNode]]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -509,7 +508,7 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Sequence[ImageNode]]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -529,7 +528,7 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         row: ImageRow,
         *,
-        permissions: Optional[Iterable[ImagePermission]] = None,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> ImageNode: ...
 
     @overload
@@ -539,16 +538,16 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         row: None,
         *,
-        permissions: Optional[Iterable[ImagePermission]] = None,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> None: ...
 
     @classmethod
     def from_row(
         cls,
         graph_ctx: GraphQueryContext,
-        row: Optional[ImageRow],
+        row: ImageRow | None,
         *,
-        permissions: Optional[Iterable[ImagePermission]] = None,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> ImageNode | None:
         if row is None:
             return None
@@ -586,7 +585,7 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     def from_legacy_image(
-        cls, image: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls, image: Image, *, permissions: Iterable[ImagePermission] | None = None
     ) -> ImageNode:
         labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
@@ -622,7 +621,7 @@ class ImageNode(graphene.ObjectType):
         id: ResolvedGlobalID,
         scope_id: ScopeType,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, image_id = id
@@ -659,14 +658,14 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -994,8 +993,8 @@ class RescanImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        registry: Optional[str] = None,
-        project: Optional[str] = None,
+        registry: str | None = None,
+        project: str | None = None,
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",

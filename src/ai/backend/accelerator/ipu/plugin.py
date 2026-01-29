@@ -8,7 +8,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -79,7 +78,7 @@ class IPUPlugin(AbstractComputePlugin):
 
     ipu_config: dict[str, Any]
 
-    _all_devices: Optional[list[IPUDevice]]
+    _all_devices: list[IPUDevice] | None
     ipuof_devices: Mapping[str, Any]
     ipuof_attributes: Mapping[str, Any]
     subnet_network_map: Mapping[ipaddress.IPv4Network, str]

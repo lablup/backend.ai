@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -65,7 +64,7 @@ class AuthRepository:
         await self._db_source.mark_user_and_keypairs_inactive(email)
 
     @auth_repository_resilience.apply()
-    async def get_ssh_public_key(self, access_key: str) -> Optional[str]:
+    async def get_ssh_public_key(self, access_key: str) -> str | None:
         return await self._db_source.fetch_ssh_public_key(access_key)
 
     @auth_repository_resilience.apply()

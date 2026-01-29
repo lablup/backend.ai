@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
@@ -14,7 +14,7 @@ class ModifyDomainAction(DomainAction):
     updater: Updater[DomainRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,5 +28,5 @@ class ModifyDomainActionResult(BaseActionResult):
     domain_data: DomainData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.domain_data.name

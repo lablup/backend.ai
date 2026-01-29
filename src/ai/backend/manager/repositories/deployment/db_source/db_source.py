@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -359,7 +359,7 @@ class DeploymentDBSource:
                 )
             )
             result = await db_sess.execute(query)
-            row: Optional[EndpointRow] = result.scalar_one_or_none()
+            row: EndpointRow | None = result.scalar_one_or_none()
 
             if not row:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
@@ -463,7 +463,7 @@ class DeploymentDBSource:
     async def list_endpoints_by_name(
         self,
         session_owner_id: uuid.UUID,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> list[DeploymentInfo]:
         """List endpoints owned by a specific user with optional name filter."""
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -526,7 +526,7 @@ class DeploymentDBSource:
                 .options(selectinload(EndpointRow.image_row))
             )
             result = await db_sess.execute(query)
-            existing_row: Optional[EndpointRow] = result.scalar_one_or_none()
+            existing_row: EndpointRow | None = result.scalar_one_or_none()
 
             if not existing_row:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
@@ -735,7 +735,7 @@ class DeploymentDBSource:
                 .returning(EndpointAutoScalingRuleRow)
             )
             result = await db_sess.execute(query)
-            updated_row: Optional[EndpointAutoScalingRuleRow] = result.scalar_one_or_none()
+            updated_row: EndpointAutoScalingRuleRow | None = result.scalar_one_or_none()
 
             if not updated_row:
                 raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
@@ -891,7 +891,7 @@ class DeploymentDBSource:
         self,
         route_id: uuid.UUID,
         status: RouteStatus,
-        error_data: Optional[dict[str, Any]] = None,
+        error_data: dict[str, Any] | None = None,
     ) -> bool:
         """Update route status."""
         async with self._begin_session_read_committed() as db_sess:
@@ -961,7 +961,7 @@ class DeploymentDBSource:
     async def get_route(
         self,
         route_id: uuid.UUID,
-    ) -> Optional[RouteInfo]:
+    ) -> RouteInfo | None:
         """Get a route by ID.
 
         Args:
@@ -1011,7 +1011,7 @@ class DeploymentDBSource:
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """
         Get endpoint ID associated with a session.
 
@@ -1074,7 +1074,7 @@ class DeploymentDBSource:
             discovery_infos: list[RouteServiceDiscoveryInfo] = []
             for row in rows:
                 # Extract inference port from service_ports
-                inference_port: Optional[int] = None
+                inference_port: int | None = None
                 if row.service_ports:
                     for port_info in row.service_ports:
                         if port_info.get("is_inference", False):
@@ -1125,7 +1125,7 @@ class DeploymentDBSource:
         self,
         db_sess: SASession,
         endpoint_id: uuid.UUID,
-    ) -> Optional[EndpointWithRoutesRawData]:
+    ) -> EndpointWithRoutesRawData | None:
         """Fetch endpoint and routes from database."""
         # Fetch endpoint
         endpoint_query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
@@ -1262,7 +1262,7 @@ class DeploymentDBSource:
         db_sess: SASession,
         domain_name: str,
         group_name: str,
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """Private method to resolve group ID."""
         query = sa.select(GroupRow.id).where(
             sa.and_(
@@ -1288,7 +1288,7 @@ class DeploymentDBSource:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
             result = await db_sess.execute(query)
-            row: Optional[VFolderRow] = result.scalar_one_or_none()
+            row: VFolderRow | None = result.scalar_one_or_none()
             if row is None:
                 raise VFolderNotFound(f"VFolder {vfolder_id} not found")
             return VFolderLocation(
@@ -1301,7 +1301,7 @@ class DeploymentDBSource:
     async def fetch_scaling_group_proxy_targets(
         self,
         scaling_group: set[str],
-    ) -> Mapping[str, Optional[ScalingGroupProxyTarget]]:
+    ) -> Mapping[str, ScalingGroupProxyTarget | None]:
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(
@@ -1318,8 +1318,8 @@ class DeploymentDBSource:
                 raise ScalingGroupProxyTargetNotFound(
                     f"Scaling group proxy target not found for groups: {scaling_group}"
                 )
-            scaling_group_targets: defaultdict[str, Optional[ScalingGroupProxyTarget]] = (
-                defaultdict(lambda: None)
+            scaling_group_targets: defaultdict[str, ScalingGroupProxyTarget | None] = defaultdict(
+                lambda: None
             )
             for row in rows:
                 if row.wsproxy_addr is None or row.wsproxy_api_token is None:
@@ -1745,7 +1745,7 @@ class DeploymentDBSource:
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
-    ) -> Mapping[uuid.UUID, Optional[SessionStatus]]:
+    ) -> Mapping[uuid.UUID, SessionStatus | None]:
         """Fetch session statuses for multiple routes.
 
         Args:
@@ -1773,7 +1773,7 @@ class DeploymentDBSource:
             rows = result.all()
 
             # 결과를 매핑으로 변환
-            status_map: dict[uuid.UUID, Optional[SessionStatus]] = {}
+            status_map: dict[uuid.UUID, SessionStatus | None] = {}
             for route_id, session_status in rows:
                 status_map[route_id] = session_status
 
@@ -1796,7 +1796,7 @@ class DeploymentDBSource:
     async def get_endpoint_health_check_config(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[ModelHealthCheck]:
+    ) -> ModelHealthCheck | None:
         async with self._begin_readonly_session_read_committed() as db_sess:
             endpoint = await EndpointRow.get(
                 db_sess,
@@ -1858,7 +1858,7 @@ class DeploymentDBSource:
 
     async def get_default_architecture_from_scaling_group(
         self, scaling_group_name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Get the default (most common) architecture from active agents in a scaling group.
         Returns None if no active agents exist.
@@ -1886,7 +1886,7 @@ class DeploymentDBSource:
     async def get_latest_revision_number(
         self,
         endpoint_id: uuid.UUID,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Get the latest revision number for an endpoint.
 
         Returns None if no revisions exist for the endpoint.

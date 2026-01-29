@@ -9,7 +9,7 @@ import textwrap
 import traceback
 from collections.abc import Iterator, Sequence
 from types import TracebackType
-from typing import Any, Optional, Self, TextIO
+from typing import Any, Self, TextIO
 
 from click import echo, style
 from tqdm import tqdm
@@ -302,10 +302,10 @@ class ProgressBarWithSpinner(tqdm):
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         if self.spinner_task is not None and not self.spinner_task.done():
             self.spinner_task.cancel()
             await self.spinner_task

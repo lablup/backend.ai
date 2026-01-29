@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import click
 
@@ -28,11 +28,11 @@ class HistoryRecord(Protocol):
     """Protocol for history record types."""
 
     phase: str
-    from_status: Optional[str]
-    to_status: Optional[str]
+    from_status: str | None
+    to_status: str | None
     result: str
-    error_code: Optional[str]
-    message: Optional[str]
+    error_code: str | None
+    message: str | None
     sub_steps: list[SubStepResultDTO]
     created_at: str
 
@@ -318,13 +318,13 @@ def session() -> None:
 @click.option("-v", "--verbose", is_flag=True, help="Show full messages without truncation")
 def list_session_history_cmd(
     ctx: CLIContext,
-    session_id: Optional[str],
-    phase: Optional[str],
+    session_id: str | None,
+    phase: str | None,
     from_status: tuple[str, ...],
     to_status: tuple[str, ...],
-    result: Optional[str],
-    error_code: Optional[str],
-    message: Optional[str],
+    result: str | None,
+    error_code: str | None,
+    message: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -469,13 +469,13 @@ def deployment() -> None:
 @click.option("-v", "--verbose", is_flag=True, help="Show full messages without truncation")
 def list_deployment_history_cmd(
     ctx: CLIContext,
-    deployment_id: Optional[str],
-    phase: Optional[str],
+    deployment_id: str | None,
+    phase: str | None,
     from_status: tuple[str, ...],
     to_status: tuple[str, ...],
-    result: Optional[str],
-    error_code: Optional[str],
-    message: Optional[str],
+    result: str | None,
+    error_code: str | None,
+    message: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -621,14 +621,14 @@ def route() -> None:
 @click.option("-v", "--verbose", is_flag=True, help="Show full messages without truncation")
 def list_route_history_cmd(
     ctx: CLIContext,
-    route_id: Optional[str],
-    deployment_id: Optional[str],
-    phase: Optional[str],
+    route_id: str | None,
+    deployment_id: str | None,
+    phase: str | None,
     from_status: tuple[str, ...],
     to_status: tuple[str, ...],
-    result: Optional[str],
-    error_code: Optional[str],
-    message: Optional[str],
+    result: str | None,
+    error_code: str | None,
+    message: str | None,
     limit: int,
     offset: int,
     order_by: str,

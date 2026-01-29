@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import urllib.parse
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Optional
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import jwt
@@ -103,7 +103,7 @@ async def proxy(
     otherwise coordinator will try to automatically redirect callee via `Location: ` response header.
     """
 
-    existing_circuit: Optional[Circuit] = None
+    existing_circuit: Circuit | None = None
     reuse = False
 
     root_ctx: RootContext = request.app["_root.context"]

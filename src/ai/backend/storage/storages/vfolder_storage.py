@@ -4,7 +4,7 @@ import logging
 import mimetypes
 from collections.abc import AsyncIterator
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 import aiofiles.os
 
@@ -32,12 +32,12 @@ class VolumeDownloadStreamReader(StreamReader):
     """
 
     _iterator: AsyncIterator[bytes]
-    _content_type: Optional[str]
+    _content_type: str | None
 
     def __init__(
         self,
         iterator: AsyncIterator[bytes],
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> None:
         self._iterator = iterator
         self._content_type = content_type
@@ -49,7 +49,7 @@ class VolumeDownloadStreamReader(StreamReader):
                 yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type
 
 
@@ -164,7 +164,7 @@ class VFolderStorage(AbstractStorage):
             relpath = self._normalize_relpath(filepath)
 
             # Detect content type from file extension
-            content_type: Optional[str] = None
+            content_type: str | None = None
             if relpath.suffix:
                 guessed_type, _ = mimetypes.guess_type(str(relpath))
                 content_type = guessed_type

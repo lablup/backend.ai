@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.repositories.base.export import ReportDef
@@ -21,7 +21,7 @@ class ListReportsAction(ExportAction):
         return "list_reports"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -32,5 +32,5 @@ class ListReportsActionResult(BaseActionResult):
     reports: list[ReportDef]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

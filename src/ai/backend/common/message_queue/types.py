@@ -2,7 +2,7 @@ import base64
 from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from typing import Optional, Self, cast
+from typing import Self, cast
 
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
@@ -22,7 +22,7 @@ class BroadcastPayload:
     """Payload data for broadcasting with optional cache."""
 
     payload: Mapping[str, str]
-    cache_id: Optional[str] = None
+    cache_id: str | None = None
 
 
 @dataclass
@@ -57,8 +57,8 @@ class MQMessage:
 
 @dataclass
 class MessageMetadata:
-    request_id: Optional[str] = None
-    user: Optional[UserData] = None
+    request_id: str | None = None
+    user: UserData | None = None
 
     def serialize(self) -> bytes:
         """
@@ -105,7 +105,7 @@ class MessagePayload:
     name: str
     source: str
     args: tuple[bytes, ...]
-    metadata: Optional[MessageMetadata] = None
+    metadata: MessageMetadata | None = None
 
     def serialize_anycast(self) -> dict[bytes, bytes]:
         """

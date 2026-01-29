@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.data.permission.role import RoleDetailData, RolePermissionsUpdateInput
@@ -12,7 +12,7 @@ class UpdateRolePermissionsAction(BaseAction):
     input_data: RolePermissionsUpdateInput
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.input_data.role_id)
 
     @override
@@ -31,5 +31,5 @@ class UpdateRolePermissionsActionResult(BaseActionResult):
     role: RoleDetailData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.role.id)

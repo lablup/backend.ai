@@ -4,7 +4,7 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import humps
 import tomli
@@ -260,55 +260,55 @@ class ModelServiceConfig(BaseConfigModel):
         examples=[8080],
         gt=1,
     )
-    health_check: Optional[ModelHealthCheck] = Field(
+    health_check: ModelHealthCheck | None = Field(
         default=None,
         description="Health check configuration for the model service.",
     )
 
 
 class ModelMetadata(BaseConfigModel):
-    author: Optional[str] = Field(
+    author: str | None = Field(
         default=None,
         examples=["John Doe"],
     )
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None,
     )
-    version: Optional[int | str] = Field(
+    version: int | str | None = Field(
         default=None,
     )
-    created: Optional[str] = Field(
+    created: str | None = Field(
         default=None,
         validation_alias=AliasChoices("created", "created_at"),
         serialization_alias="created",
     )
-    last_modified: Optional[str] = Field(
+    last_modified: str | None = Field(
         default=None,
         validation_alias=AliasChoices("last_modified", "modified_at"),
         serialization_alias="last_modified",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
     )
-    task: Optional[str] = Field(
+    task: str | None = Field(
         default=None,
     )
-    category: Optional[str] = Field(
+    category: str | None = Field(
         default=None,
     )
-    architecture: Optional[str] = Field(
+    architecture: str | None = Field(
         default=None,
     )
-    framework: Optional[list[str]] = Field(
+    framework: list[str] | None = Field(
         default=None,
     )
-    label: Optional[list[str]] = Field(
+    label: list[str] | None = Field(
         default=None,
     )
-    license: Optional[str] = Field(
+    license: str | None = Field(
         default=None,
     )
-    min_resource: Optional[dict[str, Any]] = Field(
+    min_resource: dict[str, Any] | None = Field(
         default=None,
         description="Minimum resource requirements for the model.",
     )
@@ -323,11 +323,11 @@ class ModelConfig(BaseConfigModel):
         description="Path to the model file.",
         examples=["/models/my_model"],
     )
-    service: Optional[ModelServiceConfig] = Field(
+    service: ModelServiceConfig | None = Field(
         default=None,
         description="Configuration for the model service.",
     )
-    metadata: Optional[ModelMetadata] = Field(
+    metadata: ModelMetadata | None = Field(
         default=None,
         description="Metadata about the model.",
     )
@@ -339,7 +339,7 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
-    def health_check_config(self) -> Optional[ModelHealthCheck]:
+    def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
             if model.service and model.service.health_check:
                 if model.service.health_check is not None:
@@ -381,9 +381,7 @@ def find_config_file(daemon_name: str) -> Path:
         })
 
 
-def read_from_file(
-    toml_path: Optional[Path | str], daemon_name: str
-) -> tuple[dict[str, Any], Path]:
+def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
     config: dict[str, Any]
     discovered_path: Path
     if toml_path is None:
@@ -402,7 +400,7 @@ def read_from_file(
 
 async def read_from_etcd(
     etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     async with AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map) as etcd:
         raw_value = await etcd.get("daemon/config")
     if raw_value is None:

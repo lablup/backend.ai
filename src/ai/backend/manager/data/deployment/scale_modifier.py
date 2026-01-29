@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.types import OptionalState, PartialModifier
@@ -32,12 +32,8 @@ class AutoScalingConditionModifier(PartialModifier):
 class AutoScalingActionModifier(PartialModifier):
     step_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     cooldown_seconds: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    min_replicas: OptionalState[Optional[int]] = field(
-        default_factory=OptionalState[Optional[int]].nop
-    )
-    max_replicas: OptionalState[Optional[int]] = field(
-        default_factory=OptionalState[Optional[int]].nop
-    )
+    min_replicas: OptionalState[int | None] = field(default_factory=OptionalState[int | None].nop)
+    max_replicas: OptionalState[int | None] = field(default_factory=OptionalState[int | None].nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:

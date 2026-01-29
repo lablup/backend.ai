@@ -6,7 +6,7 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Self, TypedDict
+from typing import TYPE_CHECKING, Self, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -282,9 +282,7 @@ def _check_ed25519_keypair(
     public_key.verify(signature, test_message)
 
 
-def validate_ssh_keypair(
-    private_key_value: str, public_key_value: str
-) -> tuple[bool, Optional[str]]:
+def validate_ssh_keypair(private_key_value: str, public_key_value: str) -> tuple[bool, str | None]:
     """
     Validate RSA keypair for SSH/SFTP connection.
     Args:

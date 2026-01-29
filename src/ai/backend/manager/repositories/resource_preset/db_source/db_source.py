@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -107,7 +107,7 @@ class ResourcePresetDBSource:
             return preset_row.to_dataclass()
 
     async def get_preset_by_id_or_name(
-        self, preset_id: Optional[UUID], name: Optional[str]
+        self, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetData:
         """
         Gets a resource preset by ID or name.
@@ -119,7 +119,7 @@ class ResourcePresetDBSource:
             return preset_row.to_dataclass()
 
     async def _get_preset_by_id_or_name(
-        self, db_sess: SASession, preset_id: Optional[UUID], name: Optional[str]
+        self, db_sess: SASession, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetRow:
         if preset_id is not None:
             preset_row = await self._get_preset_by_id(db_sess, preset_id)
@@ -145,9 +145,7 @@ class ResourcePresetDBSource:
                 )
             return result.row.to_dataclass()
 
-    async def delete_preset(
-        self, preset_id: Optional[UUID], name: Optional[str]
-    ) -> ResourcePresetData:
+    async def delete_preset(self, preset_id: UUID | None, name: str | None) -> ResourcePresetData:
         """
         Deletes a resource preset.
         Returns the deleted preset data.
@@ -159,9 +157,7 @@ class ResourcePresetDBSource:
             await session.delete(preset_row)
         return data
 
-    async def list_presets(
-        self, scaling_group_name: Optional[str] = None
-    ) -> list[ResourcePresetData]:
+    async def list_presets(self, scaling_group_name: str | None = None) -> list[ResourcePresetData]:
         """
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
@@ -192,7 +188,7 @@ class ResourcePresetDBSource:
         domain_name: str,
         resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
-        scaling_group: Optional[str] = None,
+        scaling_group: str | None = None,
     ) -> CheckPresetsDBData:
         """
         Fetch all data needed for checking presets from database.
@@ -480,7 +476,7 @@ class ResourcePresetDBSource:
         domain_name: str,
         resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
-        scaling_group: Optional[str] = None,
+        scaling_group: str | None = None,
     ) -> CheckPresetsDBData:
         """
         Fetch all data needed for check_presets in a single method.
@@ -594,7 +590,7 @@ class ResourcePresetDBSource:
 
     async def _get_preset_by_id(
         self, session: SASession, preset_id: UUID
-    ) -> Optional[ResourcePresetRow]:
+    ) -> ResourcePresetRow | None:
         """
         Private method to get a preset by ID using an existing session.
         """
@@ -602,9 +598,7 @@ class ResourcePresetDBSource:
             sa.select(ResourcePresetRow).where(ResourcePresetRow.id == preset_id)
         )
 
-    async def _get_preset_by_name(
-        self, session: SASession, name: str
-    ) -> Optional[ResourcePresetRow]:
+    async def _get_preset_by_name(self, session: SASession, name: str) -> ResourcePresetRow | None:
         """
         Private method to get a preset by name using an existing session.
         """

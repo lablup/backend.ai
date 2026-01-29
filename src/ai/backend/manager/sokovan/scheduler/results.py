@@ -5,7 +5,6 @@ Result type for scheduling operations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -52,9 +51,9 @@ class SessionTransitionInfo:
 
     session_id: SessionId
     from_status: SessionStatus
-    reason: Optional[str] = None
-    creation_id: Optional[str] = None
-    access_key: Optional[AccessKey] = None
+    reason: str | None = None
+    creation_id: str | None = None
+    access_key: AccessKey | None = None
 
 
 @dataclass
@@ -65,10 +64,10 @@ class HandlerKernelData:
     """
 
     kernel_id: UUID
-    agent_id: Optional[AgentId]
+    agent_id: AgentId | None
     status: KernelStatus
-    container_id: Optional[str] = None
-    occupied_slots: Optional[ResourceSlot] = None
+    container_id: str | None = None
+    occupied_slots: ResourceSlot | None = None
 
 
 @dataclass
@@ -85,7 +84,7 @@ class HandlerSessionData:
     status: SessionStatus
     scaling_group: str
     session_type: SessionTypes
-    status_info: Optional[str] = None
+    status_info: str | None = None
     kernels: list[HandlerKernelData] = field(default_factory=list)
 
 
@@ -135,7 +134,7 @@ class KernelTransitionInfo:
 
     kernel_id: KernelId
     from_status: KernelStatus
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 @dataclass
@@ -177,5 +176,5 @@ class KernelStatusTransitions:
         failure: Target kernel status for failure (e.g., TERMINATED)
     """
 
-    success: Optional[KernelStatus] = None
-    failure: Optional[KernelStatus] = None
+    success: KernelStatus | None = None
+    failure: KernelStatus | None = None

@@ -1,6 +1,6 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Optional, Self, final, override
+from typing import Self, final, override
 
 from ai.backend.common.message_queue.types import MessagePayload
 
@@ -97,7 +97,7 @@ class AbstractEvent(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         """
         Return the ID within the event domain.
         It's used to reverse-look up the event domain in the event hub.
@@ -105,7 +105,7 @@ class AbstractEvent(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         """
         Return the event as a UserEvent.
         If user event is not supported, return None.
@@ -165,14 +165,14 @@ class AbstractBroadcastEvent(AbstractEvent):
         return [self]
 
     @classmethod
-    def cache_domain(cls) -> Optional[EventCacheDomain]:
+    def cache_domain(cls) -> EventCacheDomain | None:
         """
         Return the event domain.
         """
         return None
 
     @final
-    def cache_id(self) -> Optional[str]:
+    def cache_id(self) -> str | None:
         """
         Return the cache ID for this event.
         If None is returned, the event will not be cached.

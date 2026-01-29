@@ -16,7 +16,6 @@ from typing import (
     Any,
     Final,
     NamedTuple,
-    Optional,
     Protocol,
     TypedDict,
     TypeVar,
@@ -121,22 +120,22 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[bool], default: Optional[bool] = None) -> bool: ...
+def read_sysfs(path: str | Path, type_: type[bool], default: bool | None = None) -> bool: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[int], default: Optional[int] = None) -> int: ...
+def read_sysfs(path: str | Path, type_: type[int], default: int | None = None) -> int: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[float], default: Optional[float] = None) -> float: ...
+def read_sysfs(path: str | Path, type_: type[float], default: float | None = None) -> float: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[str], default: Optional[str] = None) -> str: ...
+def read_sysfs(path: str | Path, type_: type[str], default: str | None = None) -> str: ...
 
 
-def read_sysfs(path: str | Path, type_: type[Any], default: Optional[Any] = None) -> Any:
+def read_sysfs(path: str | Path, type_: type[Any], default: Any | None = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,
@@ -168,7 +167,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     return await loop.run_in_executor(None, _read_tail)
 
 
-async def get_kernel_id_from_container(val: str | DockerContainer) -> Optional[KernelId]:
+async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
         if "Name" not in val._container:
             await val.show()

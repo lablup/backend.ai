@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -149,33 +149,33 @@ class SessionData:
     status: SessionStatus
     result: SessionResult
     num_queries: int
-    creation_id: Optional[str]
-    name: Optional[str]
-    access_key: Optional[AccessKey]
-    agent_ids: Optional[list[str]]
-    images: Optional[list[str]]
-    tag: Optional[str]
-    vfolder_mounts: Optional[list[VFolderMountData]]
-    environ: Optional[dict[str, Any]]
-    bootstrap_script: Optional[str]
-    target_sgroup_names: Optional[list[str]]
-    timeout: Optional[int]
-    batch_timeout: Optional[int]
-    terminated_at: Optional[datetime] = field(compare=False)
-    scaling_group_name: Optional[str]
-    starts_at: Optional[datetime] = field(compare=False)
-    status_info: Optional[str] = field(compare=False)
-    status_data: Optional[dict[str, Any]] = field(compare=False)
-    status_history: Optional[dict[str, Any]] = field(compare=False)
-    callback_url: Optional[str]
-    startup_command: Optional[str]
-    last_stat: Optional[dict[str, Any]] = field(compare=False)
-    network_type: Optional[NetworkType]
-    network_id: Optional[str]
-    owner: Optional[UserData] = field(compare=False)
+    creation_id: str | None
+    name: str | None
+    access_key: AccessKey | None
+    agent_ids: list[str] | None
+    images: list[str] | None
+    tag: str | None
+    vfolder_mounts: list[VFolderMountData] | None
+    environ: dict[str, Any] | None
+    bootstrap_script: str | None
+    target_sgroup_names: list[str] | None
+    timeout: int | None
+    batch_timeout: int | None
+    terminated_at: datetime | None = field(compare=False)
+    scaling_group_name: str | None
+    starts_at: datetime | None = field(compare=False)
+    status_info: str | None = field(compare=False)
+    status_data: dict[str, Any] | None = field(compare=False)
+    status_history: dict[str, Any] | None = field(compare=False)
+    callback_url: str | None
+    startup_command: str | None
+    last_stat: dict[str, Any] | None = field(compare=False)
+    network_type: NetworkType | None
+    network_id: str | None
+    owner: UserData | None = field(compare=False)
 
     # Loaded from relationship
-    service_ports: Optional[str]
+    service_ports: str | None
 
 
 @dataclass
@@ -196,8 +196,8 @@ class SessionMetadata:
     access_key: str
     session_type: SessionTypes
     priority: int
-    created_at: Optional[datetime]
-    tag: Optional[str]
+    created_at: datetime | None
+    tag: str | None
 
 
 @dataclass
@@ -206,55 +206,55 @@ class ResourceSpec:
     cluster_size: int
     occupying_slots: ResourceSlot
     requested_slots: ResourceSlot
-    scaling_group_name: Optional[str]
-    target_sgroup_names: Optional[list[str]]
-    agent_ids: Optional[list[str]]
+    scaling_group_name: str | None
+    target_sgroup_names: list[str] | None
+    agent_ids: list[str] | None
 
 
 @dataclass
 class ImageSpec:
-    images: Optional[list[str]]
-    tag: Optional[str]
+    images: list[str] | None
+    tag: str | None
 
 
 @dataclass
 class MountSpec:
-    vfolder_mounts: Optional[list[dict[str, Any]]]
+    vfolder_mounts: list[dict[str, Any]] | None
 
 
 @dataclass
 class SessionExecution:
-    environ: Optional[dict[str, Any]]
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
+    environ: dict[str, Any] | None
+    bootstrap_script: str | None
+    startup_command: str | None
     use_host_network: bool
-    callback_url: Optional[str]
+    callback_url: str | None
 
 
 @dataclass
 class SessionLifecycle:
     status: SessionStatus
     result: SessionResult
-    created_at: Optional[datetime]
-    terminated_at: Optional[datetime]
-    starts_at: Optional[datetime]
-    status_changed: Optional[datetime]
-    batch_timeout: Optional[int]
-    status_info: Optional[str]
-    status_data: Optional[Mapping[str, Any]]
-    status_history: Optional[dict[str, Any]]
+    created_at: datetime | None
+    terminated_at: datetime | None
+    starts_at: datetime | None
+    status_changed: datetime | None
+    batch_timeout: int | None
+    status_info: str | None
+    status_data: Mapping[str, Any] | None
+    status_history: dict[str, Any] | None
 
 
 @dataclass
 class SessionMetrics:
     num_queries: int
-    last_stat: Optional[dict[str, Any]]
+    last_stat: dict[str, Any] | None
 
 
 @dataclass
 class SessionNetwork:
-    network_type: Optional[NetworkType]
-    network_id: Optional[str]
+    network_type: NetworkType | None
+    network_id: str | None
 
 
 @dataclass
@@ -338,8 +338,8 @@ class SubStepResult(BaseModel):
 
     step: str
     result: SchedulingResult
-    error_code: Optional[str] = None
-    message: Optional[str] = None
+    error_code: str | None = None
+    message: str | None = None
     started_at: datetime
     ended_at: datetime
 
@@ -352,11 +352,11 @@ class SessionSchedulingHistoryData:
     session_id: SessionId
 
     phase: str  # ScheduleType value
-    from_status: Optional[SessionStatus]
-    to_status: Optional[SessionStatus]
+    from_status: SessionStatus | None
+    to_status: SessionStatus | None
 
     result: SchedulingResult
-    error_code: Optional[str]
+    error_code: str | None
     message: str
 
     sub_steps: list[SubStepResult]

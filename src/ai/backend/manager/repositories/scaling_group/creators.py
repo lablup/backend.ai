@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.types import AccessKey
@@ -24,15 +24,15 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
     name: str
     driver: str
     scheduler: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
     is_public: bool = True
-    wsproxy_addr: Optional[str] = None
-    wsproxy_api_token: Optional[str] = None
+    wsproxy_addr: str | None = None
+    wsproxy_api_token: str | None = None
     driver_opts: Mapping[str, Any] = field(default_factory=dict)
-    scheduler_opts: Optional[ScalingGroupOpts] = None
+    scheduler_opts: ScalingGroupOpts | None = None
     use_host_network: bool = False
-    fair_share_spec: Optional[FairShareScalingGroupSpec] = None
+    fair_share_spec: FairShareScalingGroupSpec | None = None
 
     @override
     def build_row(self) -> ScalingGroupRow:

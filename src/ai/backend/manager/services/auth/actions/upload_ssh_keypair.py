@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.auth.types import SSHKeypair
@@ -15,7 +15,7 @@ class UploadSSHKeypairAction(AuthAction):
     access_key: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_id)
 
     @override
@@ -29,5 +29,5 @@ class UploadSSHKeypairActionResult(BaseActionResult):
     ssh_keypair: SSHKeypair
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

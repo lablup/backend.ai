@@ -5,7 +5,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Optional
+from typing import Any
 
 import aiodocker
 
@@ -77,7 +77,7 @@ class RngdPlugin(AbstractComputePlugin):
     rngd_config: Any
 
     _rbln_stat_path: str
-    _all_devices: Optional[list[RngdDevice]]
+    _all_devices: list[RngdDevice] | None
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None

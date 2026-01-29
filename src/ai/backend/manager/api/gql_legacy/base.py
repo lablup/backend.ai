@@ -19,7 +19,6 @@ from typing import (
     Concatenate,
     Final,
     NamedTuple,
-    Optional,
     Protocol,
     TypeVar,
     cast,
@@ -145,7 +144,7 @@ class Bytes(Scalar):
         return val.hex()
 
     @staticmethod
-    def parse_literal(node: Any, _variables: Optional[dict[str, Any]] = None) -> Optional[bytes]:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> bytes | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return bytes.fromhex(node.value)
         return None
@@ -186,7 +185,7 @@ class UUIDFloatMap(Scalar):
 
     @classmethod
     def parse_literal(
-        cls, node: ValueNode, _variables: Optional[dict[str, Any]] = None
+        cls, node: ValueNode, _variables: dict[str, Any] | None = None
     ) -> dict[str, float]:
         if not isinstance(node, ObjectValueNode):
             raise GraphQLError(f"UUIDFloatMap cannot represent non-object value: {print_ast(node)}")
@@ -395,11 +394,11 @@ async def batch_result(
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
     key_getter: Callable[[Row], T_Key],
-) -> Sequence[Optional[T_SQLBasedGQLObject]]:
+) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, T_SQLBasedGQLObject | None]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -443,12 +442,12 @@ async def batch_result_in_session(
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
     key_getter: Callable[[Row], T_Key],
-) -> Sequence[Optional[T_SQLBasedGQLObject]]:
+) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, T_SQLBasedGQLObject | None]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -464,12 +463,12 @@ async def batch_result_in_scalar_stream(
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
     key_getter: Callable[[Row], T_Key],
-) -> Sequence[Optional[T_SQLBasedGQLObject]]:
+) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result scalar in async session.
     """
-    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, T_SQLBasedGQLObject | None]
     objs_per_key = {}
     for key in key_list:
         objs_per_key[key] = None
@@ -811,7 +810,7 @@ def set_if_set(
     name: str,
     *,
     clean_func: Callable[[Any], Any] | None = None,
-    target_key: Optional[str] = None,
+    target_key: str | None = None,
 ) -> None:
     """
     Set the target dict with only non-undefined keys and their values
@@ -837,7 +836,7 @@ def orm_set_if_set(
     name: str,
     *,
     clean_func: Callable[[Any], Any] | None = None,
-    target_key: Optional[str] = None,
+    target_key: str | None = None,
 ) -> None:
     """
     Set the target ORM row object with only non-undefined keys and their values
@@ -853,7 +852,7 @@ def orm_set_if_set(
             setattr(target, target_key or name, v)
 
 
-def filter_gql_undefined[T](val: T, *, default_value: Optional[T] = None) -> Optional[T]:
+def filter_gql_undefined[T](val: T, *, default_value: T | None = None) -> T | None:
     if val is Undefined:
         return default_value
     return val
@@ -1237,7 +1236,7 @@ def generate_sql_info_for_gql_connection(
         ret = GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
 
     ctx: GraphQueryContext = info.context
-    max_page_size = cast(Optional[int], ctx.config_provider.config.api.max_gql_connection_page_size)
+    max_page_size = cast(int | None, ctx.config_provider.config.api.max_gql_connection_page_size)
     if max_page_size is not None and ret.requested_page_size > max_page_size:
         raise ValueError(
             f"Cannot fetch a page larger than {max_page_size}. "

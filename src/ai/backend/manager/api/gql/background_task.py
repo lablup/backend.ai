@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -48,8 +48,8 @@ class BackgroundTaskEventPayload:
     task_id: strawberry.ID
     event_type: BgtaskEventType
     message: str
-    current_progress: Optional[float] = None
-    total_progress: Optional[float] = None
+    current_progress: float | None = None
+    total_progress: float | None = None
 
     @classmethod
     def from_updated_event(cls, event: BgtaskUpdatedEvent) -> BackgroundTaskEventPayload:
@@ -157,7 +157,7 @@ async def background_task_events(
         # Stream events from propagator
         async for event in propagator.receive(cache_id):
             # Convert event to payload
-            payload: Optional[BackgroundTaskEventPayload] = None
+            payload: BackgroundTaskEventPayload | None = None
             is_close_event = False
 
             if isinstance(event, BgtaskUpdatedEvent):

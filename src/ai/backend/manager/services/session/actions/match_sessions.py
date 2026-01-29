@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class MatchSessionsAction(SessionAction):
     owner_access_key: AccessKey
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,5 +29,5 @@ class MatchSessionsActionResult(BaseActionResult):
     # session_rows: list[SessionRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

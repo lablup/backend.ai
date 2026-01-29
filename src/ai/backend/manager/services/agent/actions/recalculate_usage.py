@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.agent.actions.base import AgentAction
@@ -8,7 +8,7 @@ from ai.backend.manager.services.agent.actions.base import AgentAction
 @dataclass
 class RecalculateUsageAction(AgentAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -21,5 +21,5 @@ class RecalculateUsageAction(AgentAction):
 @dataclass
 class RecalculateUsageActionResult(BaseActionResult):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

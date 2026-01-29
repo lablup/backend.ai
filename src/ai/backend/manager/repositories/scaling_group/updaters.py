@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -165,12 +165,12 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     Maps to ScalingGroupV2GQL structure in GraphQL types.
     """
 
-    status: Optional[ScalingGroupStatusUpdaterSpec] = None
-    metadata: Optional[ScalingGroupMetadataUpdaterSpec] = None
-    network: Optional[ScalingGroupNetworkConfigUpdaterSpec] = None
-    driver: Optional[ScalingGroupDriverConfigUpdaterSpec] = None
-    scheduler: Optional[ScalingGroupSchedulerConfigUpdaterSpec] = None
-    fair_share: Optional[ResourceGroupFairShareUpdaterSpec] = None
+    status: ScalingGroupStatusUpdaterSpec | None = None
+    metadata: ScalingGroupMetadataUpdaterSpec | None = None
+    network: ScalingGroupNetworkConfigUpdaterSpec | None = None
+    driver: ScalingGroupDriverConfigUpdaterSpec | None = None
+    scheduler: ScalingGroupSchedulerConfigUpdaterSpec | None = None
+    fair_share: ResourceGroupFairShareUpdaterSpec | None = None
 
     @property
     @override

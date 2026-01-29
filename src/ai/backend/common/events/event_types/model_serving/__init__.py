@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -33,9 +33,9 @@ class ModelServiceStatusEventArgs(AbstractEvent):
         return EventDomain.MODEL_SERVING
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

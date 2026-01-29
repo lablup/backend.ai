@@ -5,7 +5,6 @@ import subprocess
 from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import Optional
 
 import aiofiles
 
@@ -80,7 +79,7 @@ class ScratchConfig:
     def recovery_file_exists(self) -> bool:
         return self._json_recovery_file_path().is_file()
 
-    async def get_json_recovery_data(self) -> Optional[KernelRecoveryScratchData]:
+    async def get_json_recovery_data(self) -> KernelRecoveryScratchData | None:
         filepath = self._json_recovery_file_path()
         if not filepath.is_file():
             return None

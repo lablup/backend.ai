@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self, override
+from typing import Self, override
 from uuid import UUID
 
 import strawberry
@@ -131,10 +131,10 @@ class RouteHistoryOrderField(StrEnum):
 class SubStepResultGQL:
     step: str
     result: SchedulingResultGQL
-    error_code: Optional[str]
-    message: Optional[str]
-    started_at: Optional[datetime]
-    ended_at: Optional[datetime]
+    error_code: str | None
+    message: str | None
+    started_at: datetime | None
+    ended_at: datetime | None
 
     @classmethod
     def from_dataclass(cls, data: SubStepResult) -> Self:
@@ -153,11 +153,11 @@ class SessionSchedulingHistory(Node):
     id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     phase: str
-    from_status: Optional[str]
-    to_status: Optional[str]
+    from_status: str | None
+    to_status: str | None
     result: SchedulingResultGQL
-    error_code: Optional[str]
-    message: Optional[str]
+    error_code: str | None
+    message: str | None
     sub_steps: list[SubStepResultGQL]
     attempts: int
     created_at: datetime
@@ -190,11 +190,11 @@ class DeploymentHistory(Node):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     phase: str
-    from_status: Optional[str]
-    to_status: Optional[str]
+    from_status: str | None
+    to_status: str | None
     result: SchedulingResultGQL
-    error_code: Optional[str]
-    message: Optional[str]
+    error_code: str | None
+    message: str | None
     sub_steps: list[SubStepResultGQL]
     attempts: int
     created_at: datetime
@@ -228,11 +228,11 @@ class RouteHistory(Node):
     _route_id: strawberry.Private[UUID]
     _deployment_id: strawberry.Private[UUID]
     phase: str
-    from_status: Optional[str]
-    to_status: Optional[str]
+    from_status: str | None
+    to_status: str | None
     result: SchedulingResultGQL
-    error_code: Optional[str]
-    message: Optional[str]
+    error_code: str | None
+    message: str | None
     sub_steps: list[SubStepResultGQL]
     attempts: int
     created_at: datetime
@@ -270,16 +270,16 @@ class RouteHistory(Node):
 
 @strawberry.input(description="Filter for session scheduling history")
 class SessionSchedulingHistoryFilter(GQLFilter):
-    id: Optional[UUIDFilter] = None
-    session_id: Optional[UUIDFilter] = None
-    phase: Optional[StringFilter] = None
-    from_status: Optional[list[str]] = None
-    to_status: Optional[list[str]] = None
-    result: Optional[list[SchedulingResultGQL]] = None
-    error_code: Optional[StringFilter] = None
-    message: Optional[StringFilter] = None
-    created_at: Optional[DateTimeFilter] = None
-    updated_at: Optional[DateTimeFilter] = None
+    id: UUIDFilter | None = None
+    session_id: UUIDFilter | None = None
+    phase: StringFilter | None = None
+    from_status: list[str] | None = None
+    to_status: list[str] | None = None
+    result: list[SchedulingResultGQL] | None = None
+    error_code: StringFilter | None = None
+    message: StringFilter | None = None
+    created_at: DateTimeFilter | None = None
+    updated_at: DateTimeFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -384,16 +384,16 @@ class SessionSchedulingHistoryOrderBy(GQLOrderBy):
 
 @strawberry.input(description="Filter for deployment history")
 class DeploymentHistoryFilter(GQLFilter):
-    id: Optional[UUIDFilter] = None
-    deployment_id: Optional[UUIDFilter] = None
-    phase: Optional[StringFilter] = None
-    from_status: Optional[list[str]] = None
-    to_status: Optional[list[str]] = None
-    result: Optional[list[SchedulingResultGQL]] = None
-    error_code: Optional[StringFilter] = None
-    message: Optional[StringFilter] = None
-    created_at: Optional[DateTimeFilter] = None
-    updated_at: Optional[DateTimeFilter] = None
+    id: UUIDFilter | None = None
+    deployment_id: UUIDFilter | None = None
+    phase: StringFilter | None = None
+    from_status: list[str] | None = None
+    to_status: list[str] | None = None
+    result: list[SchedulingResultGQL] | None = None
+    error_code: StringFilter | None = None
+    message: StringFilter | None = None
+    created_at: DateTimeFilter | None = None
+    updated_at: DateTimeFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -496,17 +496,17 @@ class DeploymentHistoryOrderBy(GQLOrderBy):
 
 @strawberry.input(description="Filter for route history")
 class RouteHistoryFilter(GQLFilter):
-    id: Optional[UUIDFilter] = None
-    route_id: Optional[UUIDFilter] = None
-    deployment_id: Optional[UUIDFilter] = None
-    phase: Optional[StringFilter] = None
-    from_status: Optional[list[str]] = None
-    to_status: Optional[list[str]] = None
-    result: Optional[list[SchedulingResultGQL]] = None
-    error_code: Optional[StringFilter] = None
-    message: Optional[StringFilter] = None
-    created_at: Optional[DateTimeFilter] = None
-    updated_at: Optional[DateTimeFilter] = None
+    id: UUIDFilter | None = None
+    route_id: UUIDFilter | None = None
+    deployment_id: UUIDFilter | None = None
+    phase: StringFilter | None = None
+    from_status: list[str] | None = None
+    to_status: list[str] | None = None
+    result: list[SchedulingResultGQL] | None = None
+    error_code: StringFilter | None = None
+    message: StringFilter | None = None
+    created_at: DateTimeFilter | None = None
+    updated_at: DateTimeFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

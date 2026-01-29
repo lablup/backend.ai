@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import Column, Integer, String
@@ -24,13 +24,13 @@ class MockModel(Base):  # type: ignore
 class MockFilterOptions:
     """Test filter options with logical operations support"""
 
-    name: Optional[str] = None
-    status: Optional[str] = None
+    name: str | None = None
+    status: str | None = None
 
     # Logical operations
-    AND: Optional[list["MockFilterOptions"]] = None
-    OR: Optional[list["MockFilterOptions"]] = None
-    NOT: Optional[list["MockFilterOptions"]] = None
+    AND: list["MockFilterOptions"] | None = None
+    OR: list["MockFilterOptions"] | None = None
+    NOT: list["MockFilterOptions"] | None = None
 
 
 class MockFilterApplier(BaseFilterApplier[MockFilterOptions]):

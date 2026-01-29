@@ -1,7 +1,7 @@
 import os
 from collections.abc import Collection, Iterable
 from pathlib import Path
-from typing import Optional, Self
+from typing import Self
 
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.types import KernelId
@@ -55,7 +55,7 @@ class PathOwnerDeterminer:
         return cls(kernel_uid=kernel_uid, kernel_gid=kernel_gid, do_uid_match=do_uid_match)
 
     def determine(
-        self, path: Path, *, uid_override: Optional[int], gid_override: Optional[int]
+        self, path: Path, *, uid_override: int | None, gid_override: int | None
     ) -> tuple[int, int]:
         """
         Determine the final UID and GID for a path.

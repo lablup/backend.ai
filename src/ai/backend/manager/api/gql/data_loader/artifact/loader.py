@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.repositories.artifact.options import ArtifactConditions
@@ -14,7 +13,7 @@ from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 async def load_artifacts_by_ids(
     processor: ArtifactProcessors,
     artifact_ids: Sequence[uuid.UUID],
-) -> list[Optional[ArtifactData]]:
+) -> list[ArtifactData | None]:
     """Batch load artifacts by their IDs.
 
     Args:

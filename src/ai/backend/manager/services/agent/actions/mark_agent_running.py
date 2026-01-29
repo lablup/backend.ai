@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class MarkAgentRunningAction(AgentAction):
     agent_status: AgentStatus
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)
 
     @override
@@ -27,5 +27,5 @@ class MarkAgentRunningActionResult(BaseActionResult):
     agent_id: AgentId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)

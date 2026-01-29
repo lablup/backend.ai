@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.types import AccessKey
@@ -20,7 +20,7 @@ class ConvertSessionToImageAction(SessionAction):
     max_customized_image_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -36,5 +36,5 @@ class ConvertSessionToImageActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

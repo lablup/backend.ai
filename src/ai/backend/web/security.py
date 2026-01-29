@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from typing import Optional, Self
+from typing import Self
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
@@ -36,7 +36,7 @@ class SecurityPolicy:
         cls,
         request_policy_config: list[str],
         response_policy_config: list[str],
-        csp_config: Optional[Mapping[str, Optional[list[str]]]] = None,
+        csp_config: Mapping[str, list[str] | None] | None = None,
     ) -> Self:
         request_policy_map = {
             "reject_metadata_local_link_policy": reject_metadata_local_link_policy,
@@ -103,7 +103,7 @@ def add_self_content_security_policy(response: web.StreamResponse) -> web.Stream
     return response
 
 
-def csp_policy_builder(csp_config: Mapping[str, Optional[list[str]]]) -> ResponsePolicy:
+def csp_policy_builder(csp_config: Mapping[str, list[str] | None]) -> ResponsePolicy:
     csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
     csp_str = "; ".join(csp)
     if csp_str:

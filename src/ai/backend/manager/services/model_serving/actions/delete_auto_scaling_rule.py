@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -11,7 +11,7 @@ class DeleteEndpointAutoScalingRuleAction(ModelServiceAction):
     id: RuleId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -25,5 +25,5 @@ class DeleteEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

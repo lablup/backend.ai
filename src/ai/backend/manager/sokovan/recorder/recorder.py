@@ -4,7 +4,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Optional
 from uuid import UUID
 
 from .exceptions import (
@@ -26,7 +25,7 @@ class _PhaseContext:
 
     name: str
     started_at: datetime
-    success_detail: Optional[str]
+    success_detail: str | None
     steps: list[StepRecord] = field(default_factory=list)
     failed: bool = False
 
@@ -53,7 +52,7 @@ class TransitionRecorder[EntityIdT: UUID]:
     _entity_id: EntityIdT
     _started_at: datetime
     _phases: list[PhaseRecord]
-    _current_phase: Optional[_PhaseContext]
+    _current_phase: _PhaseContext | None
 
     def __init__(
         self,
@@ -114,7 +113,7 @@ class TransitionRecorder[EntityIdT: UUID]:
     def phase(
         self,
         name: str,
-        success_detail: Optional[str] = None,
+        success_detail: str | None = None,
     ) -> Generator[None, None, None]:
         """
         Enter a phase.
@@ -155,7 +154,7 @@ class TransitionRecorder[EntityIdT: UUID]:
     def step(
         self,
         name: str,
-        success_detail: Optional[str] = None,
+        success_detail: str | None = None,
     ) -> Generator[None, None, None]:
         """
         Execute a step with automatic success/failure recording.

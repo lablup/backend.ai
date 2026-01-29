@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
@@ -20,8 +19,8 @@ class AutoScalingCondition:
 class AutoScalingAction:
     step_size: int
     cooldown_seconds: int
-    min_replicas: Optional[int] = None
-    max_replicas: Optional[int] = None
+    min_replicas: int | None = None
+    max_replicas: int | None = None
 
 
 @dataclass
@@ -36,7 +35,7 @@ class AutoScalingRule:
     condition: AutoScalingCondition
     action: AutoScalingAction
     created_at: datetime
-    last_triggered_at: Optional[datetime]
+    last_triggered_at: datetime | None
 
 
 # Dataclasses for auto scaling rules used in Model Deployment
@@ -45,12 +44,12 @@ class ModelDeploymentAutoScalingRuleCreator:
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
     step_size: int
     time_window: int
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    min_replicas: int | None
+    max_replicas: int | None
 
 
 @dataclass
@@ -59,9 +58,9 @@ class ModelDeploymentAutoScalingRule:
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
     step_size: int
     time_window: int
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    min_replicas: int | None
+    max_replicas: int | None

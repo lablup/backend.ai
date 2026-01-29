@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
@@ -158,14 +158,14 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(
-        self, user_uuid: uuid.UUID, group_uuid: Optional[uuid.UUID]
+        self, user_uuid: uuid.UUID, group_uuid: uuid.UUID | None
     ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
         """
         async with self._db.begin_readonly_session() as db_session:
             if group_uuid:
-                group_row: Optional[GroupRow] = await db_session.scalar(
+                group_row: GroupRow | None = await db_session.scalar(
                     sa.select(GroupRow).where(GroupRow.id == group_uuid)
                 )
                 if group_row is None:
@@ -173,7 +173,7 @@ class VfolderRepository:
 
                 return group_row.allowed_vfolder_hosts
 
-            user_row: Optional[UserRow] = await db_session.scalar(
+            user_row: UserRow | None = await db_session.scalar(
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
@@ -191,14 +191,14 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_max_vfolder_count(
-        self, user_uuid: uuid.UUID, group_uuid: Optional[uuid.UUID]
+        self, user_uuid: uuid.UUID, group_uuid: uuid.UUID | None
     ) -> int:
         """
         Get the maximum VFolder count for a user or group.
         """
         async with self._db.begin_readonly_session() as db_session:
             if group_uuid:
-                group_row: Optional[GroupRow] = await db_session.scalar(
+                group_row: GroupRow | None = await db_session.scalar(
                     sa.select(GroupRow)
                     .where(GroupRow.id == group_uuid)
                     .options(selectinload(GroupRow.resource_policy_row))
@@ -208,7 +208,7 @@ class VfolderRepository:
 
                 return group_row.resource_policy_row.max_vfolder_count
 
-            user_row: Optional[UserRow] = await db_session.scalar(
+            user_row: UserRow | None = await db_session.scalar(
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(selectinload(UserRow.resource_policy_row))
@@ -225,7 +225,7 @@ class VfolderRepository:
         user_role: UserRole,
         domain_name: str,
         allowed_vfolder_types: list[str],
-        extra_conditions: Optional[sa.sql.elements.ColumnElement[bool]] = None,
+        extra_conditions: sa.sql.elements.ColumnElement[bool] | None = None,
     ) -> VFolderListResult:
         """
         List all VFolders accessible to a user.
@@ -646,7 +646,7 @@ class VfolderRepository:
             return len(vfolder_dicts) > 0
 
     @vfolder_repository_resilience.apply()
-    async def get_user_info(self, user_id: uuid.UUID) -> Optional[tuple[UserRole, str]]:
+    async def get_user_info(self, user_id: uuid.UUID) -> tuple[UserRole, str] | None:
         """
         Get user role and domain name for a user.
         Returns (role, domain_name) or None if user not found.
@@ -660,7 +660,7 @@ class VfolderRepository:
             return user_row.role, user_row.domain_name
 
     @vfolder_repository_resilience.apply()
-    async def get_user_email_by_id(self, user_id: uuid.UUID) -> Optional[str]:
+    async def get_user_email_by_id(self, user_id: uuid.UUID) -> str | None:
         """
         Get user email by user ID.
         Returns email or None if user not found.
@@ -685,7 +685,7 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_group_resource_info(
         self, group_id_or_name: str | uuid.UUID, domain_name: str
-    ) -> Optional[tuple[uuid.UUID, int, int, ProjectType]]:
+    ) -> tuple[uuid.UUID, int, int, ProjectType] | None:
         """
         Get group resource information by group ID or name.
         Returns (group_uuid, max_vfolder_count, max_quota_scope_size, group_type) or None.
@@ -725,7 +725,7 @@ class VfolderRepository:
     @vfolder_repository_resilience.apply()
     async def get_user_resource_info(
         self, user_id: uuid.UUID
-    ) -> Optional[tuple[int, int, Optional[int]]]:
+    ) -> tuple[int, int, int | None] | None:
         """
         Get user resource information.
         Returns (max_vfolder_count, max_quota_scope_size, container_uid) or None.
@@ -750,7 +750,7 @@ class VfolderRepository:
 
     async def _get_vfolder_by_id(
         self, session: SASession, vfolder_id: uuid.UUID
-    ) -> Optional[VFolderRow]:
+    ) -> VFolderRow | None:
         """
         Private method to get a VFolder by ID using an existing session.
         """
@@ -868,7 +868,7 @@ class VfolderRepository:
             return (count or 0) > 0
 
     @vfolder_repository_resilience.apply()
-    async def get_user_by_email(self, email: str) -> Optional[tuple[uuid.UUID, str]]:
+    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str] | None:
         """
         Get user info by email.
         Returns (user_id, domain_name) or None if user not found.
@@ -951,7 +951,7 @@ class VfolderRepository:
         inviter_email: str,
         invitee_email: str,
         permission: VFolderPermission,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Create a VFolder invitation.
         Returns the invitee email on success, None on failure.
@@ -971,9 +971,7 @@ class VfolderRepository:
                 return None
 
     @vfolder_repository_resilience.apply()
-    async def get_invitation_by_id(
-        self, invitation_id: uuid.UUID
-    ) -> Optional[VFolderInvitationData]:
+    async def get_invitation_by_id(self, invitation_id: uuid.UUID) -> VFolderInvitationData | None:
         """
         Get invitation by ID.
         Returns VFolderInvitationData or None if not found.
@@ -1107,7 +1105,7 @@ class VfolderRepository:
         user_uuid: uuid.UUID,
         resource_policy: Mapping[str, Any],
         domain_name: str,
-        group_id: Optional[uuid.UUID] = None,
+        group_id: uuid.UUID | None = None,
     ) -> None:
         """
         Ensure that the user has the required permission on the specified vfolder host.
@@ -1238,7 +1236,7 @@ class VfolderRepository:
         user_id: uuid.UUID,
         user_role: UserRole,
         domain_name: str,
-    ) -> Optional[VFolderData]:
+    ) -> VFolderData | None:
         """
         Get the accessible .logs vfolder for a user.
         Returns VFolderData if found, None otherwise.

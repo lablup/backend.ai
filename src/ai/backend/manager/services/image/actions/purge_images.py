@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -16,7 +16,7 @@ class PurgeImageAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,10 +29,10 @@ class PurgeImageAction(ImageAction):
 class PurgeImageActionResult(BaseActionResult):
     reserved_bytes: int
     purged_image: ImageData
-    error: Optional[str]
+    error: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.purged_image.id)
 
 
@@ -56,7 +56,7 @@ class PurgeImagesAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -72,5 +72,5 @@ class PurgeImagesActionResult(BaseActionResult):
     errors: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

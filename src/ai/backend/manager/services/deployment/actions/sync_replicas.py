@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class SyncReplicaAction(DeploymentBaseAction):
     deployment_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.deployment_id)
 
     @override
@@ -27,5 +27,5 @@ class SyncReplicaActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -11,7 +11,7 @@ from collections.abc import (
     Sequence,
 )
 from pathlib import Path
-from typing import Any, Optional, Self, cast
+from typing import Any, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -115,9 +115,9 @@ class ComputeSession(BaseFunction):
     all containers belonging to the same compute session.
     """
 
-    id: Optional[UUID]
-    name: Optional[str]
-    owner_access_key: Optional[str]
+    id: UUID | None
+    name: str | None
+    owner_access_key: str | None
     created: bool
     status: str
     service_ports: list[str]
@@ -128,14 +128,14 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: Optional[str] = None,
-        access_key: Optional[str] = None,
+        status: str | None = None,
+        access_key: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of sessions.
@@ -195,37 +195,37 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        priority: Optional[int] = None,
-        starts_at: Optional[str] = None,
+        priority: int | None = None,
+        starts_at: str | None = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[UUID]] = None,
-        callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
-        mount_ids: Optional[list[UUID]] = None,
-        mount_id_map: Optional[Mapping[UUID, str]] = None,
-        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        batch_timeout: Optional[str | int] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
+        dependencies: Sequence[UUID] | None = None,
+        callback_url: str | None = None,
+        mounts: list[str] | None = None,
+        mount_map: Mapping[str, str] | None = None,
+        mount_ids: list[UUID] | None = None,
+        mount_id_map: Mapping[UUID, str] | None = None,
+        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
+        batch_timeout: str | int | None = None,
+        resources: Mapping[str, str | int] | None = None,
+        resource_opts: Mapping[str, str | int] | None = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[list[int]] = None,
-        assign_agent: Optional[list[str]] = None,
-        attach_network: Optional[str] = None,
+        scaling_group: str | None = None,
+        owner_access_key: str | None = None,
+        preopen_ports: list[int] | None = None,
+        assign_agent: list[str] | None = None,
+        attach_network: str | None = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -427,7 +427,7 @@ class ComputeSession(BaseFunction):
         tag: str | Undefined = undefined,
         scaling_group: str | Undefined = undefined,
         owner_access_key: str | Undefined = undefined,
-        _attach_network: Optional[str] = None,  # TODO: Handle this argument properly
+        _attach_network: str | None = None,  # TODO: Handle this argument properly
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.
@@ -563,7 +563,7 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
+    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -639,7 +639,7 @@ class ComputeSession(BaseFunction):
     @api_function
     async def destroy(
         self, *, forced: bool = False, recursive: bool = False
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -755,7 +755,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -853,7 +853,7 @@ class ComputeSession(BaseFunction):
         return result
 
     @api_function
-    async def get_logs(self, kernel_id: Optional[UUID] = None) -> dict[str, Any]:
+    async def get_logs(self, kernel_id: UUID | None = None) -> dict[str, Any]:
         """
         Retrieves the console log of the compute session container.
         """
@@ -912,10 +912,10 @@ class ComputeSession(BaseFunction):
     @api_function
     async def execute(
         self,
-        run_id: Optional[str] = None,
-        code: Optional[str] = None,
+        run_id: str | None = None,
+        code: str | None = None,
         mode: str = "query",
-        opts: Optional[dict] = None,
+        opts: dict | None = None,
     ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -999,7 +999,7 @@ class ComputeSession(BaseFunction):
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         show_progress: bool = False,
     ) -> Any:
         """
@@ -1274,7 +1274,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: Optional[dict] = None
+        self, code: str = "", *, mode: str = "query", opts: dict | None = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1320,9 +1320,9 @@ class InferenceSession(BaseFunction):
     Provides various interactions with inference sessions in Backend.AI.
     """
 
-    id: Optional[UUID]
-    name: Optional[str]
-    owner_access_key: Optional[str]
+    id: UUID | None
+    name: str | None
+    owner_access_key: str | None
     created: bool
     status: str
     service_ports: list[str]
@@ -1340,8 +1340,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        _filter: Optional[str] = None,
-        _order: Optional[str] = None,
+        _filter: str | None = None,
+        _order: str | None = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.
@@ -1380,34 +1380,34 @@ class InferenceSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
         type_: str = SessionTypes.INFERENCE.value,
-        starts_at: Optional[str] = None,
+        starts_at: str | None = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[UUID]] = None,
-        callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
-        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        mount_ids: Optional[list[UUID]] = None,
-        mount_id_map: Optional[Mapping[UUID, str]] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str]] = None,
-        resource_opts: Optional[Mapping[str, str | int | bool]] = None,
+        dependencies: Sequence[UUID] | None = None,
+        callback_url: str | None = None,
+        mounts: list[str] | None = None,
+        mount_map: Mapping[str, str] | None = None,
+        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        mount_ids: list[UUID] | None = None,
+        mount_id_map: Mapping[UUID, str] | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
+        resources: Mapping[str, str] | None = None,
+        resource_opts: Mapping[str, str | int | bool] | None = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = None,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[list[int]] = None,
-        assign_agent: Optional[list[str]] = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = None,
+        scaling_group: str | None = None,
+        owner_access_key: str | None = None,
+        preopen_ports: list[int] | None = None,
+        assign_agent: list[str] | None = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1422,10 +1422,10 @@ class InferenceSession(BaseFunction):
         *,
         name: str | Undefined = undefined,
         type_: str | Undefined = undefined,
-        starts_at: Optional[str] = None,
+        starts_at: str | None = None,
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Optional[Sequence[UUID]] = None,  # cannot be stored in templates
+        dependencies: Sequence[UUID] | None = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: list[str] | Undefined = undefined,
@@ -1449,7 +1449,7 @@ class InferenceSession(BaseFunction):
         """
         raise NotImplementedError
 
-    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
+    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -1513,7 +1513,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if an user has passed the tab key just after the code in
@@ -1546,7 +1546,7 @@ class InferenceSession(BaseFunction):
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         show_progress: bool = False,
     ) -> None:
         """

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -28,11 +28,11 @@ class DeploymentAutoScalingPolicyCreatorSpec(CreatorSpec[DeploymentAutoScalingPo
     endpoint_id: uuid.UUID
     min_replicas: int
     max_replicas: int
-    metric_source: Optional[AutoScalingMetricSource]
-    metric_name: Optional[str]
-    comparator: Optional[AutoScalingMetricComparator]
-    scale_up_threshold: Optional[Decimal]
-    scale_down_threshold: Optional[Decimal]
+    metric_source: AutoScalingMetricSource | None
+    metric_name: str | None
+    comparator: AutoScalingMetricComparator | None
+    scale_up_threshold: Decimal | None
+    scale_down_threshold: Decimal | None
     scale_up_step_size: int
     scale_down_step_size: int
     cooldown_seconds: int

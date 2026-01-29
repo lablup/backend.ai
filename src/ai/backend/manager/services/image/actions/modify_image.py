@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -21,7 +21,7 @@ class ModifyImageAction(ImageAction):
     updater_spec: ImageUpdaterSpec
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -35,7 +35,7 @@ class ModifyImageActionResult(BaseActionResult):
     image: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image.id)
 
 

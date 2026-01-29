@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 from uuid import UUID
 from warnings import deprecated
 
@@ -38,7 +38,7 @@ class Service(BaseFunction):
     @api_function
     @classmethod
     @deprecated("Use paginated_list() instead of this method unless you set the name filter.")
-    async def list(cls, name: Optional[str] = None) -> list[dict[str, Any]]:
+    async def list(cls, name: str | None = None) -> list[dict[str, Any]]:
         params = {}
         if name:
             params["name"] = name
@@ -54,8 +54,8 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult[dict[str, Any]]:
         return await fetch_paginated_result(
             "endpoint_list",
@@ -98,24 +98,24 @@ class Service(BaseFunction):
         domain_name: str,
         group_name: str,
         scaling_group: str,
-        extra_mounts: Optional[Sequence[str]] = None,
-        extra_mount_map: Optional[Mapping[str, str]] = None,
-        extra_mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        service_name: Optional[str] = None,
-        model_version: Optional[str] = None,
-        _dependencies: Optional[Sequence[str]] = None,
-        model_mount_destination: Optional[str] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
+        extra_mounts: Sequence[str] | None = None,
+        extra_mount_map: Mapping[str, str] | None = None,
+        extra_mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        service_name: str | None = None,
+        model_version: str | None = None,
+        _dependencies: Sequence[str] | None = None,
+        model_mount_destination: str | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        owner_access_key: Optional[str] = None,
-        model_definition_path: Optional[str] = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = DEFAULT_IMAGE_ARCH,
+        owner_access_key: str | None = None,
+        model_definition_path: str | None = None,
         expose_to_public: bool = False,
-        runtime_variant: Optional[RuntimeVariant] = None,
+        runtime_variant: RuntimeVariant | None = None,
     ) -> dict[str, Any]:
         """
         Creates an inference service.
@@ -239,18 +239,18 @@ class Service(BaseFunction):
         domain_name: str,
         group_name: str,
         scaling_group: str,
-        service_name: Optional[str] = None,
-        model_version: Optional[str] = None,
-        _dependencies: Optional[Sequence[str]] = None,
-        model_mount_destination: Optional[str] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
+        service_name: str | None = None,
+        model_version: str | None = None,
+        _dependencies: Sequence[str] | None = None,
+        model_mount_destination: str | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        owner_access_key: Optional[str] = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = DEFAULT_IMAGE_ARCH,
+        owner_access_key: str | None = None,
         expose_to_public: bool = False,
     ) -> dict[str, Any]:
         """

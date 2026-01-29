@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from importlib import import_module
 from types import FunctionType
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -29,7 +29,7 @@ class LazyClickMixin:
     """
 
     _import_name: str
-    _loaded_impl: Optional[click.Command | click.Group]
+    _loaded_impl: click.Command | click.Group | None
 
     def __init__(self, *, import_name: str, **kwargs) -> None:
         self._import_name = import_name
@@ -63,9 +63,7 @@ class EnumChoice(click.Choice):
         super().__init__(enum_members)
         self.enum = enum
 
-    def convert(
-        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
-    ) -> Enum:
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> Enum:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
             return next(e for e in self.enum if e == value)
@@ -83,7 +81,7 @@ class MinMaxRangeParamType(click.ParamType):
     name = "min-max decimal range"
 
     def convert(
-        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
+        self, value: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> tuple[Decimal | None, Decimal | None]:
         try:
             left, _, right = value.partition(":")

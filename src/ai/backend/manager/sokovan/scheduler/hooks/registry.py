@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -70,7 +70,7 @@ class HookRegistry:
         )
         self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
 
-    def get_hook(self, status: SessionStatus) -> Optional[StatusTransitionHook]:
+    def get_hook(self, status: SessionStatus) -> StatusTransitionHook | None:
         """Get the hook for a specific status transition.
 
         Args:

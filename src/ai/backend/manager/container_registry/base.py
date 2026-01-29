@@ -11,7 +11,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Optional,
     cast,
 )
 
@@ -50,7 +49,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
-progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
+progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
@@ -266,7 +265,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         )
         rqst_args["headers"].update(**self.base_hdrs)
         tags = []
-        tag_list_url: Optional[yarl.URL]
+        tag_list_url: yarl.URL | None
         tag_list_url = (self.registry_url / f"v2/{image}/tags/list").with_query(
             {"n": "10"},
         )
@@ -622,7 +621,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         image: str,
         tag: str,
         manifests: dict[str, dict],
-        skip_reason: Optional[str] = None,
+        skip_reason: str | None = None,
     ) -> None:
         """
         Detects if image is compatible with Backend.AI and injects the matadata to database if it complies.

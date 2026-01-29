@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, NewType, Optional, TypedDict
+from typing import Any, NewType, TypedDict
 
 import aiohttp
 import jwt
@@ -141,9 +141,9 @@ class VASTAPIClient:
     password: str
     ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
-    _cache: Optional[Cache]
+    _cache: Cache | None
 
-    _auth_token: Optional[TokenPair]
+    _auth_token: TokenPair | None
 
     def __init__(
         self,
@@ -252,8 +252,8 @@ class VASTAPIClient:
         sess: aiohttp.ClientSession,
         method: RequestMethod,
         path: str,
-        body: Optional[Mapping[str, Any]] = None,
-        params: Optional[Mapping[str, Any]] = None,
+        body: Mapping[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> aiohttp.ClientResponse:
         await self._validate_token()
 
@@ -296,7 +296,7 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
 
-    async def list_quotas(self, qname: Optional[str] = None) -> list[VASTQuota]:
+    async def list_quotas(self, qname: str | None = None) -> list[VASTQuota]:
         if qname is not None:
             params = {"name": qname}
         else:
@@ -438,7 +438,7 @@ class VASTAPIClient:
             if response.status == 404:
                 raise VASTNotFoundError
 
-    async def get_cluster_info(self, cluster_id: int) -> Optional[VASTClusterInfo]:
+    async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
         current_time = time.time()
         if (cached := self._cache) is not None:
             if current_time - cached.timestamp < self._cache_ttl:

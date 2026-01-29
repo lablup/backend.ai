@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 import strawberry
@@ -73,14 +73,14 @@ class ProjectFairShareGQL(Node):
     async def user_fair_shares(
         self,
         info: Info,
-        filter: Optional[UserFairShareFilter] = None,
-        order_by: Optional[list[UserFairShareOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: UserFairShareFilter | None = None,
+        order_by: list[UserFairShareOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> UserFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher import fetch_user_fair_shares
         from ai.backend.manager.repositories.fair_share.options import UserFairShareConditions
@@ -155,7 +155,7 @@ class ProjectFairShareConnection(Connection[ProjectFairShareGQL]):
 class ProjectFairShareFilter(GQLFilter):
     """Filter for project fair shares."""
 
-    resource_group: Optional[StringFilter] = strawberry.field(
+    resource_group: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define resource pool boundaries "
@@ -163,14 +163,14 @@ class ProjectFairShareFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
-    project_id: Optional[UUIDFilter] = strawberry.field(
+    project_id: UUIDFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by project UUID. Projects are containers for sessions and user activities. "
             "Supports equals operation for exact match or 'in' operation for multiple UUIDs."
         ),
     )
-    domain_name: Optional[StringFilter] = strawberry.field(
+    domain_name: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by domain name. This filters projects belonging to a specific domain. "
@@ -178,15 +178,15 @@ class ProjectFairShareFilter(GQLFilter):
         ),
     )
 
-    AND: Optional[list[ProjectFairShareFilter]] = strawberry.field(
+    AND: list[ProjectFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: Optional[list[ProjectFairShareFilter]] = strawberry.field(
+    OR: list[ProjectFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: Optional[list[ProjectFairShareFilter]] = strawberry.field(
+    NOT: list[ProjectFairShareFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.data.fair_share import (
@@ -41,7 +41,7 @@ class GetDomainFairShareAction(DomainFairShareAction):
         return "get"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.domain_name}"
 
 
@@ -52,7 +52,7 @@ class GetDomainFairShareActionResult(BaseActionResult):
     data: DomainFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -70,7 +70,7 @@ class SearchDomainFairSharesAction(DomainFairShareAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -82,7 +82,7 @@ class SearchDomainFairSharesActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -112,7 +112,7 @@ class GetProjectFairShareAction(ProjectFairShareAction):
         return "get"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.project_id}"
 
 
@@ -123,7 +123,7 @@ class GetProjectFairShareActionResult(BaseActionResult):
     data: ProjectFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -141,7 +141,7 @@ class SearchProjectFairSharesAction(ProjectFairShareAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -153,7 +153,7 @@ class SearchProjectFairSharesActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -184,7 +184,7 @@ class GetUserFairShareAction(UserFairShareAction):
         return "get"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
 
 
@@ -195,7 +195,7 @@ class GetUserFairShareActionResult(BaseActionResult):
     data: UserFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -213,7 +213,7 @@ class SearchUserFairSharesAction(UserFairShareAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -225,7 +225,7 @@ class SearchUserFairSharesActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -246,7 +246,7 @@ class UpsertDomainFairShareWeightAction(DomainFairShareAction):
         return "upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.domain_name}"
 
 
@@ -257,7 +257,7 @@ class UpsertDomainFairShareWeightActionResult(BaseActionResult):
     data: DomainFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -276,7 +276,7 @@ class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
         return "upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.project_id}"
 
 
@@ -287,7 +287,7 @@ class UpsertProjectFairShareWeightActionResult(BaseActionResult):
     data: ProjectFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -307,7 +307,7 @@ class UpsertUserFairShareWeightAction(UserFairShareAction):
         return "upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
 
 
@@ -318,7 +318,7 @@ class UpsertUserFairShareWeightActionResult(BaseActionResult):
     data: UserFairShareData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)
 
 
@@ -346,7 +346,7 @@ class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
         return "bulk_upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:[{len(self.inputs)} domains]"
 
 
@@ -357,7 +357,7 @@ class BulkUpsertDomainFairShareWeightActionResult(BaseActionResult):
     upserted_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"[{self.upserted_count} domains]"
 
 
@@ -383,7 +383,7 @@ class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
         return "bulk_upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:[{len(self.inputs)} projects]"
 
 
@@ -394,7 +394,7 @@ class BulkUpsertProjectFairShareWeightActionResult(BaseActionResult):
     upserted_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"[{self.upserted_count} projects]"
 
 
@@ -421,7 +421,7 @@ class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
         return "bulk_upsert_weight"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"{self.resource_group}:[{len(self.inputs)} users]"
 
 
@@ -432,5 +432,5 @@ class BulkUpsertUserFairShareWeightActionResult(BaseActionResult):
     upserted_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return f"[{self.upserted_count} users]"

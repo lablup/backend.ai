@@ -169,7 +169,6 @@ ignore = [
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # UP (pyupgrade) - defer large-scale changes for gradual adoption
     "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
-    "UP045",  # non-pep604-annotation-optional - Optional[X] -> X | None (5392 violations, defer)
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)

@@ -12,7 +12,7 @@ from .extensions import pass_ctx_obj
 from .types import CLIContext
 
 if TYPE_CHECKING:
-    from typing import Optional
+    pass
 
 
 @click.group()
@@ -96,7 +96,7 @@ def create_deployment_cmd(
 @click.option("--offset", type=int, default=0, help="Number of items to skip")
 def list_deployments_cmd(
     ctx: CLIContext,
-    project_id: Optional[str],
+    project_id: str | None,
     limit: int,
     offset: int,
 ) -> None:
@@ -166,8 +166,8 @@ def info_deployment_cmd(ctx: CLIContext, deployment_id: str) -> None:
 def update_deployment_cmd(
     ctx: CLIContext,
     deployment_id: str,
-    name: Optional[str],
-    replicas: Optional[int],
+    name: str | None,
+    replicas: int | None,
 ) -> None:
     """Update a deployment."""
     import json
@@ -448,7 +448,7 @@ def update_route_traffic_cmd(
     ctx: CLIContext,
     deployment_id: str,
     route_id: str,
-    traffic_status: Optional[str],
+    traffic_status: str | None,
 ) -> None:
     """Update route traffic status."""
     import json

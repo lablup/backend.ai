@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.repositories.base import CreatorSpec
@@ -14,7 +14,7 @@ class HuggingFaceRegistryCreatorSpec(CreatorSpec[HuggingFaceRegistryRow]):
     """CreatorSpec for HuggingFace registry creation."""
 
     url: str
-    token: Optional[str] = None
+    token: str | None = None
 
     @override
     def build_row(self) -> HuggingFaceRegistryRow:

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -9,7 +9,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 @dataclass
 class ListHuggingFaceRegistryAction(ArtifactRegistryAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -23,5 +23,5 @@ class ListHuggingFaceRegistryActionResult(BaseActionResult):
     data: list[HuggingFaceRegistryData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

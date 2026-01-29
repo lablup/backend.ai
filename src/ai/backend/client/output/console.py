@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from tabulate import tabulate
 
@@ -22,7 +22,7 @@ class NoItems(Exception):
 class ConsoleOutputHandler(BaseOutputHandler):
     def print_item(
         self,
-        item: Optional[_Item],
+        item: _Item | None,
         fields: Sequence[FieldSpec],
     ) -> None:
         if item is None:
@@ -146,7 +146,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         self,
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
-        page_size: Optional[int] = None,
+        page_size: int | None = None,
         plain: bool = False,
     ) -> None:
         fields: list[FieldSpec] = []
@@ -197,8 +197,8 @@ class ConsoleOutputHandler(BaseOutputHandler):
     def print_mutation_result(
         self,
         item: _Item,
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         t = [
@@ -219,10 +219,10 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_mutation_error(
         self,
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
         msg: str = "Failed",
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         t = [

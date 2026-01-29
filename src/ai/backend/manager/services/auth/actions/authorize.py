@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from aiohttp import web
 
@@ -16,10 +16,10 @@ class AuthorizeAction(AuthAction):
     domain_name: str
     email: str
     password: str
-    stoken: Optional[str]
+    stoken: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -41,9 +41,9 @@ class AuthorizeAction(AuthAction):
 
 @dataclass
 class AuthorizeActionResult(BaseActionResult):
-    stream_response: Optional[web.StreamResponse]
-    authorization_result: Optional[AuthorizationResult]
+    stream_response: web.StreamResponse | None
+    authorization_result: AuthorizationResult | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.authorization_result.user_id) if self.authorization_result else None

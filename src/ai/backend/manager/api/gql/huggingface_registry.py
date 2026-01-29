@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -49,7 +49,7 @@ class HuggingFaceRegistry(Node):
     id: NodeID[str]
     url: str
     name: str
-    token: Optional[str]
+    token: str | None
 
     @classmethod
     def from_dataclass(cls, data: HuggingFaceRegistryData) -> Self:
@@ -90,7 +90,7 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
 @strawberry.field(description="Added in 25.14.0")
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
-) -> Optional[HuggingFaceRegistry]:
+) -> HuggingFaceRegistry | None:
     processors = info.context.processors
     action_result = await processors.artifact_registry.get_huggingface_registry.wait_for_complete(
         GetHuggingFaceRegistryAction(registry_id=uuid.UUID(id))
@@ -101,12 +101,12 @@ async def huggingface_registry(
 @strawberry.field(description="Added in 25.14.0")
 async def huggingface_registries(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    offset: int | None = None,
+    limit: int | None = None,
 ) -> HuggingFaceRegistryConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
@@ -136,7 +136,7 @@ async def huggingface_registries(
 class CreateHuggingFaceRegistryInput:
     url: str
     name: str
-    token: Optional[str] = None
+    token: str | None = None
 
     def to_creator(self) -> Creator[HuggingFaceRegistryRow]:
         return Creator(spec=HuggingFaceRegistryCreatorSpec(url=self.url, token=self.token))
@@ -148,9 +148,9 @@ class CreateHuggingFaceRegistryInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateHuggingFaceRegistryInput:
     id: ID
-    url: Optional[str] = UNSET
-    name: Optional[str] = UNSET
-    token: Optional[str] = UNSET
+    url: str | None = UNSET
+    name: str | None = UNSET
+    token: str | None = UNSET
 
     def to_updater(self) -> Updater[HuggingFaceRegistryRow]:
         spec = HuggingFaceRegistryUpdaterSpec(

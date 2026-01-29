@@ -2,7 +2,6 @@ import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from typing import Optional
 
 from ai.backend.common.events.hub.hub import EventPropagator
 from ai.backend.common.events.types import AbstractEvent
@@ -17,7 +16,7 @@ class AsyncBypassPropagator(EventPropagator):
     """
 
     _id: uuid.UUID
-    _queue: asyncio.Queue[Optional[AbstractEvent]]
+    _queue: asyncio.Queue[AbstractEvent | None]
     _closed: bool = False
 
     def __init__(self) -> None:

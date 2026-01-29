@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactData
@@ -13,7 +13,7 @@ class UpdateArtifactAction(ArtifactAction):
     updater: Updater[ArtifactRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
     @override
@@ -27,5 +27,5 @@ class UpdateArtifactActionResult(BaseActionResult):
     result: ArtifactData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

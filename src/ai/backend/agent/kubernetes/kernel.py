@@ -6,7 +6,7 @@ import shutil
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional, override
+from typing import Any, override
 
 import pkg_resources
 import zmq
@@ -422,7 +422,7 @@ class KubernetesCodeRunner(AbstractCodeRunner):
 
 async def prepare_krunner_env_impl(
     distro: str, entrypoint_name: str, root_path: str
-) -> tuple[str, Optional[str]]:
+) -> tuple[str, str | None]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(

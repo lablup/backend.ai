@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
@@ -12,7 +12,7 @@ class SearchDeploymentsAction(DeploymentBaseAction):
     querier: BatchQuerier
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,5 +29,5 @@ class SearchDeploymentsActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

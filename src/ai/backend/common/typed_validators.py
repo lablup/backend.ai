@@ -5,7 +5,7 @@ import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, Optional, TypeVar
+from typing import Annotated, Any, ClassVar, Final, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -356,7 +356,7 @@ class AutoDirectoryPath(DirectoryPath):
 
 
 class UserID(int):
-    _default_uid: Optional[int] = None
+    _default_uid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
@@ -407,7 +407,7 @@ class UserID(int):
 
 
 class GroupID(int):
-    _default_gid: Optional[int] = None
+    _default_gid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
@@ -462,7 +462,7 @@ TItem = TypeVar("TItem")
 
 class DelimiterSeparatedList(list[TItem]):
     delimiter: str = ","
-    min_length: Optional[int] = None
+    min_length: int | None = None
     empty_str_as_empty_list: bool = False
 
     @classmethod

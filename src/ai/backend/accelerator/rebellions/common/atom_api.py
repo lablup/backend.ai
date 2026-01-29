@@ -1,6 +1,5 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Optional
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -56,7 +55,7 @@ class ATOMContext(DataClassJsonMixin):
 class ATOMStat(DataClassJsonMixin):
     KMD_version: str
     devices: list[ATOMDeviceStat]
-    contexts: Optional[list[ATOMContext]] = None
+    contexts: list[ATOMContext] | None = None
 
 
 class ATOMAPI:

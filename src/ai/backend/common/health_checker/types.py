@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NewType, Optional
+from typing import NewType
 
 # Service group is a string identifier with type safety
 # Allows components to define their own service groups while maintaining type safety
@@ -68,7 +68,7 @@ class ComponentHealthStatus:
 
     is_healthy: bool
     last_checked_at: datetime
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 @dataclass

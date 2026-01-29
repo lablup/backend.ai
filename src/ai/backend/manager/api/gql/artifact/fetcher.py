@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
-from typing import Optional
 
 import strawberry
 from aiotools import apartial
@@ -86,15 +85,15 @@ async def get_registry_url(
 
 async def fetch_artifact_revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactRevisionFilter] = None,
-    order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: ArtifactRevisionFilter | None = None,
+    order_by: list[ArtifactRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> ArtifactRevisionConnection:
     """Fetch artifact revisions with optional filtering, ordering, and pagination.
 
@@ -152,14 +151,14 @@ async def fetch_artifact_revisions(
 
 async def fetch_artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter],
-    order_by: Optional[list[ArtifactOrderBy]],
-    before: Optional[str],
-    after: Optional[str],
-    first: Optional[int],
-    last: Optional[int],
-    limit: Optional[int],
-    offset: Optional[int],
+    filter: ArtifactFilter | None,
+    order_by: list[ArtifactOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
 ) -> ArtifactConnection:
     """
     Fetch artifacts with optional filtering, ordering, and pagination.
@@ -216,7 +215,7 @@ async def fetch_artifacts(
 async def fetch_artifact(
     info: Info[StrawberryGQLContext],
     artifact_id: uuid.UUID,
-) -> Optional[Artifact]:
+) -> Artifact | None:
     """
     Fetch a specific artifact by its ID.
     """
@@ -241,7 +240,7 @@ async def fetch_artifact(
 async def fetch_artifact_revision(
     info: Info[StrawberryGQLContext],
     artifact_revision_id: uuid.UUID,
-) -> Optional[ArtifactRevision]:
+) -> ArtifactRevision | None:
     """
     Fetch a specific artifact revision by its ID.
     """

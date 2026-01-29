@@ -11,7 +11,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Concatenate,
-    Optional,
     ParamSpec,
     TypeVar,
     cast,
@@ -576,7 +575,7 @@ def sql_json_increment(
     col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
     key: tuple[str, ...],
     *,
-    parent_updates: Optional[Mapping[str, Any]] = None,
+    parent_updates: Mapping[str, Any] | None = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """

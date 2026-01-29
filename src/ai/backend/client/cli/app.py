@@ -3,7 +3,7 @@ import json
 import shlex
 import sys
 from collections.abc import MutableMapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import click
@@ -137,8 +137,8 @@ class ProxyRunnerContext:
     port: int
     args: dict[str, None | str | list[str]]
     envs: dict[str, str]
-    api_session: Optional[AsyncSession]
-    local_server: Optional[asyncio.AbstractServer]
+    api_session: AsyncSession | None
+    local_server: asyncio.AbstractServer | None
     exit_code: int
 
     def __init__(
@@ -149,8 +149,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Optional[Sequence[str]] = None,
-        envs: Optional[Sequence[str]] = None,
+        args: Sequence[str] | None = None,
+        envs: Sequence[str] | None = None,
     ) -> None:
         self.host = host
         self.port = port

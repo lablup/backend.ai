@@ -1,6 +1,5 @@
 from collections.abc import Iterator, Mapping
 from http import HTTPStatus
-from typing import Optional
 from unittest import mock
 from unittest.mock import AsyncMock
 from uuid import UUID
@@ -13,9 +12,7 @@ from ai.backend.client.config import API_VERSION, APIConfig
 from ai.backend.client.session import Session
 
 
-def build_url(
-    config: APIConfig, path: str, params: Optional[Mapping[str, str | int]] = None
-) -> URL:
+def build_url(config: APIConfig, path: str, params: Mapping[str, str | int] | None = None) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = f"{base_url}/{query_path}"

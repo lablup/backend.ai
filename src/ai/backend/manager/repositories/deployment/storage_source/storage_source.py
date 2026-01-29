@@ -1,7 +1,5 @@
 """Storage source implementation for deployment repository."""
 
-from typing import Optional
-
 import tomli
 
 from ai.backend.common.types import VFolderID
@@ -22,7 +20,7 @@ class DeploymentStorageSource:
     async def fetch_service_config(
         self,
         model_vfolder: VFolderLocation,
-    ) -> Optional[ModelServiceDefinition]:
+    ) -> ModelServiceDefinition | None:
         """
         Fetch and parse service-definition.toml from model vfolder.
 

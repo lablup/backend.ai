@@ -6,7 +6,6 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -52,15 +51,15 @@ class RoleDTO(BaseModel):
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
-    deleted_at: Optional[datetime] = Field(default=None, description="Deletion timestamp")
-    description: Optional[str] = Field(default=None, description="Role description")
+    deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
+    description: str | None = Field(default=None, description="Role description")
 
 
 class AssignedUserDTO(BaseModel):
     """DTO for user assigned to a role."""
 
     user_id: UUID = Field(description="User ID")
-    granted_by: Optional[UUID] = Field(default=None, description="ID of user who granted this role")
+    granted_by: UUID | None = Field(default=None, description="ID of user who granted this role")
     granted_at: datetime = Field(description="Timestamp when the role was granted")
 
 
@@ -69,7 +68,7 @@ class PaginationInfo(BaseModel):
 
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
+    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class CreateRoleResponse(BaseResponseModel):
@@ -108,7 +107,7 @@ class AssignRoleResponse(BaseResponseModel):
 
     user_id: UUID = Field(description="User ID")
     role_id: UUID = Field(description="Role ID")
-    granted_by: Optional[UUID] = Field(default=None, description="ID of user who granted the role")
+    granted_by: UUID | None = Field(default=None, description="ID of user who granted the role")
 
 
 class RevokeRoleResponse(BaseResponseModel):

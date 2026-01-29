@@ -1,6 +1,6 @@
 import enum
 from collections.abc import Mapping
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -43,7 +43,7 @@ class OrderingItem(NamedTuple):
 
 class QueryOrderTransformer(Transformer):
     def __init__(
-        self, sa_table: sa.Table | sa.sql.Join | type, column_map: Optional[ColumnMapType] = None
+        self, sa_table: sa.Table | sa.sql.Join | type, column_map: ColumnMapType | None = None
     ) -> None:
         super().__init__()
         self._sa_table = sa_table
@@ -88,7 +88,7 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: Optional[ColumnMapType] = None) -> None:
+    def __init__(self, column_map: ColumnMapType | None = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 

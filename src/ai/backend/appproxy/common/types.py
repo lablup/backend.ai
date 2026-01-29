@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import (
     Annotated,
     Any,
-    Optional,
     TypeVar,
 )
 from uuid import UUID
@@ -98,7 +97,7 @@ class RouteInfo(BaseModel):
     """
 
     route_id: Annotated[
-        Optional[UUID],
+        UUID | None,
         Field(
             default=None,
             description="Unique identifier for the route. If None, indicates a temporary route.",
@@ -116,7 +115,7 @@ class RouteInfo(BaseModel):
         ),
     ]
     session_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             description="Name of the session associated with this route.",
@@ -125,7 +124,7 @@ class RouteInfo(BaseModel):
         ),
     ]
     kernel_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             ...,
             description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",

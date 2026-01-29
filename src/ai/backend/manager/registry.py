@@ -17,7 +17,6 @@ from decimal import Decimal
 from typing import (
     Any,
     Literal,
-    Optional,
     cast,
 )
 
@@ -373,14 +372,14 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
-        bootstrap_script: Optional[str] = None,
-        dependencies: Optional[list[uuid.UUID]] = None,
-        startup_command: Optional[str] = None,
-        starts_at_timestamp: Optional[str] = None,
-        batch_timeout: Optional[timedelta] = None,
-        tag: Optional[str] = None,
-        callback_url: Optional[yarl.URL] = None,
-        route_id: Optional[uuid.UUID] = None,
+        bootstrap_script: str | None = None,
+        dependencies: list[uuid.UUID] | None = None,
+        startup_command: str | None = None,
+        starts_at_timestamp: str | None = None,
+        batch_timeout: timedelta | None = None,
+        tag: str | None = None,
+        callback_url: yarl.URL | None = None,
+        route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
@@ -800,7 +799,7 @@ class AgentRegistry:
                 )
 
         session_creation_id = secrets.token_urlsafe(16)
-        kernel_id: Optional[KernelId] = None
+        kernel_id: KernelId | None = None
         current_task = asyncio.current_task()
         if current_task is None:
             raise NoCurrentTaskContext("No current task context")
@@ -906,7 +905,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: Optional[str],
+        scaling_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict,
         *,
@@ -915,14 +914,14 @@ class AgentRegistry:
         public_sgroup_only: bool,
         cluster_mode: ClusterMode,
         cluster_size: int,
-        session_tag: Optional[str],
-        internal_data: Optional[dict],
-        starts_at: Optional[datetime],
-        batch_timeout: Optional[timedelta],
-        agent_list: Optional[Sequence[str]],
-        dependency_sessions: Optional[Sequence[SessionId]],
-        callback_url: Optional[URL],
-        route_id: Optional[uuid.UUID],
+        session_tag: str | None,
+        internal_data: dict | None,
+        starts_at: datetime | None,
+        batch_timeout: timedelta | None,
+        agent_list: Sequence[str] | None,
+        dependency_sessions: Sequence[SessionId] | None,
+        callback_url: URL | None,
+        route_id: uuid.UUID | None,
         sudo_session_enabled: bool,
         network: NetworkRow | None,
         startup_command: str | None,
@@ -969,7 +968,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: Optional[str],
+        scaling_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict,
         *,
@@ -978,14 +977,14 @@ class AgentRegistry:
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
-        session_tag: Optional[str] = None,
-        internal_data: Optional[dict] = None,
-        starts_at: Optional[datetime] = None,
-        batch_timeout: Optional[timedelta] = None,
-        agent_list: Optional[Sequence[str]] = None,
-        dependency_sessions: Optional[Sequence[SessionId]] = None,
-        callback_url: Optional[URL] = None,
-        route_id: Optional[uuid.UUID] = None,
+        session_tag: str | None = None,
+        internal_data: dict | None = None,
+        starts_at: datetime | None = None,
+        batch_timeout: timedelta | None = None,
+        agent_list: Sequence[str] | None = None,
+        dependency_sessions: Sequence[SessionId] | None = None,
+        callback_url: URL | None = None,
+        route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
         startup_command: str | None = None,
@@ -1061,7 +1060,7 @@ class AgentRegistry:
         }
 
     async def get_user_occupancy(
-        self, user_id: uuid.UUID, *, db_sess: Optional[AsyncSession] = None
+        self, user_id: uuid.UUID, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
@@ -1084,7 +1083,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_keypair_occupancy(
-        self, access_key: AccessKey, *, db_sess: Optional[AsyncSession] = None
+        self, access_key: AccessKey, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
@@ -1112,7 +1111,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_domain_occupancy(
-        self, domain_name: str, *, db_sess: Optional[AsyncSession] = None
+        self, domain_name: str, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
@@ -1142,7 +1141,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_group_occupancy(
-        self, group_id: uuid.UUID, *, db_sess: Optional[AsyncSession] = None
+        self, group_id: uuid.UUID, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
@@ -1402,7 +1401,7 @@ class AgentRegistry:
         session: SessionRow,
         *,
         forced: bool = False,
-        reason: Optional[KernelLifecycleEventReason] = None,
+        reason: KernelLifecycleEventReason | None = None,
         user_role: UserRole | None = None,
     ) -> Mapping[str, Any]:
         """
@@ -1765,7 +1764,7 @@ class AgentRegistry:
                             session.id,
                         )
                     for kernel in destroyed_kernels:
-                        last_stat: Optional[dict[str, Any]]
+                        last_stat: dict[str, Any] | None
                         last_stat = None
                         try:
                             last_stat = await self.valkey_stat.get_kernel_statistics(
@@ -1971,7 +1970,7 @@ class AgentRegistry:
         code: str,
         opts: Mapping[str, Any],
         *,
-        flush_timeout: Optional[float] = None,
+        flush_timeout: float | None = None,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
             # The agent aggregates at most 2 seconds of outputs
@@ -2207,7 +2206,7 @@ class AgentRegistry:
         kernel_id: KernelId,
         session_id: SessionId,
         reason: str,
-        exit_code: Optional[int] = None,
+        exit_code: int | None = None,
     ) -> None:
         """
         Mark the kernel (individual worker) terminated and release
@@ -2376,7 +2375,7 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-    ) -> Optional[AbuseReport]:
+    ) -> AbuseReport | None:
         kern_id = str(kernel_id)
         result = await self.valkey_stat.get_abuse_report(kern_id)
         if result is None:

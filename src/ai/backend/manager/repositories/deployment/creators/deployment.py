@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
 import yarl
 
@@ -37,8 +37,8 @@ class DeploymentMetadataFields:
     created_user_id: uuid.UUID
     session_owner_id: uuid.UUID
     revision_history_limit: int = 10
-    tag: Optional[str] = None
-    created_at: Optional[datetime] = None
+    tag: str | None = None
+    created_at: datetime | None = None
 
 
 @dataclass
@@ -49,7 +49,7 @@ class DeploymentReplicaFields:
     """
 
     replica_count: int
-    desired_replica_count: Optional[int] = None
+    desired_replica_count: int | None = None
 
 
 @dataclass
@@ -60,7 +60,7 @@ class DeploymentNetworkFields:
     """
 
     open_to_public: bool = False
-    url: Optional[str] = None
+    url: str | None = None
 
 
 @dataclass
@@ -73,7 +73,7 @@ class DeploymentResourceFields:
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: ResourceSlot
-    resource_opts: Optional[Mapping[str, Any]] = None
+    resource_opts: Mapping[str, Any] | None = None
 
 
 @dataclass
@@ -83,9 +83,9 @@ class DeploymentMountFields:
     Corresponds to VFolderMountsCreator in data layer.
     """
 
-    model_vfolder_id: Optional[uuid.UUID]
+    model_vfolder_id: uuid.UUID | None
     model_mount_destination: str = "/models"
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
     extra_mounts: Sequence[VFolderMount] = ()
 
 
@@ -97,10 +97,10 @@ class DeploymentExecutionFields:
     """
 
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    environ: Optional[Mapping[str, str]] = None
-    callback_url: Optional[yarl.URL] = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    environ: Mapping[str, str] | None = None
+    callback_url: yarl.URL | None = None
 
 
 @dataclass

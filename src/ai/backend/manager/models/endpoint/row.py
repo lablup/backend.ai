@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -370,9 +369,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_tokens: bool = False,
         load_image: bool = False,
@@ -414,9 +413,9 @@ class EndpointRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -453,9 +452,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         endpoint_ids: Sequence[EndpointId],
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -494,9 +493,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         model_id: UUID,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -956,9 +955,9 @@ class EndpointTokenRow(Base):
         session: AsyncSession,
         endpoint_id: UUID,
         *,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_endpoint: bool = False,
     ) -> Sequence[Self]:
         query = (
@@ -983,9 +982,9 @@ class EndpointTokenRow(Base):
         session: AsyncSession,
         token: str,
         *,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_endpoint: bool = False,
     ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
@@ -1185,8 +1184,8 @@ class EndpointAutoScalingRuleRow(Base):
     def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
         """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
         # Map threshold + comparator back to min/max threshold
-        min_threshold: Optional[Decimal] = None
-        max_threshold: Optional[Decimal] = None
+        min_threshold: Decimal | None = None
+        max_threshold: Decimal | None = None
 
         if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
             max_threshold = self.threshold

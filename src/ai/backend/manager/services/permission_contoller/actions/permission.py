@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -21,7 +21,7 @@ class CreatePermissionAction(PermissionAction):
     creator: Creator[PermissionRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -40,7 +40,7 @@ class CreatePermissionActionResult(BaseActionResult):
     data: PermissionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data else None
 
 
@@ -49,7 +49,7 @@ class DeletePermissionAction(PermissionAction):
     purger: Purger[PermissionRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.purger.pk_value)
 
     @override
@@ -68,5 +68,5 @@ class DeletePermissionActionResult(BaseActionResult):
     data: PermissionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

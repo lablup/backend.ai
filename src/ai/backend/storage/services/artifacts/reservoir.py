@@ -7,7 +7,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, Optional, cast, override
+from typing import Any, Final, cast, override
 
 import aiofiles
 import aiohttp
@@ -87,7 +87,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
             yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         # Guess content type from file extension
         content_type, _ = mimetypes.guess_type(self._filepath)
         return content_type or "application/octet-stream"
@@ -102,7 +102,7 @@ class ReservoirVFSFileDownloader:
     _model_id: str
     _revision: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
+    _progress_task: asyncio.Task[None] | None
     _bytes_downloaded: int
 
     def __init__(
@@ -252,12 +252,12 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
     _size: int
     _options: BucketCopyOptions
     _download_chunk_size: int
-    _content_type: Optional[str]
+    _content_type: str | None
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
+    _progress_task: asyncio.Task[None] | None
 
     def __init__(
         self,
@@ -266,7 +266,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
         size: int,
         options: BucketCopyOptions,
         download_chunk_size: int,
-        content_type: Optional[str],
+        content_type: str | None,
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
@@ -389,7 +389,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                 log.warning(f"Failed to update final status in Redis: {redis_err}")
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type
 
 
@@ -430,7 +430,7 @@ class ReservoirService:
         self,
         registry_name: str,
         artifact_revision_id: uuid.UUID,
-    ) -> Optional[VerificationStepResult]:
+    ) -> VerificationStepResult | None:
         """
         Fetch verification result from remote reservoir manager.
 
@@ -471,7 +471,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
-        storage_prefix: Optional[str] = None,
+        storage_prefix: str | None = None,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -488,7 +488,7 @@ class ReservoirService:
                 If "/", stores files at root.
         """
         success = False
-        verification_result: Optional[VerificationStepResult] = None
+        verification_result: VerificationStepResult | None = None
         try:
             if model.revision is None:
                 raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
@@ -533,7 +533,7 @@ class ReservoirService:
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
-        storage_prefix: Optional[str] = None,
+        storage_prefix: str | None = None,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -874,8 +874,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         options: BucketCopyOptions,
         model_id: str,
         revision: str,
-        progress_reporter: Optional[ProgressReporter],
-        key_prefix: Optional[str] = None,
+        progress_reporter: ProgressReporter | None,
+        key_prefix: str | None = None,
     ) -> tuple[list[tuple[FileObjectData, str]], int]:
         """Direct copy from Reservoir S3 to target storage"""
         dst_client, bucket_name = self._get_s3_client(storage_pool, storage_name)
@@ -997,7 +997,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         self,
         *,
         s3_client: S3Client,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
     ) -> tuple[list[str], dict[str, int], int]:
         """
         List all non-marker object keys in the given bucket (optionally under a prefix).

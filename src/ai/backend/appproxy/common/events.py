@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from pydantic import TypeAdapter
 
@@ -37,11 +37,11 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return ",".join([str(c.id) for c in self.circuits])
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -77,11 +77,11 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.circuit.id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -106,11 +106,11 @@ class GenericWorkerEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return self.worker_id
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -168,11 +168,11 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -195,11 +195,11 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -222,9 +222,9 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

@@ -3,7 +3,6 @@ from __future__ import annotations
 from base64 import b64encode
 from typing import (
     TYPE_CHECKING,
-    Optional,
     Self,
 )
 
@@ -33,7 +32,7 @@ class Viewer(graphene.ObjectType):
         return b64encode(role.encode()).decode()
 
     @classmethod
-    async def get_viewer(cls, info: graphene.ResolveInfo) -> Optional[Self]:
+    async def get_viewer(cls, info: graphene.ResolveInfo) -> Self | None:
         user = current_user()
         if user is None:
             return None

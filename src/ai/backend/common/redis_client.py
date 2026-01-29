@@ -3,7 +3,7 @@ import logging
 import socket
 from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 import hiredis
 
@@ -212,8 +212,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _redis_target: RedisTarget
     _db: int
 
-    _socket_timeout: Optional[float]
-    _socket_connect_timeout: Optional[float]
+    _socket_timeout: float | None
+    _socket_connect_timeout: float | None
     _keepalive_options: dict[int, int]
 
     def __init__(
@@ -221,8 +221,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
         redis_target: RedisTarget,
         *,
         db: int = 0,
-        socket_timeout: Optional[float] = 5.0,
-        socket_connect_timeout: Optional[float] = 2.0,
+        socket_timeout: float | None = 5.0,
+        socket_connect_timeout: float | None = 2.0,
         keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
         self._redis_target = redis_target

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -56,8 +56,8 @@ class MigrationFolderInfo(TypedDict):
     quota_scope_id: str
     src_path: Path
     dst_path: Path
-    current_size: Optional[int]
-    old_quota: Optional[int]
+    current_size: int | None
+    old_quota: int | None
 
 
 class VFolderMigrationStatus(enum.StrEnum):
@@ -107,7 +107,7 @@ async def upgrade_2_to_3(
     dsn: str,
     volume: AbstractVolume,
     outfile: str,
-    report_path: Optional[Path] = None,
+    report_path: Path | None = None,
     force_scan_folder_size: bool = False,
 ) -> None:
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
@@ -131,7 +131,7 @@ async def upgrade_2_to_3(
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
-            old_quota_map: dict[UUID, Optional[int]] = {}
+            old_quota_map: dict[UUID, int | None] = {}
             quota_scope_map: dict[UUID, str] = {}
             async with connect_database(dsn) as conn:
                 for target in target_chunk:
@@ -225,7 +225,7 @@ async def check_and_upgrade(
     local_config: StorageProxyUnifiedConfig,
     dsn: str,
     outfile: str,
-    report_path: Optional[Path] = None,
+    report_path: Path | None = None,
     force_scan_folder_size: bool = False,
 ) -> None:
     etcd = make_etcd(local_config)
@@ -354,9 +354,9 @@ async def check_and_upgrade(
 )
 def main(
     outfile: str,
-    config_path: Optional[Path],
+    config_path: Path | None,
     dsn: str,
-    report_path: Optional[Path],
+    report_path: Path | None,
     force_scan_folder_size: bool,
     log_level: LogLevel,
     debug: bool,

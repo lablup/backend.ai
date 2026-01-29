@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError, KeypairResourcePolicyNotFound
@@ -73,7 +71,7 @@ class KeypairResourcePolicyDBSource:
                 .from_statement(delete_stmt)
                 .execution_options(populate_existing=True)
             )
-            row: Optional[KeyPairResourcePolicyRow] = await db_sess.scalar(query_stms)
+            row: KeyPairResourcePolicyRow | None = await db_sess.scalar(query_stms)
             if row is None:
                 raise KeypairResourcePolicyNotFound(
                     f"Keypair resource policy with name {name} not found."

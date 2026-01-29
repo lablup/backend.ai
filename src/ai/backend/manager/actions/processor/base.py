@@ -2,7 +2,6 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -27,7 +26,7 @@ class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]],
+        monitors: Sequence[ActionMonitor] | None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
@@ -60,8 +59,8 @@ class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
         action_id = action_trigger_meta.action_id
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
-        result: Optional[TActionResult] = None
-        error_code: Optional[ErrorCode] = None
+        result: TActionResult | None = None
+        error_code: ErrorCode | None = None
 
         await self._start_monitors(action, action_trigger_meta)
         try:
@@ -112,8 +111,8 @@ class ActionProcessor[TAction: BaseAction, TActionResult: BaseActionResult]:
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]] = None,
-        validators: Optional[Sequence[ActionValidator]] = None,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[ActionValidator] | None = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -20,7 +20,7 @@ class ActivateRevisionAction(RevisionOperationBaseAction):
     revision_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.revision_id)
 
     @override
@@ -34,9 +34,9 @@ class ActivateRevisionActionResult(BaseActionResult):
     """Result of activating a revision."""
 
     deployment: ModelDeploymentData
-    previous_revision_id: Optional[UUID]
+    previous_revision_id: UUID | None
     activated_revision_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.activated_revision_id)

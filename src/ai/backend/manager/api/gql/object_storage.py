@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -61,12 +61,12 @@ class ObjectStorage(Node):
     async def namespaces(
         self,
         info: Info[StrawberryGQLContext],
-        before: Optional[str],
-        after: Optional[str],
-        first: Optional[int],
-        last: Optional[int],
-        limit: Optional[int],
-        offset: Optional[int],
+        before: str | None,
+        after: str | None,
+        first: int | None,
+        last: int | None,
+        limit: int | None,
+        offset: int | None,
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
         action_result = (
@@ -100,7 +100,7 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
 
 
 @strawberry.field(description="Added in 25.14.0")
-async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ObjectStorage]:
+async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
     processors = info.context.processors
     action_result = await processors.object_storage.get.wait_for_complete(
         GetObjectStorageAction(storage_id=uuid.UUID(id))
@@ -111,12 +111,12 @@ async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[O
 @strawberry.field(description="Added in 25.14.0")
 async def object_storages(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ObjectStorageConnection:
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
@@ -164,12 +164,12 @@ class CreateObjectStorageInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateObjectStorageInput:
     id: ID
-    name: Optional[str] = UNSET
-    host: Optional[str] = UNSET
-    access_key: Optional[str] = UNSET
-    secret_key: Optional[str] = UNSET
-    endpoint: Optional[str] = UNSET
-    region: Optional[str] = UNSET
+    name: str | None = UNSET
+    host: str | None = UNSET
+    access_key: str | None = UNSET
+    secret_key: str | None = UNSET
+    endpoint: str | None = UNSET
+    region: str | None = UNSET
 
     def to_updater(self) -> Updater[ObjectStorageRow]:
         spec = ObjectStorageUpdaterSpec(
@@ -192,7 +192,7 @@ class DeleteObjectStorageInput:
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
     key: str
-    expiration: Optional[int] = None
+    expiration: int | None = None
 
 
 @strawberry.input(description="Added in 25.14.0")

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
@@ -18,18 +18,18 @@ class BaseImageEvent(AbstractAnycastEvent):
         return EventDomain.IMAGE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return self.image
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
 @dataclass
 class ImagePullStartedEvent(BaseImageEvent):
     timestamp: float
-    image_ref: Optional[ImageRef] = None
+    image_ref: ImageRef | None = None
 
     @override
     def serialize(self) -> tuple:
@@ -70,8 +70,8 @@ class ImagePullStartedEvent(BaseImageEvent):
 @dataclass
 class ImagePullFinishedEvent(BaseImageEvent):
     timestamp: float
-    msg: Optional[str] = None
-    image_ref: Optional[ImageRef] = None
+    msg: str | None = None
+    image_ref: ImageRef | None = None
 
     @override
     def serialize(self) -> tuple:
@@ -112,7 +112,7 @@ class ImagePullFinishedEvent(BaseImageEvent):
 @dataclass
 class ImagePullFailedEvent(BaseImageEvent):
     msg: str
-    image_ref: Optional[ImageRef] = None
+    image_ref: ImageRef | None = None
 
     @override
     def serialize(self) -> tuple:

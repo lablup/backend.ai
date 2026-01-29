@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction
 
@@ -16,7 +16,7 @@ class NotificationAction(BaseAction):
 
     @abstractmethod
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         raise NotImplementedError
 
     @classmethod

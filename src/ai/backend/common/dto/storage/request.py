@@ -1,7 +1,6 @@
 import uuid
 from collections.abc import Mapping
 from pathlib import PurePosixPath
-from typing import Optional
 
 from pydantic import Field
 
@@ -16,7 +15,7 @@ from ai.backend.common.types import QuotaConfig
 
 
 class QuotaScopeReq(BaseRequestModel):
-    options: Optional[QuotaConfig] = Field(
+    options: QuotaConfig | None = Field(
         default=None,
         description="The options for the quota scope.",
     )
@@ -123,7 +122,7 @@ class PresignedDownloadObjectReq(BaseRequestModel):
     key: str = Field(
         description="The object key (path) within the bucket to download the file from."
     )
-    expiration: Optional[int] = Field(default=None, description="Token expiration time in seconds")
+    expiration: int | None = Field(default=None, description="Token expiration time in seconds")
 
 
 class GetObjectMetaReq(BaseRequestModel):
@@ -162,7 +161,7 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         """,
         examples=["downloads", "likes", "created", "modified"],
     )
-    search: Optional[str] = Field(
+    search: str | None = Field(
         default=None,
         description="""
         Search query to filter models by name, description, or tags.
@@ -197,7 +196,7 @@ class HuggingFaceScanModelsSyncReq(BaseRequestModel):
         """,
         examples=["downloads", "likes", "created", "modified"],
     )
-    search: Optional[str] = Field(
+    search: str | None = Field(
         default=None,
         description="""
         Search query to filter models by name, description, or tags.
@@ -349,7 +348,7 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
             },
         ],
     )
-    storage_prefix: Optional[str] = Field(
+    storage_prefix: str | None = Field(
         default=None,
         description="""
         Custom prefix path for storing imported artifacts.
@@ -385,7 +384,7 @@ class HuggingFaceGetCommitHashReqQueryParam(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface-registry"],
     )
-    revision: Optional[str] = Field(
+    revision: str | None = Field(
         default=None,
         description="The revision (branch/tag) of the model.",
         examples=["main", "v1.0"],
@@ -450,7 +449,7 @@ class ReservoirImportModelsReq(BaseRequestModel):
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
     )
-    storage_prefix: Optional[str] = Field(
+    storage_prefix: str | None = Field(
         default=None,
         description="""
         Custom prefix path for storing imported artifacts.
@@ -490,7 +489,7 @@ class VFSUploadFileReq(BaseRequestModel):
     """
 
     filepath: str = Field(description="The file path within VFS storage to upload the file to.")
-    content_type: Optional[str] = Field(
+    content_type: str | None = Field(
         default=None, description="MIME type of the file being uploaded (optional for VFS)."
     )
 

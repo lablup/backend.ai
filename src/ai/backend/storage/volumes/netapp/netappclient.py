@@ -65,7 +65,6 @@ from pathlib import Path
 from typing import (
     Any,
     NotRequired,
-    Optional,
     TypeAlias,
     TypedDict,
 )
@@ -236,7 +235,7 @@ class NetAppClient:
         # return volume_qtree_cluster
 
     async def list_volumes(
-        self, extra_fields: Optional[Sequence[str]] = None
+        self, extra_fields: Sequence[str] | None = None
     ) -> Mapping[VolumeID, VolumeInfo]:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -262,7 +261,7 @@ class NetAppClient:
     async def get_volume_by_name(
         self,
         name: str,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> VolumeInfo:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -286,7 +285,7 @@ class NetAppClient:
     async def get_volume_by_id(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> VolumeInfo:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -309,7 +308,7 @@ class NetAppClient:
     async def get_volume_metric_by_id(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -325,7 +324,7 @@ class NetAppClient:
     async def list_qtrees(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> Sequence[QTreeInfo]:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -351,7 +350,7 @@ class NetAppClient:
     async def get_default_qtree(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         return await self.get_qtree_by_id(volume_id, 0, extra_fields=extra_fields)
 
@@ -359,7 +358,7 @@ class NetAppClient:
         self,
         volume_id: VolumeID,
         qtree_id: QTreeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -383,7 +382,7 @@ class NetAppClient:
         self,
         volume_id: VolumeID,
         name: str,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         default_extra_fields = ["path"]
         _extra_fields = (

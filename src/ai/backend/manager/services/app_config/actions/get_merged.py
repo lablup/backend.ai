@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 
@@ -23,7 +23,7 @@ class GetMergedAppConfigAction(AppConfigAction):
         return "app_config_user"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id
 
     @override
@@ -40,5 +40,5 @@ class GetMergedAppConfigActionResult(BaseActionResult):
     merged_config: Mapping[str, Any]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id

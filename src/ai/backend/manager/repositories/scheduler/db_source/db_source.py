@@ -7,7 +7,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -147,8 +147,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _create_resource_slot_from_policy(
-    total_resource_slots: Optional[ResourceSlot],
-    default_for_unspecified: Optional[DefaultForUnspecified],
+    total_resource_slots: ResourceSlot | None,
+    default_for_unspecified: DefaultForUnspecified | None,
     known_slot_types: Mapping[SlotName, SlotTypes],
 ) -> ResourceSlot:
     """Create ResourceSlot from policy data."""
@@ -1758,7 +1758,7 @@ class ScheduleDBSource:
         )
         await db_sess.execute(kernel_query)
 
-    async def sync_agent_occupied_slots(self, agent_ids: Optional[set[AgentId]] = None) -> None:
+    async def sync_agent_occupied_slots(self, agent_ids: set[AgentId] | None = None) -> None:
         """
         Public method to sync agent occupied slots to AgentRow.
         If agent_ids is None, syncs all agents.
@@ -2067,7 +2067,7 @@ class ScheduleDBSource:
             return cast(CursorResult, result).rowcount > 0
 
     async def update_kernel_status_terminated(
-        self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
+        self, kernel_id: UUID, reason: str, exit_code: int | None = None
     ) -> bool:
         """
         Update kernel status to TERMINATED.
@@ -2228,7 +2228,7 @@ class ScheduleDBSource:
             return cast(CursorResult, result).rowcount
 
     async def update_kernels_to_pulling_for_image(
-        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, image_ref: str | None = None
     ) -> int:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -2270,7 +2270,7 @@ class ScheduleDBSource:
             return cast(CursorResult, result).rowcount
 
     async def update_kernels_to_prepared_for_image(
-        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, image_ref: str | None = None
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -2315,7 +2315,7 @@ class ScheduleDBSource:
             return cast(CursorResult, result).rowcount
 
     async def cancel_kernels_for_failed_image(
-        self, agent_id: AgentId, image: str, error_msg: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
     ) -> set[SessionId]:
         """
         Cancel kernels for an image that failed to be available on an agent.
@@ -3037,9 +3037,7 @@ class ScheduleDBSource:
             )
             await db_sess.execute(kernel_stmt)
 
-    async def get_container_info_for_kernels(
-        self, session_id: SessionId
-    ) -> dict[UUID, Optional[str]]:
+    async def get_container_info_for_kernels(self, session_id: SessionId) -> dict[UUID, str | None]:
         """
         Get container IDs for kernels in a session.
         Used for cleanup when session fails to start.
@@ -3086,7 +3084,7 @@ class ScheduleDBSource:
     async def update_session_network_id(
         self,
         session_id: SessionId,
-        network_id: Optional[str],
+        network_id: str | None,
     ) -> None:
         """
         Update session's network information in the database.
@@ -3157,7 +3155,7 @@ class ScheduleDBSource:
         self,
         scaling_group: str,
         session_statuses: list[SessionStatus],
-        kernel_statuses: Optional[list[KernelStatus]],
+        kernel_statuses: list[KernelStatus] | None,
     ) -> list[SessionWithKernels]:
         """Fetch sessions for handler execution based on status filters.
 

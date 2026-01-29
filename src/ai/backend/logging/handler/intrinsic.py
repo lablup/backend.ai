@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 import msgpack
 import psutil
@@ -40,13 +40,13 @@ class RelayHandler(logging.Handler):
             self._sock.close()
         self._zctx.term()
 
-    def _fallback(self, record: Optional[logging.LogRecord]) -> None:
+    def _fallback(self, record: logging.LogRecord | None) -> None:
         if record is None:
             return
         print(record.getMessage(), file=sys.stderr)
 
     @override
-    def emit(self, record: Optional[logging.LogRecord]) -> None:
+    def emit(self, record: logging.LogRecord | None) -> None:
         if self._sock is None:
             self._fallback(record)
             return

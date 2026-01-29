@@ -1,7 +1,7 @@
 import textwrap
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Optional, Self
+from typing import Any, Self
 from uuid import UUID
 
 from ai.backend.cli.types import Undefined, undefined
@@ -42,8 +42,8 @@ class ServiceAutoScalingRule(BaseFunction):
         fields: Sequence[FieldSpec] | None = None,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> RelayPaginatedResult[dict]:
         return await execute_paginated_relay_query(
             "endpoint_auto_scaling_rule_nodes",
@@ -69,8 +69,8 @@ class ServiceAutoScalingRule(BaseFunction):
         step_size: int,
         cooldown_seconds: int,
         *,
-        min_replicas: Optional[int] = None,
-        max_replicas: Optional[int] = None,
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
     ) -> Self:
         q = textwrap.dedent(
             """
@@ -153,8 +153,8 @@ class ServiceAutoScalingRule(BaseFunction):
         comparator: AutoScalingMetricComparator | Undefined = undefined,
         step_size: int | Undefined = undefined,
         cooldown_seconds: int | Undefined = undefined,
-        min_replicas: Optional[int] | Undefined = undefined,
-        max_replicas: Optional[int] | Undefined = undefined,
+        min_replicas: int | None | Undefined = undefined,
+        max_replicas: int | None | Undefined = undefined,
     ) -> Self:
         q = textwrap.dedent(
             """

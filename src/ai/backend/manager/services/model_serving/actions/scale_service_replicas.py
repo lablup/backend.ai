@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Self, override
+from typing import Self, override
 
 from pydantic import model_validator
 from pydantic.dataclasses import dataclass
@@ -30,7 +30,7 @@ class ScaleServiceReplicasAction(ModelServiceAction):
         return self
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @classmethod
@@ -44,5 +44,5 @@ class ScaleServiceReplicasActionResult(BaseActionResult):
     target_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

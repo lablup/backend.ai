@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -23,7 +23,7 @@ class ValidateRuleAction(NotificationAction):
         return "validate_rule"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_id)
 
 
@@ -34,5 +34,5 @@ class ValidateRuleActionResult(BaseActionResult):
     message: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -5,7 +5,7 @@ import urllib.parse
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -111,9 +111,9 @@ class GPFSAPIClient:
         sess: aiohttp.ClientSession,
         method: str,
         path: str,
-        body: Optional[Any] = None,
+        body: Any | None = None,
         *,
-        err_handler: Optional[ResponseHandler] = None,
+        err_handler: ResponseHandler | None = None,
     ) -> aiohttp.ClientResponse:
         response_handler = err_handler or base_response_handler
         match method:
@@ -289,9 +289,9 @@ class GPFSAPIClient:
         self,
         fs_name: str,
         fileset_name: str,
-        path: Optional[Path] = None,
-        owner: Optional[str] = None,
-        permissions: Optional[int] = None,
+        path: Path | None = None,
+        owner: str | None = None,
+        permissions: int | None = None,
         create_directory: bool = True,
     ) -> None:
         body: dict[str, Any] = {

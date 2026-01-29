@@ -3,7 +3,7 @@ Generic base handler for Sokovan operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 from ai.backend.manager.defs import LockID
 
@@ -22,7 +22,7 @@ class SokovanHandler[TResult](ABC):
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:

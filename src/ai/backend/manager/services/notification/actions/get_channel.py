@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -22,7 +22,7 @@ class GetChannelAction(NotificationAction):
         return "get_channel"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.channel_id)
 
 
@@ -33,5 +33,5 @@ class GetChannelActionResult(BaseActionResult):
     channel_data: NotificationChannelData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.channel_data.id)

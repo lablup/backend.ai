@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import scaling_group_fields
@@ -183,8 +183,8 @@ class ScalingGroup(BaseFunction):
         scheduler: str | Undefined = undefined,
         scheduler_opts: Mapping[str, str] | Undefined = undefined,
         use_host_network: bool | Undefined = undefined,
-        wsproxy_addr: Optional[str] | Undefined = undefined,
-        wsproxy_api_token: Optional[str] | Undefined = undefined,
+        wsproxy_addr: str | None | Undefined = undefined,
+        wsproxy_api_token: str | None | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """

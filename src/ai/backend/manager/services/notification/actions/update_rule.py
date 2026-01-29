@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationRuleData
@@ -23,7 +23,7 @@ class UpdateRuleAction(NotificationAction):
         return "update_rule"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
 
@@ -34,5 +34,5 @@ class UpdateRuleActionResult(BaseActionResult):
     rule_data: NotificationRuleData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_data.id)

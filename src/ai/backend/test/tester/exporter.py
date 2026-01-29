@@ -3,7 +3,6 @@ import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from ai.backend.common.json import pretty_json_str
 from ai.backend.test.contexts.tester import TestSpecMetaContext
@@ -12,7 +11,7 @@ from ai.backend.test.contexts.tester import TestSpecMetaContext
 class TestExporter(ABC):
     @classmethod
     @abstractmethod
-    async def create(cls, sub_name: Optional[str]) -> "TestExporter":
+    async def create(cls, sub_name: str | None) -> "TestExporter":
         """
         Create an instance of the exporter.
         This method can be overridden to provide custom initialization logic.
@@ -63,20 +62,20 @@ _DEFAULT_OUTPUT_DIRECTORY = Path("test_output")
 class ErrorOutput:
     test_id: str
     spec_name: str
-    sub_name: Optional[str]
+    sub_name: str | None
     stage: str
     exception_name: str
     traceback: str
 
 
 class DefaultExporter(TestExporter):
-    _sub_name: Optional[str]
+    _sub_name: str | None
     _started: float
-    _last_stage: Optional[str]
+    _last_stage: str | None
     _last_stage_done: float
     _output_directory: Path
 
-    def __init__(self, sub_name: Optional[str], started: float, last_stage_done: float) -> None:
+    def __init__(self, sub_name: str | None, started: float, last_stage_done: float) -> None:
         self._sub_name = sub_name
         self._started = started
         self._last_stage = None
@@ -86,7 +85,7 @@ class DefaultExporter(TestExporter):
             self._output_directory.mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    async def create(cls, sub_name: Optional[str] = None) -> TestExporter:
+    async def create(cls, sub_name: str | None = None) -> TestExporter:
         return cls(sub_name, started=0.0, last_stage_done=0.0)
 
     async def export_start(self) -> None:

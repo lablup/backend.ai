@@ -5,8 +5,6 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
@@ -39,7 +37,7 @@ class GetRoleResponse(BaseResponseModel):
 
     global_role: str = Field(description="System-wide role: 'superadmin' or 'user'")
     domain_role: str = Field(description="Domain-level role: 'admin' or 'user'")
-    group_role: Optional[str] = Field(
+    group_role: str | None = Field(
         default=None,
         description="Group-level role if group ID was requested; None if not a member",
     )
@@ -67,7 +65,7 @@ class UpdateFullNameResponse(BaseResponseModel):
 class UpdatePasswordResponse(BaseResponseModel):
     """Response for update password."""
 
-    error_msg: Optional[str] = Field(
+    error_msg: str | None = Field(
         default=None,
         description="Error detail on failure (e.g., new password mismatch); None on success",
     )

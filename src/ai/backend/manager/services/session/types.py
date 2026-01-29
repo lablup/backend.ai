@@ -1,7 +1,7 @@
 import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.manager.data.session.types import SessionStatus
@@ -21,8 +21,8 @@ class LegacySessionInfo:
     lang: str
     image: str
     architecture: str
-    registry: Optional[str]
-    tag: Optional[str]
+    registry: str | None
+    tag: str | None
     container_id: UUID
     occupied_slots: str  # legacy
     occupying_slots: str
@@ -31,12 +31,12 @@ class LegacySessionInfo:
     environ: str
     resource_opts: str
     status: SessionStatus
-    status_info: Optional[str]
-    status_data: Optional[dict[str, Any]]
+    status_info: str | None
+    status_data: dict[str, Any] | None
     creation_time: datetime
-    termination_time: Optional[datetime]
+    termination_time: datetime | None
     num_queries_executed: int
-    last_stat: Optional[dict[str, Any]]
+    last_stat: dict[str, Any] | None
     idle_checks: Any
 
     def asdict(self) -> dict[str, Any]:

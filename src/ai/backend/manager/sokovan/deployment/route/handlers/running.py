@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -34,7 +33,7 @@ class RunningRouteHandler(RouteHandler):
         return "check-running-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for checking running routes."""
         return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
@@ -49,16 +48,16 @@ class RunningRouteHandler(RouteHandler):
         ]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         return None
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Get the failure route status if applicable."""
         return RouteStatus.TERMINATING
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
 

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
-    Optional,
     Protocol,
     Self,
 )
@@ -52,7 +51,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class CoordinatorMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     event: EventMetricObserver
@@ -307,7 +306,7 @@ class InferenceAppConfig(BaseModel):
         ),
     ]
     route_id: Annotated[
-        Optional[UUID],
+        UUID | None,
         Field(
             default=None,
             description="ID of the route. This is optional and may not be present for older routes.",
@@ -316,7 +315,7 @@ class InferenceAppConfig(BaseModel):
         ),
     ]
     kernel_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             ...,
             description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",

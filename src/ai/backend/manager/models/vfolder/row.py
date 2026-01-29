@@ -14,7 +14,6 @@ from typing import (
     Any,
     Final,
     NamedTuple,
-    Optional,
     cast,
     overload,
     override,
@@ -266,13 +265,13 @@ DEAD_VFOLDER_STATUSES = (
 class VFolderDeletionInfo(NamedTuple):
     vfolder_id: VFolderID
     host: str
-    unmanaged_path: Optional[str]
+    unmanaged_path: str | None
 
 
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
-    unmanaged_path: Optional[str]
+    unmanaged_path: str | None
     domain_name: str
 
     # Target Vfolder infos
@@ -534,7 +533,7 @@ class VFolderPermissionRow(Base):
 vfolder_permissions = VFolderPermissionRow.__table__
 
 
-def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
+def is_unmanaged(unmanaged_path: str | None) -> bool:
     return (unmanaged_path is not None) and unmanaged_path != ""
 
 
@@ -748,7 +747,7 @@ async def get_allowed_vfolder_hosts_by_group(
     conn: SAConnection,
     resource_policy: Mapping[str, Any],
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    group_id: uuid.UUID | None = None,
 ) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
@@ -784,7 +783,7 @@ async def get_allowed_vfolder_hosts_by_user(
     resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
-    group_id: Optional[uuid.UUID] = None,
+    group_id: uuid.UUID | None = None,
 ) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
@@ -1015,7 +1014,7 @@ async def prepare_vfolder_mounts(
                 f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
                 e.extra_data,
             ) from e
-        if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
+        if unmanaged_path := cast(str | None, vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
@@ -1201,7 +1200,7 @@ async def ensure_host_permission_allowed(
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    group_id: uuid.UUID | None = None,
 ) -> None:
     from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -1228,7 +1227,7 @@ async def filter_host_allowed_permission(
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
-    group_id: Optional[uuid.UUID] = None,
+    group_id: uuid.UUID | None = None,
 ) -> VFolderHostPermissionMap:
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
@@ -1276,7 +1275,7 @@ async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
-    _storage_ptask_group: Optional[aiotools.PersistentTaskGroup] = None,
+    _storage_ptask_group: aiotools.PersistentTaskGroup | None = None,
     *,
     force: bool = False,
 ) -> int:
@@ -1347,7 +1346,7 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
-    quota_scope_user: Optional[UserRow] = await conn.scalar(query)
+    quota_scope_user: UserRow | None = await conn.scalar(query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1362,7 +1361,7 @@ async def ensure_quota_scope_accessible_by_user(
 
     # Lookup group table to match if quota is scoped to the group
     query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group: Optional[GroupRow] = await conn.scalar(query)
+    quota_scope_group: GroupRow | None = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:

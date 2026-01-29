@@ -4,7 +4,7 @@ import random
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import appdirs
 from dotenv import find_dotenv, load_dotenv
@@ -196,21 +196,21 @@ class APIConfig:
     def __init__(
         self,
         *,
-        endpoint: Optional[URL | str] = None,
-        endpoint_type: Optional[str] = None,
-        domain: Optional[str] = None,
-        group: Optional[str] = None,
-        storage_proxy_address_map: Optional[Mapping[str, str]] = None,
-        version: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
-        hash_type: Optional[str] = None,
-        vfolder_mounts: Optional[Iterable[str]] = None,
-        skip_sslcert_validation: Optional[bool] = None,
-        connection_timeout: Optional[float] = None,
-        read_timeout: Optional[float] = None,
-        announcement_handler: Optional[Callable[[str], None]] = None,
+        endpoint: URL | str | None = None,
+        endpoint_type: str | None = None,
+        domain: str | None = None,
+        group: str | None = None,
+        storage_proxy_address_map: Mapping[str, str] | None = None,
+        version: str | None = None,
+        user_agent: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        hash_type: str | None = None,
+        vfolder_mounts: Iterable[str] | None = None,
+        skip_sslcert_validation: bool | None = None,
+        connection_timeout: float | None = None,
+        read_timeout: float | None = None,
+        announcement_handler: Callable[[str], None] | None = None,
     ) -> None:
         self._endpoints = (
             _clean_urls(endpoint)
@@ -374,7 +374,7 @@ class APIConfig:
         return self._read_timeout
 
     @property
-    def announcement_handler(self) -> Optional[Callable[[str], None]]:
+    def announcement_handler(self) -> Callable[[str], None] | None:
         """The announcement handler to display server-set announcements."""
         return self._announcement_handler
 
@@ -392,7 +392,7 @@ def get_config() -> APIConfig:
     return _config
 
 
-def set_config(conf: Optional[APIConfig]) -> None:
+def set_config(conf: APIConfig | None) -> None:
     """
     Sets the configuration used throughout the current process.
     """

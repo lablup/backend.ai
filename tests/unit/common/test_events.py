@@ -1,7 +1,6 @@
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Optional
 
 import aiotools
 import pytest
@@ -35,10 +34,10 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
     def event_domain(self) -> EventDomain:
         return EventDomain.AGENT
 
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod

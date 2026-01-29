@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import click
 
@@ -55,7 +55,7 @@ def main(
     ctx: click.Context,
     log_level: str,
     debug: bool,
-    config_path: Optional[pathlib.Path] = None,
+    config_path: pathlib.Path | None = None,
 ) -> None:
     """
     Manager Administration CLI

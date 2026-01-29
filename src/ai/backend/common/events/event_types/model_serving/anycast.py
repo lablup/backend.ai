@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -34,11 +34,11 @@ class RouteCreationEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.route_id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -78,9 +78,9 @@ class EndpointRouteListUpdatedEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.endpoint_id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

@@ -1,8 +1,5 @@
 import enum
 from dataclasses import dataclass, field
-from typing import (
-    Optional,
-)
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -28,14 +25,14 @@ class MetricQueryParameter(BaseModel):
 @dataclass
 class ContainerMetricResponseInfo:
     value_type: str
-    container_metric_name: Optional[str]
-    agent_id: Optional[str]
-    instance: Optional[str]
-    job: Optional[str]
-    kernel_id: Optional[str]
-    owner_project_id: Optional[str]
-    owner_user_id: Optional[str]
-    session_id: Optional[str]
+    container_metric_name: str | None
+    agent_id: str | None
+    instance: str | None
+    job: str | None
+    kernel_id: str | None
+    owner_project_id: str | None
+    owner_user_id: str | None
+    session_id: str | None
 
 
 @dataclass
@@ -48,11 +45,11 @@ class MetricResultValue:
 class ContainerMetricOptionalLabel:
     value_type: ValueType
 
-    agent_id: Optional[str] = None
-    kernel_id: Optional[UUID] = None
-    session_id: Optional[UUID] = None
-    user_id: Optional[UUID] = None
-    project_id: Optional[UUID] = None
+    agent_id: str | None = None
+    kernel_id: UUID | None = None
+    session_id: UUID | None = None
+    user_id: UUID | None = None
+    project_id: UUID | None = None
 
 
 @dataclass

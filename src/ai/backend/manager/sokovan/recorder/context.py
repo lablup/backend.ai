@@ -4,7 +4,7 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from typing import ClassVar, Optional
+from typing import ClassVar
 from uuid import UUID
 
 from .pool import RecordPool, _SharedPhaseContext
@@ -112,8 +112,8 @@ class RecorderContext[EntityIdT: UUID]:
     def shared_phase(
         cls,
         name: str,
-        success_detail: Optional[str] = None,
-        entity_ids: Optional[set[EntityIdT]] = None,
+        success_detail: str | None = None,
+        entity_ids: set[EntityIdT] | None = None,
     ) -> Generator[None, None, None]:
         """
         Record a shared phase that applies to all or specific entities.
@@ -171,7 +171,7 @@ class RecorderContext[EntityIdT: UUID]:
     def shared_step(
         cls,
         name: str,
-        success_detail: Optional[str] = None,
+        success_detail: str | None = None,
     ) -> Generator[None, None, None]:
         """
         Record a step within a shared phase.

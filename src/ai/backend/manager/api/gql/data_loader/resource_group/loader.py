@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -15,7 +14,7 @@ from ai.backend.manager.services.scaling_group.processors import ScalingGroupPro
 async def load_resource_groups_by_names(
     processor: ScalingGroupProcessors,
     resource_group_names: Sequence[str],
-) -> list[Optional[ScalingGroupData]]:
+) -> list[ScalingGroupData | None]:
     """Batch load resource groups by their names.
 
     Args:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator, Mapping
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 from yarl import URL
@@ -14,7 +14,7 @@ class PurityClient:
     endpoint: URL
     api_token: str
     api_version: str
-    _auth_token: Optional[str]
+    _auth_token: str | None
 
     _session: aiohttp.ClientSession
 

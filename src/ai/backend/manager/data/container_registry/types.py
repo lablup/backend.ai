@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.container_registry import ContainerRegistryType
 
@@ -11,10 +11,10 @@ class ContainerRegistryData:
     url: str
     registry_name: str
     type: ContainerRegistryType
-    project: Optional[str]
-    username: Optional[str]
-    password: Optional[str]
-    ssl_verify: Optional[bool]
-    is_global: Optional[bool]
+    project: str | None
+    username: str | None
+    password: str | None
+    ssl_verify: bool | None
+    is_global: bool | None
     # TODO: Add proper type
-    extra: Optional[dict[str, Any]]
+    extra: dict[str, Any] | None

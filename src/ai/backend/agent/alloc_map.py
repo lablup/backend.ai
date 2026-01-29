@@ -11,7 +11,6 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
-    Optional,
     TypeVar,
     final,
 )
@@ -81,9 +80,9 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def __init__(
         self,
         *,
-        device_slots: Optional[Mapping[DeviceId, DeviceSlotInfo]] = None,
-        device_mask: Optional[Iterable[DeviceId]] = None,
-        exclusive_slot_types: Optional[Iterable[SlotName]] = None,
+        device_slots: Mapping[DeviceId, DeviceSlotInfo] | None = None,
+        device_mask: Iterable[DeviceId] | None = None,
+        exclusive_slot_types: Iterable[SlotName] | None = None,
     ) -> None:
         self.exclusive_slot_types = exclusive_slot_types or {}
         self.device_slots = device_slots or {}
@@ -126,7 +125,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
 
     @final
     def get_current_allocations(
-        self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
+        self, affinity_hint: AffinityHint | None, slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
 
@@ -221,7 +220,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def update_affinity_hint(
         self,
         device_alloc: Mapping[DeviceId, Decimal],
-        affinity_hint: Optional[AffinityHint] = None,
+        affinity_hint: AffinityHint | None = None,
     ) -> None:
         if affinity_hint is None:
             return
@@ -239,8 +238,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         """
         Allocate the given amount of resources.
@@ -302,8 +301,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
         requested_slots = {k: v for k, v in slots.items() if v > 0}
@@ -338,8 +337,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, requested_alloc in requested_slots.items():
@@ -391,8 +390,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
 
@@ -519,8 +518,8 @@ class FractionAllocMap(AbstractAllocMap):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal("0.01"),
         allow_resource_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -568,7 +567,7 @@ class FractionAllocMap(AbstractAllocMap):
         sorted_dev_allocs: Sequence[tuple[DeviceId, Decimal]],
         alloc: Decimal,
         *,
-        context_tag: Optional[str] = None,
+        context_tag: str | None = None,
     ) -> None:
         if len(sorted_dev_allocs) == 0:
             raise FractionalResourceFragmented(
@@ -595,8 +594,8 @@ class FractionAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -665,8 +664,8 @@ class FractionAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:

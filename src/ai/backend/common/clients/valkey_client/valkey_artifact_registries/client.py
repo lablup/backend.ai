@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import Any, Optional, Self
+from typing import Any, Self
 
 from glide import ExpirySet, ExpiryType
 
@@ -136,7 +136,7 @@ class ValkeyArtifactRegistryClient:
     async def get_registry(
         self,
         registry_id: uuid.UUID,
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         """
         Get cached registry data.
 

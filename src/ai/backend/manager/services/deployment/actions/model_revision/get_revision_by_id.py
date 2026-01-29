@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -16,7 +16,7 @@ class GetRevisionByIdAction(ModelRevisionBaseAction):
     revision_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.revision_id)
 
     @override
@@ -30,5 +30,5 @@ class GetRevisionByIdActionResult(BaseActionResult):
     data: ModelRevisionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

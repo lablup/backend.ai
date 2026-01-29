@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
@@ -17,12 +17,12 @@ from ai.backend.manager.types import PaginationOptions
 class ListArtifactsWithRevisionsAction(ArtifactAction):
     """Action to list artifacts with revisions using old-style pagination (REST API)."""
 
-    pagination: Optional[PaginationOptions] = None
-    ordering: Optional[ArtifactOrderingOptions] = None
-    filters: Optional[ArtifactFilterOptions] = None
+    pagination: PaginationOptions | None = None
+    ordering: ArtifactOrderingOptions | None = None
+    filters: ArtifactFilterOptions | None = None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -38,5 +38,5 @@ class ListArtifactsWithRevisionsActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
