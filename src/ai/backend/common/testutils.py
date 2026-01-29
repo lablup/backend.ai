@@ -16,7 +16,7 @@ def mock_corofunc(return_value: Any) -> mock.Mock:
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs) -> Any:
+    async def _mock_corofunc(*_args, **_kargs) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)

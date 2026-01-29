@@ -352,7 +352,7 @@ global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
 
-async def hello(request: web.Request) -> web.Response:
+async def hello(_request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
@@ -362,7 +362,7 @@ async def hello(request: web.Request) -> web.Response:
     })
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -1400,12 +1400,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
-            return lambda lock_id, lifetime_hint: FileLock(
+            return lambda lock_id, lifetime_hint: FileLock(  # noqa: ARG005
                 ipc_base_path / f"{manager_id}.{lock_id}.lock",
                 timeout=0,
             )
         case "pg_advisory":
-            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
+            return lambda lock_id, lifetime_hint: PgAdvisoryLock(  # noqa: ARG005
+                root_ctx.db, lock_id
+            )
         case "redlock":
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
             redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
@@ -1527,7 +1529,7 @@ def build_root_app(
         ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise ServerMisconfiguredError("cleanup_contexts is not initialized")
@@ -1539,7 +1541,7 @@ def build_root_app(
                 await stack.enter_async_context(cctx_instance)
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:
@@ -1571,7 +1573,7 @@ def build_root_app(
 def build_prometheus_service_discovery_handler(
     root_ctx: RootContext,
 ) -> Handler:
-    async def _handler(request: web.Request) -> web.Response:
+    async def _handler(_request: web.Request) -> web.Response:
         services = await root_ctx.service_discovery.discover()
         resp = []
         for service in services:

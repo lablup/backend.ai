@@ -175,10 +175,11 @@ def dismiss() -> None:
         sys.exit(ExitCode.FAILURE)
     try:
         local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
-        with open(local_state_path / "announcement.json", "rb") as f:
+        announcement_path = local_state_path / "announcement.json"
+        with announcement_path.open("rb") as f:
             state = json.load(f)
         state["dismissed"] = True
-        with open(local_state_path / "announcement.json", "w") as f:
+        with announcement_path.open("w") as f:
             json.dump(state, f)
         print_done("Dismissed the last shown announcement.")
     except (OSError, json.JSONDecodeError):

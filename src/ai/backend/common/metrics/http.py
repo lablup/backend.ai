@@ -67,7 +67,7 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
 
 
 def build_prometheus_metrics_handler(prometheus_metric: PrometheusAPIMetric) -> Handler:
-    async def prometheus_metrics_handler(request: web.Request) -> web.Response:
+    async def prometheus_metrics_handler(_request: web.Request) -> web.Response:
         """
         Returns the Prometheus metrics.
         """

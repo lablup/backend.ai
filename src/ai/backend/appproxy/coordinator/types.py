@@ -128,8 +128,8 @@ class CircuitManager:
         authority = circuit.worker_row.authority
 
         async def _event_handler(
-            context: CircuitManager,
-            agent_id: AgentId,
+            _context: CircuitManager,
+            _agent_id: AgentId,
             event: AppProxyWorkerCircuitAddedEvent,
         ) -> None:
             if circuit.id in [c.id for c in event.circuits]:

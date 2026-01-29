@@ -134,7 +134,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        request_timeout: ClientTimeout,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Make an HTTP request using the session client.
@@ -142,7 +142,7 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         headers = {
@@ -155,7 +155,7 @@ class StorageProxyHTTPClient:
                 headers=headers,
                 json=body,
                 params=params,
-                timeout=timeout,
+                timeout=request_timeout,
             ) as client_resp:
                 if client_resp.status // 100 == 2:
                     yield client_resp
@@ -177,7 +177,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        request_timeout: ClientTimeout,
     ) -> Optional[Mapping[str, Any]]:
         """
         Make an HTTP request using the session client.
@@ -185,11 +185,11 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         async with self.request_stream_response(
-            method, url, body=body, params=params, timeout=timeout
+            method, url, body=body, params=params, request_timeout=request_timeout
         ) as response_stream:
             if response_stream.status == HTTPStatus.NO_CONTENT:
                 return None
@@ -205,7 +205,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        request_timeout: ClientTimeout,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request and return the response as a dictionary.
@@ -213,10 +213,12 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response object from the request
         """
-        response = await self.request(method, url, body=body, params=params, timeout=timeout)
+        response = await self.request(
+            method, url, body=body, params=params, request_timeout=request_timeout
+        )
         if response is None:
             raise UnexpectedStorageProxyResponseError(
                 "Unexpected response from storage proxy: None",

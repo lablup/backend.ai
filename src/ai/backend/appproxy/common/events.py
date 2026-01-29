@@ -154,7 +154,7 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
@@ -181,7 +181,7 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
@@ -208,7 +208,7 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod

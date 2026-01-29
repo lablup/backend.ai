@@ -95,11 +95,13 @@ async def pipe_output(
         log.exception("unexpected error")
 
 
-async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 2.0) -> None:
+async def terminate_and_wait(
+    proc: asyncio.subprocess.Process, timeout_seconds: float = 2.0
+) -> None:
     try:
         proc.terminate()
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout)
+            await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
         except TimeoutError:
             proc.kill()
             await proc.wait()
@@ -606,7 +608,7 @@ class BaseRunner(metaclass=ABCMeta):
             await aexecute_interactive(
                 self.kernel_client,
                 code_text,
-                timeout=None,
+                timeout_seconds=None,
                 output_hook=output_hook,
                 allow_stdin=allow_stdin,
                 stdin_hook=stdin_hook,
@@ -956,7 +958,7 @@ class BaseRunner(metaclass=ABCMeta):
                     except TimeoutError:
                         # Takes too much time to open a local port.
                         if service_info["name"] in self.services_running:
-                            await terminate_and_wait(proc, timeout=10.0)
+                            await terminate_and_wait(proc, timeout_seconds=10.0)
                             self.services_running.pop(service_info["name"], None)
                             error_reason = (
                                 f"opening the service port timed out: {service_info['name']}"
@@ -1024,7 +1026,8 @@ class BaseRunner(metaclass=ABCMeta):
             pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
-            with open(log_path, "ab") as log_out:
+            log_out = await asyncio.to_thread(Path(log_path).open, "ab")
+            try:
                 env = {**self.child_env}
                 if batch:
                     env["_BACKEND_BATCH_MODE"] = "1"
@@ -1046,7 +1049,9 @@ class BaseRunner(metaclass=ABCMeta):
                 ]
                 retcode = await proc.wait()
                 await asyncio.gather(*pipe_tasks)
-            return retcode
+                return retcode
+            finally:
+                await asyncio.to_thread(log_out.close)
         except Exception:
             log.exception("unexpected error")
             return -1

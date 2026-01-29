@@ -76,8 +76,29 @@ class KubernetesKernel(AbstractKernel):
             raise ValueError("Scaling failed!")
 
         if scale.to_dict()["status"]["replicas"] == 0:
-            while not await self.is_scaled():
-                await asyncio.sleep(0.5)
+            # Wait for scaling to complete using asyncio.Event pattern
+            scaled_event = asyncio.Event()
+
+            async def wait_for_scaling() -> None:
+                max_iterations = 120  # 60 seconds timeout at 0.5s per iteration
+                for _ in range(max_iterations):
+                    if await self.is_scaled():
+                        scaled_event.set()
+                        return
+                    await asyncio.sleep(0.5)
+                # Timeout - still set event to avoid hanging
+                scaled_event.set()
+
+            wait_task = asyncio.create_task(wait_for_scaling())
+            try:
+                await scaled_event.wait()
+            finally:
+                if not wait_task.done():
+                    wait_task.cancel()
+                    try:
+                        await wait_task
+                    except asyncio.CancelledError:
+                        pass
 
         # TODO: Find way to detect if kernel runner has started inside container
 

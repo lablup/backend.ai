@@ -41,7 +41,7 @@ class RootContext(BaseContext):
     metadata_plugin_ctx: MetadataPluginContext
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -83,7 +83,7 @@ async def container_resolver_middleware(
     return await handler(request)
 
 
-async def list_versions(request: web.Request) -> web.Response:
+async def list_versions(_request: web.Request) -> web.Response:
     return web.Response(body="latest/")
 
 

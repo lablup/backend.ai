@@ -88,7 +88,7 @@ def temp_domain(domain_name: str, run: ClientRunnerFunc) -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
-def users(n: int = 3) -> tuple[User, ...]:
+def users(_n: int = 3) -> tuple[User, ...]:
     fake = Faker()
     return tuple(
         User(
@@ -143,12 +143,12 @@ def keypair_resource_policy() -> str:
 
 @pytest.fixture
 def txt_file() -> Generator[TextIOWrapper, None, None]:
-    filepath = "test.txt"
-    with open(filepath, "w") as f:
+    filepath = Path("test.txt")
+    with filepath.open("w") as f:
         f.write("This file is for testing.")
     yield f
 
-    os.remove(filepath)
+    filepath.unlink()
 
 
 run_user = make_run_fixture("user_file")

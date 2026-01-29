@@ -42,7 +42,7 @@ class AsyncFileWriter:
         return self
 
     def _write(self) -> None:
-        with open(self._target_filename, self._access_mode) as f:
+        with Path(self._target_filename).open(self._access_mode) as f:
             while True:
                 item = self._q.sync_q.get()
                 if item is Sentinel.TOKEN:

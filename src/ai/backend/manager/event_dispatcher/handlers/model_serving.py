@@ -41,7 +41,7 @@ class ModelServingEventHandler:
 
     async def handle_model_service_status_update(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: ModelServiceStatusAnycastEvent,
     ) -> None:
@@ -75,8 +75,8 @@ class ModelServingEventHandler:
 
     async def handle_route_creation(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: RouteCreatedAnycastEvent,
     ) -> None:
         endpoint: Optional[EndpointRow] = None

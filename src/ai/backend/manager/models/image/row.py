@@ -1146,7 +1146,7 @@ class ImagePermissionContextBuilder(
     async def apply_customized_role(
         self,
         ctx: ClientContext,
-        target_scope: ScopeType,
+        _target_scope: ScopeType,
     ) -> frozenset[ImagePermission]:
         if ctx.user_role == UserRole.SUPERADMIN:
             return ALL_IMAGE_PERMISSIONS
@@ -1231,7 +1231,9 @@ class ImagePermissionContextBuilder(
         perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
 
-    async def _get_allowed_registries_for_user(self, ctx: ClientContext, user_id: UUID) -> set[str]:
+    async def _get_allowed_registries_for_user(
+        self, _ctx: ClientContext, user_id: UUID
+    ) -> set[str]:
         user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
@@ -1330,7 +1332,7 @@ class ImagePermissionContextBuilder(
 
     async def _get_user_accessible_project_scopes(
         self,
-        ctx: ClientContext,
+        _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
         from ai.backend.manager.models.group import AssocGroupUserRow
@@ -1344,7 +1346,7 @@ class ImagePermissionContextBuilder(
 
     async def _get_domain_accessible_project_scopes(
         self,
-        ctx: ClientContext,
+        _ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
         from ai.backend.manager.models.group import GroupRow
@@ -1433,7 +1435,7 @@ class ImagePermissionContextBuilder(
     ) -> ImagePermissionContext:
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
+        def global_registry_condition(_project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(

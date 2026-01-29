@@ -25,7 +25,7 @@ class ReservedBatchSessionValidator(ValidatorRule):
         """Return a message describing successful validation."""
         return "Batch session has reached its scheduled start time"
 
-    def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
+    def validate(self, _snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Check if this is a batch session with a scheduled start time
         if workload.session_type == SessionTypes.BATCH and workload.starts_at is not None:
             # Check if the current time is before the scheduled start time

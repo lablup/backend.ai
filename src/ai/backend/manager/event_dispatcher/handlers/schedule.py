@@ -50,66 +50,66 @@ class ScheduleEventHandler:
         self._event_hub = event_hub
 
     async def handle_session_enqueued(
-        self, context: None, agent_id: str, ev: SessionEnqueuedAnycastEvent
+        self, _context: None, _agent_id: str, _ev: SessionEnqueuedAnycastEvent
     ) -> None:
         # Request scheduling for next cycle through SchedulingController
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
 
     async def handle_session_terminated(
-        self, context: None, agent_id: str, ev: SessionTerminatedAnycastEvent
+        self, _context: None, _agent_id: str, _ev: SessionTerminatedAnycastEvent
     ) -> None:
         # Request scheduling for next cycle through SchedulingController
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
 
     async def handle_agent_started(
-        self, context: None, agent_id: str, ev: AgentStartedEvent
+        self, _context: None, _agent_id: str, _ev: AgentStartedEvent
     ) -> None:
         # Request scheduling for next cycle through SchedulingController
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
 
     async def handle_do_sokovan_process_if_needed(
-        self, context: None, agent_id: str, ev: DoSokovanProcessIfNeededEvent
+        self, _context: None, _agent_id: str, ev: DoSokovanProcessIfNeededEvent
     ) -> None:
         """Handle Sokovan process if needed event (checks marks)."""
         schedule_type = ScheduleType(ev.schedule_type)
         await self._schedule_coordinator.process_if_needed(schedule_type)
 
     async def handle_do_sokovan_process_schedule(
-        self, context: None, agent_id: str, ev: DoSokovanProcessScheduleEvent
+        self, _context: None, _agent_id: str, ev: DoSokovanProcessScheduleEvent
     ) -> None:
         """Handle Sokovan process schedule event (unconditional)."""
         schedule_type = ScheduleType(ev.schedule_type)
         await self._schedule_coordinator.process_schedule(schedule_type)
 
     async def handle_scheduling_broadcast(
-        self, context: None, source: AgentId, ev: SchedulingBroadcastEvent
+        self, _context: None, _source: AgentId, ev: SchedulingBroadcastEvent
     ) -> None:
         """Handle scheduling broadcast event (individual)."""
         await self._event_hub.propagate_event(ev)
 
     async def handle_do_deployment_lifecycle_if_needed(
-        self, context: None, agent_id: str, ev: DoDeploymentLifecycleIfNeededEvent
+        self, _context: None, _agent_id: str, ev: DoDeploymentLifecycleIfNeededEvent
     ) -> None:
         """Handle deployment lifecycle if needed event (checks marks)."""
         lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
         await self._deployment_coordinator.process_if_needed(lifecycle_type)
 
     async def handle_do_deployment_lifecycle(
-        self, context: None, agent_id: str, ev: DoDeploymentLifecycleEvent
+        self, _context: None, _agent_id: str, ev: DoDeploymentLifecycleEvent
     ) -> None:
         """Handle deployment lifecycle event (unconditional)."""
         lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
         await self._deployment_coordinator.process_deployment_lifecycle(lifecycle_type)
 
     async def handle_do_route_lifecycle_if_needed(
-        self, context: None, agent_id: str, ev: DoRouteLifecycleIfNeededEvent
+        self, _context: None, _agent_id: str, ev: DoRouteLifecycleIfNeededEvent
     ) -> None:
         """Handle route lifecycle if needed event (checks marks)."""
         lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
         await self._route_coordinator.process_if_needed(lifecycle_type)
 
     async def handle_do_route_lifecycle(
-        self, context: None, agent_id: str, ev: DoRouteLifecycleEvent
+        self, _context: None, _agent_id: str, ev: DoRouteLifecycleEvent
     ) -> None:
         """Handle route lifecycle event (unconditional)."""
         lifecycle_type = RouteLifecycleType(ev.lifecycle_type)

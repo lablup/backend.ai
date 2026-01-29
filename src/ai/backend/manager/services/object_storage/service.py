@@ -105,7 +105,7 @@ class ObjectStorageService:
         return GetObjectStorageActionResult(result=storage_data)
 
     # TODO: Add filtering logic
-    async def list(self, action: ListObjectStorageAction) -> ListObjectStorageActionResult:
+    async def list(self, _action: ListObjectStorageAction) -> ListObjectStorageActionResult:
         """
         List all object storages.
         """

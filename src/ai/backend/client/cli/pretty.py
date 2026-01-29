@@ -56,7 +56,7 @@ def italic(text: str) -> str:
     return "\x1b[3m" + text + "\x1b[23m"
 
 
-def format_pretty(msg: str, status: PrintStatus = PrintStatus.NONE, colored: bool = True) -> str:
+def format_pretty(msg: str, status: PrintStatus = PrintStatus.NONE, _colored: bool = True) -> str:
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
@@ -201,10 +201,10 @@ def print_error(exc: Exception, *, file: TextIO | None = None) -> None:
 def show_warning(
     message: str,
     category: type[Warning],
-    filename: str,
-    lineno: int,
+    _filename: str,
+    _lineno: int,
     file: TextIO | None = None,
-    line: str | None = None,
+    _line: str | None = None,
 ) -> None:
     echo(
         "{}: {}".format(
@@ -233,19 +233,19 @@ class ProgressBarWithSpinner(tqdm):
 
     @staticmethod
     def alt_format_meter(
-        n: int | float,
-        total: int | float | None,
-        elapsed: float,
-        ncols: int | None = None,
+        _n: int | float,
+        _total: int | float | None,
+        _elapsed: float,
+        _ncols: int | None = None,
         prefix: str = "",
-        ascii: bool = False,
-        unit: str = "it",
-        unit_scale: bool = False,
-        rate: float | None = None,
-        bar_format: str | None = None,
+        _ascii: bool = False,
+        _unit: str = "it",
+        _unit_scale: bool = False,
+        _rate: float | None = None,
+        _bar_format: str | None = None,
         postfix: str | None = None,
-        *args: Any,
-        **kwargs: Any,
+        *_args: Any,
+        **_kwargs: Any,
     ) -> str:
         # Return the prefix string only.
         return str(prefix) + str(postfix)

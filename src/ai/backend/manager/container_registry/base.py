@@ -444,7 +444,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_oci_index(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -463,7 +463,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_oci_manifest(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -525,7 +525,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v2_multiplatform_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -546,7 +546,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v2_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -574,7 +574,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v1_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,

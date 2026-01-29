@@ -62,7 +62,7 @@ def cli() -> None:
 )
 @click.pass_obj
 def generate_sample(
-    cli_ctx: CLIContext,
+    _cli_ctx: CLIContext,
     output: pathlib.Path,
     env: str,
     overwrite: bool,

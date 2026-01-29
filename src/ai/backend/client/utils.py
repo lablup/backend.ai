@@ -1,8 +1,8 @@
 import base64
 import io
-import os
 import textwrap
 import uuid
+from pathlib import Path
 from typing import Any
 
 from ai.backend.client.output.types import FieldSet, FieldSpec
@@ -63,8 +63,9 @@ def flatten_connections_in_data(data: dict) -> dict:
 
 class ProgressReportingReader(io.BufferedReader):
     def __init__(self, file_path: str, *, tqdm_instance: Any = None) -> None:
-        super().__init__(open(file_path, "rb"))
-        self._filename = os.path.basename(file_path)
+        file_path_obj = Path(file_path)
+        super().__init__(file_path_obj.open("rb"))
+        self._filename = file_path_obj.name
         if tqdm_instance is None:
             from tqdm import tqdm
 
@@ -72,7 +73,7 @@ class ProgressReportingReader(io.BufferedReader):
             self.tqdm = tqdm(
                 unit="bytes",
                 unit_scale=True,
-                total=os.path.getsize(file_path),
+                total=file_path_obj.stat().st_size,
             )
         else:
             self._owns_tqdm = False

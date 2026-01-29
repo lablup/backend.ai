@@ -344,7 +344,7 @@ def setup_graylog_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
 
 def log_processor(
     config: LoggingConfig,
-    parent_pid: int,
+    _parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
     msgpack_options: MsgpackOptions,
@@ -372,7 +372,7 @@ def log_processor(
         agg_sock.bind(log_endpoint)
         ep_url = yarl.URL(log_endpoint)
         if ep_url.scheme.lower() == "ipc":
-            os.chmod(ep_url.path, 0o777)
+            Path(ep_url.path).chmod(0o777)
         try:
             ready_event.set()
             while True:

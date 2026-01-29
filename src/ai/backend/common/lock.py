@@ -92,7 +92,7 @@ class FileLock(AbstractDistributedLock):
             raise RuntimeError("Lock is already acquired")
         if not self._path.exists():
             self._path.touch()
-        self._file = open(self._path, "wb")
+        self._file = self._path.open("wb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:
             async for attempt in AsyncRetrying(

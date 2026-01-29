@@ -82,7 +82,7 @@ async def shutdown(app: web.Application) -> None:
 
 
 def create_app(
-    default_cors_options: CORSOptions,
+    _default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     # default_cors_options is kept for API consistency but not used in rate limiting
     app = web.Application()

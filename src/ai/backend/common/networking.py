@@ -25,7 +25,7 @@ async def curl(
     *,
     params: Optional[Mapping[str, str]] = None,
     headers: Optional[Mapping[str, str]] = None,
-    timeout: float = 0.2,
+    timeout_seconds: float = 0.2,
 ) -> Optional[str]: ...
 
 
@@ -36,7 +36,7 @@ async def curl(
     *,
     params: Optional[Mapping[str, str]] = None,
     headers: Optional[Mapping[str, str]] = None,
-    timeout: float = 0.2,
+    timeout_seconds: float = 0.2,
 ) -> str: ...
 
 
@@ -46,7 +46,7 @@ async def curl(
     *,
     params: Optional[Mapping[str, str]] = None,
     headers: Optional[Mapping[str, str]] = None,
-    timeout: float = 0.2,
+    timeout_seconds: float = 0.2,
 ) -> Optional[str]:
     """
     A simple curl-like helper function that uses aiohttp to fetch some string/data
@@ -56,7 +56,7 @@ async def curl(
         async with (
             aiohttp.ClientSession(
                 raise_for_status=True,
-                timeout=aiohttp.ClientTimeout(connect=timeout),
+                timeout=aiohttp.ClientTimeout(connect=timeout_seconds),
             ) as sess,
             sess.get(url, params=params, headers=headers) as resp,
         ):

@@ -38,7 +38,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-from ai.backend.common.dto.manager.auth.field import (
+from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
@@ -747,7 +747,7 @@ async def client_ctx(
         )
     )
 
-    async def _shutdown(app: web.Application) -> None:
+    async def _shutdown(_app: web.Application) -> None:
         await client_pool.close()
 
     # NOTE: on_shutdown handlers are invoked before other cleanups.
@@ -875,7 +875,7 @@ async def webapp_ctx(
         raise ValueError("Unrecognized service.mode", config.service.mode)
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
 
-    async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+    async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
         # Remove "Server" header for a security reason.
         response.headers.popall("Server", None)
 

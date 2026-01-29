@@ -97,7 +97,7 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
-    cli_ctx: click.Context,
+    _cli_ctx: click.Context,
     mode: InstallModes | None,
     target_path: str,
     show_guide: bool,

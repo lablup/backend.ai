@@ -487,7 +487,7 @@ class ArtifactRevisionService:
                         )
                     )
 
-                    async def _task(reporter: ProgressReporter) -> None:
+                    async def _task(_reporter: ProgressReporter) -> None:
                         # When use_delegation is True, if remote status is not AVAILABLE, delegate import
                         if reservoir_config.use_delegation:
                             remote_reservoir_client = ReservoirRegistryClient(
@@ -780,7 +780,7 @@ class ArtifactRevisionService:
         )
 
     async def _resolve_artifact_registry_meta(
-        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             artifact_registry_cfg = self._config_provider.config.artifact_registry

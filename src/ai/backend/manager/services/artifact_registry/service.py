@@ -153,7 +153,7 @@ class ArtifactRegistryService:
         return GetHuggingFaceRegistriesActionResult(result=registry_data_list)
 
     async def list_huggingface_registry(
-        self, action: ListHuggingFaceRegistryAction
+        self, _action: ListHuggingFaceRegistryAction
     ) -> ListHuggingFaceRegistryActionResult:
         """
         List all huggingface registries.
@@ -232,7 +232,7 @@ class ArtifactRegistryService:
         return GetReservoirRegistriesActionResult(result=reservoir_data_list)
 
     async def list_reservoir_registries(
-        self, action: ListReservoirRegistriesAction
+        self, _action: ListReservoirRegistriesAction
     ) -> ListReservoirRegistriesActionResult:
         """
         List all reservoirs.

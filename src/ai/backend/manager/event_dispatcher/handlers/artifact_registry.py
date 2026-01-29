@@ -61,7 +61,7 @@ class ArtifactRegistryEventHandler:
         self._config_provider = config_provider
 
     async def handle_artifact_registry_scan(
-        self, context: None, source: AgentId, event: DoScanReservoirRegistryEvent
+        self, _context: None, _source: AgentId, _event: DoScanReservoirRegistryEvent
     ) -> None:
         processors = self._processors_factory()
         registries = await self._artifact_registry_repository.list_artifact_registry_data()

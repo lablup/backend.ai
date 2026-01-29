@@ -60,7 +60,7 @@ class LocalRegistry(BaseContainerRegistry):
     async def _scan_tag_local(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, str],
+        _rqst_args: dict[str, str],
         image: str,
         tag: str,
     ) -> None:

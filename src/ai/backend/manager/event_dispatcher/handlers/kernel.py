@@ -59,8 +59,8 @@ class KernelEventHandler:
 
     async def handle_kernel_log(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: DoSyncKernelLogsEvent,
     ) -> None:
         # The log data is at most 10 MiB.
@@ -113,8 +113,8 @@ class KernelEventHandler:
 
     async def handle_kernel_preparing(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelPreparingAnycastEvent,
     ) -> None:
         log.info(
@@ -127,8 +127,8 @@ class KernelEventHandler:
 
     async def handle_kernel_pulling(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelPullingAnycastEvent,
     ) -> None:
         log.info(
@@ -141,8 +141,8 @@ class KernelEventHandler:
 
     async def handle_kernel_creating(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelCreatingAnycastEvent,
     ) -> None:
         log.info(
@@ -155,8 +155,8 @@ class KernelEventHandler:
 
     async def handle_kernel_started(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelStartedAnycastEvent,
     ) -> None:
         log.info(
@@ -169,8 +169,8 @@ class KernelEventHandler:
 
     async def handle_kernel_cancelled(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelCancelledAnycastEvent,
     ) -> None:
         log.info(
@@ -193,8 +193,8 @@ class KernelEventHandler:
 
     async def handle_kernel_terminated(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: KernelTerminatedAnycastEvent,
     ) -> None:
         await self._schedule_coordinator.handle_kernel_terminated(event)

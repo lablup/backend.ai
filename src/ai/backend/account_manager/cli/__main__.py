@@ -16,8 +16,8 @@ _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"]
 )
 @click.pass_context
 def main(
-    ctx: click.Context,
-    log_level: str,
+    _ctx: click.Context,
+    _log_level: str,
 ) -> None:
     """
     Backend.AI Account Manager CLI
@@ -46,7 +46,8 @@ def generate_example_configuration(output: Path) -> None:
     if output == "-" or output is None:
         print(tomlkit.dumps(ensure_json_serializable(generated_example)))
     else:
-        with open(output, mode="w") as fw:
+        output_path = Path(output)
+        with output_path.open(mode="w") as fw:
             fw.write(tomlkit.dumps(ensure_json_serializable(generated_example)))
 
 

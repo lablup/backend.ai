@@ -304,7 +304,6 @@ class TestModifyUser:
         mock_user_repository.update_user_validated.assert_called_once_with(
             email=modified_user_data.email,
             updater=action.updater,
-            requester_uuid=None,
         )
 
     async def test_modify_nonexistent_user_raises_error(
@@ -365,7 +364,6 @@ class TestDeleteUser:
         assert result is not None
         mock_user_repository.soft_delete_user_validated.assert_called_once_with(
             email="test@example.com",
-            requester_uuid=None,
         )
 
     async def test_delete_nonexistent_user_raises_error(

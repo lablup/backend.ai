@@ -161,7 +161,7 @@ class Terminal:
                 if self.pid is None:
                     raise RuntimeError("Terminal process ID is not set")
                 await self.sock_term_out.send_multipart([b"Restarting...\r\n"])
-                os.waitpid(self.pid, 0)
+                await asyncio.to_thread(os.waitpid, self.pid, 0)
                 await self.start()
         except Exception:
             log.exception("Unexpected error during restart of terminal")
@@ -230,6 +230,6 @@ class Terminal:
         os.kill(self.pid, signal.SIGHUP)
         os.kill(self.pid, signal.SIGCONT)
         await asyncio.sleep(0)
-        os.waitpid(self.pid, 0)
+        await asyncio.to_thread(os.waitpid, self.pid, 0)
         self.pid = None
         self.fd = None

@@ -719,7 +719,7 @@ class FractionAllocMap(AbstractAllocMap):
         def allocate_across_devices(
             dev_allocs: list[tuple[DeviceId, Decimal]],
             remaining_alloc: Decimal,
-            slot_name: SlotName,
+            _slot_name: SlotName,
         ) -> dict[DeviceId, Decimal]:
             slot_allocation: dict[DeviceId, Decimal] = {}
             n_devices = len(dev_allocs)

@@ -424,8 +424,8 @@ class BaseVolume(AbstractVolume):
         await aiofiles.os.makedirs(vfpath, mode, exist_ok=exist_ok)
         if mode != DEFAULT_VFOLDER_PERMISSION_MODE:
             # The mode parameter in os.makedirs() sometimes fails to set directory permissions correctly.
-            # Calling os.chmod() afterward ensures the desired permissions are properly applied.
-            os.chmod(vfpath, mode)
+            # Calling Path.chmod() afterward ensures the desired permissions are properly applied.
+            vfpath.chmod(mode)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
@@ -621,7 +621,7 @@ class BaseVolume(AbstractVolume):
         q: janus.Queue[bytes] = janus.Queue()
 
         def _write(q: janus._SyncQueueProxy[bytes]) -> None:
-            with open(target_path, "wb") as f:
+            with target_path.open("wb") as f:
                 while True:
                     buf = q.get()
                     try:
@@ -657,7 +657,7 @@ class BaseVolume(AbstractVolume):
             chunk_size: int,
         ) -> None:
             try:
-                with open(target_path, "rb") as f:
+                with target_path.open("rb") as f:
                     while True:
                         buf = f.read(chunk_size)
                         if not buf:

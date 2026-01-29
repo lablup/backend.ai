@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import secrets
 import tarfile
 import tempfile
@@ -428,7 +427,7 @@ class ComputeSession(BaseFunction):
         tag: str | Undefined = undefined,
         scaling_group: str | Undefined = undefined,
         owner_access_key: str | Undefined = undefined,
-        attach_network: Optional[str] = None,  # TODO: Handle this argument properly
+        _attach_network: Optional[str] = None,  # TODO: Handle this argument properly
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.
@@ -1127,7 +1126,7 @@ class ComputeSession(BaseFunction):
                     with tarfile.open(fp.name) as tarf:
                         tarf.extractall(path=dest, filter=tarfile.data_filter)
                         file_names.extend(tarf.getnames())
-                    os.unlink(fp.name)
+                    Path(fp.name).unlink()
         return {"file_names": file_names}
 
     @api_function
@@ -1341,8 +1340,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        _filter: Optional[str] = None,
+        _order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.

@@ -617,7 +617,7 @@ class ScalingGroupPermissionContextBuilder(
     async def apply_customized_role(
         self,
         ctx: ClientContext,
-        target_scope: ScopeType,
+        _target_scope: ScopeType,
     ) -> frozenset[ScalingGroupPermission]:
         if ctx.user_role == UserRole.SUPERADMIN:
             return ALL_SCALING_GROUP_PERMISSIONS

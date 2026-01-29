@@ -43,7 +43,7 @@ class Storage(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = "ALIVE",
+        _status: str = "ALIVE",
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,

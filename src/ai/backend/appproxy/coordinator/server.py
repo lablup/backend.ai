@@ -470,7 +470,7 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 async def on_worker_lost_event(
     context: RootContext,
-    worker_id: AgentId,
+    _worker_id: AgentId,
     event: WorkerLostEvent,
 ) -> None:
     log.warning("detected termination of proxy worker {}", event.worker_id)
@@ -489,7 +489,7 @@ async def on_worker_lost_event(
 
 async def on_route_update_event(
     context: RootContext,
-    worker_id: AgentId,
+    _worker_id: AgentId,
     event: EndpointRouteListUpdatedEvent,
 ) -> None:
     (
@@ -617,7 +617,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.health_engine = health_engine
     await health_engine.start()
 
-    async def _check_health(context: None, src: AgentId, event: DoHealthCheckEvent) -> None:
+    async def _check_health(_context: None, _src: AgentId, _event: DoHealthCheckEvent) -> None:
         try:
             # Check all endpoints with health checking enabled
             # This now only performs individual route health checks
@@ -643,7 +643,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    async def _collect(context: None, src: AgentId, event: DoCheckUnusedPortEvent) -> None:
+    async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
         try:
 
             async def _update(sess: SASession) -> list[Circuit]:
@@ -836,7 +836,7 @@ async def metrics(request: web.Request) -> web.Response:
     )
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -855,8 +855,8 @@ async def status(request: web.Request) -> web.Response:
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -904,12 +904,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
-            return lambda lock_id, lifetime_hint: FileLock(
+            return lambda lock_id, lifetime_hint: FileLock(  # noqa: ARG005
                 ipc_base_path / f"{coordinator_id}.{lock_id}.lock",
                 timeout=0,
             )
         case "pg_advisory":
-            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
+            return lambda lock_id, lifetime_hint: PgAdvisoryLock(  # noqa: ARG005
+                root_ctx.db, lock_id
+            )
         case "redlock":
             redlock_config = root_ctx.local_config.proxy_coordinator.redlock_config
 
@@ -974,7 +976,7 @@ def build_root_app(
         ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
@@ -986,7 +988,7 @@ def build_root_app(
                 await stack.enter_async_context(cctx_instance)
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:

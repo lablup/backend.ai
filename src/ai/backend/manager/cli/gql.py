@@ -22,7 +22,7 @@ def cli() -> None:
 
 @cli.command()
 @click.pass_obj
-def show(cli_ctx: CLIContext) -> None:
+def show(_cli_ctx: CLIContext) -> None:
     warnings.warn(
         "The 'gql' subcommand is deprecated. Use the 'api' subcommand.",
         DeprecationWarning,

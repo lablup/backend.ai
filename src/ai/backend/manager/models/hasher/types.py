@@ -138,7 +138,7 @@ class PasswordColumn(TypeDecorator):
     impl = VARCHAR
     cache_ok = True
 
-    def process_bind_param(self, value: Any, dialect: Any) -> Optional[str]:
+    def process_bind_param(self, value: Any, _dialect: Any) -> Optional[str]:
         if value is None:
             return None
 

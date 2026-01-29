@@ -176,7 +176,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             await kube_config.load_kube_config()
 
             def _kernel_resource_spec_read() -> KernelResourceSpec:
-                with open((self.config_dir / "resource.txt").resolve()) as f:
+                resource_file = (self.config_dir / "resource.txt").resolve()
+                with resource_file.open() as f:
                     return KernelResourceSpec.read_from_file(f)
 
             resource_spec = await loop.run_in_executor(None, _kernel_resource_spec_read)
@@ -1085,7 +1086,7 @@ class KubernetesAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         raise NotImplementedError
 
@@ -1099,7 +1100,7 @@ class KubernetesAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout_seconds: float | None,
     ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
@@ -1150,7 +1151,7 @@ class KubernetesAgent(
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
 
-        async def force_cleanup(reason: str = "self-terminated") -> None:
+        async def force_cleanup(_reason: str = "self-terminated") -> None:
             await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)  # type: ignore[attr-defined]
 
         try:

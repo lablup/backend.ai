@@ -129,11 +129,11 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             )
 
     def _create_sparse_file(self, name: str, size: int) -> None:
-        fd = os.open(name, os.O_CREAT, 0o644)
-        os.close(fd)
+        filepath = Path(name)
+        filepath.touch(mode=0o644, exist_ok=True)
         os.truncate(name, size)
         # Check that no space was allocated
-        stat = os.stat(name)
+        stat = filepath.stat()
         if stat.st_blocks != 0:
             raise RuntimeError("could not create sparse file")
 
@@ -248,7 +248,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
                 valid_gid = config.kernel_gid
             for p in paths:
                 if valid_uid is None or valid_gid is None:
-                    stat = os.stat(p)
+                    stat = p.stat()
                     valid_uid = stat.st_uid if valid_uid is None else valid_uid
                     valid_gid = stat.st_gid if valid_gid is None else valid_gid
                 os.chown(p, valid_uid, valid_gid)
@@ -301,7 +301,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         exit_code = await umount.wait()
         if exit_code != 0:
             raise RuntimeError("umount failed")
-        await loop.run_in_executor(None, os.remove, str(scratch_file))
+        await loop.run_in_executor(None, scratch_file.unlink)
         await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
 

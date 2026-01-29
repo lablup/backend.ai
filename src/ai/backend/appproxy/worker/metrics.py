@@ -271,7 +271,7 @@ async def gather_inference_measures(
             return None
 
 
-async def collect_inference_metric(root_ctx: RootContext, interval: float) -> None:
+async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> None:
     try:
         inference_circuits = [
             circuit

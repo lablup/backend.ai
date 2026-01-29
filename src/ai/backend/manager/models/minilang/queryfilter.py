@@ -93,7 +93,7 @@ class QueryFilterTransformer(Transformer):
             return sa.false()
         raise ValueError("Unknown/unsupported atomic token", a.value)
 
-    def _transform_val_leaf(self, col_name: str, op: str, value: Any) -> Any:
+    def _transform_val_leaf(self, col_name: str, _op: str, value: Any) -> Any:
         if self._fieldspec:
             try:
                 func = self._fieldspec[col_name][1]

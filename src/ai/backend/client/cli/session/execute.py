@@ -744,8 +744,8 @@ def run(
         else:
             log_dir = local_cache_path / "client-logs"
             log_dir.mkdir(parents=True, exist_ok=True)
-            stdout = open(log_dir / f"{name}.stdout.log", "w", encoding="utf-8")
-            stderr = open(log_dir / f"{name}.stderr.log", "w", encoding="utf-8")
+            stdout = (log_dir / f"{name}.stdout.log").open("w", encoding="utf-8")
+            stderr = (log_dir / f"{name}.stderr.log").open("w", encoding="utf-8")
 
         try:
 

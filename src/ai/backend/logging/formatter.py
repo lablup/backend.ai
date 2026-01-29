@@ -18,7 +18,7 @@ type _SysExcInfoType = (
 
 
 def format_exception(
-    self: logging.Formatter,
+    _self: logging.Formatter,
     ei: Sequence[str] | _SysExcInfoType,
 ) -> str:
     match ei:

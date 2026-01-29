@@ -207,16 +207,16 @@ async def setup(
             raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 
 def create_app(
-    default_cors_options: CORSOptions,
+    _default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "setup"

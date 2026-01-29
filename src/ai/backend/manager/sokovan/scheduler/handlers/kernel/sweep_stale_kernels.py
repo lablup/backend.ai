@@ -69,7 +69,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
 
     async def execute(
         self,
-        scaling_group: str,
+        _scaling_group: str,
         kernels: Sequence[KernelInfo],
     ) -> KernelExecutionResult:
         """Sweep kernels with stale presence status.

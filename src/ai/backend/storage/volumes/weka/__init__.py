@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -48,7 +47,7 @@ class WekaQuotaModel(BaseQuotaModel):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
-            lambda: os.stat(path).st_ino,
+            lambda: path.stat().st_ino,
         )
 
     async def create_quota_scope(

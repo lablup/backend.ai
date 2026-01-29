@@ -57,7 +57,7 @@ class StorageNamespaceService:
         return GetNamespacesActionResult(result=namespaces)
 
     async def get_all_namespaces(
-        self, action: GetAllNamespacesAction
+        self, _action: GetAllNamespacesAction
     ) -> GetAllNamespacesActionResult:
         log.info("Getting all namespaces grouped by storage")
         namespaces_by_storage = (

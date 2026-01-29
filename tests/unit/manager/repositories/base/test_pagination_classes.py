@@ -137,7 +137,7 @@ class TestCursorForwardPagination:
         # 11 rows returned means there's a next page
         rows = [MagicMock() for _ in range(11)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=100)
 
         assert result.has_next_page is True
         assert result.has_previous_page is True  # cursor exists = has previous
@@ -158,7 +158,7 @@ class TestCursorForwardPagination:
         # Exactly 10 rows means no next page
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=100)
 
         assert result.has_next_page is False
         assert result.has_previous_page is True  # cursor exists = has previous
@@ -177,7 +177,7 @@ class TestCursorForwardPagination:
         )
         rows = [MagicMock() for _ in range(5)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=5)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=5)
 
         # When using cursor, there's always a previous page (we came from somewhere)
         assert result.has_previous_page is True
@@ -241,7 +241,7 @@ class TestCursorBackwardPagination:
         # 11 rows returned means there's a previous page
         rows = [MagicMock() for _ in range(11)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=100)
 
         assert result.has_previous_page is True
         assert result.has_next_page is True  # cursor exists = has next
@@ -262,7 +262,7 @@ class TestCursorBackwardPagination:
         # Exactly 10 rows means no previous page
         rows = [MagicMock() for _ in range(10)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=100)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=100)
 
         assert result.has_previous_page is False
         assert result.has_next_page is True  # cursor exists = has next
@@ -281,7 +281,7 @@ class TestCursorBackwardPagination:
         )
         rows = [MagicMock() for _ in range(5)]
 
-        result = pagination.compute_page_info(cast(list[Row[Any]], rows), total_count=5)
+        result = pagination.compute_page_info(cast(list[Row[Any]], rows), _total_count=5)
 
         # When using backward cursor, there's always a next page (we came from somewhere ahead)
         assert result.has_next_page is True

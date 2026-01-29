@@ -111,6 +111,9 @@ select = [
     "ANN",    # flake8-annotations: enforces type annotations
     "DTZ",    # flake8-datetimez: enforces timezone-aware datetime usage
     "S101",   # flake8-bandit: detects use of assert in production code
+    "ASYNC",  # flake8-async: async/await best practices
+    "PTH",    # flake8-use-pathlib: use pathlib instead of os.path
+    "ARG",    # flake8-unused-arguments: unused function arguments
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -174,6 +177,10 @@ ignore = [
     "ANN002",  # missing-type-args - *args type annotation, low practical value
     "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
     "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs
+    # ARG (unused arguments) - exceptions for common patterns
+    "ARG002",  # unused-method-argument - Protocol/ABC methods may not use all arguments
+    # PTH (pathlib) - defer some conversions
+    # ASYNC (async best practices) - exceptions
 ]
 
 [tool.ruff.lint.isort]
@@ -248,9 +255,12 @@ split-on-trailing-comma = true
 # - Logging modules use lazy imports for optional driver dependencies (logstash, graylog, otel)
 "src/ai/backend/logging/logger.py" = ["PLC0415"]
 "src/ai/backend/logging/utils.py" = ["PLC0415"]
-# - Test files may use print for debugging and have flexible type annotations
-"tests/**/*.py" = ["T20", "ANN", "S101"]
-"src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101"]
+# - Test files may use print for debugging, have flexible type annotations, and unused fixtures
+"tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+"src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+# - GraphQL legacy and modern resolvers may have unused parameters for GraphQL interface compatibility
+"src/ai/backend/manager/api/gql_legacy/**/*.py" = ["ARG"]
+"src/ai/backend/manager/api/gql/**/*.py" = ["ARG"]
 # - Type stub files have their own conventions
 "stubs/**/*.pyi" = ["ANN"]
 # - Vec2D class intentionally overrides tuple operators with incompatible return types for vector math

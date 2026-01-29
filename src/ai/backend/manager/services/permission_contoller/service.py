@@ -223,11 +223,11 @@ class PermissionControllerService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def get_scope_types(self, action: GetScopeTypesAction) -> GetScopeTypesActionResult:
+    async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
         return GetScopeTypesActionResult(scope_types=list(ScopeType))
 
-    async def get_entity_types(self, action: GetEntityTypesAction) -> GetEntityTypesActionResult:
+    async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
         """Get all available entity types."""
         return GetEntityTypesActionResult(entity_types=list(EntityType))
 

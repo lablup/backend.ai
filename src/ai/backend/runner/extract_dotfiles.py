@@ -5,7 +5,7 @@ from pathlib import Path
 
 def extract_dotfiles() -> None:
     try:
-        with open("/home/config/dotfiles.json") as fr:
+        with Path("/home/config/dotfiles.json").open() as fr:
             dotfiles = json.loads(fr.read())
     except FileNotFoundError:
         return

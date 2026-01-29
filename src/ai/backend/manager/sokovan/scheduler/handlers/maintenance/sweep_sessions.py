@@ -77,7 +77,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        scaling_group: str,
+        _scaling_group: str,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep stale sessions including those with pending timeout.

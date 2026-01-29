@@ -512,7 +512,7 @@ async def stream_proxy(
         """Update connection tracker with current timestamp."""
         await valkey_live.update_app_connection_tracker(str(kernel_id), service, stream_id)
 
-    async def refresh_cb(kernel_id_str: str, data: bytes) -> None:
+    async def refresh_cb(_kernel_id_str: str, _data: bytes) -> None:
         await asyncio.shield(
             rpc_ptask_group.create_task(
                 call_non_bursty(
@@ -636,7 +636,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
 
 async def handle_kernel_terminating(
     app: web.Application,
-    source: AgentId,
+    _source: AgentId,
     event: KernelTerminatingBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]

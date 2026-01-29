@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import click
 from tabulate import tabulate
@@ -61,7 +62,7 @@ def create(
     """
 
     if template_path:
-        with open(template_path) as fr:
+        with Path(template_path).open() as fr:
             body = fr.read()
     else:
         body = ""
@@ -168,7 +169,7 @@ def update(template_id: str, template_path: str | None, owner_access_key: str | 
     """
 
     if template_path:
-        with open(template_path) as fr:
+        with Path(template_path).open() as fr:
             body = fr.read()
     else:
         body = ""

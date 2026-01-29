@@ -37,7 +37,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
         print_fail(f"Failed to download the SSH key from the session (exit: {e.returncode}):")
         print(e.stdout.decode())
         sys.exit(ExitCode.FAILURE)
-    os.rename(key_filename, key_path)
+    Path(key_filename).rename(key_path)
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
@@ -67,4 +67,4 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     finally:
         proxy_proc.send_signal(signal.SIGINT)
         proxy_proc.wait()
-        os.unlink(key_path)
+        Path(key_path).unlink()

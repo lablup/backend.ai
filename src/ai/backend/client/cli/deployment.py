@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
@@ -75,7 +76,8 @@ def create_deployment_cmd(
 
     with Session() as session:
         try:
-            with open(config_file, encoding="utf-8") as f:
+            config_file_path = Path(config_file)
+            with config_file_path.open(encoding="utf-8") as f:
                 config_data = json.load(f)
 
             request = CreateDeploymentRequest.model_validate(config_data)
@@ -262,7 +264,8 @@ def create_revision_cmd(
 
     with Session() as session:
         try:
-            with open(config_file, encoding="utf-8") as f:
+            config_file_path = Path(config_file)
+            with config_file_path.open(encoding="utf-8") as f:
                 config_data = json.load(f)
 
             request = CreateRevisionRequest.model_validate(config_data)

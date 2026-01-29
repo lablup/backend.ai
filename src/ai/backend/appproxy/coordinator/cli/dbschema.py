@@ -29,7 +29,7 @@ def cli(args: Any) -> None:
     help="The path to Alembic config file. [default: alembic-appproxy.ini]",
 )
 @click.pass_obj
-def show(cli_ctx: CLIContext, alembic_config: str) -> None:
+def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """Show the current schema information."""
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
@@ -72,7 +72,7 @@ def show(cli_ctx: CLIContext, alembic_config: str) -> None:
     help="The path to Alembic config file. [default: alembic-appproxy.ini]",
 )
 @click.pass_obj
-def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
+def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.

@@ -52,8 +52,8 @@ class ArtifactEventHandler:
 
     async def handle_model_verifying(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelVerifyingEvent,
     ) -> None:
         try:
@@ -141,8 +141,8 @@ class ArtifactEventHandler:
 
     async def handle_model_import_done(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelImportDoneEvent,
     ) -> None:
         try:
@@ -245,8 +245,8 @@ class ArtifactEventHandler:
 
     async def handle_model_metadata_fetch_done(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelMetadataFetchDoneEvent,
     ) -> None:
         model_info = event.model

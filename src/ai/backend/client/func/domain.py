@@ -148,7 +148,7 @@ class Domain(BaseFunction):
         vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
-        fields: Iterable[FieldSpec | str] | None = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Updates an existing domain.

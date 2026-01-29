@@ -574,7 +574,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
     return distro, volume_name
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
+async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner
@@ -633,8 +633,9 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
         proxy_worker_binary = pkg_resources.resource_filename(
             "ai.backend.agent.docker", f"linuxkit-metadata-proxy-worker.{arch}.bin"
         )
-        shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
-        os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
+        proxy_path = Path("/tmp/backend.ai/linuxkit-metadata-proxy")
+        shutil.copyfile(proxy_worker_binary, proxy_path)
+        proxy_path.chmod(0o755)
         server_port = local_config.agent.metadata_server_port
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(

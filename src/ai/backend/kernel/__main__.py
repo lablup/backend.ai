@@ -55,7 +55,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Replace stdin with a "null" file
     # (trying to read stdin will raise EOFError immediately afterwards.)
-    sys.stdin = open(os.devnull, encoding="latin1")
+    sys.stdin = Path(os.devnull).open(encoding="latin1")
     setproctitle("backend.ai: kernel runner")
     asyncio_run_forever(
         runner._init(args),

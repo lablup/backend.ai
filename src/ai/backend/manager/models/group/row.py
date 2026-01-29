@@ -671,7 +671,7 @@ class ProjectPermissionContextBuilder(
         return ProjectPermissionContext()
 
     async def build_ctx_in_container_registry_scope(
-        self, ctx: ClientContext, scope: ContainerRegistryScope
+        self, _ctx: ClientContext, scope: ContainerRegistryScope
     ) -> ProjectPermissionContext:
         permissions = MEMBER_PERMISSIONS
         return ProjectPermissionContext(

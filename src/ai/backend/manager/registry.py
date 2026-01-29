@@ -2090,7 +2090,7 @@ class AgentRegistry:
     async def download_single(
         self,
         session: SessionRow,
-        access_key: AccessKey,
+        _access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
@@ -2354,7 +2354,7 @@ class AgentRegistry:
     async def get_agent_local_config(
         self,
         agent_id: AgentId,
-        agent_addr: str,
+        _agent_addr: str,
     ) -> Mapping[str, str]:
         async with self._agent_client_pool.acquire(agent_id) as client:
             return await client.get_local_config()

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import os
 import pickle
 import re
 import signal
@@ -1168,7 +1167,7 @@ class AbstractAgent[
         if self.local_config.debug.log_heartbeats:
             _log = log.debug if isinstance(event, AgentHeartbeatEvent) else log.info
         else:
-            _log = (lambda *args: None) if isinstance(event, AgentHeartbeatEvent) else log.info
+            _log = (lambda *_args: None) if isinstance(event, AgentHeartbeatEvent) else log.info
         if self.local_config.debug.log_events:
             _log("produce_event({0})", event)
         if isinstance(event, KernelTerminatedAnycastEvent):
@@ -1678,9 +1677,9 @@ class AbstractAgent[
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
-            exc_type: type[BaseException],
+            exc_type: type[BaseException],  # noqa: ARG001
             exc_obj: BaseException,
-            exc_tb: TracebackType,
+            exc_tb: TracebackType,  # noqa: ARG001
         ) -> None:
             log.exception("unexpected error in lifecycle task", exc_info=exc_obj)
 
@@ -2024,11 +2023,10 @@ class AbstractAgent[
         auto_terminate = self.local_config.agent.force_terminate_abusing_containers
 
         def _read(path: Path) -> str:
-            with open(path) as fr:
-                return fr.read()
+            return path.read_text()
 
         def _rm(path: Path) -> None:
-            os.remove(path)
+            path.unlink()
 
         terminated_kernels: dict[str, ContainerLifecycleEvent] = {}
         abuse_report: dict[str, str] = {}
@@ -2099,7 +2097,7 @@ class AbstractAgent[
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         """
         Push the given image to the given registry.
@@ -2111,7 +2109,7 @@ class AbstractAgent[
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout_seconds: float | None,
     ) -> None:
         """
         Pull the given image from the given registry.
@@ -2155,7 +2153,7 @@ class AbstractAgent[
 
         bgtask_mgr = self.background_task_manager
 
-        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
+        async def _pull(_reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
             img_ref = ImageRef.from_image_config(img_conf)
             img_canonical = img_ref.canonical
 
@@ -2184,7 +2182,7 @@ class AbstractAgent[
                     image_pull_timeout = self.local_config.api.pull_timeout
                     try:
                         await self.pull_image(
-                            img_ref, img_conf["registry"], timeout=image_pull_timeout
+                            img_ref, img_conf["registry"], timeout_seconds=image_pull_timeout
                         )
 
                     except TimeoutError:
@@ -2413,7 +2411,7 @@ class AbstractAgent[
         session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
-        timeout: Optional[float] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> None:
         kernel_obj = self.kernel_registry.get(kernel_id, None)
         if kernel_obj is None:
@@ -2426,7 +2424,7 @@ class AbstractAgent[
         }
         try:
             # NOTE: asyncio.timeout(0) immediately times out
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(timeout_seconds):
                 while True:
                     try:
                         result = await self.execute(
@@ -2508,11 +2506,11 @@ class AbstractAgent[
         session_id: SessionId,
         kernel_id: KernelId,
         code_to_execute: str,
-        timeout: Optional[float] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> None:
         self._ongoing_exec_batch_tasks.add(
             asyncio.create_task(
-                self.execute_batch(session_id, kernel_id, code_to_execute, timeout),
+                self.execute_batch(session_id, kernel_id, code_to_execute, timeout_seconds),
             ),
         )
 
@@ -2623,7 +2621,7 @@ class AbstractAgent[
                         await self.pull_image(
                             ctx.image_ref,
                             kernel_config["image"]["registry"],
-                            timeout=image_pull_timeout,
+                            timeout_seconds=image_pull_timeout,
                         )
 
                     except TimeoutError as e:
@@ -3729,7 +3727,7 @@ class AbstractAgent[
 
 async def handle_volume_mount(
     context: AbstractAgent,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
     if context.local_config.agent.cohabiting_storage_proxy:
@@ -3777,7 +3775,7 @@ async def handle_volume_mount(
 
 async def handle_volume_umount(
     context: AbstractAgent,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
     if context.local_config.agent.cohabiting_storage_proxy:

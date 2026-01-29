@@ -165,8 +165,31 @@ async def push_session_events(
                 raise InvalidArgument(f"Invalid scope: {scope}")
 
     async with sse_response(request) as resp:
-        while not resp.prepared:
-            await asyncio.sleep(0.1)
+        # Wait for response to be prepared using asyncio.Event pattern
+        ready_event = asyncio.Event()
+
+        async def check_prepared() -> None:
+            # Poll until prepared, setting event when ready
+            max_iterations = 50  # 5 seconds timeout at 0.1s per iteration
+            for _ in range(max_iterations):
+                if resp.prepared:
+                    ready_event.set()
+                    return
+                await asyncio.sleep(0.1)
+            # If not ready after timeout, still set the event to avoid hanging
+            ready_event.set()
+
+        check_task = asyncio.create_task(check_prepared())
+        try:
+            await ready_event.wait()
+        finally:
+            if not check_task.done():
+                check_task.cancel()
+                try:
+                    await check_task
+                except asyncio.CancelledError:
+                    pass
+
         propagator = SessionEventPropagator(resp, root_ctx.db, filters)
         root_ctx.event_hub.register_event_propagator(propagator, aliases)
         try:
@@ -231,7 +254,7 @@ async def push_background_task_events(
 
 async def _propagate_events(
     app: web.Application,
-    agent_id: AgentId,
+    _agent_id: AgentId,
     event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
 ) -> None:
     """

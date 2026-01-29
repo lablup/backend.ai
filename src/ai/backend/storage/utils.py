@@ -38,7 +38,7 @@ async def check_params(
     checker: Optional[t.Trafaret],
     *,
     read_from: CheckParamSource = CheckParamSource.BODY,
-    auth_required: bool = True,
+    _auth_required: bool = True,
 ) -> AsyncIterator[Any]:
     if checker is None:
         if request.can_read_body:

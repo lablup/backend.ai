@@ -333,7 +333,7 @@ class CPUPlugin(AbstractComputePlugin):
                 return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
 
-        async def api_impl(cid: str, pids: list[int]) -> list[Optional[Decimal]]:
+        async def api_impl(_cid: str, _pids: list[int]) -> list[Optional[Decimal]]:
             return []
 
         per_process_cpu_util = {}
@@ -597,7 +597,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
-        def get_scratch_size(container_id: str) -> int:
+        def get_scratch_size(_container_id: str) -> int:
             # Temporarily disabled as this function incurs too much delay with
             # a large number of files in scratch dirs, causing indefinite accumulation of
             # stat collector tasks and slowing down everything.
@@ -853,7 +853,7 @@ class MemoryPlugin(AbstractComputePlugin):
             return None, None, None
 
         async def api_impl(
-            cid: str, pids: list[int]
+            _cid: str, _pids: list[int]
         ) -> list[tuple[Optional[int], Optional[int], Optional[int]]]:
             return []
 

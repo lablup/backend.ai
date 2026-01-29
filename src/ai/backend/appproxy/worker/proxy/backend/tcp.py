@@ -71,7 +71,7 @@ class TCPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(interval: float) -> None:
+        async def _last_access_marker_task(_interval: float) -> None:
             await self.mark_last_used_time(route)
 
         route = self.selected_route

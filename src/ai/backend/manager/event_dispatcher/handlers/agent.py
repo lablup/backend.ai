@@ -74,7 +74,7 @@ class AgentEventHandler:
 
     async def handle_agent_started(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: AgentStartedEvent,
     ) -> None:
@@ -89,7 +89,7 @@ class AgentEventHandler:
 
     async def handle_agent_terminated(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: AgentTerminatedEvent,
     ) -> None:
@@ -121,7 +121,7 @@ class AgentEventHandler:
 
     async def handle_agent_heartbeat(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: AgentHeartbeatEvent,
     ) -> None:
@@ -134,7 +134,7 @@ class AgentEventHandler:
     # Use remove_agent_from_images_by_id instead of this if possible
     async def handle_agent_images_remove(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: AgentImagesRemoveEvent,
     ) -> None:
@@ -147,7 +147,7 @@ class AgentEventHandler:
 
     async def handle_agent_installed_images_remove(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: AgentInstalledImagesRemoveEvent,
     ) -> None:
@@ -159,7 +159,7 @@ class AgentEventHandler:
         )
 
     async def handle_check_agent_resource(
-        self, context: None, source: AgentId, event: DoAgentResourceCheckEvent
+        self, _context: None, source: AgentId, _event: DoAgentResourceCheckEvent
     ) -> None:
         async with self._db.begin_readonly() as conn:
             query = (

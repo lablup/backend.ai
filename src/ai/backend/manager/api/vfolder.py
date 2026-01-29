@@ -1704,7 +1704,7 @@ async def _delete(
     root_ctx: RootContext,
     vfolder_row: Mapping[str, Any],
     user_uuid: uuid.UUID,
-    user_role: UserRole,
+    _user_role: UserRole,
     domain_name: str,
     resource_policy: Mapping[str, Any],
 ) -> None:
@@ -2694,9 +2694,9 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
 
 
 async def storage_task_exception_handler(
-    exc_type: type[BaseException],
+    exc_type: type[BaseException],  # noqa: ARG001
     exc_obj: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: TracebackType,  # noqa: ARG001
 ) -> None:
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 

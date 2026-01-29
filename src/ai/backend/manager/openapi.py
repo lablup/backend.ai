@@ -557,7 +557,7 @@ def main(output: Path) -> None:
     if output == "-" or output is None:
         print(pretty_json_str(openapi))
     else:
-        with open(output, mode="w") as fw:
+        with Path(output).open(mode="w") as fw:
             fw.write(pretty_json_str(openapi))
 
 

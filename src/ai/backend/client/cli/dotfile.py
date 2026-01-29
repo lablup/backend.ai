@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import click
 from tabulate import tabulate
@@ -63,7 +64,8 @@ def create(
     """
 
     if dotfile_path:
-        with open(dotfile_path) as fr:
+        dotfile_path_obj = Path(dotfile_path)
+        with dotfile_path_obj.open() as fr:
             body = fr.read()
     else:
         body = ""
@@ -223,7 +225,8 @@ def update(
     """
 
     if dotfile_path:
-        with open(dotfile_path) as fr:
+        dotfile_path_obj = Path(dotfile_path)
+        with dotfile_path_obj.open() as fr:
             body = fr.read()
     else:
         body = ""

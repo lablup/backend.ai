@@ -132,7 +132,6 @@ class DeploymentAPIHandler:
         creator = self.create_deployment_adapter.build_creator(
             body.parsed,
             user_uuid=user_ctx.user_uuid,
-            user_domain=user_ctx.user_domain,
         )
 
         # Call service action
@@ -265,7 +264,7 @@ class DeploymentAPIHandler:
     @api_handler
     async def create_revision(
         self,
-        path: PathParam[DeploymentPathParam],
+        _path: PathParam[DeploymentPathParam],
         body: BodyParam[CreateRevisionRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
@@ -368,8 +367,8 @@ class DeploymentAPIHandler:
     @api_handler
     async def deactivate_revision(
         self,
-        path: PathParam[RevisionPathParam],
-        processors_ctx: ProcessorsCtx,
+        _path: PathParam[RevisionPathParam],
+        _processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Deactivate a revision."""
         # Note: For deactivation, we can set the desired_replicas to 0 or use a specific action

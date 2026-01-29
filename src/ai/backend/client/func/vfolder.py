@@ -320,7 +320,7 @@ class VFolderByName(BaseFunction):
             return await resp.text()
 
     def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]) -> None:
-        with open(file_path, mode) as f:
+        with file_path.open(mode) as f:
             while True:
                 chunk = q.get()
                 if not chunk:
@@ -511,9 +511,9 @@ class VFolderByName(BaseFunction):
                 upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:
-                input_file = open(base_path / file_path, "rb")
+                input_file = (base_path / file_path).open("rb")
             else:
-                input_file = open(str(Path(file_path).relative_to(base_path)), "rb")
+                input_file = Path(file_path).relative_to(base_path).open("rb")
             print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
             # TODO: refactor out the progress bar
             uploader = tus_client.async_uploader(

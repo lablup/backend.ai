@@ -31,7 +31,7 @@ PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"
 def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2) -> Iterator[None]:
     if not path.exists():
         path.touch()
-    file = open(path, "wb")
+    file = path.open("wb")
     acquired = False
     try:
         for _ in range(max_retries):

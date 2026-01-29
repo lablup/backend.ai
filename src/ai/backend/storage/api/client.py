@@ -179,7 +179,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             raise InvalidAPIParameters(extra_msg="The file is not a regular file.")
         if request.method == "HEAD":
             ifrange: datetime | None = request.if_range
-            mtime = os.stat(file_path).st_mtime
+            mtime = file_path.stat().st_mtime
             last_mdt = datetime.fromtimestamp(mtime, tz=UTC)
             resp_status = 200
             if ifrange is not None and mtime <= ifrange.timestamp():
@@ -228,7 +228,7 @@ async def download_directory_as_archive(
         """Iterable to async iterable"""
 
         def _consume(
-            loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
+            _loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
         ) -> None:
             for item in iter:
                 q.put(item)
@@ -422,7 +422,7 @@ async def tus_options(request: web.Request) -> web.Response:
 
 
 async def prepare_tus_session_headers(
-    request: web.Request,
+    _request: web.Request,
     token_data: Mapping[str, Any],
     volume: AbstractVolume,
 ) -> MutableMapping[str, str]:

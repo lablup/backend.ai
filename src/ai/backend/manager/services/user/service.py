@@ -75,7 +75,6 @@ class UserService:
         user_data_result = await self._user_repository.update_user_validated(
             email=action.email,
             updater=action.updater,
-            requester_uuid=None,  # No user context available in ModifyUserAction
         )
         return ModifyUserActionResult(
             data=user_data_result,
@@ -84,7 +83,6 @@ class UserService:
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
         await self._user_repository.soft_delete_user_validated(
             email=action.email,
-            requester_uuid=None,  # No user context available in DeleteUserAction
         )
         return DeleteUserActionResult()
 
@@ -167,7 +165,9 @@ class UserService:
         )
         return UserMonthStatsActionResult(stats=stats)
 
-    async def admin_month_stats(self, action: AdminMonthStatsAction) -> AdminMonthStatsActionResult:
+    async def admin_month_stats(
+        self, _action: AdminMonthStatsAction
+    ) -> AdminMonthStatsActionResult:
         stats = await self._user_repository.get_admin_time_binned_monthly_stats(
             valkey_stat_client=self._valkey_stat_client,
         )

@@ -258,14 +258,14 @@ async def shutdown_app(app: web.Application) -> None:
     pass
 
 
-async def prepare_hook(request: web.Request, response: web.StreamResponse) -> None:
+async def prepare_hook(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 
 @aiotools.server_context
 async def watcher_server(
-    loop: asyncio.AbstractEventLoop,
-    pidx: int,
+    _loop: asyncio.AbstractEventLoop,
+    _pidx: int,
     args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     global shutdown_enabled
@@ -337,7 +337,7 @@ async def watcher_server(
                 log.info("shutting down...")
                 if stop_sig == signal.SIGALRM and shutdown_enabled:
                     log.warning("shutting down the agent node!")
-                    subprocess.run(["shutdown", "-h", "now"])
+                    await asyncio.to_thread(subprocess.run, ["shutdown", "-h", "now"])
                 await runner.cleanup()
 
 
@@ -363,7 +363,7 @@ async def watcher_server(
 )
 @click.pass_context
 def main(
-    ctx: click.Context,
+    _ctx: click.Context,
     config_path: str,
     log_level: LogLevel,
     debug: bool,

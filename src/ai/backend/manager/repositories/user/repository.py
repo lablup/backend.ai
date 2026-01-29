@@ -224,7 +224,6 @@ class UserRepository:
         self,
         email: str,
         updater: Updater[UserRow],
-        requester_uuid: Optional[UUID],
     ) -> UserData:
         """
         Update user with ownership validation and handle role/group changes.
@@ -299,7 +298,7 @@ class UserRepository:
             return UserData.from_row(updated_user)
 
     @user_repository_resilience.apply()
-    async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
+    async def soft_delete_user_validated(self, email: str) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
         """
@@ -377,7 +376,7 @@ class UserRepository:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    def _validate_user_access(self, user_row: UserRow, requester_uuid: Optional[UUID]) -> bool:
+    def _validate_user_access(self, _user_row: UserRow, _requester_uuid: Optional[UUID]) -> bool:
         """Private method to validate user access - can be extended for ownership logic."""
         # For now, allow access - this can be extended with ownership validation
         return True

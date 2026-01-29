@@ -1,7 +1,7 @@
-import os
 import re
 import shutil
 from dataclasses import dataclass
+from pathlib import Path
 from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -53,10 +53,10 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
     def _verify_downloaded_file_identical(
         self, original_file_path: str, downloaded_file_path: str
     ) -> None:
-        with open(original_file_path, encoding="utf-8") as original_file:
+        with Path(original_file_path).open(encoding="utf-8") as original_file:
             original_content = original_file.read()
 
-        with open(downloaded_file_path, encoding="utf-8") as downloaded_file:
+        with Path(downloaded_file_path).open(encoding="utf-8") as downloaded_file:
             downloaded_content = downloaded_file.read()
 
         assert original_content == downloaded_content, (
@@ -78,24 +78,28 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
 
     async def _create_dummy_file(self) -> _UploadFileMeta:
         test_spec = TestSpecMetaContext.current()
-        current_dir = os.getcwd()
-        base_dir = os.path.join(current_dir, f"test_{test_spec.test_id}")
+        current_dir = Path.cwd()
+        base_dir = current_dir / f"test_{test_spec.test_id}"
 
-        os.makedirs(base_dir, exist_ok=True)
+        base_dir.mkdir(parents=True, exist_ok=True)
 
         file_name = f"{test_spec.test_id}.txt"
-        full_path = os.path.join(base_dir, file_name)
+        full_path = base_dir / file_name
         file_content = f"This is a dummy file for test {test_spec.test_id}."
 
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(file_content)
+        full_path.write_text(file_content, encoding="utf-8")
 
         return _UploadFileMeta(
-            file_name=file_name, full_path=full_path, base_dir=base_dir, content=file_content
+            file_name=file_name,
+            full_path=str(full_path),
+            base_dir=str(base_dir),
+            content=file_content,
         )
 
     async def _cleanup_dummy_file(self, file_meta: _UploadFileMeta) -> None:
-        if os.path.exists(file_meta.full_path):
-            os.remove(file_meta.full_path)
-        if os.path.exists(file_meta.base_dir):
-            shutil.rmtree(file_meta.base_dir)
+        full_path = Path(file_meta.full_path)
+        base_dir = Path(file_meta.base_dir)
+        if full_path.exists():
+            full_path.unlink()
+        if base_dir.exists():
+            shutil.rmtree(base_dir)

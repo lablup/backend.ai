@@ -753,7 +753,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     }),
     loads=_json_loads,
 )
-async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+async def get_commit_status(request: web.Request, _params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -783,7 +783,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     }),
     loads=_json_loads,
 )
-async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+async def get_abusing_report(request: web.Request, _params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -941,7 +941,7 @@ async def convert_session_to_image(
 
 
 @catch_unexpected(log)
-async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
+async def check_agent_lost(root_ctx: RootContext, _interval: float) -> None:
     try:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
@@ -959,7 +959,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
 
 
 @catch_unexpected(log)
-async def report_stats(root_ctx: RootContext, interval: float) -> None:
+async def report_stats(root_ctx: RootContext, _interval: float) -> None:
     try:
         stats_monitor = root_ctx.stats_monitor
         await stats_monitor.report_metric(

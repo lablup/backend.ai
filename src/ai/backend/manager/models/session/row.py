@@ -1343,7 +1343,6 @@ class SessionRow(Base):
         db: ExtendedAsyncSAEngine,
         session_id: SessionId,
         success: bool,
-        exit_code: int,
     ) -> None:
         # TODO: store exit code?
         data = {

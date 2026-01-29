@@ -438,7 +438,6 @@ class TestUserRepository:
         result = await user_repository.update_user_validated(
             email=sample_user_email,
             updater=updater,
-            requester_uuid=None,
         )
 
         assert result is not None
@@ -461,7 +460,6 @@ class TestUserRepository:
             await user_repository.update_user_validated(
                 email="nonexistent@example.com",
                 updater=updater,
-                requester_uuid=None,
             )
 
     @pytest.mark.asyncio
@@ -472,9 +470,7 @@ class TestUserRepository:
         sample_user_email: str,
     ) -> None:
         """Test successful user soft deletion"""
-        await user_repository.soft_delete_user_validated(
-            email=sample_user_email, requester_uuid=None
-        )
+        await user_repository.soft_delete_user_validated(email=sample_user_email)
 
         # Verify the user status is now DELETED
         async with db_with_cleanup.begin_session() as session:
@@ -491,9 +487,7 @@ class TestUserRepository:
     ) -> None:
         """Test soft delete for non-existent user succeeds silently (idempotent)"""
         # The method is idempotent - it doesn't raise an error for non-existent users
-        await user_repository.soft_delete_user_validated(
-            email="nonexistent@example.com", requester_uuid=None
-        )
+        await user_repository.soft_delete_user_validated(email="nonexistent@example.com")
         # No exception should be raised
 
     def test_validate_user_access_owner(

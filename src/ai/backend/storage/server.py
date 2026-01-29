@@ -547,7 +547,7 @@ async def service_discovery_ctx(
         sd_loop.close()
 
 
-async def _on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def _on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
