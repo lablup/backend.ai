@@ -3009,8 +3009,6 @@ type Mutation {
   
   The image is not removed from the database but its status changes to DELETED.
   This is a soft delete operation.
-  
-  **Required Role:** SUPERADMIN, ADMIN, or USER
   """
   forgetImage(input: ForgetImageInputGQL!): ForgetImageResult!
 
@@ -3021,8 +3019,6 @@ type Mutation {
   
   The image is permanently removed from the database. Optionally, the image
   can also be untagged from the container registry (HarborV2 only).
-  
-  **Required Role:** SUPERADMIN, ADMIN, or USER
   """
   purgeImage(input: PurgeImageInputGQL!): PurgeImageResult!
 
@@ -3033,8 +3029,6 @@ type Mutation {
   
   An alias is an alternative name that can be used to reference the image.
   Multiple aliases can be created for the same image.
-  
-  **Required Role:** SUPERADMIN
   """
   aliasImage(input: AliasImageInputGQL!): AliasImageResult!
 
@@ -3042,8 +3036,6 @@ type Mutation {
   Added in 26.2.0.
   
   Remove an alias from an image.
-  
-  **Required Role:** SUPERADMIN
   """
   dealiasImage(input: DealiasImageInputGQL!): DealiasImageResult!
 
@@ -3054,8 +3046,6 @@ type Mutation {
   
   This removes any user-defined resource limits and reverts to the defaults
   specified in the image labels.
-  
-  **Required Role:** SUPERADMIN
   """
   clearImageResourceLimit(input: ClearImageResourceLimitInputGQL!): ClearImageResourceLimitResult!
 }
