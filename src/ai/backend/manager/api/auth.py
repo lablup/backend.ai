@@ -24,7 +24,7 @@ from dateutil.tz import tzutc
 from ai.backend.common import validators as tx
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.dto.manager.auth.field import (
+from ai.backend.common.dto.manager.auth.types import (
     AuthResponseType,
     AuthSuccessResponse,
     AuthTokenType,

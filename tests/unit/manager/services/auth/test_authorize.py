@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from aiohttp import web
 
-from ai.backend.common.dto.manager.auth.field import AuthTokenType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
