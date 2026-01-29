@@ -1244,7 +1244,7 @@ async def filter_host_allowed_permission(
     return allowed_hosts
 
 
-async def _delete_vfolder_permission_rows(
+async def _delete_vfolder_invitation_rows(
     db_session: SASession,
     vfolder_row_ids: Iterable[uuid.UUID],
 ) -> None:
@@ -1252,7 +1252,7 @@ async def _delete_vfolder_permission_rows(
     await db_session.execute(stmt)
 
 
-async def _delete_vfolder_invitation_rows(
+async def _delete_vfolder_permission_rows(
     db_session: SASession,
     vfolder_row_ids: Iterable[uuid.UUID],
 ) -> None:
@@ -1281,13 +1281,27 @@ async def initiate_vfolder_deletion(
     force: bool = False,
 ) -> int:
     """Purges VFolder content from storage host."""
+    # Lazy import to avoid circular import
+    from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+    from ai.backend.manager.repositories.vfolder.purgers import (
+        VFolderInvitationBatchPurgerSpec,
+        VFolderPermissionBatchPurgerSpec,
+    )
+
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
     if vfolder_info_len == 0:
         return 0
 
-    async with db_engine.connect() as db_conn:
-        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
+    async with db_engine.begin_session() as db_session:
+        await execute_batch_purger(
+            db_session,
+            BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids)),
+        )
+        await execute_batch_purger(
+            db_session,
+            BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids)),
+        )
     await update_vfolder_status(
         db_engine,
         vfolder_ids,
