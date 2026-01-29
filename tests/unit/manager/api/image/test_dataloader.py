@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.data_loader.image.loader import load_images_by_ids
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageData
 
 
 class TestLoadImagesByIds:
