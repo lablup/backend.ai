@@ -61,10 +61,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_images_by_id import (
-    RescanImagesByIdAction,
-    RescanImagesByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
@@ -117,7 +113,6 @@ class ImageProcessors(AbstractProcessorPackage):
         ClearImageCustomResourceLimitByIdAction,
         ClearImageCustomResourceLimitByIdActionResult,
     ]
-    rescan_images_by_id: ActionProcessor[RescanImagesByIdAction, RescanImagesByIdActionResult]
     set_image_resource_limit_by_id: ActionProcessor[
         SetImageResourceLimitByIdAction, SetImageResourceLimitByIdActionResult
     ]
@@ -168,7 +163,6 @@ class ImageProcessors(AbstractProcessorPackage):
         self.clear_image_custom_resource_limit_by_id = ActionProcessor(
             service.clear_image_custom_resource_limit_by_id, action_monitors
         )
-        self.rescan_images_by_id = ActionProcessor(service.rescan_images_by_id, action_monitors)
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
@@ -192,6 +186,5 @@ class ImageProcessors(AbstractProcessorPackage):
             PurgeImagesAction.spec(),
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
-            RescanImagesByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
         ]
