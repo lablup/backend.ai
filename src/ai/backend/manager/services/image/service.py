@@ -42,6 +42,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
@@ -83,10 +87,6 @@ from ai.backend.manager.services.image.actions.rescan_images_by_id import (
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
-)
-from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
-    GetAliasesByImageIdsAction,
-    GetAliasesByImageIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,

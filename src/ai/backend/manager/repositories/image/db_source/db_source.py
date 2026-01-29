@@ -429,9 +429,7 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def query_aliases_by_image_ids(
-        self, image_ids: list[UUID]
-    ) -> dict[UUID, list[str]]:
+    async def query_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
         """
         Queries image aliases by image IDs.
         Returns a dictionary mapping image ID to list of alias strings.
