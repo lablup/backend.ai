@@ -4,7 +4,6 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
@@ -14,8 +13,6 @@ class ForgetImageAction(ImageAction):
     Deprecated. Use ForgetImageByIdAction instead.
     """
 
-    user_id: uuid.UUID
-    client_role: UserRole
     reference: str
     architecture: str
 
@@ -40,7 +37,6 @@ class ForgetImageActionResult(BaseActionResult):
 
 @dataclass
 class ForgetImageByIdAction(ImageAction):
-    user_id: uuid.UUID
     image_id: uuid.UUID
 
     @override

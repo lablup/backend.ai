@@ -395,10 +395,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
         mock_image_repository.soft_delete_image_by_id = AsyncMock(return_value=deleted_image)
 
-        action = ForgetImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=image_data.id,
-        )
+        action = ForgetImageByIdAction(image_id=image_data.id)
 
         with with_user(superadmin_user_data):
             result = await processors.forget_image_by_id.wait_for_complete(action)
@@ -414,15 +411,11 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         regular_user_data: UserData,
     ) -> None:
         """Regular user can forget image they own by ID."""
-        user_id = uuid.uuid4()
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=True)
         mock_image_repository.soft_delete_image_by_id = AsyncMock(return_value=deleted_image)
 
-        action = ForgetImageByIdAction(
-            user_id=user_id,
-            image_id=image_data.id,
-        )
+        action = ForgetImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
             result = await processors.forget_image_by_id.wait_for_complete(action)
@@ -441,10 +434,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         """Regular user cannot forget image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
-        action = ForgetImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=image_data.id,
-        )
+        action = ForgetImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
@@ -459,10 +449,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         """Forget non-existent image should raise ImageNotFound."""
         mock_image_repository.soft_delete_image_by_id = AsyncMock(side_effect=ImageNotFound())
 
-        action = ForgetImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=uuid.uuid4(),
-        )
+        action = ForgetImageByIdAction(image_id=uuid.uuid4())
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
@@ -599,10 +586,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         """Superadmin can purge any image by ID."""
         mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=image_data)
 
-        action = PurgeImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=image_data.id,
-        )
+        action = PurgeImageByIdAction(image_id=image_data.id)
 
         with with_user(superadmin_user_data):
             result = await processors.purge_image_by_id.wait_for_complete(action)
@@ -618,14 +602,10 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         regular_user_data: UserData,
     ) -> None:
         """Regular user can purge image they own by ID."""
-        user_id = uuid.uuid4()
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=True)
         mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=image_data)
 
-        action = PurgeImageByIdAction(
-            user_id=user_id,
-            image_id=image_data.id,
-        )
+        action = PurgeImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
             result = await processors.purge_image_by_id.wait_for_complete(action)
@@ -644,10 +624,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         """Regular user cannot purge image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
-        action = PurgeImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=image_data.id,
-        )
+        action = PurgeImageByIdAction(image_id=image_data.id)
 
         with with_user(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
@@ -662,10 +639,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         """Purge non-existent image should raise ImageNotFound."""
         mock_image_repository.delete_image_with_aliases = AsyncMock(side_effect=ImageNotFound())
 
-        action = PurgeImageByIdAction(
-            user_id=uuid.uuid4(),
-            image_id=uuid.uuid4(),
-        )
+        action = PurgeImageByIdAction(image_id=uuid.uuid4())
 
         with with_user(superadmin_user_data):
             with pytest.raises(ImageNotFound):
