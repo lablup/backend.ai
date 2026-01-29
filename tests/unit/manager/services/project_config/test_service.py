@@ -14,7 +14,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.contexts.user import UserData, with_user
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
@@ -73,7 +74,7 @@ def user_context(user_id: uuid.UUID, domain_name: str) -> Iterator[UserData]:
         is_authorized=True,
         is_admin=True,
         is_superadmin=True,
-        role="superadmin",
+        role=UserRole.SUPERADMIN,
         domain_name=domain_name,
     )
     with with_user(user_data):

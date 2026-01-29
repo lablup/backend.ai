@@ -9,7 +9,6 @@ It will be fixed in the future; for now understand them as the same concept.
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 import sqlalchemy as sa
 
@@ -44,7 +43,7 @@ class ProjectConfigDBSource:
         self._db = db
 
     async def resolve_project(
-        self, domain_name: Optional[str], project_id_or_name: uuid.UUID | str
+        self, domain_name: str | None, project_id_or_name: uuid.UUID | str
     ) -> ResolvedProject:
         """
         Resolve project identity (id + domain_name) in a single query.
@@ -92,7 +91,7 @@ class ProjectConfigDBSource:
         """
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
-            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
             return ProjectDotfilesResult(dotfiles=dotfiles, leftover_space=leftover_space)
@@ -111,7 +110,7 @@ class ProjectConfigDBSource:
         """Add a new dotfile to the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 
@@ -143,7 +142,7 @@ class ProjectConfigDBSource:
         """Update an existing dotfile in the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, _ = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, _ = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 
@@ -169,7 +168,7 @@ class ProjectConfigDBSource:
         """Remove a dotfile from the project in a single session."""
         async with self._db.begin_session() as session:
             conn = await session.connection()
-            dotfiles, _ = await query_group_dotfiles(conn, project_id)  # type: ignore[arg-type]
+            dotfiles, _ = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.project_config.actions.base import ProjectConfigAction
@@ -12,7 +12,7 @@ class DeleteDotfileAction(ProjectConfigAction):
     path: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.project_id_or_name)
 
     @override
@@ -26,5 +26,5 @@ class DeleteDotfileActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -9,7 +9,6 @@ It will be fixed in the future; for now understand them as the same concept.
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -48,7 +47,7 @@ class ProjectConfigRepository:
 
     @project_config_repository_resilience.apply()
     async def resolve_project(
-        self, domain_name: Optional[str], project_id_or_name: uuid.UUID | str
+        self, domain_name: str | None, project_id_or_name: uuid.UUID | str
     ) -> ResolvedProject:
         """
         Resolve project identity (id + domain_name) in a single query.

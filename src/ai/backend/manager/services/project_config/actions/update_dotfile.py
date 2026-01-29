@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.project_config.actions.base import ProjectConfigAction
@@ -15,7 +15,7 @@ class UpdateDotfileAction(ProjectConfigAction):
     permission: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.project_id_or_name)
 
     @override
@@ -29,5 +29,5 @@ class UpdateDotfileActionResult(BaseActionResult):
     project_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.project_id)
