@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
     GetAliasesByImageIdsAction,
 )
@@ -11,7 +11,7 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 
 async def load_aliases_by_image_ids(
     processor: ImageProcessors,
-    image_ids: Sequence[uuid.UUID],
+    image_ids: Sequence[ImageID],
 ) -> list[list[str]]:
     """Batch load image aliases by image IDs.
 
