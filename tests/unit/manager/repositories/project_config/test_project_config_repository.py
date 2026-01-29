@@ -1,4 +1,10 @@
-"""Tests for ProjectConfigRepository functionality."""
+"""Tests for ProjectConfigRepository functionality.
+
+As there is an ongoing migration of renaming group to project,
+there are some occurrences where "group" is being used as "project"
+(e.g., GroupRow, ProjectType).
+It will be fixed in the future; for now understand them as the same concept.
+"""
 
 from __future__ import annotations
 
@@ -35,14 +41,14 @@ class TestProjectConfigRepository:
         return ProjectConfigRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def sample_group(
+    async def sample_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> tuple[uuid.UUID, str, str]:
-        """Returns (group_id, group_name, domain_name)."""
+        """Returns (project_id, project_name, domain_name)."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         policy_name = f"policy-{uuid.uuid4().hex[:8]}"
-        group_id = uuid.uuid4()
-        group_name = f"test-group-{uuid.uuid4().hex[:8]}"
+        project_id = uuid.uuid4()
+        project_name = f"test-project-{uuid.uuid4().hex[:8]}"
         dotfiles = [{"path": ".bashrc", "perm": "644", "data": "# test"}]
 
         async with db_with_cleanup.begin_session() as session:
@@ -66,8 +72,8 @@ class TestProjectConfigRepository:
             )
             session.add(
                 GroupRow(
-                    id=group_id,
-                    name=group_name,
+                    id=project_id,
+                    name=project_name,
                     is_active=True,
                     domain_name=domain_name,
                     total_resource_slots={},
@@ -78,53 +84,53 @@ class TestProjectConfigRepository:
                 )
             )
             await session.commit()
-        return group_id, group_name, domain_name
+        return project_id, project_name, domain_name
 
     @pytest.mark.asyncio
-    async def test_resolve_group_by_uuid(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+    async def test_resolve_project_by_uuid(
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
-        group_id, _, domain_name = sample_group
+        project_id, _, domain_name = sample_project
 
-        result = await repo.resolve_group(None, group_id)
+        result = await repo.resolve_project(None, project_id)
 
-        assert result.id == group_id
+        assert result.id == project_id
         assert result.domain_name == domain_name
 
     @pytest.mark.asyncio
-    async def test_resolve_group_by_name(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+    async def test_resolve_project_by_name(
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
-        group_id, group_name, domain_name = sample_group
+        project_id, project_name, domain_name = sample_project
 
-        result = await repo.resolve_group(domain_name, group_name)
+        result = await repo.resolve_project(domain_name, project_name)
 
-        assert result.id == group_id
+        assert result.id == project_id
         assert result.domain_name == domain_name
 
     @pytest.mark.asyncio
-    async def test_resolve_group_by_name_missing_domain(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+    async def test_resolve_project_by_name_missing_domain(
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
-        _, group_name, _ = sample_group
+        _, project_name, _ = sample_project
 
         with pytest.raises(InvalidAPIParameters):
-            await repo.resolve_group(None, group_name)
+            await repo.resolve_project(None, project_name)
 
     @pytest.mark.asyncio
-    async def test_resolve_group_not_found(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+    async def test_resolve_project_not_found(
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
         with pytest.raises(ProjectNotFound):
-            await repo.resolve_group(None, uuid.uuid4())
+            await repo.resolve_project(None, uuid.uuid4())
 
     @pytest.mark.asyncio
     async def test_get_dotfiles(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
-        group_id, _, _ = sample_group
+        project_id, _, _ = sample_project
 
-        result = await repo.get_dotfiles(group_id)
+        result = await repo.get_dotfiles(project_id)
 
         assert len(result.dotfiles) == 1
         assert result.dotfiles[0]["path"] == ".bashrc"
@@ -132,16 +138,16 @@ class TestProjectConfigRepository:
 
     @pytest.mark.asyncio
     async def test_modify_dotfile(
-        self, repo: ProjectConfigRepository, sample_group: tuple[uuid.UUID, str, str]
+        self, repo: ProjectConfigRepository, sample_project: tuple[uuid.UUID, str, str]
     ) -> None:
-        group_id, _, _ = sample_group
+        project_id, _, _ = sample_project
 
         await repo.modify_dotfile(
-            group_id,
+            project_id,
             DotfileInput(path=".bashrc", permission="755", data="# updated"),
         )
 
-        result = await repo.get_dotfiles(group_id)
+        result = await repo.get_dotfiles(project_id)
         assert len(result.dotfiles) == 1
         assert result.dotfiles[0]["path"] == ".bashrc"
         assert result.dotfiles[0]["data"] == "# updated"
