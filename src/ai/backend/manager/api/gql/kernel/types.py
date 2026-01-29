@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import TYPE_CHECKING, Self
 from uuid import UUID
 
 import strawberry
@@ -13,6 +15,9 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ServicePortEntryGQL,
@@ -26,6 +31,14 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
 KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.2.0")
+
+
+@dataclass(frozen=True)
+class KernelStatusInMatchSpec:
+    """Specification for KernelStatus IN operations (IN, NOT IN)."""
+
+    values: list[KernelStatus]
+    negated: bool
 
 
 @strawberry.enum(
@@ -44,14 +57,32 @@ class KernelStatusFilterGQL:
     in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelStatusGQL] | None = None
 
-    def build_condition(self) -> QueryCondition | None:
+    def build_query_condition(
+        self,
+        in_factory: Callable[[KernelStatusInMatchSpec], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build a query condition from this filter using the provided factory callable.
+
+        Args:
+            in_factory: Factory function for IN operations (IN, NOT IN)
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
         if self.in_:
-            return KernelConditions.by_statuses(self.in_)
+            return in_factory(
+                KernelStatusInMatchSpec(
+                    values=self.in_,
+                    negated=False,
+                )
+            )
         if self.not_in:
-            # For not_in, we need all statuses except the ones in the list
-            all_statuses = set(KernelStatus)
-            allowed_statuses = all_statuses - set(self.not_in)
-            return KernelConditions.by_statuses(list(allowed_statuses))
+            return in_factory(
+                KernelStatusInMatchSpec(
+                    values=self.not_in,
+                    negated=True,
+                )
+            )
         return None
 
 
@@ -73,7 +104,9 @@ class KernelFilterGQL(GQLFilter):
             if condition:
                 conditions.append(condition)
         if self.status:
-            condition = self.status.build_condition()
+            condition = self.status.build_query_condition(
+                KernelConditions.by_status_filter_in,
+            )
             if condition:
                 conditions.append(condition)
         if self.session_id:
