@@ -16,7 +16,7 @@ from ai.backend.common.metrics.types import (
     UNDEFINED,
     UTILIZATION_METRIC_DETENTION,
 )
-from ai.backend.common.types import AgentId, KernelId, MetricKey, SessionId
+from ai.backend.common.types import PID, AgentId, ContainerId, KernelId, MetricKey, SessionId
 
 from .types import (
     ALL_METRIC_VALUE_TYPES,
@@ -81,14 +81,16 @@ class RPCMetricObserver:
 
 class UtilizationMetricObserver:
     _instance: Optional[Self] = None
-    _removal_tasks: dict[KernelId, asyncio.Task[None]]
+    _removal_kernel_tasks: dict[KernelId, asyncio.Task[None]]
+    _removal_process_tasks: dict[tuple[ContainerId, PID], asyncio.Task[None]]
 
     _container_metric: Gauge
     _device_metric: Gauge
     _process_metric: Gauge
 
     def __init__(self) -> None:
-        self._removal_tasks = {}
+        self._removal_kernel_tasks = {}
+        self._removal_process_tasks = {}
         self._container_metric = Gauge(
             name="backendai_container_utilization",
             documentation="Container utilization metrics",
@@ -179,11 +181,11 @@ class UtilizationMetricObserver:
                         continue
 
         def callback(_task: asyncio.Task) -> None:
-            self._removal_tasks.pop(kernel_id, None)
+            self._removal_kernel_tasks.pop(kernel_id, None)
             kernel_metrics.pop(kernel_id, None)
 
         task = asyncio.create_task(remove_later())
-        self._removal_tasks[kernel_id] = task
+        self._removal_kernel_tasks[kernel_id] = task
         task.add_done_callback(functools.partial(callback))
 
     def observe_device_metric(
@@ -216,6 +218,55 @@ class UtilizationMetricObserver:
                 pid=metric.pid,
                 value_type=metric_value_type,
             ).set(float(value))
+
+    async def lazy_remove_process_metric(
+        self,
+        process_metrics: MutableMapping[ContainerId, dict[PID, dict[MetricKey, Metric]]],
+        *,
+        agent_id: AgentId,
+        kernel_id: KernelId,
+        session_id: SessionId | None,
+        owner_user_id: uuid.UUID | None,
+        project_id: uuid.UUID | None,
+        container_id: ContainerId,
+        pid: PID,
+        keys: Iterable[MetricKey],
+    ) -> None:
+        removal_key = (container_id, pid)
+
+        # Skip if removal is already scheduled
+        existing_task = self._removal_process_tasks.get(removal_key)
+        if existing_task is not None and not existing_task.done():
+            return
+
+        async def remove_later() -> None:
+            await asyncio.sleep(UTILIZATION_METRIC_DETENTION)
+            for key in keys:
+                for value_type in ALL_METRIC_VALUE_TYPES:
+                    try:
+                        self._process_metric.remove(
+                            key,
+                            agent_id,
+                            kernel_id,
+                            session_id or UNDEFINED,
+                            owner_user_id or UNDEFINED,
+                            project_id or UNDEFINED,
+                            container_id,
+                            pid,
+                            value_type,
+                        )
+                    except KeyError:
+                        continue
+
+        def callback(task: asyncio.Task) -> None:
+            self._removal_process_tasks.pop(removal_key, None)
+            # Clean up local cache
+            if container_id in process_metrics:
+                process_metrics[container_id].pop(pid, None)
+
+        task = asyncio.create_task(remove_later())
+        self._removal_process_tasks[removal_key] = task
+        task.add_done_callback(functools.partial(callback))
 
 
 class SyncContainerLifecycleObserver:
