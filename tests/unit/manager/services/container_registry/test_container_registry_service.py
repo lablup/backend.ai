@@ -180,6 +180,8 @@ def sample_image_data() -> ImageData:
         accelerators="",
         labels=ImageLabelsData(label_data={}),
         resources=ImageResourcesData(resources_data={}),
+        resource_limits=[],
+        tags=[],
     )
 
 

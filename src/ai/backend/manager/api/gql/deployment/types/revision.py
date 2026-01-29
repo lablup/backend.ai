@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
-from ai.backend.manager.api.gql.image import Image
+from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFolder

@@ -30,7 +30,7 @@ class ImageLabelEntryGQL:
 class ImageResourceLimitGQL:
     key: str
     min: str
-    max: str | None
+    max: str
 ```
 
 ---
@@ -42,10 +42,12 @@ class ImageResourceLimitGQL:
 @strawberry.type(name="ImageIdentityInfo")
 class ImageIdentityInfoGQL:
     canonical_name: str       # Full canonical name (e.g., cr.backend.ai/stable/python:3.9)
-    namespace: str            # Base image namespace (e.g., python)
+    namespace: str            # Image namespace/path within the registry (e.g., stable/python)
     architecture: str         # CPU architecture (e.g., x86_64, aarch64)
-    aliases: list[str]        # Image aliases
 ```
+
+> **Note**: `aliases` field is not included because it requires additional database joins.
+> It may be added as a separate field resolver in a future iteration.
 
 ### ImageMetadataInfoGQL
 ```python
