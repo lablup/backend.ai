@@ -395,11 +395,11 @@ class ImageService:
         """
         Creates an alias for an image by its ID.
         """
-        image_id, image_alias = await self._image_repository.add_image_alias_by_id(
+        image_alias = await self._image_repository.add_image_alias_by_id(
             action.image_id, action.alias
         )
         return AliasImageByIdActionResult(
-            image_id=image_id,
+            image_id=action.image_id,
             image_alias=image_alias,
         )
 

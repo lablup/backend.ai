@@ -969,9 +969,7 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         image_alias_data: ImageAliasData,
     ) -> None:
         """Alias image by ID with valid data should return image alias."""
-        mock_image_repository.add_image_alias_by_id = AsyncMock(
-            return_value=(image_id, image_alias_data)
-        )
+        mock_image_repository.add_image_alias_by_id = AsyncMock(return_value=image_alias_data)
 
         action = AliasImageByIdAction(
             image_id=image_id,
