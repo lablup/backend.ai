@@ -130,6 +130,7 @@ BEP numbers start from 1000.
 | [1040](BEP-1040-multiple-path-zip-download-implementation.md) | Multiple Files Download in ZIP | TaekYoung Kwon | Draft |
 | [1041](BEP-1041-scope-based-graphql-api-naming.md) | Scope-Based GraphQL API Naming Convention | HyeokJin Kim | Draft |
 | [1042](BEP-1042-mypy-strict-mode-migration.md) | MyPy Strict Mode Migration | HyeokJin Kim | Draft |
+| [1043](BEP-1043-multi-agent-device-split.md) | Multi-Agent Device Split | Hyunhoi Koo | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
