@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -323,7 +322,7 @@ class ScalingGroup(graphene.ObjectType):
 
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
-    ) -> Optional[int]:
+    ) -> int | None:
         if self._is_masked:
             return None
         from .agent import Agent
@@ -336,7 +335,7 @@ class ScalingGroup(graphene.ObjectType):
 
     async def resolve_agent_total_resource_slots_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         if self._is_masked:
             return None
         from ai.backend.manager.data.agent.types import AgentStatus
@@ -382,7 +381,7 @@ class ScalingGroup(graphene.ObjectType):
         agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
 
         def _compare_each_resource_and_get_max(
-            val1: ResourceSlot, val2: Optional[ResourceSlot]
+            val1: ResourceSlot, val2: ResourceSlot | None
         ) -> ResourceSlot:
             if val2 is None:
                 return val1
@@ -392,7 +391,7 @@ class ScalingGroup(graphene.ObjectType):
                 return_val[key] = max(val1[key], val2[key])
             return return_val
 
-        result: Optional[ResourceSlot] = None
+        result: ResourceSlot | None = None
         for agent_row in agent_list:
             result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
         return dict(result.to_json()) if result is not None else {}
@@ -428,7 +427,7 @@ class ScalingGroup(graphene.ObjectType):
             occupied_slots += kernel.occupied_slots
         return occupied_slots.to_json()
 
-    async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> Optional[float]:
+    async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> float | None:
         graph_ctx: GraphQueryContext = info.context
         result = await graph_ctx.etcd.get("config/plugins/accelerator/cuda/quantum_size")
         return float(result) if result is not None else None
@@ -491,7 +490,7 @@ class ScalingGroup(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         query = sa.select(scaling_groups).select_from(scaling_groups)
         if is_active is not None:
@@ -509,7 +508,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         domain: str,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
@@ -534,7 +533,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         group: uuid.UUID,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
@@ -557,7 +556,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         access_key: str,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,

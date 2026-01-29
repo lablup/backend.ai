@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.exc import NoResultFound
@@ -79,7 +79,7 @@ class ModelServingEventHandler:
         _source: AgentId,
         event: RouteCreatedAnycastEvent,
     ) -> None:
-        endpoint: Optional[EndpointRow] = None
+        endpoint: EndpointRow | None = None
 
         try:
             async with self._db.begin_readonly_session() as db_sess:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
@@ -27,11 +27,11 @@ class SessionLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -45,11 +45,11 @@ class BaseSessionEvent(AbstractAnycastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.session_id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -100,7 +100,7 @@ class SessionCreationEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -156,7 +156,7 @@ class SessionTerminationEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -197,7 +197,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -231,7 +231,7 @@ class BaseSessionExecutionEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import AccessKey, KernelId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -11,10 +11,10 @@ from ai.backend.manager.services.session.base import SessionAction
 class GetContainerLogsAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
-    kernel_id: Optional[KernelId]
+    kernel_id: KernelId | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,5 +29,5 @@ class GetContainerLogsActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

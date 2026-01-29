@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
@@ -92,7 +92,7 @@ class RedisHelperConfig(BaseModel):
 
 class SingleRedisConfig(BaseModel):
     addr: Annotated[
-        Optional[HostPortPairModel],
+        HostPortPairModel | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -105,7 +105,7 @@ class SingleRedisConfig(BaseModel):
         ),
     ]
     sentinel: Annotated[
-        Optional[list[HostPortPairModel]],
+        list[HostPortPairModel] | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -122,7 +122,7 @@ class SingleRedisConfig(BaseModel):
         ),
     ]
     service_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("service_name", "service-name"),
@@ -139,7 +139,7 @@ class SingleRedisConfig(BaseModel):
         ),
     ]
     password: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -153,7 +153,7 @@ class SingleRedisConfig(BaseModel):
         ),
     ]
     request_timeout: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             validation_alias=AliasChoices("request_timeout", "request-timeout"),
@@ -217,8 +217,8 @@ class SingleRedisConfig(BaseModel):
     @field_validator("sentinel", mode="before")
     @classmethod
     def _parse_sentinel(
-        cls, v: Optional[str | list[HostPortPairModel]]
-    ) -> Optional[list[HostPortPairModel]]:
+        cls, v: str | list[HostPortPairModel] | None
+    ) -> list[HostPortPairModel] | None:
         if v is None or isinstance(v, list):
             return v
         if isinstance(v, str):
@@ -230,13 +230,13 @@ class SingleRedisConfig(BaseModel):
         raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
     @field_serializer("addr")
-    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info: Any) -> Optional[str]:
+    def _serialize_addr(self, addr: HostPortPairModel | None, _info: Any) -> str | None:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
     @field_serializer("sentinel")
     def _serialize_sentinel(
-        self, sentinel: Optional[list[HostPortPairModel]], _info: Any
-    ) -> Optional[str]:
+        self, sentinel: list[HostPortPairModel] | None, _info: Any
+    ) -> str | None:
         if sentinel is None:
             return None
         return ",".join(f"{hp.host}:{hp.port}" for hp in sentinel)
@@ -280,7 +280,7 @@ class SingleRedisConfig(BaseModel):
 
 class RedisConfig(SingleRedisConfig):
     override_configs: Annotated[
-        Optional[dict[str, SingleRedisConfig]],
+        dict[str, SingleRedisConfig] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("override_configs", "override-configs"),
@@ -307,7 +307,7 @@ class RedisConfig(SingleRedisConfig):
         if self.sentinel:
             sentinel_addrs = [hp.to_legacy() for hp in self.sentinel]
 
-        override_targets: Optional[dict[str, _RedisTarget]] = None
+        override_targets: dict[str, _RedisTarget] | None = None
         if self.override_configs:
             override_targets = {k: v.to_redis_target() for k, v in self.override_configs.items()}
 
@@ -329,7 +329,7 @@ class RedisConfig(SingleRedisConfig):
         sentinel_addrs = None
         if self.sentinel:
             sentinel_addrs = [hp.address for hp in self.sentinel]
-        override_targets: Optional[dict[str, ValkeyTarget]] = None
+        override_targets: dict[str, ValkeyTarget] | None = None
         if self.override_configs:
             override_targets = {k: v.to_valkey_target() for k, v in self.override_configs.items()}
 

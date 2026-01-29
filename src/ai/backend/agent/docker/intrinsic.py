@@ -9,7 +9,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiohttp
 import async_timeout
@@ -114,7 +114,7 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     return result
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
+async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = container.id[:7]
     try:
         ret = await container.stats(stream=False)  # TODO: cache
@@ -170,7 +170,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -244,7 +244,7 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        async def sysfs_impl(container_id: str) -> Optional[float]:
+        async def sysfs_impl(container_id: str) -> float | None:
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
             try:
@@ -269,7 +269,7 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
-        async def api_impl(container_id: str) -> Optional[float]:
+        async def api_impl(container_id: str) -> float | None:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:
@@ -323,7 +323,7 @@ class CPUPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid: int, cid: str) -> Optional[Decimal]:
+        async def psutil_impl(pid: int, cid: str) -> Decimal | None:
             try:
                 p = psutil.Process(pid)
                 cpu_times = p.cpu_times()
@@ -333,17 +333,17 @@ class CPUPlugin(AbstractComputePlugin):
                 return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
 
-        async def api_impl(_cid: str, _pids: list[int]) -> list[Optional[Decimal]]:
+        async def api_impl(_cid: str, _pids: list[int]) -> list[Decimal | None]:
             return []
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: list[Optional[Decimal]] = []
+        results: list[Decimal | None] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks: list[asyncio.Task[list[Optional[Decimal]]]] = []
+                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
                 # group by container ID
                 cid_pids_map: dict[str, list[int]] = {}
                 for pid, cid in pid_map_list:
@@ -489,7 +489,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -618,7 +618,7 @@ class MemoryPlugin(AbstractComputePlugin):
 
         async def sysfs_impl(
             container_id: str,
-        ) -> Optional[tuple[int, int, int, int, int, int, int]]:
+        ) -> tuple[int, int, int, int, int, int, int] | None:
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
@@ -718,7 +718,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
-        async def api_impl(container_id: str) -> Optional[tuple[int, int, int, int, int, int, int]]:
+        async def api_impl(container_id: str) -> tuple[int, int, int, int, int, int, int] | None:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:
@@ -830,9 +830,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(
-            pid: int, cid: str
-        ) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        async def psutil_impl(pid: int, cid: str) -> tuple[int | None, int | None, int | None]:
             try:
                 p = psutil.Process(pid)
                 stats = p.as_dict(attrs=["memory_info", "io_counters"])
@@ -854,13 +852,13 @@ class MemoryPlugin(AbstractComputePlugin):
 
         async def api_impl(
             _cid: str, _pids: list[int]
-        ) -> list[tuple[Optional[int], Optional[int], Optional[int]]]:
+        ) -> list[tuple[int | None, int | None, int | None]]:
             return []
 
         per_process_mem_used_bytes = {}
         per_process_io_read_bytes = {}
         per_process_io_write_bytes = {}
-        results: list[tuple[Optional[int], Optional[int], Optional[int]]]
+        results: list[tuple[int | None, int | None, int | None]]
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":

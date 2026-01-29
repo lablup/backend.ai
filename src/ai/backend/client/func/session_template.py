@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
@@ -15,9 +15,9 @@ class SessionTemplate(BaseFunction):
     async def create(
         cls,
         template: str,
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        owner_access_key: str | None = None,
     ) -> "SessionTemplate":
         rqst = Request("POST", "/template/session")
         if domain_name is None:
@@ -45,7 +45,7 @@ class SessionTemplate(BaseFunction):
         async with rqst.fetch() as resp:
             return await resp.json()
 
-    def __init__(self, template_id: str, owner_access_key: Optional[str] = None) -> None:
+    def __init__(self, template_id: str, owner_access_key: str | None = None) -> None:
         self.template_id = template_id
         self.owner_access_key = owner_access_key
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -33,26 +33,26 @@ class KernelBindingData:
     """Kernel-agent binding data for precondition checking and session starting."""
 
     kernel_id: KernelId
-    agent_id: Optional[AgentId]
-    agent_addr: Optional[str]
+    agent_id: AgentId | None
+    agent_addr: str | None
     scaling_group: str
     image: str
     architecture: str
-    status: Optional[KernelStatus] = None
-    status_changed: Optional[float] = None
+    status: KernelStatus | None = None
+    status_changed: float | None = None
     cluster_role: str = DEFAULT_ROLE
     cluster_idx: int = 0
     local_rank: int = 0
-    cluster_hostname: Optional[str] = None
-    uid: Optional[int] = None
-    main_gid: Optional[int] = None
+    cluster_hostname: str | None = None
+    uid: int | None = None
+    main_gid: int | None = None
     gids: list[int] = field(default_factory=list)
     requested_slots: ResourceSlot = field(default_factory=ResourceSlot)
     resource_opts: dict[str, Any] = field(default_factory=dict)
-    bootstrap_script: Optional[str] = None
-    startup_command: Optional[str] = None
+    bootstrap_script: str | None = None
+    startup_command: str | None = None
     preopen_ports: list[int] = field(default_factory=list)
-    internal_data: Optional[dict[str, Any]] = None
+    internal_data: dict[str, Any] | None = None
     vfolder_mounts: list[Any] = field(
         default_factory=list
     )  # Would be list[VFolderMount] in full impl
@@ -83,8 +83,8 @@ class SessionDataForStart:
     user_email: str
     user_name: str
     environ: dict[str, str]
-    network_type: Optional[NetworkType] = None
-    network_id: Optional[str] = None
+    network_type: NetworkType | None = None
+    network_id: str | None = None
 
 
 @dataclass
@@ -98,12 +98,12 @@ class ScheduledSessionData:
     name: str
     kernels: list[KernelBindingData]
     # Additional fields for PREPARED sessions
-    cluster_mode: Optional[ClusterMode] = None
-    user_uuid: Optional[UUID] = None
-    user_email: Optional[str] = None
-    user_name: Optional[str] = None
-    network_type: Optional[NetworkType] = None
-    network_id: Optional[str] = None
+    cluster_mode: ClusterMode | None = None
+    user_uuid: UUID | None = None
+    user_email: str | None = None
+    user_name: str | None = None
+    network_type: NetworkType | None = None
+    network_id: str | None = None
 
 
 @dataclass
@@ -145,10 +145,10 @@ class KernelStartData:
     requested_slots: ResourceSlot
     resource_opts: dict[str, Any]
     preopen_ports: list[int]
-    container_id: Optional[str] = None
-    cluster_hostname: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    startup_command: Optional[str] = None
+    container_id: str | None = None
+    cluster_hostname: str | None = None
+    bootstrap_script: str | None = None
+    startup_command: str | None = None
 
 
 @dataclass
@@ -165,8 +165,8 @@ class PreparedSessionData:
     user_uuid: UUID
     user_email: str
     user_name: str
-    network_type: Optional[NetworkType] = None
-    network_id: Optional[str] = None
+    network_type: NetworkType | None = None
+    network_id: str | None = None
 
 
 @dataclass
@@ -181,15 +181,15 @@ class PreparedSessionsWithImages:
 class KernelCreationInfo:
     """Information about kernel creation from agent."""
 
-    container_id: Optional[str] = None
-    resource_spec: Optional[dict[str, Any]] = None
+    container_id: str | None = None
+    resource_spec: dict[str, Any] | None = None
     attached_devices: dict[str, Any] = field(default_factory=dict)
-    repl_in_port: Optional[int] = None
-    repl_out_port: Optional[int] = None
-    stdin_port: Optional[int] = None
-    stdout_port: Optional[int] = None
+    repl_in_port: int | None = None
+    repl_out_port: int | None = None
+    stdin_port: int | None = None
+    stdout_port: int | None = None
     service_ports: list[int] = field(default_factory=list)
-    kernel_host: Optional[str] = None
+    kernel_host: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KernelCreationInfo:
@@ -313,7 +313,7 @@ class SessionWithKernels:
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
     phase_attempts: int = 0
-    phase_started_at: Optional[datetime] = None
+    phase_started_at: datetime | None = None
 
     @property
     def main_kernel(self) -> KernelInfo:

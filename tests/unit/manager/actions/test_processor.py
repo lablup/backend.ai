@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final, Optional
+from typing import Final
 
 import pytest
 from tenacity import BaseAction
@@ -19,7 +19,7 @@ class MockAction(BaseAction):
     type: str
     operation: str
 
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.id
 
     @classmethod
@@ -35,7 +35,7 @@ class MockAction(BaseAction):
 class MockActionResult(BaseActionResult):
     id: str
 
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.id
 
 

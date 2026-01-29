@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -39,7 +38,7 @@ class RouteEvictionHandler(RouteHandler):
         return "evict-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for eviction."""
         return None
 
@@ -49,17 +48,17 @@ class RouteEvictionHandler(RouteHandler):
         return [RouteStatus.UNHEALTHY]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Routes that should be evicted become TERMINATING."""
         return RouteStatus.TERMINATING
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """No failure status for eviction - routes are either evicted or left as is."""
         return None
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """No stale status for eviction handler."""
         return None
 

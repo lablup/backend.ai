@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -63,7 +63,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for operations targeting TERMINATING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 

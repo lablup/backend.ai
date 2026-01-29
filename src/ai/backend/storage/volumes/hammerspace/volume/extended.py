@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import (
     Any,
     ClassVar,
-    Optional,
     override,
 )
 
@@ -94,8 +93,8 @@ class HammerspaceQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         name = self._get_share_name(quota_scope_id)
         path = self._get_share_path(quota_scope_id)
@@ -128,7 +127,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         name = self._get_share_name(quota_scope_id)
         share = await self._client.get_share(
             GetShareParams(name=name),
@@ -169,8 +168,8 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
@@ -202,7 +201,7 @@ class HammerspaceVolume(BaseHammerspaceVolume):
 
         ssl_enabled = self.config.get("ssl_enabled", False)
         raw_ssl_config = self.config.get("ssl_config", None)
-        ssl_config: Optional[SSLConfig] = None
+        ssl_config: SSLConfig | None = None
         if raw_ssl_config is not None:
             ssl_config = SSLConfig.model_validate(raw_ssl_config)
         self._connection_info = APIConnectionInfo(
@@ -244,16 +243,14 @@ class HammerspaceVolume(BaseHammerspaceVolume):
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])
 
-    async def _get_site_id(self) -> Optional[uuid.UUID]:
+    async def _get_site_id(self) -> uuid.UUID | None:
         sites = await self._client.get_sites()
         if not sites:
             return None
         site = sites[0]
         return site.uoid.uuid
 
-    async def _get_site_metric_series_row(
-        self, site_id: uuid.UUID
-    ) -> Optional[ValidClusterMetricRow]:
+    async def _get_site_metric_series_row(self, site_id: uuid.UUID) -> ValidClusterMetricRow | None:
         metrics = await self._client.get_cluster_metrics(
             params=ClusterMetricParams(
                 site_id=site_id,

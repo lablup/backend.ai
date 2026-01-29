@@ -4,7 +4,7 @@ import logging
 import sys
 import traceback
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional, override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
 from ai.backend.common.events.types import AbstractEvent
@@ -26,7 +26,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ErrorMonitor(AbstractErrorReporterPlugin):
     _error_log_repository: ErrorLogRepository
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_monitor is initialized without the root context. "
@@ -46,8 +46,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
     async def capture_exception(
         self,
-        exc_instance: Optional[Exception] = None,
-        context: Optional[Mapping[str, Any]] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         if not self.enabled:
             return
@@ -97,7 +97,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
     _error_log_repository: ErrorLogRepository
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_event_dispatcher is initialized without the root context. "

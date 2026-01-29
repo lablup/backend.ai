@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
 from ai.backend.common.types import AccessKey
@@ -55,7 +54,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.DEPRIORITIZING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for deprioritize."""
         return None
 
@@ -79,7 +78,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for deprioritizing sessions."""
         return None
 

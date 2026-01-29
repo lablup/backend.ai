@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -22,18 +22,18 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     password: PasswordInfo
     need_password_change: bool
     domain_name: str
-    full_name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    status: Optional[UserStatus] = None
-    role: Optional[str] = None
-    allowed_client_ip: Optional[list[str]] = None
-    totp_activated: Optional[bool] = None
-    resource_policy: Optional[str] = None
-    sudo_session_enabled: Optional[bool] = None
-    container_uid: Optional[int] = None
-    container_main_gid: Optional[int] = None
-    container_gids: Optional[list[int]] = None
+    full_name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+    status: UserStatus | None = None
+    role: str | None = None
+    allowed_client_ip: list[str] | None = None
+    totp_activated: bool | None = None
+    resource_policy: str | None = None
+    sudo_session_enabled: bool | None = None
+    container_uid: int | None = None
+    container_main_gid: int | None = None
+    container_gids: list[int] | None = None
 
     @override
     def build_row(self) -> UserRow:

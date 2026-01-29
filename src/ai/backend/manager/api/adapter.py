@@ -6,7 +6,7 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Optional, final
+from typing import final
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
@@ -24,7 +24,7 @@ class BaseFilterAdapter:
         equals_factory: Callable[[StringMatchSpec], QueryCondition],
         starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
         ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
-    ) -> Optional[QueryCondition]:
+    ) -> QueryCondition | None:
         """
         Convert StringFilter to QueryCondition using provided factory callables.
 
@@ -122,7 +122,7 @@ class BaseFilterAdapter:
         uuid_filter: UUIDFilter,
         equals_factory: Callable[[UUIDEqualMatchSpec], QueryCondition],
         in_factory: Callable[[UUIDInMatchSpec], QueryCondition],
-    ) -> Optional[QueryCondition]:
+    ) -> QueryCondition | None:
         """
         Convert UUIDFilter to QueryCondition using provided factory callables.
 

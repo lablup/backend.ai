@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.types import (
     KernelEnqueueingConfig,
@@ -293,7 +293,7 @@ class SessionPreparer:
         self,
         spec: SessionCreationSpec,
         kernel_config: list[KernelEnqueueingConfig],
-    ) -> Optional[list[str]]:
+    ) -> list[str] | None:
         """Get pre-assigned agent for a kernel."""
         # Check if agent is specified in kernel config
         designated_agents = set()

@@ -2,7 +2,6 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
@@ -31,8 +30,8 @@ class BatchActionProcessor[
     def __init__(
         self,
         func: Callable[[TBatchAction], Awaitable[TBatchActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]] = None,
-        validators: Optional[Sequence[BatchActionValidator]] = None,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[BatchActionValidator] | None = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 

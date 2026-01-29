@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -22,7 +22,7 @@ class BaseKernelEvent(AbstractBroadcastEvent):
         return EventDomain.KERNEL
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.kernel_id)
 
 
@@ -32,7 +32,7 @@ class KernelLifecycleEvent(BaseKernelEvent):
     reason: str = ""
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -60,7 +60,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -145,7 +145,7 @@ class KernelTerminationEvent(BaseKernelEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Optional
 
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
 from ai.backend.common.exception import BackendAIError
@@ -191,7 +190,7 @@ class PermissionControllerRepository:
         )
 
     @permission_controller_repository_resilience.apply()
-    async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
+    async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
         result = await self._db_source.get_role(role_id)
         return result.to_data() if result else None
 

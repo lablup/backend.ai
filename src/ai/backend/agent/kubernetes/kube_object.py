@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 import attrs
 
@@ -20,8 +20,8 @@ class AbstractAPIObject:
 class KubernetesVolumeMount:
     name: str
     mountPath: str
-    subPath: Optional[str]
-    readOnly: Optional[bool]
+    subPath: str | None
+    readOnly: bool | None
 
 
 class KubernetesAbstractVolume:

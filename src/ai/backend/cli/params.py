@@ -4,7 +4,6 @@ from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import (
     Any,
-    Optional,
     Protocol,
     TypeVar,
     override,
@@ -23,8 +22,8 @@ class BoolExprType(click.ParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> bool:
         if isinstance(value, bool):
             return value
@@ -51,8 +50,8 @@ class ByteSizeParamType(click.ParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> Any:
         if isinstance(value, int):
             return value
@@ -77,8 +76,8 @@ class ByteSizeParamCheckType(ByteSizeParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> str:
         if isinstance(value, int):
             return value
@@ -101,8 +100,8 @@ class CommaSeparatedKVListParamType(click.ParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> Mapping[str, str]:
         if isinstance(value, dict):
             return value
@@ -146,8 +145,8 @@ class JSONParamType(click.ParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> Any:
         if self._parsed:
             # Click invokes this method TWICE
@@ -187,8 +186,8 @@ class RangeExprOptionType(click.ParamType):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> Any:
         key, value = value.split("=", maxsplit=1)
         if not self._rx_range_key.match(key):
@@ -222,12 +221,12 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
 ):
     name = "List Expression"
 
-    def __init__(self, type_: Optional[type[TScalar]] = None) -> None:
+    def __init__(self, type_: type[TScalar] | None = None) -> None:
         super().__init__()
         self.type_ = type_ if type_ is not None else str
 
     def convert(
-        self, arg: str | int, param: Optional[click.Parameter], ctx: Optional[click.Context]
+        self, arg: str | int, param: click.Parameter | None, ctx: click.Context | None
     ) -> int | list[Any]:
         try:
             match arg:
@@ -251,8 +250,8 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> TScalar | Undefined:
         try:
             if value is undefined:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Optional
 
 from ai.backend.client.request import Request
 from ai.backend.common.dto.manager.export import (
@@ -70,11 +69,11 @@ class Export(BaseFunction):
     async def stream_users_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[UserExportFilter] = None,
-        order: Optional[list[UserExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: UserExportFilter | None = None,
+        order: list[UserExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -113,11 +112,11 @@ class Export(BaseFunction):
     async def stream_sessions_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[SessionExportFilter] = None,
-        order: Optional[list[SessionExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: SessionExportFilter | None = None,
+        order: list[SessionExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -156,11 +155,11 @@ class Export(BaseFunction):
     async def stream_projects_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[ProjectExportFilter] = None,
-        order: Optional[list[ProjectExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: ProjectExportFilter | None = None,
+        order: list[ProjectExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -199,11 +198,11 @@ class Export(BaseFunction):
     async def stream_audit_logs_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[AuditLogExportFilter] = None,
-        order: Optional[list[AuditLogExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: AuditLogExportFilter | None = None,
+        order: list[AuditLogExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """

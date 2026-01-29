@@ -6,7 +6,6 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -55,15 +54,15 @@ class PaginationInfo(BaseModel):
 
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
+    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class NetworkConfigDTO(BaseModel):
     """Network configuration for deployment."""
 
     open_to_public: bool = Field(description="Whether the deployment is public")
-    url: Optional[str] = Field(default=None, description="Deployment URL")
-    preferred_domain_name: Optional[str] = Field(default=None, description="Preferred domain name")
+    url: str | None = Field(default=None, description="Deployment URL")
+    preferred_domain_name: str | None = Field(default=None, description="Preferred domain name")
 
 
 class ClusterConfigDTO(BaseModel):
@@ -131,7 +130,7 @@ class DeploymentDTO(BaseModel):
     default_deployment_strategy: DeploymentStrategy = Field(
         description="Default deployment strategy"
     )
-    current_revision: Optional[RevisionDTO] = Field(
+    current_revision: RevisionDTO | None = Field(
         default=None, description="Current active revision"
     )
 
@@ -203,11 +202,11 @@ class RouteDTO(BaseModel):
 
     id: UUID = Field(description="Route ID")
     endpoint_id: UUID = Field(description="Endpoint/Deployment ID")
-    session_id: Optional[str] = Field(default=None, description="Session ID")
+    session_id: str | None = Field(default=None, description="Session ID")
     status: RouteStatus = Field(description="Route status")
     traffic_ratio: float = Field(description="Traffic ratio for this route")
     created_at: datetime = Field(description="Creation timestamp")
-    revision_id: Optional[UUID] = Field(default=None, description="Revision ID")
+    revision_id: UUID | None = Field(default=None, description="Revision ID")
     traffic_status: RouteTrafficStatus = Field(description="Traffic status")
     error_data: dict = Field(default_factory=dict, description="Error data if any")
 

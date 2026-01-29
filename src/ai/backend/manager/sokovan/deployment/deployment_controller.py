@@ -3,7 +3,6 @@
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.data.permission.types import EntityType, ScopeType
@@ -268,7 +267,7 @@ class DeploymentController:
     async def get_route(
         self,
         route_id: uuid.UUID,
-    ) -> Optional[RouteInfo]:
+    ) -> RouteInfo | None:
         """Get a single route by its ID.
 
         Args:
@@ -288,7 +287,7 @@ class DeploymentController:
         self,
         route_id: uuid.UUID,
         traffic_status: RouteTrafficStatus,
-    ) -> Optional[RouteInfo]:
+    ) -> RouteInfo | None:
         """Update route traffic status.
 
         Args:

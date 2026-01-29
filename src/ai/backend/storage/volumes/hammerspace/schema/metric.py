@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,11 +7,11 @@ class ClusterMetricRow(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     time: int  # timestamp
-    total: Optional[int]
-    used: Optional[int]
-    free: Optional[int]
+    total: int | None
+    used: int | None
+    free: int | None
 
-    def parse(self) -> Optional[ValidClusterMetricRow]:
+    def parse(self) -> ValidClusterMetricRow | None:
         if self.total is None or self.used is None or self.free is None:
             return None
         return ValidClusterMetricRow(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -56,7 +56,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PREPARED]
 
     @classmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Include sessions where kernels are in PREPARED status."""
         return [KernelStatus.PREPARED]
 
@@ -83,7 +83,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for operations targeting PREPARED sessions transitioning to CREATING."""
         return LockID.LOCKID_SOKOVAN_TARGET_CREATING
 

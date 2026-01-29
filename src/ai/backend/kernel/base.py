@@ -21,7 +21,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Optional,
     TypeVar,
     cast,
 )
@@ -152,26 +151,26 @@ class BaseRunner(metaclass=ABCMeta):
     ])
     default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
-    kernel_mgr: Optional[AsyncKernelManager] = None
-    kernel_client: Optional[AsyncKernelClient] = None
+    kernel_mgr: AsyncKernelManager | None = None
+    kernel_client: AsyncKernelClient | None = None
 
     child_env: MutableMapping[str, str]
-    subproc: Optional[asyncio.subprocess.Process]
-    service_parser: Optional[ServiceParser]
+    subproc: asyncio.subprocess.Process | None
+    service_parser: ServiceParser | None
     runtime_path: Path
 
     services_running: dict[str, asyncio.subprocess.Process]
 
     intrinsic_host_ports_mapping: Mapping[str, int]
 
-    _build_success: Optional[bool]
+    _build_success: bool | None
 
     # Set by subclasses.
     user_input_queue: asyncio.Queue[str] | _AsyncQueueProxy[str] | None
 
     _main_task: asyncio.Task
     _run_task: asyncio.Task
-    _health_check_task: Optional[asyncio.Task]
+    _health_check_task: asyncio.Task | None
 
     def __init__(self, runtime_path: Path) -> None:
         setup_logger_basic(self.log_prefix, False)
@@ -414,7 +413,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def init_with_loop(self) -> None:
         """Initialize after the event loop is created."""
 
-    async def _clean(self, clean_cmd: Optional[str]) -> None:
+    async def _clean(self, clean_cmd: str | None) -> None:
         ret = 0
         try:
             if clean_cmd is None or clean_cmd == "":
@@ -450,7 +449,7 @@ class BaseRunner(metaclass=ABCMeta):
             await asyncio.sleep(0.01)  # extra delay to flush logs
             log.info("The user bootstrap script has exited with code {}", ret)
 
-    async def _build(self, build_cmd: Optional[str]) -> None:
+    async def _build(self, build_cmd: str | None) -> None:
         ret = 0
         try:
             if build_cmd is None or build_cmd == "":
@@ -864,8 +863,8 @@ class BaseRunner(metaclass=ABCMeta):
         self,
         service_info: Mapping[str, Any],
         *,
-        cwd: Optional[str] = None,
-        launch_timeout: Optional[float] = 30.0,
+        cwd: str | None = None,
+        launch_timeout: float | None = 30.0,
     ) -> dict[str, Any]:
         error_reason = None
         try:
@@ -890,7 +889,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "error": error_reason,
                         }
 
-                    cmdargs: Optional[Sequence[str | os.PathLike]]
+                    cmdargs: Sequence[str | os.PathLike] | None
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":

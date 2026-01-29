@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Optional, Protocol
+from typing import Protocol
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.exception import ErrorCode
@@ -14,7 +14,7 @@ from .base import AbstractTaskHook, TaskContext
 class BackgroundTaskObserver(Protocol):
     def observe_bgtask_started(self, *, task_name: str) -> None: ...
     def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+        self, *, task_name: str, status: str, duration: float, error_code: ErrorCode | None
     ) -> None: ...
 
 
@@ -23,7 +23,7 @@ class NopBackgroundTaskObserver:
         pass
 
     def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+        self, *, task_name: str, status: str, duration: float, error_code: ErrorCode | None
     ) -> None:
         pass
 

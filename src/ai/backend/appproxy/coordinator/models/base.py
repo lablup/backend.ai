@@ -8,7 +8,6 @@ from collections.abc import Callable
 from typing import (
     Any,
     ClassVar,
-    Optional,
     TypeVar,
     cast,
 )
@@ -94,10 +93,10 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(self, value: enum.Enum | None, dialect: sa.Dialect) -> Optional[str]:
+    def process_bind_param(self, value: enum.Enum | None, dialect: sa.Dialect) -> str | None:
         return value.name if value else None
 
-    def process_result_value(self, value: Any, dialect: sa.Dialect) -> Optional[enum.Enum]:
+    def process_result_value(self, value: Any, dialect: sa.Dialect) -> enum.Enum | None:
         return self._enum_cls[value] if value else None
 
     def copy(self, **kw: Any) -> EnumType:
@@ -124,9 +123,9 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[T_StrEnum],
+        value: T_StrEnum | None,
         dialect: sa.Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         if value is None:
             return None
         if self._use_name:
@@ -135,9 +134,9 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
 
     def process_result_value(
         self,
-        value: Optional[str],
+        value: str | None,
         dialect: sa.Dialect,
-    ) -> Optional[T_StrEnum]:
+    ) -> T_StrEnum | None:
         if value is None:
             return None
         if self._use_name:
@@ -203,12 +202,12 @@ class StructuredJSONObjectColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(self, value: BaseModel | None, dialect: sa.Dialect) -> Optional[str]:
+    def process_bind_param(self, value: BaseModel | None, dialect: sa.Dialect) -> str | None:
         if value:
             return value.model_dump_json()
         return None
 
-    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> Optional[BaseModel]:
+    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> BaseModel | None:
         if value:
             return self._schema(**json.loads(value))
         return None
@@ -233,16 +232,14 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def process_bind_param(
-        self, value: list[TBaseModel] | None, dialect: sa.Dialect
-    ) -> Optional[str]:
+    def process_bind_param(self, value: list[TBaseModel] | None, dialect: sa.Dialect) -> str | None:
         if value is not None:
             return TypeAdapter(list[TBaseModel]).dump_json(value).decode("utf-8")
         return None
 
     def process_result_value(
         self, value: str | None, dialect: sa.Dialect
-    ) -> Optional[list[TBaseModel]]:
+    ) -> list[TBaseModel] | None:
         if value is not None:
             return [self._schema(**i) for i in json.loads(value)]
         return None
@@ -259,14 +256,12 @@ class URLColumn(TypeDecorator):
     impl = sa.types.UnicodeText
     cache_ok = True
 
-    def process_bind_param(
-        self, value: yarl.URL | str | None, dialect: sa.Dialect
-    ) -> Optional[str]:
+    def process_bind_param(self, value: yarl.URL | str | None, dialect: sa.Dialect) -> str | None:
         if isinstance(value, yarl.URL):
             return str(value)
         return value
 
-    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> Optional[yarl.URL]:
+    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> yarl.URL | None:
         if value is None:
             return None
         if value is not None:
@@ -282,7 +277,7 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value: str | None, dialect: sa.Dialect) -> Optional[str]:
+    def process_bind_param(self, value: str | None, dialect: sa.Dialect) -> str | None:
         if value is None:
             return value
         try:
@@ -291,9 +286,7 @@ class IPColumn(TypeDecorator):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(
-        self, value: str | None, dialect: sa.Dialect
-    ) -> Optional[ReadableCIDR]:
+    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> ReadableCIDR | None:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -317,7 +310,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Any, dialect: sa.Dialect) -> Optional[str | bytes]:
+    def process_bind_param(self, value: Any, dialect: sa.Dialect) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -332,7 +325,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
             return value.bytes
         return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect: sa.Dialect) -> Optional[UUID_SubType]:
+    def process_result_value(self, value: Any, dialect: sa.Dialect) -> UUID_SubType | None:
         if value is None:
             return value
         cls = type(self)

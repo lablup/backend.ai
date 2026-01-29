@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
 from ai.backend.common.exception import (
@@ -18,7 +18,7 @@ class _TaskExecutor(ABC):
     @abstractmethod
     async def revive_task(
         self, manifest_dict: Mapping[str, Any]
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         """
         Revive the background task with the provided manifest dictionary.
         This method should be implemented by subclasses to provide
@@ -29,7 +29,7 @@ class _TaskExecutor(ABC):
     @abstractmethod
     async def execute_new_task(
         self, manifest: BaseBackgroundTaskManifest
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         """
         Execute the background task with the provided manifest.
         This method should be implemented by subclasses to provide
@@ -40,7 +40,7 @@ class _TaskExecutor(ABC):
 
 class _TaskDefinition[
     TManifest: BaseBackgroundTaskManifest,
-    TResult: Optional[BaseBackgroundTaskResult],
+    TResult: BaseBackgroundTaskResult | None,
 ](_TaskExecutor):
     _handler: BaseBackgroundTaskHandler[TManifest, TResult]
     _task_name: BgtaskNameBase
@@ -87,7 +87,7 @@ class BackgroundTaskHandlerRegistry:
 
     async def revive_task(
         self, name: str, manifest_dict: Mapping[str, Any]
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         try:
             definition = self._executor_registry[name]
         except KeyError as e:
@@ -96,7 +96,7 @@ class BackgroundTaskHandlerRegistry:
 
     async def execute_new_task(
         self, name: BgtaskNameBase, manifest: BaseBackgroundTaskManifest
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         try:
             definition = self._executor_registry[name.value]
         except KeyError as e:

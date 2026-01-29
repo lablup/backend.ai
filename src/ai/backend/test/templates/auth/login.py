@@ -3,7 +3,7 @@ import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
@@ -58,7 +58,7 @@ async def _login(
     test_id: str,
     user_id: str,
     password: str,
-    otp: Optional[str] = None,
+    otp: str | None = None,
 ) -> None:
     temp_dir = _get_test_temp_dir(test_id)
     temp_dir.mkdir(parents=True, exist_ok=True)

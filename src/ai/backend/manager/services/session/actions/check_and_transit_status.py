@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action import BaseActionResult, BaseBatchActionResult
@@ -20,7 +20,7 @@ class CheckAndTransitStatusAction(SessionAction):
     session_id: SessionId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -36,7 +36,7 @@ class CheckAndTransitStatusActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)
 
 

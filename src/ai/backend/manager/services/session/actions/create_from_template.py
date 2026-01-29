@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, override
+from typing import Any, override
 
 import yarl
 
@@ -32,13 +32,13 @@ class CreateFromTemplateActionParams:
     owner_access_key: AccessKey | Undefined
     enqueue_only: bool
     max_wait_seconds: int
-    starts_at: Optional[str]
+    starts_at: str | None
     reuse_if_exists: bool
-    startup_command: Optional[str]
-    batch_timeout: Optional[timedelta]
-    bootstrap_script: Optional[str] | Undefined
-    dependencies: Optional[list[uuid.UUID]]
-    callback_url: Optional[yarl.URL]
+    startup_command: str | None
+    batch_timeout: timedelta | None
+    bootstrap_script: str | None | Undefined
+    dependencies: list[uuid.UUID] | None
+    callback_url: yarl.URL | None
 
 
 @dataclass
@@ -48,10 +48,10 @@ class CreateFromTemplateAction(SessionAction):
     user_role: UserRole
     sudo_session_enabled: bool
     requester_access_key: AccessKey
-    keypair_resource_policy: Optional[dict]
+    keypair_resource_policy: dict | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -68,5 +68,5 @@ class CreateFromTemplateActionResult(BaseActionResult):
     result: Mapping[str, Any]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_id)

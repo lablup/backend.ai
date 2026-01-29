@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -52,7 +52,7 @@ class VFSStorageConnection(Connection[VFSStorage]):
 
 
 @strawberry.field(description="Added in 25.16.0. Get a VFS storage by ID")
-async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[VFSStorage]:
+async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
     processors = info.context.processors
     action_result = await processors.vfs_storage.get.wait_for_complete(
         GetVFSStorageAction(storage_id=uuid.UUID(id))
@@ -63,12 +63,12 @@ async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[VFSS
 @strawberry.field(description="Added in 25.16.0. List all VFS storages")
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> VFSStorageConnection:
     processors = info.context.processors
 
@@ -109,9 +109,9 @@ class CreateVFSStorageInput:
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
 class UpdateVFSStorageInput:
     id: ID
-    name: Optional[str] = UNSET
-    host: Optional[str] = UNSET
-    base_path: Optional[str] = UNSET
+    name: str | None = UNSET
+    host: str | None = UNSET
+    base_path: str | None = UNSET
 
     def to_updater(self) -> Updater[VFSStorageRow]:
         spec = VFSStorageUpdaterSpec(

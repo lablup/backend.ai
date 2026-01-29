@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.deployment.types import (
     ModelDeploymentData,
@@ -34,7 +33,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 async def load_routes_by_ids(
     processor: DeploymentProcessors,
     route_ids: Sequence[uuid.UUID],
-) -> list[Optional[RouteInfo]]:
+) -> list[RouteInfo | None]:
     """Batch load routes by their IDs.
 
     Args:
@@ -63,7 +62,7 @@ async def load_routes_by_ids(
 async def load_deployments_by_ids(
     processor: DeploymentProcessors,
     deployment_ids: Sequence[uuid.UUID],
-) -> list[Optional[ModelDeploymentData]]:
+) -> list[ModelDeploymentData | None]:
     """Batch load deployments by their IDs.
 
     Args:
@@ -92,7 +91,7 @@ async def load_deployments_by_ids(
 async def load_revisions_by_ids(
     processor: DeploymentProcessors,
     revision_ids: Sequence[uuid.UUID],
-) -> list[Optional[ModelRevisionData]]:
+) -> list[ModelRevisionData | None]:
     """Batch load revisions by their IDs.
 
     Args:
@@ -121,7 +120,7 @@ async def load_revisions_by_ids(
 async def load_replicas_by_ids(
     processor: DeploymentProcessors,
     replica_ids: Sequence[uuid.UUID],
-) -> list[Optional[ModelReplicaData]]:
+) -> list[ModelReplicaData | None]:
     """Batch load replicas by their IDs.
 
     Args:

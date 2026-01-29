@@ -5,7 +5,6 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from pydantic import AliasChoices, Field
@@ -42,7 +41,7 @@ class AuthorizeRequest(BaseRequestModel):
     password: str = Field(
         description="Login password, verified against the stored hash",
     )
-    stoken: Optional[str] = Field(
+    stoken: str | None = Field(
         default=None,
         description="Secondary token forwarded to auth hook plugins (e.g., for 2FA)",
         validation_alias=AliasChoices("stoken", "sToken"),
@@ -52,7 +51,7 @@ class AuthorizeRequest(BaseRequestModel):
 class GetRoleRequest(BaseRequestModel):
     """Request to get the user's roles at global, domain, and optionally group scope."""
 
-    group: Optional[UUID] = Field(
+    group: UUID | None = Field(
         default=None,
         description="Group (project) ID to also query group-level role; errors if not a member",
     )
@@ -68,15 +67,15 @@ class SignupRequest(BaseRequestModel):
     password: str = Field(
         description="Initial password; validated via VERIFY_PASSWORD_FORMAT hook",
     )
-    username: Optional[str] = Field(
+    username: str | None = Field(
         default=None,
         description="Display username; defaults to email if omitted",
     )
-    full_name: Optional[str] = Field(
+    full_name: str | None = Field(
         default=None,
         description="User's full name for display; defaults to empty string",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Free-text account description; defaults to empty string",
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -99,7 +99,7 @@ class SessionStartedMessage(NotifiableMessage):
         return NotificationRuleType.SESSION_STARTED
 
     session_id: str = Field(description="Unique identifier of the compute session")
-    session_name: Optional[str] = Field(
+    session_name: str | None = Field(
         default=None, description="User-defined name for the session, if provided"
     )
     session_type: str = Field(
@@ -124,7 +124,7 @@ class SessionTerminatedMessage(NotifiableMessage):
         return NotificationRuleType.SESSION_TERMINATED
 
     session_id: str = Field(description="Unique identifier of the compute session")
-    session_name: Optional[str] = Field(
+    session_name: str | None = Field(
         default=None, description="User-defined name for the session, if provided"
     )
     session_type: str = Field(
@@ -136,7 +136,7 @@ class SessionTerminatedMessage(NotifiableMessage):
     status: str = Field(
         description="Final status of the session (e.g., 'terminated', 'cancelled', 'error')"
     )
-    termination_reason: Optional[str] = Field(
+    termination_reason: str | None = Field(
         default=None,
         description="Reason for termination (e.g., 'user-requested', 'timeout', 'error')",
     )
@@ -160,13 +160,13 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
         description="Type of registry where the artifact is stored (e.g., 'HARBOR', 'HUGGINGFACE')"
     )
     registry_id: str = Field(description="Unique identifier of the registry")
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None, description="Version of the artifact revision, if available"
     )
     status: str = Field(description="Status of the artifact revision")
     success: bool = Field(description="Whether the download operation succeeded")
-    digest: Optional[str] = Field(default=None, description="Digest of the artifact revision")
-    verification_result: Optional[dict[str, Any]] = Field(
+    digest: str | None = Field(default=None, description="Digest of the artifact revision")
+    verification_result: dict[str, Any] | None = Field(
         default=None, description="Verification result of the artifact revision, if available"
     )
 

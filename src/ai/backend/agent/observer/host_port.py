@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import ContainerStatus
@@ -59,7 +59,7 @@ class HostPortObserver(AbstractObserver):
 
     @classmethod
     @override
-    def timeout(cls) -> Optional[float]:
+    def timeout(cls) -> float | None:
         return 10.0
 
     @override

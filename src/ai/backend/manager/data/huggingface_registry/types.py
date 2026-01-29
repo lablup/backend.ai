@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
@@ -13,7 +12,7 @@ class HuggingFaceRegistryData:
     id: uuid.UUID
     name: str
     url: str
-    token: Optional[str]
+    token: str | None
 
     @classmethod
     def from_stateful_data(

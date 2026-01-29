@@ -8,7 +8,6 @@ including filters for username, email, domain, role, and status fields.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -75,7 +74,7 @@ class UserExportFilter(BaseRequestModel):
     Use this to narrow down the exported user data to specific criteria.
     """
 
-    username: Optional[StringFilter] = Field(
+    username: StringFilter | None = Field(
         default=None,
         description=(
             "Filter users by username. Supports various match modes: "
@@ -83,7 +82,7 @@ class UserExportFilter(BaseRequestModel):
             "Can be case-insensitive and/or negated."
         ),
     )
-    email: Optional[StringFilter] = Field(
+    email: StringFilter | None = Field(
         default=None,
         description=(
             "Filter users by email address. Supports various match modes: "
@@ -91,28 +90,28 @@ class UserExportFilter(BaseRequestModel):
             "Useful for finding users from specific email domains."
         ),
     )
-    domain_name: Optional[StringFilter] = Field(
+    domain_name: StringFilter | None = Field(
         default=None,
         description=(
             "Filter users by their assigned domain name. "
             "Use this to export users belonging to a specific domain."
         ),
     )
-    role: Optional[list[str]] = Field(
+    role: list[str] | None = Field(
         default=None,
         description=(
             "Filter users by role(s). Accepts a list of role values "
             "(e.g., ['admin', 'user', 'monitor']). Uses IN query."
         ),
     )
-    status: Optional[list[str]] = Field(
+    status: list[str] | None = Field(
         default=None,
         description=(
             "Filter users by account status(es). Accepts a list of status values "
             "(e.g., ['active', 'inactive']). Uses IN query."
         ),
     )
-    created_at: Optional[DateTimeRangeFilter] = Field(
+    created_at: DateTimeRangeFilter | None = Field(
         default=None,
         description=(
             "Filter users by their registration timestamp. "
@@ -130,7 +129,7 @@ class UserExportCSVRequest(BaseRequestModel):
     All parameters are optional to allow flexible export configurations.
     """
 
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         description=(
             "List of field keys to include in the export. "
@@ -138,7 +137,7 @@ class UserExportCSVRequest(BaseRequestModel):
             "If not specified or empty, all available fields will be exported."
         ),
     )
-    filter: Optional[UserExportFilter] = Field(
+    filter: UserExportFilter | None = Field(
         default=None,
         description=(
             "Filter conditions to apply before export. "
@@ -146,7 +145,7 @@ class UserExportCSVRequest(BaseRequestModel):
             "If not specified, all users (up to max_rows limit) will be exported."
         ),
     )
-    order: Optional[list[UserExportOrder]] = Field(
+    order: list[UserExportOrder] | None = Field(
         default=None,
         description=(
             "List of ordering specifications for sorting the exported data. "

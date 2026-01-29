@@ -2,7 +2,7 @@ import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Self
+from typing import Any, Self
 
 from aiohttp import web
 
@@ -333,11 +333,11 @@ class BackendAIError(web.HTTPError, ABC):
 
     error_type: str = "https://api.backend.ai/probs/general-error"
     error_title: str = "General Backend API Error."
-    extra_msg: Optional[str]
+    extra_msg: str | None
     body_dict: dict[str, Any]
 
     def __init__(
-        self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs
+        self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
@@ -799,7 +799,7 @@ class PassthroughError(BackendAIError):
         self,
         status_code: int,
         error_code: ErrorCode,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         self.status_code = status_code
         self._error_code = error_code
@@ -959,7 +959,7 @@ class AgentWatcherResponseError(BackendAIError, web.HTTPServiceUnavailable):
         self,
         status_code: int,
         error_code: ErrorCode,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         self.status_code = status_code
         self._error_code = error_code

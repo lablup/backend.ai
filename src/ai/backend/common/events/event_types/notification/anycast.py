@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
 from pydantic import BaseModel, Field
 
@@ -47,11 +47,11 @@ class NotificationTriggeredEvent(AbstractAnycastEvent, BaseModel):
         return "notification_triggered"
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     def serialize(self) -> tuple[bytes, ...]:

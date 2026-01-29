@@ -9,7 +9,7 @@ import socket
 import textwrap
 from collections.abc import Callable, Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Optional, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiohttp_cors
 import attrs
@@ -116,7 +116,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(Optional[float], root_ctx.config_provider.config.manager.status_update_interval)
+    interval = cast(float | None, root_ctx.config_provider.config.manager.status_update_interval)
     if interval is None:
         # Do not run bgtask if interval is not set
         return

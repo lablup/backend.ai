@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
     Self,
     TypedDict,
     cast,
@@ -151,7 +150,7 @@ domains = DomainRow.__table__
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
     created_at: datetime
     modified_at: datetime
@@ -159,7 +158,7 @@ class DomainModel(RBACModel[DomainPermission]):
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _allowed_docker_registries: list[str]
-    _integration_id: Optional[str]
+    _integration_id: str | None
     _dotfiles: bytes
 
     orm_obj: DomainRow
@@ -186,7 +185,7 @@ class DomainModel(RBACModel[DomainPermission]):
 
     @property
     @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
-    def integration_id(self) -> Optional[str]:
+    def integration_id(self) -> str | None:
         return self._integration_id
 
     @property
@@ -393,7 +392,7 @@ async def get_permission_ctx(
 async def get_domains(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
-    domain_names: Optional[Iterable[str]] = None,
+    domain_names: Iterable[str] | None = None,
     *,
     ctx: ClientContext,
     db_session: SASession,

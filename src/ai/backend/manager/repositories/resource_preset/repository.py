@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import trafaret as t
@@ -118,7 +118,7 @@ class ResourcePresetRepository:
 
     @resource_preset_repository_resilience.apply()
     async def get_preset_by_id_or_name(
-        self, preset_id: Optional[UUID], name: Optional[str]
+        self, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetData:
         """
         Gets a resource preset by ID or name.
@@ -147,7 +147,7 @@ class ResourcePresetRepository:
 
     @resource_preset_repository_resilience.apply()
     async def delete_preset_validated(
-        self, preset_id: Optional[UUID], name: Optional[str]
+        self, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetData:
         """
         Deletes a resource preset.
@@ -162,9 +162,7 @@ class ResourcePresetRepository:
         return preset
 
     @resource_preset_repository_resilience.apply()
-    async def list_presets(
-        self, scaling_group_name: Optional[str] = None
-    ) -> list[ResourcePresetData]:
+    async def list_presets(self, scaling_group_name: str | None = None) -> list[ResourcePresetData]:
         """
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
@@ -193,7 +191,7 @@ class ResourcePresetRepository:
         group_name: str,
         domain_name: str,
         resource_policy: Mapping[str, Any],
-        scaling_group: Optional[str] = None,
+        scaling_group: str | None = None,
     ) -> CheckPresetsResult:
         """
         Check resource presets availability and resource limits.

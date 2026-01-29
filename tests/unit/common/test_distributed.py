@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import aiotools
 import pytest
@@ -86,10 +86,10 @@ class NoopAnycastEvent(AbstractAnycastEvent):
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod

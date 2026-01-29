@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import graphene
 import strawberry
@@ -68,28 +68,28 @@ class ByteSize(str):
 @strawberry.input
 class StringFilter:
     # Basic operations
-    contains: Optional[str] = None
-    starts_with: Optional[str] = None
-    ends_with: Optional[str] = None
-    equals: Optional[str] = None
+    contains: str | None = None
+    starts_with: str | None = None
+    ends_with: str | None = None
+    equals: str | None = None
 
     # NOT operations
-    not_contains: Optional[str] = None
-    not_starts_with: Optional[str] = None
-    not_ends_with: Optional[str] = None
-    not_equals: Optional[str] = None
+    not_contains: str | None = None
+    not_starts_with: str | None = None
+    not_ends_with: str | None = None
+    not_equals: str | None = None
 
     # Case-insensitive operations
-    i_contains: Optional[str] = strawberry.field(name="iContains", default=None)
-    i_starts_with: Optional[str] = strawberry.field(name="iStartsWith", default=None)
-    i_ends_with: Optional[str] = strawberry.field(name="iEndsWith", default=None)
-    i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
+    i_contains: str | None = strawberry.field(name="iContains", default=None)
+    i_starts_with: str | None = strawberry.field(name="iStartsWith", default=None)
+    i_ends_with: str | None = strawberry.field(name="iEndsWith", default=None)
+    i_equals: str | None = strawberry.field(name="iEquals", default=None)
 
     # Case-insensitive NOT operations
-    i_not_contains: Optional[str] = strawberry.field(name="iNotContains", default=None)
-    i_not_starts_with: Optional[str] = strawberry.field(name="iNotStartsWith", default=None)
-    i_not_ends_with: Optional[str] = strawberry.field(name="iNotEndsWith", default=None)
-    i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
+    i_not_contains: str | None = strawberry.field(name="iNotContains", default=None)
+    i_not_starts_with: str | None = strawberry.field(name="iNotStartsWith", default=None)
+    i_not_ends_with: str | None = strawberry.field(name="iNotEndsWith", default=None)
+    i_not_equals: str | None = strawberry.field(name="iNotEquals", default=None)
 
     def to_dataclass(self) -> StringFilterData:
         return StringFilterData(
@@ -111,7 +111,7 @@ class StringFilter:
         equals_factory: Callable[[StringMatchSpec], QueryCondition],
         starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
         ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
-    ) -> Optional[QueryCondition]:
+    ) -> QueryCondition | None:
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
@@ -200,12 +200,12 @@ class StringFilter:
 
 @strawberry.input
 class IntFilter:
-    equals: Optional[int] = None
-    not_equals: Optional[int] = None
-    greater_than: Optional[int] = None
-    greater_than_or_equal: Optional[int] = None
-    less_than: Optional[int] = None
-    less_than_or_equal: Optional[int] = None
+    equals: int | None = None
+    not_equals: int | None = None
+    greater_than: int | None = None
+    greater_than_or_equal: int | None = None
+    less_than: int | None = None
+    less_than_or_equal: int | None = None
 
     def to_dataclass(self) -> IntFilterData:
         return IntFilterData(
@@ -281,17 +281,17 @@ class UUIDFilter:
 class DateTimeFilter:
     """Filter for datetime fields."""
 
-    before: Optional[datetime] = None
-    after: Optional[datetime] = None
-    equals: Optional[datetime] = None
-    not_equals: Optional[datetime] = None
+    before: datetime | None = None
+    after: datetime | None = None
+    equals: datetime | None = None
+    not_equals: datetime | None = None
 
     def build_query_condition(
         self,
         before_factory: Callable[[datetime], QueryCondition],
         after_factory: Callable[[datetime], QueryCondition],
-        equals_factory: Optional[Callable[[datetime], QueryCondition]] = None,
-    ) -> Optional[QueryCondition]:
+        equals_factory: Callable[[datetime], QueryCondition] | None = None,
+    ) -> QueryCondition | None:
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
@@ -375,12 +375,12 @@ def decode_cursor(cursor: str) -> str:
 
 
 def build_pagination_options(
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> PaginationOptions:
     from ai.backend.manager.types import (
         BackwardPaginationOptions,
@@ -410,8 +410,8 @@ def build_pagination_options(
 class PageInfo:
     has_next_page: bool
     has_previous_page: bool
-    start_cursor: Optional[str] = None
-    end_cursor: Optional[str] = None
+    start_cursor: str | None = None
+    end_cursor: str | None = None
 
     def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(

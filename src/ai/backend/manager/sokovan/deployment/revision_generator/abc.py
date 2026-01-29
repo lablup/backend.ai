@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import (
@@ -26,8 +25,8 @@ class RevisionGenerator(ABC):
         self,
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
-        default_architecture: Optional[str] = None,
+        model_definition_path: str | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Process draft revision by loading service definition and merging.
@@ -50,9 +49,9 @@ class RevisionGenerator(ABC):
     async def load_service_definition(
         self,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
+        model_definition_path: str | None,
         runtime_variant: str,
-    ) -> Optional[ModelServiceDefinition]:
+    ) -> ModelServiceDefinition | None:
         """
         Load service definition from vfolder.
 
@@ -70,8 +69,8 @@ class RevisionGenerator(ABC):
     def merge_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: Optional[ModelServiceDefinition],
-        default_architecture: Optional[str] = None,
+        service_definition: ModelServiceDefinition | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Merge draft revision with service definition.

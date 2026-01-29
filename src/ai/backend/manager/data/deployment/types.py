@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
@@ -58,7 +58,7 @@ class ImageEnvironment(BaseModel):
 
 
 class ModelServiceDefinition(BaseModel):
-    environment: Optional[ImageEnvironment] = Field(
+    environment: ImageEnvironment | None = Field(
         default=None,
         description="""
         Environment in which the model service will run.
@@ -70,7 +70,7 @@ class ModelServiceDefinition(BaseModel):
             }
         ],
     )
-    resource_slots: Optional[dict[str, Any]] = Field(
+    resource_slots: dict[str, Any] | None = Field(
         default=None,
         description="""
         Resource slots used by the model service session.
@@ -79,7 +79,7 @@ class ModelServiceDefinition(BaseModel):
             {"cpu": 1, "mem": "2gb"},
         ],
     )
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] | None = Field(
         default=None,
         description="""
         Environment variables to set for the model service.
@@ -195,9 +195,9 @@ class DeploymentMetadata:
     resource_group: str
     created_user: UUID
     session_owner: UUID
-    created_at: Optional[datetime]
+    created_at: datetime | None
     revision_history_limit: int
-    tag: Optional[str] = None
+    tag: str | None = None
 
 
 @dataclass
@@ -222,7 +222,7 @@ class MountInfo:
 @dataclass
 class MountMetadata:
     model_vfolder_id: UUID
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
     model_mount_destination: str = "/models"
     extra_mounts: list[VFolderMount] = field(default_factory=list)
 
@@ -242,7 +242,7 @@ class MountMetadata:
 @dataclass
 class ReplicaSpec:
     replica_count: int
-    desired_replica_count: Optional[int] = None
+    desired_replica_count: int | None = None
 
     @property
     def target_replica_count(self) -> int:
@@ -259,16 +259,16 @@ class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Mapping[str, Any]
-    resource_opts: Optional[Mapping[str, Any]] = None
+    resource_opts: Mapping[str, Any] | None = None
 
 
 class ExecutionSpec(ConfiguredModel):
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    environ: Optional[dict[str, str]] = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    environ: dict[str, str] | None = None
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
-    callback_url: Optional[yarl.URL] = None
-    inference_runtime_config: Optional[Mapping[str, Any]] = None
+    callback_url: yarl.URL | None = None
+    inference_runtime_config: Mapping[str, Any] | None = None
 
 
 class ModelRevisionSpec(ConfiguredModel):
@@ -290,15 +290,15 @@ class ModelRevisionSpec(ConfiguredModel):
 
 
 class ImageIdentifierDraft(ConfiguredModel):
-    canonical: Optional[str]
-    architecture: Optional[str]
+    canonical: str | None
+    architecture: str | None
 
 
 class ResourceSpecDraft(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
-    resource_slots: Optional[Mapping[str, Any]]
-    resource_opts: Optional[Mapping[str, Any]] = None
+    resource_slots: Mapping[str, Any] | None
+    resource_opts: Mapping[str, Any] | None = None
 
 
 class ModelRevisionSpecDraft(ConfiguredModel):
@@ -311,9 +311,9 @@ class ModelRevisionSpecDraft(ConfiguredModel):
 @dataclass
 class DeploymentNetworkSpec:
     open_to_public: bool
-    access_token_ids: Optional[list[UUID]] = None
-    url: Optional[str] = None
-    preferred_domain_name: Optional[str] = None
+    access_token_ids: list[UUID] | None = None
+    url: str | None = None
+    preferred_domain_name: str | None = None
 
 
 @dataclass
@@ -326,7 +326,7 @@ class DeploymentInfo:
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
 
-    def target_revision(self) -> Optional[ModelRevisionSpec]:
+    def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
             return self.model_revisions[0]
         return None
@@ -347,7 +347,7 @@ class ScaleOutDecision:
 
 @dataclass
 class DefinitionFiles:
-    service_definition: Optional[dict[str, Any]]
+    service_definition: dict[str, Any] | None
     model_definition: dict[str, Any]
 
 
@@ -357,11 +357,11 @@ class RouteInfo:
 
     route_id: UUID
     endpoint_id: UUID
-    session_id: Optional[SessionId]
+    session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime | None
-    revision_id: Optional[UUID]
+    revision_id: UUID | None
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 
@@ -388,12 +388,12 @@ class ModelDeploymentAutoScalingRuleData:
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
     step_size: int
     time_window: int
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    min_replicas: int | None
+    max_replicas: int | None
     created_at: datetime
     last_triggered_at: datetime
 
@@ -435,8 +435,8 @@ class ResourceConfigData:
 @dataclass
 class ModelRuntimeConfigData:
     runtime_variant: RuntimeVariant
-    inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[dict[str, Any]] = None
+    inference_runtime_config: Mapping[str, Any] | None = None
+    environ: dict[str, Any] | None = None
 
 
 @dataclass
@@ -487,13 +487,13 @@ class ModelDeploymentData:
     id: UUID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
-    revision: Optional[ModelRevisionData]
+    revision: ModelRevisionData | None
     revision_history_ids: list[UUID]
     scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: Optional[UUID] = None
+    access_token_ids: UUID | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
@@ -531,11 +531,11 @@ class DeploymentHistoryData:
     deployment_id: UUID
 
     phase: str  # DeploymentLifecycleType value
-    from_status: Optional[ModelDeploymentStatus]
-    to_status: Optional[ModelDeploymentStatus]
+    from_status: ModelDeploymentStatus | None
+    to_status: ModelDeploymentStatus | None
 
     result: SchedulingResult
-    error_code: Optional[str]
+    error_code: str | None
     message: str
 
     sub_steps: list[SubStepResult]
@@ -554,11 +554,11 @@ class RouteHistoryData:
     deployment_id: UUID
 
     phase: str  # RouteLifecycleType value
-    from_status: Optional[RouteStatus]
-    to_status: Optional[RouteStatus]
+    from_status: RouteStatus | None
+    to_status: RouteStatus | None
 
     result: SchedulingResult
-    error_code: Optional[str]
+    error_code: str | None
     message: str
 
     sub_steps: list[SubStepResult]

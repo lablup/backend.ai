@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Sequence
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -97,9 +97,7 @@ class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
 
 
 @strawberry.field(description="Added in 25.14.0")
-async def reservoir_registry(
-    id: ID, info: Info[StrawberryGQLContext]
-) -> Optional[ReservoirRegistry]:
+async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
     processors = info.context.processors
     action_result = await processors.artifact_registry.get_reservoir_registry.wait_for_complete(
         GetReservoirRegistryAction(reservoir_id=uuid.UUID(id))
@@ -110,12 +108,12 @@ async def reservoir_registry(
 @strawberry.field(description="Added in 25.14.0")
 async def reservoir_registries(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    offset: int | None = None,
+    limit: int | None = None,
 ) -> ReservoirRegistryConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
@@ -164,11 +162,11 @@ class CreateReservoirRegistryInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateReservoirRegistryInput:
     id: ID
-    name: Optional[str] = UNSET
-    endpoint: Optional[str] = UNSET
-    access_key: Optional[str] = UNSET
-    secret_key: Optional[str] = UNSET
-    api_version: Optional[str] = UNSET
+    name: str | None = UNSET
+    endpoint: str | None = UNSET
+    access_key: str | None = UNSET
+    secret_key: str | None = UNSET
+    api_version: str | None = UNSET
 
     def to_updater(self) -> Updater[ReservoirRegistryRow]:
         spec = ReservoirRegistryUpdaterSpec(

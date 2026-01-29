@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import click
 
 
@@ -9,9 +7,9 @@ class CommaSeparatedChoice(click.Choice):
     def convert(
         self,
         value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
-    ) -> Optional[list[str]]:
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> list[str] | None:
         pieces = value.split(",")
         return [super(click.Choice, self).convert(piece, param, ctx) for piece in pieces]
 

@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import attrs
 import graphene
@@ -1271,8 +1271,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scaling_group: Optional[str] = None,
-        status: Optional[str] = None,
+        scaling_group: str | None = None,
+        status: str | None = None,
     ) -> Sequence[Agent]:
         return await Agent.load_all(
             info.context,
@@ -1288,10 +1288,10 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        scaling_group: Optional[str] = None,
-        status: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        scaling_group: str | None = None,
+        status: str | None = None,
     ) -> AgentList:
         total_count = await Agent.load_count(
             info.context,
@@ -1382,7 +1382,7 @@ class Query(graphene.ObjectType):
         *,
         id: str,
         permission: DomainPermission,
-    ) -> Optional[DomainNode]:
+    ) -> DomainNode | None:
         return await DomainNode.get_node(info, id, permission)
 
     @staticmethod
@@ -1391,12 +1391,12 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         permission: DomainPermission,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[DomainNode]:
         return await DomainNode.get_connection(
             info,
@@ -1414,15 +1414,15 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scope: Optional[ScopeType] = None,
+        scope: ScopeType | None = None,
         permission: AgentPermission = AgentPermission.CREATE_COMPUTE_SESSION,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         _scope = scope if scope is not None else SystemScope()
         return await AgentNode.get_connection(
@@ -1443,7 +1443,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> Domain:
         ctx: GraphQueryContext = info.context
         name = ctx.user["domain_name"] if name is None else name
@@ -1460,7 +1460,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
@@ -1477,16 +1477,16 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scope: Optional[ScopeType] = None,
-        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        scope: ScopeType | None = None,
+        container_registry_scope: ContainerRegistryScope | None = None,
         permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
         _scope = scope or SystemScope()
         return await GroupNode.get_connection(
@@ -1516,16 +1516,16 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scope_id: Optional[ScopeType] = None,
-        project_id: Optional[uuid.UUID] = None,
+        scope_id: ScopeType | None = None,
+        project_id: uuid.UUID | None = None,
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[VirtualFolderNode]:
         _scope_id: ScopeType
         if project_id is not None:
@@ -1609,7 +1609,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         name: str,
         *,
-        domain_name: Optional[str] = None,
+        domain_name: str | None = None,
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1656,8 +1656,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
         type: list[str] | None = None,
     ) -> Sequence[Group]:
         if type is None:
@@ -1758,7 +1758,7 @@ class Query(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
@@ -1813,7 +1813,7 @@ class Query(graphene.ObjectType):
     async def resolve_viewer(
         root: Any,
         info: graphene.ResolveInfo,
-    ) -> Optional[Viewer]:
+    ) -> Viewer | None:
         return await Viewer.get_viewer(info)
 
     @staticmethod
@@ -1822,8 +1822,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
     ) -> User:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -1839,7 +1839,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
+        domain_name: str | None = None,
         user_id: uuid.UUID | str | None = None,
     ) -> User:
         ctx: GraphQueryContext = info.context
@@ -1857,10 +1857,10 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[UserStatus] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        is_active: bool | None = None,
+        status: UserStatus | None = None,
     ) -> Sequence[User]:
         from ai.backend.common.data.user.types import UserRole
 
@@ -1894,12 +1894,12 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[UserStatus] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        is_active: bool | None = None,
+        status: UserStatus | None = None,
     ) -> UserList:
         from ai.backend.common.data.user.types import UserRole
 
@@ -1976,9 +1976,9 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: ResolvedGlobalID,
-        scope_id: Optional[ScopeType] = None,
+        scope_id: ScopeType | None = None,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
-    ) -> Optional[ImageNode]:
+    ) -> ImageNode | None:
         if scope_id is None:
             scope_id = SystemScope()
         return await ImageNode.get_node(info, id, scope_id, permission)
@@ -1989,15 +1989,15 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[ImageNode]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -2021,8 +2021,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[AccessKey] = None,
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
     ) -> KeyPair:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -2038,9 +2038,9 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
     ) -> Sequence[KeyPair]:
         ctx: GraphQueryContext = info.context
         if email is None:
@@ -2066,11 +2066,11 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
     ) -> KeyPairList:
         total_count = await KeyPair.load_count(
             info.context,
@@ -2095,7 +2095,7 @@ class Query(graphene.ObjectType):
     async def resolve_keypair_resource_policy(
         root: Any,
         info: graphene.ResolveInfo,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> KeyPairResourcePolicy:
         ctx: GraphQueryContext = info.context
         client_access_key = ctx.access_key
@@ -2135,7 +2135,7 @@ class Query(graphene.ObjectType):
     async def resolve_user_resource_policy(
         root: Any,
         info: graphene.ResolveInfo,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
@@ -2223,8 +2223,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[ResourcePreset]:
         return await ResourcePreset.load_all(info.context, filter=filter, order=order)
 
@@ -2247,7 +2247,7 @@ class Query(graphene.ObjectType):
     async def resolve_scaling_groups(
         root: Any,
         info: graphene.ResolveInfo,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_all(info.context, is_active=is_active)
 
@@ -2257,7 +2257,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: Optional[str],
+        domain_name: str | None,
         project_id: uuid.UUID,
         group_id: uuid.UUID,  # Not used. `scoped_query()` injects this parameter.
         access_key: AccessKey,
@@ -2276,7 +2276,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         domain: str,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_domain(
             info.context,
@@ -2290,7 +2290,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         user_group: str,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         from uuid import UUID
 
@@ -2306,7 +2306,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_keypair(
             info.context,
@@ -2331,8 +2331,8 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> StorageVolumeList:
         total_count = await StorageVolume.load_count(
             info.context,
@@ -2354,10 +2354,10 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: str,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-    ) -> Optional[VirtualFolder]:
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+    ) -> VirtualFolder | None:
         graph_ctx: GraphQueryContext = info.context
         vfolder_id = uuid.UUID(id)
         loader = graph_ctx.dataloader_manager.get_loader(
@@ -2378,11 +2378,11 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> VirtualFolderList:
         # TODO: adopt the generic queryfilter language
         total_count = await VirtualFolder.load_count(
@@ -2412,9 +2412,9 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> VirtualFolderPermissionList:
         total_count = await VirtualFolderPermission.load_count(
             info.context,
@@ -2439,10 +2439,10 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count(
             info.context,
@@ -2469,10 +2469,10 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        user_id: Optional[uuid.UUID] = None,  # not used, fixed
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        user_id: uuid.UUID | None = None,  # not used, fixed
+        filter: str | None = None,
+        order: str | None = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count_invited(
             info.context,
@@ -2499,10 +2499,10 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        user_id: Optional[uuid.UUID] = None,  # not used, fixed
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        user_id: uuid.UUID | None = None,  # not used, fixed
+        filter: str | None = None,
+        order: str | None = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count_project(
             info.context,
@@ -2527,10 +2527,10 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         id: ResolvedGlobalID,
-        scope_id: Optional[ScopeType] = None,
-        project_id: Optional[uuid.UUID] = None,
+        scope_id: ScopeType | None = None,
+        project_id: uuid.UUID | None = None,
         permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
-    ) -> Optional[ComputeSessionNode]:
+    ) -> ComputeSessionNode | None:
         if scope_id is None:
             scope_id = SystemScope()
         return await ComputeSessionNode.get_accessible_node(info, id, scope_id, permission)
@@ -2540,16 +2540,16 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scope_id: Optional[ScopeType] = None,
-        project_id: Optional[uuid.UUID] = None,
+        scope_id: ScopeType | None = None,
+        project_id: uuid.UUID | None = None,
         permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
         final_scope_id: ScopeType
         if project_id is not None:
@@ -2580,11 +2580,11 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         resource_group_id: str,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
         # TODO: Clean up this function
         graph_ctx: GraphQueryContext = info.context
@@ -2603,8 +2603,8 @@ class Query(graphene.ObjectType):
                 result.append(node)
         result.sort(key=lambda node: session_order[SessionId(node.row_id)])
         total_count = len(result)
-        page_size: Optional[int] = None
-        cursor: Optional[str] = None
+        page_size: int | None = None
+        cursor: str | None = None
         if offset is not None:
             result = result[offset:]
         if after is not None:
@@ -2647,13 +2647,13 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
         session_id: SessionId,
-        role: Optional[UserRole] = None,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
+        role: UserRole | None = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
         total_count = await ComputeContainer.load_count(
@@ -2710,12 +2710,12 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
             info.context,
@@ -2745,8 +2745,8 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: SessionId,
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[AccessKey] = None,
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
     ) -> ComputeSession:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2769,11 +2769,11 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
-        order_key: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
+        order_key: str | None = None,
         order_asc: bool = True,
     ) -> LegacyComputeSessionList:
         total_count = await LegacyComputeSession.load_count(
@@ -2803,10 +2803,10 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         sess_id: str,
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[AccessKey] = None,
-        status: Optional[str] = None,
-    ) -> Optional[LegacyComputeSession]:
+        domain_name: str | None = None,
+        access_key: AccessKey | None = None,
+        status: str | None = None,
+    ) -> LegacyComputeSession | None:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
         # by other users and in other groups.
@@ -2833,10 +2833,10 @@ class Query(graphene.ObjectType):
     async def resolve_total_resource_slot(
         root: Any,
         info: graphene.ResolveInfo,
-        statuses: Optional[list[str]] = None,
-        filter: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        resource_group_name: Optional[str] = None,
+        statuses: list[str] | None = None,
+        filter: str | None = None,
+        domain_name: str | None = None,
+        resource_group_name: str | None = None,
     ) -> TotalResourceSlot:
         graph_ctx: GraphQueryContext = info.context
 
@@ -2862,9 +2862,9 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         endpoint_id: uuid.UUID,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> Endpoint:
         graph_ctx: GraphQueryContext = info.context
         return await Endpoint.load_item(
@@ -2883,11 +2883,11 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> EndpointList:
         total_count = await Endpoint.load_count(
             info.context,
@@ -2914,9 +2914,9 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         routing_id: uuid.UUID,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> Routing:
         graph_ctx: GraphQueryContext = info.context
         return await Routing.load_item(
@@ -2935,12 +2935,12 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        endpoint_id: uuid.UUID | None = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> RoutingList:
         total_count = await Routing.load_count(
             info.context,
@@ -2968,9 +2968,9 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         token: str,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> EndpointToken:
         graph_ctx: GraphQueryContext = info.context
         return await EndpointToken.load_item(
@@ -2989,12 +2989,12 @@ class Query(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        endpoint_id: uuid.UUID | None = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> EndpointTokenList:
         total_count = await EndpointToken.load_count(
             info.context,
@@ -3021,8 +3021,8 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        quota_scope_id: Optional[str] = None,
-        storage_host_name: Optional[str] = None,
+        quota_scope_id: str | None = None,
+        storage_host_name: str | None = None,
     ) -> QuotaScope:
         if not quota_scope_id or not storage_host_name:
             raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
@@ -3108,13 +3108,13 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         return await AuditLogNode.get_connection(
             info,
@@ -3151,13 +3151,13 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         services: list[str],
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         return await ServiceConfigNode.get_connection(
             info,

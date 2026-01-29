@@ -4,7 +4,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -46,7 +46,7 @@ class VFolderMountPermission(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderMountPermission]:
+    def _missing_(cls, value: Any) -> VFolderMountPermission | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(
                 f"VFolderMountPermission value must be a string, got {type(value).__name__}"
@@ -102,7 +102,7 @@ class VFolderOperationStatus(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
+    def _missing_(cls, value: Any) -> VFolderOperationStatus | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(
                 f"VFolderOperationStatus value must be a string, got {type(value).__name__}"
@@ -153,20 +153,20 @@ class VFolderData:
     name: str
     host: str
     domain_name: str
-    quota_scope_id: Optional[QuotaScopeID]
+    quota_scope_id: QuotaScopeID | None
     usage_mode: VFolderUsageMode
-    permission: Optional[VFolderMountPermission]
+    permission: VFolderMountPermission | None
     max_files: int
-    max_size: Optional[int]
+    max_size: int | None
     num_files: int
     cur_size: int
     created_at: datetime
-    last_used: Optional[datetime]
-    creator: Optional[str]
-    unmanaged_path: Optional[str]
+    last_used: datetime | None
+    creator: str | None
+    unmanaged_path: str | None
     ownership_type: VFolderOwnershipType
-    user: Optional[uuid.UUID]
-    group: Optional[uuid.UUID]
+    user: uuid.UUID | None
+    group: uuid.UUID | None
     cloneable: bool
     status: VFolderOperationStatus
 
@@ -195,7 +195,7 @@ class VFolderInvitationData:
     invitee: str  # email
     permission: VFolderMountPermission
     created_at: datetime
-    modified_at: Optional[datetime]
+    modified_at: datetime | None
 
 
 @dataclass
@@ -213,9 +213,9 @@ class VFolderCreateParams:
     host: str
     creator: str
     ownership_type: VFolderOwnershipType
-    user: Optional[uuid.UUID]
-    group: Optional[uuid.UUID]
-    unmanaged_path: Optional[str]
+    user: uuid.UUID | None
+    group: uuid.UUID | None
+    unmanaged_path: str | None
     cloneable: bool
     status: VFolderOperationStatus
 
@@ -238,14 +238,14 @@ class VFolderListResult:
     """
 
     vfolders: list[VFolderAccessInfo]
-    total_count: Optional[int] = None
+    total_count: int | None = None
 
 
 @dataclass
 class VFolderDeleteParams:
     vfolder_id: VFolderID
     host: str
-    unmanaged_path: Optional[str] = None
+    unmanaged_path: str | None = None
 
 
 class DeleteStatus(enum.StrEnum):
@@ -272,6 +272,6 @@ class VFolderLocation:
     """
 
     id: uuid.UUID
-    quota_scope_id: Optional[QuotaScopeID]
+    quota_scope_id: QuotaScopeID | None
     host: str
     ownership_type: VFolderOwnershipType

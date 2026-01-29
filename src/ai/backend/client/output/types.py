@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import attr
 
@@ -172,7 +172,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         self,
         fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
-        page_size: Optional[int] = None,
+        page_size: int | None = None,
         plain: bool = False,
     ) -> None:
         raise NotImplementedError
@@ -181,8 +181,8 @@ class BaseOutputHandler(metaclass=ABCMeta):
     def print_mutation_result(
         self,
         item: Mapping[str, Any],
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         raise NotImplementedError
@@ -190,10 +190,10 @@ class BaseOutputHandler(metaclass=ABCMeta):
     @abstractmethod
     def print_mutation_error(
         self,
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
         msg: str = "Failed",
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
+        item_name: str | None = None,
+        action_name: str | None = None,
         extra_info: Mapping = {},
     ) -> None:
         raise NotImplementedError

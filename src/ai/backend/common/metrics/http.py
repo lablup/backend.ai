@@ -1,5 +1,5 @@
 import time
-from typing import Optional, Protocol
+from typing import Protocol
 
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
@@ -16,7 +16,7 @@ class APIMetricObserverProtocol(Protocol):
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None: ...
@@ -34,7 +34,7 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
         endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
         status_code = -1
         start = time.perf_counter()
-        error_code: Optional[ErrorCode] = None
+        error_code: ErrorCode | None = None
         try:
             resp = await handler(request)
             status_code = resp.status

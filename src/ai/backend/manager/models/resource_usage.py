@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, tzinfo
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import attrs
@@ -108,7 +108,7 @@ class ResourceUsage:
         return attrs.evolve(self, nfs={*self.nfs}, device_type={*self.device_type})
 
 
-def to_str(val: Any) -> Optional[str]:
+def to_str(val: Any) -> str | None:
     return str(val) if val is not None else None
 
 
@@ -117,37 +117,37 @@ class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
     child_usage_group: dict = attrs.field(factory=dict)
 
-    project_row: Optional[GroupRow] = attrs.field(default=None)
-    session_row: Optional[SessionRow] = attrs.field(default=None)
-    kernel_row: Optional[KernelRow] = attrs.field(default=None)
+    project_row: GroupRow | None = attrs.field(default=None)
+    session_row: SessionRow | None = attrs.field(default=None)
+    kernel_row: KernelRow | None = attrs.field(default=None)
 
-    created_at: Optional[datetime] = attrs.field(default=None)
-    terminated_at: Optional[datetime] = attrs.field(default=None)
-    scheduled_at: Optional[str] = attrs.field(default=None)
-    used_time: Optional[str] = attrs.field(default=None)
-    used_days: Optional[int] = attrs.field(default=None)
-    agents: Optional[set[str]] = attrs.field(default=None)
+    created_at: datetime | None = attrs.field(default=None)
+    terminated_at: datetime | None = attrs.field(default=None)
+    scheduled_at: str | None = attrs.field(default=None)
+    used_time: str | None = attrs.field(default=None)
+    used_days: int | None = attrs.field(default=None)
+    agents: set[str] | None = attrs.field(default=None)
 
-    user_id: Optional[UUID] = attrs.field(default=None)
-    user_email: Optional[str] = attrs.field(default=None)
-    full_name: Optional[str] = attrs.field(default=None)  # User's full_name
-    access_key: Optional[str] = attrs.field(default=None)
-    project_id: Optional[UUID] = attrs.field(default=None)
-    project_name: Optional[str] = attrs.field(default=None)
-    kernel_id: Optional[UUID] = attrs.field(default=None)
-    container_ids: Optional[set[str]] = attrs.field(default=None)
-    session_id: Optional[UUID] = attrs.field(default=None)
-    session_name: Optional[str] = attrs.field(default=None)
-    domain_name: Optional[str] = attrs.field(default=None)
-    images: Optional[set[str]] = attrs.field(default=None)
+    user_id: UUID | None = attrs.field(default=None)
+    user_email: str | None = attrs.field(default=None)
+    full_name: str | None = attrs.field(default=None)  # User's full_name
+    access_key: str | None = attrs.field(default=None)
+    project_id: UUID | None = attrs.field(default=None)
+    project_name: str | None = attrs.field(default=None)
+    kernel_id: UUID | None = attrs.field(default=None)
+    container_ids: set[str] | None = attrs.field(default=None)
+    session_id: UUID | None = attrs.field(default=None)
+    session_name: str | None = attrs.field(default=None)
+    domain_name: str | None = attrs.field(default=None)
+    images: set[str] | None = attrs.field(default=None)
 
-    last_stat: Optional[Mapping[str, Any]] = attrs.field(default=None)
+    last_stat: Mapping[str, Any] | None = attrs.field(default=None)
     extra_info: Mapping[str, Any] = attrs.field(factory=dict)
 
-    status: Optional[str] = attrs.field(default=None)
-    status_info: Optional[str] = attrs.field(default=None)
-    status_history: Optional[Mapping[str, Any]] = attrs.field(default=None)
-    cluster_mode: Optional[str] = attrs.field(default=None)
+    status: str | None = attrs.field(default=None)
+    status_info: str | None = attrs.field(default=None)
+    status_history: Mapping[str, Any] | None = attrs.field(default=None)
+    cluster_mode: str | None = attrs.field(default=None)
 
     total_usage: ResourceUsage = attrs.field(factory=ResourceUsage)
 
@@ -445,7 +445,7 @@ def parse_total_resource_group(
 
 def parse_resource_usage(
     kernel: KernelRow,
-    last_stat: Optional[Mapping[str, Any]],
+    last_stat: Mapping[str, Any] | None,
 ) -> ResourceUsage:
     if not last_stat:
         return ResourceUsage(
@@ -590,9 +590,9 @@ KERNEL_RESOURCE_SELECT_COLS = (
 
 
 def _parse_query(
-    kernel_cond: Optional[ColumnElement[bool]] = None,
-    session_cond: Optional[ColumnElement[bool]] = None,
-    project_cond: Optional[ColumnElement[bool]] = None,
+    kernel_cond: ColumnElement[bool] | None = None,
+    session_cond: ColumnElement[bool] | None = None,
+    project_cond: ColumnElement[bool] | None = None,
 ) -> sa.sql.Select:
     session_load = joinedload(KernelRow.session)
     if session_cond is not None:
@@ -620,8 +620,8 @@ async def fetch_resource_usage(
     db_engine: ExtendedAsyncSAEngine,
     start_date: datetime,
     end_date: datetime,
-    session_ids: Optional[Sequence[UUID]] = None,
-    project_ids: Optional[Sequence[UUID]] = None,
+    session_ids: Sequence[UUID] | None = None,
+    project_ids: Sequence[UUID] | None = None,
 ) -> list[KernelRow]:
     project_cond = None
     if project_ids:

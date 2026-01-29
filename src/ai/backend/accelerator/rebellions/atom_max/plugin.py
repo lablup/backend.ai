@@ -2,7 +2,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from decimal import Decimal
-from typing import Optional
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -36,7 +35,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
     )
     exclusive_slot_types: set[str] = {"atom-max.device"}
 
-    _all_devices: Optional[list[ATOMMaxDevice]]
+    _all_devices: list[ATOMMaxDevice] | None
 
     async def _list_devices(self) -> list[ATOMMaxDevice]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path)

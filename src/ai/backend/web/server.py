@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, Optional, cast
+from typing import Any, cast
 from uuid import uuid4
 
 import aiohttp
@@ -770,7 +770,7 @@ async def webapp_ctx(
 
     request_policy_config: list[str] = config.security.request_policies
     response_policy_config: list[str] = config.security.response_policies
-    csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = (
+    csp_policy_config: Mapping[str, list[str] | None] | None = (
         config.security.csp.model_dump(by_alias=True) if config.security.csp else None
     )
     app["security_policy"] = SecurityPolicy.from_config(

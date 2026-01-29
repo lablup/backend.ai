@@ -4,7 +4,7 @@ import logging
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Optional, override
+from typing import override
 
 import trafaret as t
 
@@ -97,7 +97,7 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -126,7 +126,7 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         if isinstance(pending_session_or_kernel, KernelRow):
             sgroup_name = pending_session_or_kernel.scaling_group
             arch_str = pending_session_or_kernel.architecture
@@ -192,7 +192,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -234,7 +234,7 @@ class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None

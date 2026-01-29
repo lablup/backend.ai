@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, Self
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -58,7 +58,7 @@ class ArtifactData:
     id: uuid.UUID
     name: str
     type: ArtifactType
-    description: Optional[str]
+    description: str | None
     registry_id: uuid.UUID
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
@@ -67,7 +67,7 @@ class ArtifactData:
     scanned_at: datetime
     updated_at: datetime
     readonly: bool
-    extra: Optional[dict[str, Any]]
+    extra: dict[str, Any] | None
 
 
 @dataclass
@@ -75,14 +75,14 @@ class ArtifactRevisionData:
     id: uuid.UUID
     artifact_id: uuid.UUID
     version: str
-    readme: Optional[str]
-    size: Optional[int]
+    readme: str | None
+    size: int | None
     status: ArtifactStatus
-    remote_status: Optional[ArtifactRemoteStatus]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    digest: Optional[str]
-    verification_result: Optional[VerificationStepResult]
+    remote_status: ArtifactRemoteStatus | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    digest: str | None
+    verification_result: VerificationStepResult | None
 
 
 @dataclass
@@ -92,13 +92,13 @@ class ArtifactRevisionResponseData:
     id: uuid.UUID
     artifact_id: uuid.UUID
     version: str
-    size: Optional[int]
+    size: int | None
     status: ArtifactStatus
-    remote_status: Optional[ArtifactRemoteStatus]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    digest: Optional[str]
-    verification_result: Optional[VerificationStepResult]
+    remote_status: ArtifactRemoteStatus | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    digest: str | None
+    verification_result: VerificationStepResult | None
 
     @classmethod
     def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
@@ -118,7 +118,7 @@ class ArtifactRevisionResponseData:
 
 @dataclass
 class ArtifactRevisionReadme:
-    readme: Optional[str]
+    readme: str | None
 
 
 @dataclass
@@ -234,20 +234,20 @@ class ArtifactOrderingOptions:
 class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
-    artifact_type: Optional[list[ArtifactType]] = None
-    name_filter: Optional[StringFilterData] = None
-    registry_filter: Optional[StringFilterData] = None
-    source_filter: Optional[StringFilterData] = None
-    registry_id: Optional[uuid.UUID] = None
-    registry_type: Optional[ArtifactRegistryType] = None
-    source_registry_id: Optional[uuid.UUID] = None
-    source_registry_type: Optional[ArtifactRegistryType] = None
-    availability: Optional[list[ArtifactAvailability]] = None
+    artifact_type: list[ArtifactType] | None = None
+    name_filter: StringFilterData | None = None
+    registry_filter: StringFilterData | None = None
+    source_filter: StringFilterData | None = None
+    registry_id: uuid.UUID | None = None
+    registry_type: ArtifactRegistryType | None = None
+    source_registry_id: uuid.UUID | None = None
+    source_registry_type: ArtifactRegistryType | None = None
+    availability: list[ArtifactAvailability] | None = None
 
     # Logical operations
-    AND: Optional[list["ArtifactFilterOptions"]] = None
-    OR: Optional[list["ArtifactFilterOptions"]] = None
-    NOT: Optional[list["ArtifactFilterOptions"]] = None
+    AND: list["ArtifactFilterOptions"] | None = None
+    OR: list["ArtifactFilterOptions"] | None = None
+    NOT: list["ArtifactFilterOptions"] | None = None
 
 
 @dataclass

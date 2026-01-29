@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.request import Request
@@ -26,7 +26,7 @@ class Admin(BaseFunction):
     async def query(
         cls,
         query: str,
-        variables: Optional[Mapping[str, Any]] = None,
+        variables: Mapping[str, Any] | None = None,
     ) -> Any:
         """
         Sends the GraphQL query and returns the response.
@@ -44,7 +44,7 @@ class Admin(BaseFunction):
     async def _query(
         cls,
         query: str,
-        variables: Optional[Mapping[str, Any]] = None,
+        variables: Mapping[str, Any] | None = None,
     ) -> Any:
         """
         Internal async implementation of the query() method,

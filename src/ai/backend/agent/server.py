@@ -28,7 +28,6 @@ from typing import (
     Any,
     ClassVar,
     Literal,
-    Optional,
     cast,
 )
 from uuid import UUID
@@ -264,9 +263,9 @@ class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
-    rpc_auth_manager_public_key: Optional[PublicKey]
-    rpc_auth_agent_public_key: Optional[PublicKey]
-    rpc_auth_agent_secret_key: Optional[SecretKey]
+    rpc_auth_manager_public_key: PublicKey | None
+    rpc_auth_agent_public_key: PublicKey | None
+    rpc_auth_agent_secret_key: SecretKey | None
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
@@ -855,7 +854,7 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         session_id: str,
-        reason: Optional[KernelLifecycleEventReason] = None,
+        reason: KernelLifecycleEventReason | None = None,
         suppress_events: bool = False,
         agent_id: AgentId | None = None,
     ) -> dict[str, Any]:
@@ -971,7 +970,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
-        timeout_seconds: Optional[float],
+        timeout_seconds: float | None,
         agent_id: AgentId | None = None,
     ) -> None:
         log.info(
@@ -1066,7 +1065,7 @@ class AgentRPCServer(aobject):
         agent = self.runtime.get_agent(agent_id)
         bgtask_mgr = agent.background_task_manager
 
-        image_push_timeout = cast(Optional[float], self.local_config.api.push_timeout)
+        image_push_timeout = cast(float | None, self.local_config.api.push_timeout)
 
         async def _push_image(_reporter: ProgressReporter) -> None:
             await agent.push_image(

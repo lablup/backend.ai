@@ -20,7 +20,6 @@ from collections.abc import (
 from pathlib import Path
 from typing import (
     Any,
-    Optional,
     TypedDict,
 )
 
@@ -36,7 +35,7 @@ log = BraceStyleAdapter(logging.getLogger())
 class Action(TypedDict):
     action: str
     args: Mapping[str, str]
-    ref: Optional[str]
+    ref: str | None
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -97,7 +96,7 @@ class ServiceParser:
         service_name: str,
         frozen_envs: Collection[str],
         opts: Mapping[str, Any],
-    ) -> tuple[Optional[Sequence[str]], Mapping[str, str]]:
+    ) -> tuple[Sequence[str] | None, Mapping[str, str]]:
         if service_name not in self.services.keys():
             return None, {}
         service = self.services[service_name]

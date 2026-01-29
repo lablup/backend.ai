@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Optional, cast
+from typing import cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -93,7 +93,7 @@ class ImageDBSource:
         session: SASession,
         image_id: UUID,
         load_aliases: bool = False,
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
     ) -> ImageRow:
         """
         Private method to get an image by ID using an existing session.
@@ -120,7 +120,7 @@ class ImageDBSource:
     async def query_images_by_canonicals(
         self,
         canonicals: list[str],
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
     ) -> dict[ImageID, ImageDataWithDetails]:
         query = (
             sa.select(ImageRow)
@@ -138,7 +138,7 @@ class ImageDBSource:
     async def query_image_details_by_identifier(
         self,
         identifier: ImageIdentifier,
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
         try:
             async with self._db.begin_readonly_session() as session:
@@ -158,7 +158,7 @@ class ImageDBSource:
         self,
         image_id: UUID,
         load_aliases: bool = False,
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
         async with self._db.begin_session() as session:
             try:
@@ -170,7 +170,7 @@ class ImageDBSource:
             return row.to_detailed_dataclass()
 
     async def query_all_images(
-        self, status_filter: Optional[list[ImageStatus]] = None
+        self, status_filter: list[ImageStatus] | None = None
     ) -> Mapping[ImageID, ImageDataWithDetails]:
         async with self._db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)

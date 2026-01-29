@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.permission import (
@@ -34,7 +34,7 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
     name: str
     source: RoleSource
     status: RoleStatus
-    description: Optional[str] = None
+    description: str | None = None
 
     @override
     def build_row(self) -> RoleRow:
@@ -111,7 +111,7 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
 
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
     @override
     def build_row(self) -> UserRoleRow:

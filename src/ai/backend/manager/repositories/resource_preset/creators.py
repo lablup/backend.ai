@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
@@ -14,8 +14,8 @@ class ResourcePresetCreatorSpec(CreatorSpec[ResourcePresetRow]):
 
     name: str
     resource_slots: ResourceSlot
-    shared_memory: Optional[str]
-    scaling_group_name: Optional[str]
+    shared_memory: str | None
+    scaling_group_name: str | None
 
     @override
     def build_row(self) -> ResourcePresetRow:

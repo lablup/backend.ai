@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
@@ -12,7 +12,7 @@ class UnregisterNamespaceAction(StorageNamespaceAction):
     namespace: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.storage_id)
 
     @override
@@ -26,5 +26,5 @@ class UnregisterNamespaceActionResult(BaseActionResult):
     storage_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.storage_id)

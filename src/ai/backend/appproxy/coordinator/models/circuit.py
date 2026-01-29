@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import jwt
@@ -248,7 +248,7 @@ class Circuit(Base, BaseMixin):
 
         return c
 
-    async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
+    async def get_endpoint_url(self, session: AsyncSession | None = None) -> URL:
         from .worker import Worker
 
         worker: Worker = (

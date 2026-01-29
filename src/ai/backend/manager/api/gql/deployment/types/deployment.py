@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Optional, override
+from typing import override
 from uuid import UUID, uuid4
 
 import strawberry
@@ -134,14 +134,14 @@ class ReplicaState:
     async def replicas(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[ReplicaFilter] = None,
-        order_by: Optional[list[ReplicaOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: ReplicaFilter | None = None,
+        order_by: list[ReplicaOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ModelReplicaConnection:
         from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
 
@@ -175,14 +175,14 @@ class ScalingRule:
     async def auto_scaling_rules(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[AutoScalingRuleFilter] = None,
-        order_by: Optional[list[AutoScalingRuleOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: AutoScalingRuleFilter | None = None,
+        order_by: list[AutoScalingRuleOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> AutoScalingRuleConnection:
         from ai.backend.manager.api.gql.deployment.fetcher.auto_scaling import (
             fetch_auto_scaling_rules,
@@ -258,22 +258,22 @@ class ModelDeploymentNetworkAccess:
     """
 
     _deployment_id: strawberry.Private[UUID]
-    endpoint_url: Optional[str] = None
-    preferred_domain_name: Optional[str] = None
+    endpoint_url: str | None = None
+    preferred_domain_name: str | None = None
     open_to_public: bool = False
 
     @strawberry.field
     async def access_tokens(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[AccessTokenFilter] = None,
-        order_by: Optional[list[AccessTokenOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: AccessTokenFilter | None = None,
+        order_by: list[AccessTokenOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> AccessTokenConnection:
         """Resolve access tokens for this deployment."""
         from ai.backend.manager.api.gql.deployment.fetcher.access_token import (
@@ -321,7 +321,7 @@ class ModelDeployment(Node):
     id: NodeID
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
-    revision: Optional[ModelRevision] = None
+    revision: ModelRevision | None = None
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     _created_user_id: strawberry.Private[UUID]
@@ -343,7 +343,7 @@ class ModelDeployment(Node):
     @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")
     async def deployment_policy(
         self, info: Info[StrawberryGQLContext]
-    ) -> Optional[DeploymentPolicyGQL]:
+    ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
         processor = info.context.processors.deployment
 
@@ -359,14 +359,14 @@ class ModelDeployment(Node):
     async def revision_history(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[ModelRevisionFilter] = None,
-        order_by: Optional[list[ModelRevisionOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: ModelRevisionFilter | None = None,
+        order_by: list[ModelRevisionOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ModelRevisionConnection:
         from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
 
@@ -420,22 +420,22 @@ class ModelDeployment(Node):
 # Filter Types
 @strawberry.input(description="Added in 25.19.0")
 class DeploymentStatusFilter:
-    in_: Optional[list[DeploymentStatusGQL]] = strawberry.field(name="in", default=None)
-    equals: Optional[DeploymentStatusGQL] = None
+    in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
+    equals: DeploymentStatusGQL | None = None
 
 
 @strawberry.input(description="Added in 25.19.0")
 class DeploymentFilter(GQLFilter):
-    name: Optional[StringFilter] = None
-    status: Optional[DeploymentStatusFilter] = None
-    open_to_public: Optional[bool] = None
-    tags: Optional[StringFilter] = None
-    endpoint_url: Optional[StringFilter] = None
-    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
+    name: StringFilter | None = None
+    status: DeploymentStatusFilter | None = None
+    open_to_public: bool | None = None
+    tags: StringFilter | None = None
+    endpoint_url: StringFilter | None = None
+    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
-    AND: Optional[list[DeploymentFilter]] = None
-    OR: Optional[list[DeploymentFilter]] = None
-    NOT: Optional[list[DeploymentFilter]] = None
+    AND: list[DeploymentFilter] | None = None
+    OR: list[DeploymentFilter] | None = None
+    NOT: list[DeploymentFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -564,13 +564,13 @@ class DeploymentStatusChangedPayload:
 class ModelDeploymentMetadataInput:
     project_id: ID
     domain_name: str
-    name: Optional[str] = None
-    tags: Optional[list[str]] = None
+    name: str | None = None
+    tags: list[str] | None = None
 
 
 @strawberry.input(description="Added in 25.19.0")
 class ModelDeploymentNetworkAccessInput:
-    preferred_domain_name: Optional[str] = None
+    preferred_domain_name: str | None = None
     open_to_public: bool = False
 
     def to_network_spec(self) -> DeploymentNetworkSpec:
@@ -594,8 +594,8 @@ class DeploymentStrategyInputGQL:
 
     type: DeploymentStrategyTypeGQL
     rollback_on_failure: bool = False
-    rolling_update: Optional[RollingUpdateConfigInputGQL] = None
-    blue_green: Optional[BlueGreenConfigInputGQL] = None
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
 
     def validate(self) -> None:
         """Validate that the appropriate config is provided for the strategy type."""
@@ -664,13 +664,13 @@ class CreateDeploymentInput:
 @strawberry.input(description="Added in 25.19.0")
 class UpdateDeploymentInput:
     id: ID
-    open_to_public: Optional[bool] = None
-    tags: Optional[list[str]] = None
-    default_deployment_strategy: Optional[DeploymentStrategyInputGQL] = None
-    active_revision_id: Optional[ID] = None
-    desired_replica_count: Optional[int] = None
-    name: Optional[str] = None
-    preferred_domain_name: Optional[str] = None
+    open_to_public: bool | None = None
+    tags: list[str] | None = None
+    default_deployment_strategy: DeploymentStrategyInputGQL | None = None
+    active_revision_id: ID | None = None
+    desired_replica_count: int | None = None
+    name: str | None = None
+    preferred_domain_name: str | None = None
 
     def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
         """Convert input to deployment updater."""
@@ -716,7 +716,7 @@ class UpdateDeploymentInput:
         )
         return Updater(spec=spec, pk_value=deployment_id)
 
-    def to_policy_updater_spec(self) -> Optional[DeploymentPolicyUpdaterSpec]:
+    def to_policy_updater_spec(self) -> DeploymentPolicyUpdaterSpec | None:
         """Convert deployment strategy input to policy updater spec.
 
         Returns None if no deployment_strategy is provided (no policy update).

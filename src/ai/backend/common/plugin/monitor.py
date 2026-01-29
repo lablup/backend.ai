@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from . import AbstractPlugin, BasePluginContext
 
@@ -27,7 +27,7 @@ GAUGE = StatMetricTypes.GAUGE
 
 
 class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -38,13 +38,13 @@ class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Optional[float | int] = None,
+        value: float | int | None = None,
     ) -> None:
         pass
 
 
 class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -53,8 +53,8 @@ class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def capture_exception(
         self,
-        exc_instance: Optional[Exception] = None,
-        context: Optional[Mapping[str, Any]] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         pass
 
@@ -70,7 +70,7 @@ class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
         self,
         metric_type: StatMetricTypes,
         metric_name: str,
-        value: Optional[float | int] = None,
+        value: float | int | None = None,
     ) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.report_metric(metric_type, metric_name, value)
@@ -81,8 +81,8 @@ class ErrorPluginContext(BasePluginContext[AbstractErrorReporterPlugin]):
 
     async def capture_exception(
         self,
-        exc_instance: Optional[Exception] = None,
-        context: Optional[Mapping[str, Any]] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.capture_exception(exc_instance, context)

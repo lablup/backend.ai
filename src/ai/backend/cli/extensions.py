@@ -2,7 +2,7 @@ import os
 import signal
 import sys
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import click
 from click.exceptions import Abort, ClickException
@@ -115,7 +115,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def get_command(self, ctx: click.Context, cmd_name: str) -> Optional[click.Command]:
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         if cmd_name in self._aliases:
             cmd_name = self._aliases[cmd_name]
         command = super().get_command(ctx, cmd_name)

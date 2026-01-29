@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 import strawberry
 from aiohttp import web
@@ -117,14 +116,14 @@ class RouteHistoryConnection(Connection[RouteHistory]):
 @strawberry.field(description="List session scheduling history (superadmin only)")
 async def session_scheduling_histories(
     info: Info[StrawberryGQLContext],
-    filter: Optional[SessionSchedulingHistoryFilter] = None,
-    order_by: Optional[list[SessionSchedulingHistoryOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: SessionSchedulingHistoryFilter | None = None,
+    order_by: list[SessionSchedulingHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> SessionSchedulingHistoryConnection:
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -172,14 +171,14 @@ async def session_scheduling_histories(
 @strawberry.field(description="List deployment history (superadmin only)")
 async def deployment_histories(
     info: Info[StrawberryGQLContext],
-    filter: Optional[DeploymentHistoryFilter] = None,
-    order_by: Optional[list[DeploymentHistoryOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: DeploymentHistoryFilter | None = None,
+    order_by: list[DeploymentHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> DeploymentHistoryConnection:
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -224,14 +223,14 @@ async def deployment_histories(
 @strawberry.field(description="List route history (superadmin only)")
 async def route_histories(
     info: Info[StrawberryGQLContext],
-    filter: Optional[RouteHistoryFilter] = None,
-    order_by: Optional[list[RouteHistoryOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: RouteHistoryFilter | None = None,
+    order_by: list[RouteHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> RouteHistoryConnection:
     me = current_user()
     if me is None or not me.is_superadmin:

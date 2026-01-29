@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class CLIContext(AbstractContextManager):
     _logger: AbstractLogger
 
-    def __init__(self, log_level: LogLevel, config_path: Optional[Path] = None) -> None:
+    def __init__(self, log_level: LogLevel, config_path: Path | None = None) -> None:
         self.config_path = config_path
         self.log_level = log_level
 

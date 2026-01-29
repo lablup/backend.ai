@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Optional
 
 
-def resolve_pci_sysfs_path(bus_id: str) -> Optional[str]:
+def resolve_pci_sysfs_path(bus_id: str) -> str | None:
     """
     Recursively searches /sys/devices for a directory whose basename
     matches the given PCI bus ID, returning the full path if found.

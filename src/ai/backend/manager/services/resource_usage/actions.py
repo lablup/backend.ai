@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, QueryPagination
@@ -40,7 +40,7 @@ class SearchDomainUsageBucketsAction(DomainUsageBucketAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -52,7 +52,7 @@ class SearchDomainUsageBucketsActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -83,7 +83,7 @@ class SearchProjectUsageBucketsAction(ProjectUsageBucketAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -95,7 +95,7 @@ class SearchProjectUsageBucketsActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -126,7 +126,7 @@ class SearchUserUsageBucketsAction(UserUsageBucketAction):
         return "search"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -138,5 +138,5 @@ class SearchUserUsageBucketsActionResult(BaseActionResult):
     total_count: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

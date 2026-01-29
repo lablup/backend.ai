@@ -1,7 +1,7 @@
 import asyncio
 import signal
 from collections.abc import Awaitable, Callable, Collection
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 __all__ = ("current_loop",)
 
@@ -13,7 +13,7 @@ else:
     current_loop = asyncio.get_event_loop  # type: ignore
 
 
-all_tasks: Callable[[Optional[asyncio.AbstractEventLoop]], Collection[asyncio.Task]]
+all_tasks: Callable[[asyncio.AbstractEventLoop | None], Collection[asyncio.Task]]
 if hasattr(asyncio, "all_tasks"):
     all_tasks = asyncio.all_tasks  # type: ignore
 else:
@@ -57,7 +57,7 @@ def _asyncio_run[T](coro: Awaitable[T], *, debug: bool = False) -> T:
             loop.close()
 
 
-run: Callable[[Awaitable[_T], Optional[bool]], _T]
+run: Callable[[Awaitable[_T], bool | None], _T]
 if hasattr(asyncio, "run"):
     asyncio_run = asyncio.run  # type: ignore
 else:

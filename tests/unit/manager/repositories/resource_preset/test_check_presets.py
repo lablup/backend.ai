@@ -11,7 +11,7 @@ import uuid
 from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -370,8 +370,8 @@ class TestCheckPresetsOccupiedSlots:
         addr: str,
         *,
         status: AgentStatus = AgentStatus.ALIVE,
-        available_slots: Optional[ResourceSlot] = None,
-        occupied_slots: Optional[ResourceSlot] = None,
+        available_slots: ResourceSlot | None = None,
+        occupied_slots: ResourceSlot | None = None,
         schedulable: bool = True,
     ) -> AgentId:
         """Helper method to create an agent with specified status and resources."""

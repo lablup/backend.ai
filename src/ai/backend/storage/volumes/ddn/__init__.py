@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 import aiofiles
 import aiofiles.os
@@ -142,8 +142,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         pid_path = qspath / PROJECT_ID_FILE_NAME

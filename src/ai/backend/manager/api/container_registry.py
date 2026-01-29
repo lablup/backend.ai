@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -114,7 +114,7 @@ async def _get_registry_row_matching_url(
 
 
 def _is_authorized_harbor_webhook_request(
-    auth_header: Optional[str], registry_row: ContainerRegistryRow
+    auth_header: str | None, registry_row: ContainerRegistryRow
 ) -> bool:
     if auth_header:
         extra = registry_row.extra or {}

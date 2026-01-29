@@ -5,7 +5,7 @@ import subprocess
 from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 import pkg_resources
 from aiodocker.docker import Docker
@@ -28,7 +28,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         self.image_ref = image_ref
         arch = get_arch_name()

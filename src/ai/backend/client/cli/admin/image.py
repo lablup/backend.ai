@@ -1,6 +1,5 @@
 import json
 import sys
-from typing import Optional
 
 import click
 
@@ -60,14 +59,14 @@ def list(ctx: CLIContext, operation: bool) -> None:
     default=None,
     help="The name of the project to which the images belong. If not specified, scan all projects.",
 )
-def rescan(registry: str, project: Optional[str] = None) -> None:
+def rescan(registry: str, project: str | None = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
     """
     from ai.backend.client.session import AsyncSession
     from ai.backend.common.bgtask.types import BgtaskStatus
 
-    async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
+    async def rescan_images_impl(registry: str, project: str | None) -> None:
         async with AsyncSession() as session:
             try:
                 result = await session.Image.rescan_images(registry, project)

@@ -2,7 +2,6 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 from ai.backend.manager.actions.types import OperationStatus
 
@@ -13,9 +12,9 @@ class StartedActionMessage:
 
     action_id: uuid.UUID
     action_type: str
-    entity_id: Optional[str | uuid.UUID]
-    request_id: Optional[str]
-    triggered_by: Optional[str]
+    entity_id: str | uuid.UUID | None
+    request_id: str | None
+    triggered_by: str | None
     entity_type: str
     operation_type: str
     created_at: datetime
@@ -27,9 +26,9 @@ class FinishedActionMessage:
 
     action_id: uuid.UUID
     action_type: str
-    entity_id: Optional[str | uuid.UUID]  # TODO: Make this required?
-    request_id: Optional[str]
-    triggered_by: Optional[str]
+    entity_id: str | uuid.UUID | None  # TODO: Make this required?
+    request_id: str | None
+    triggered_by: str | None
     entity_type: str
     operation_type: str
     status: OperationStatus

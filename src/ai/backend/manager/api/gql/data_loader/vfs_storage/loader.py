@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -14,7 +13,7 @@ from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcess
 async def load_vfs_storages_by_ids(
     processor: VFSStorageProcessors,
     storage_ids: Sequence[uuid.UUID],
-) -> list[Optional[VFSStorageData]]:
+) -> list[VFSStorageData | None]:
     """Batch load VFS storages by their IDs.
 
     Args:

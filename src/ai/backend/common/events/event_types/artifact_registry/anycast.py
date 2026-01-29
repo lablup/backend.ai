@@ -1,4 +1,4 @@
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -30,9 +30,9 @@ class DoScanReservoirRegistryEvent(AbstractAnycastEvent):
         return EventDomain.ARTIFACT
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

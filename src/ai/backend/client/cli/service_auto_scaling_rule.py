@@ -1,7 +1,7 @@
 import decimal
 import sys
 from collections.abc import Iterable
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import click
@@ -63,8 +63,8 @@ def create(
     comparator: AutoScalingMetricComparator,
     step_size: int,
     cooldown_seconds: int,
-    min_replicas: Optional[int] = None,
-    max_replicas: Optional[int] = None,
+    min_replicas: int | None = None,
+    max_replicas: int | None = None,
 ) -> None:
     """Create a new auto-scaling rule."""
 
@@ -110,11 +110,11 @@ def create(
 def list(
     ctx: CLIContext,
     service: str,
-    format: Optional[str],
-    filter_: Optional[str],
-    order: Optional[str],
+    format: str | None,
+    filter_: str | None,
+    order: str | None,
     offset: int,
-    limit: Optional[int],
+    limit: int | None,
 ) -> None:
     """List all set auto-scaling rules for given model service."""
 
@@ -218,8 +218,8 @@ def update(
     comparator: str | Undefined,
     step_size: int | Undefined,
     cooldown_seconds: int | Undefined,
-    min_replicas: Optional[int] | Undefined,
-    max_replicas: Optional[int] | Undefined,
+    min_replicas: int | None | Undefined,
+    max_replicas: int | None | Undefined,
 ) -> None:
     """Update attributes of the given auto-scaling rule."""
     with Session() as session:

@@ -16,7 +16,6 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
-    Optional,
     cast,
 )
 
@@ -129,7 +128,7 @@ class MetricTypes(enum.Enum):
 @attrs.define(auto_attribs=True, slots=True)
 class Measurement:
     value: Decimal
-    capacity: Optional[Decimal] = None
+    capacity: Decimal | None = None
 
     def apply_scale_factor(self, scale_factor: Decimal) -> Measurement:
         return Measurement(
@@ -151,7 +150,7 @@ class NodeMeasurement:
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -165,7 +164,7 @@ class ContainerMeasurement:
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -179,7 +178,7 @@ class ProcessMeasurement:
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
     stats_filter: frozenset[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -211,7 +210,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
+    def __init__(self, initial_value: Decimal | None = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -301,8 +300,8 @@ class Metric:
     stats: MovingStatistics
     stats_filter: frozenset[str]
     current: Decimal
-    capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    capacity: Decimal | None = None
+    current_hook: Callable[[Metric], Decimal] | None = None
 
     def update(self, value: Measurement) -> None:
         if value.capacity is not None:
@@ -346,7 +345,7 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: AbstractAgent, mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
+        self, agent: AbstractAgent, mode: StatModes | None = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
@@ -381,7 +380,7 @@ class StatContext:
     def _get_ownership_info_from_kernel(
         self,
         kernel_id: KernelId,
-    ) -> tuple[Optional[SessionId], Optional[uuid.UUID], Optional[uuid.UUID]]:
+    ) -> tuple[SessionId | None, uuid.UUID | None, uuid.UUID | None]:
         kernel_obj = self.agent.kernel_registry.get(kernel_id)
         if kernel_obj is not None:
             ownership_data = kernel_obj.ownership_data

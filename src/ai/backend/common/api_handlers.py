@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from inspect import Signature
 from typing import (
     Any,
-    Optional,
     Self,
     TypeVar,
     get_args,
@@ -75,11 +74,11 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
 
 class BodyParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
-    _parsed: Optional[TRequestModel]
+    _parsed: TRequestModel | None
 
     def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TRequestModel] = None
+        self._parsed: TRequestModel | None = None
 
     @property
     def parsed(self) -> TRequestModel:
@@ -97,11 +96,11 @@ class BodyParam[TRequestModel: BaseRequestModel]:
 
 class QueryParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
-    _parsed: Optional[TRequestModel]
+    _parsed: TRequestModel | None
 
     def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TRequestModel] = None
+        self._parsed: TRequestModel | None = None
 
     @property
     def parsed(self) -> TRequestModel:
@@ -119,11 +118,11 @@ class QueryParam[TRequestModel: BaseRequestModel]:
 
 class HeaderParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
-    _parsed: Optional[TRequestModel]
+    _parsed: TRequestModel | None
 
     def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TRequestModel] = None
+        self._parsed: TRequestModel | None = None
 
     @property
     def parsed(self) -> TRequestModel:
@@ -141,11 +140,11 @@ class HeaderParam[TRequestModel: BaseRequestModel]:
 
 class PathParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
-    _parsed: Optional[TRequestModel]
+    _parsed: TRequestModel | None
 
     def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TRequestModel] = None
+        self._parsed: TRequestModel | None = None
 
     @property
     def parsed(self) -> TRequestModel:
@@ -174,7 +173,7 @@ type JSONDict = dict[str, Any]
 @dataclass
 class APIResponse:
     _status_code: int
-    _data: Optional[BaseResponseModel]
+    _data: BaseResponseModel | None
 
     @classmethod
     def build(cls, status_code: int, response_model: BaseResponseModel) -> Self:
@@ -185,7 +184,7 @@ class APIResponse:
         return cls(_status_code=status_code, _data=None)
 
     @property
-    def to_json(self) -> Optional[JSONDict]:
+    def to_json(self) -> JSONDict | None:
         return self._data.model_dump(mode="json") if self._data else None
 
     @property

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from strawberry import Info
 
@@ -35,14 +33,14 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL:
 @strawberry.field(description="Added in 26.1.0")
 async def agents_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[AgentFilterGQL] = None,
-    order_by: Optional[list[AgentOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: AgentFilterGQL | None = None,
+    order_by: list[AgentOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> AgentV2Connection:
     return await fetch_agents(
         info,

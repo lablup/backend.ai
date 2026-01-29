@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -150,14 +150,14 @@ class DeploymentAutoScalingPolicyData:
     endpoint: UUID
     min_replicas: int
     max_replicas: int
-    metric_source: Optional[AutoScalingMetricSource]
-    metric_name: Optional[str]
-    comparator: Optional[AutoScalingMetricComparator]
-    scale_up_threshold: Optional[Decimal]
-    scale_down_threshold: Optional[Decimal]
+    metric_source: AutoScalingMetricSource | None
+    metric_name: str | None
+    comparator: AutoScalingMetricComparator | None
+    scale_up_threshold: Decimal | None
+    scale_down_threshold: Decimal | None
     scale_up_step_size: int
     scale_down_step_size: int
     cooldown_seconds: int
-    last_scaled_at: Optional[datetime]
+    last_scaled_at: datetime | None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None

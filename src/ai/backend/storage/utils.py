@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any
 
 import trafaret as t
 from aiohttp import web
@@ -35,7 +35,7 @@ def fstime2datetime(t: float | int) -> datetime:
 @actxmgr
 async def check_params(
     request: web.Request,
-    checker: Optional[t.Trafaret],
+    checker: t.Trafaret | None,
     *,
     read_from: CheckParamSource = CheckParamSource.BODY,
     _auth_required: bool = True,

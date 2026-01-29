@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -9,7 +9,7 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 @dataclass
 class ListObjectStorageAction(ObjectStorageAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -24,5 +24,5 @@ class ListObjectStorageActionResult(BaseActionResult):
     data: list[ObjectStorageData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

@@ -6,7 +6,7 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -61,10 +61,10 @@ __all__ = (
 class DeploymentFilter(BaseRequestModel):
     """Filter for deployments."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    project_id: Optional[UUID] = Field(default=None, description="Filter by project ID")
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
-    status: Optional[list[ModelDeploymentStatus]] = Field(
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    project_id: UUID | None = Field(default=None, description="Filter by project ID")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    status: list[ModelDeploymentStatus] | None = Field(
         default=None, description="Filter by deployment status"
     )
 
@@ -72,15 +72,15 @@ class DeploymentFilter(BaseRequestModel):
 class RevisionFilter(BaseRequestModel):
     """Filter for revisions."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    deployment_id: Optional[UUID] = Field(default=None, description="Filter by deployment ID")
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
 
 
 class SearchDeploymentsRequest(BaseRequestModel):
     """Request body for searching deployments with filters, orders, and pagination."""
 
-    filter: Optional[DeploymentFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[DeploymentOrder] = Field(default=None, description="Order specification")
+    filter: DeploymentFilter | None = Field(default=None, description="Filter conditions")
+    order: DeploymentOrder | None = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -88,8 +88,8 @@ class SearchDeploymentsRequest(BaseRequestModel):
 class SearchRevisionsRequest(BaseRequestModel):
     """Request body for searching revisions with filters, orders, and pagination."""
 
-    filter: Optional[RevisionFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[RevisionOrder] = Field(default=None, description="Order specification")
+    filter: RevisionFilter | None = Field(default=None, description="Filter conditions")
+    order: RevisionOrder | None = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
@@ -97,8 +97,8 @@ class SearchRevisionsRequest(BaseRequestModel):
 class UpdateDeploymentRequest(BaseRequestModel):
     """Request to update a deployment."""
 
-    name: Optional[str] = Field(default=None, description="Updated deployment name")
-    desired_replicas: Optional[int] = Field(
+    name: str | None = Field(default=None, description="Updated deployment name")
+    desired_replicas: int | None = Field(
         default=None, ge=0, description="Updated desired replica count"
     )
 
@@ -119,11 +119,9 @@ class RevisionPathParam(BaseRequestModel):
 class RouteFilter(BaseRequestModel):
     """Filter for routes."""
 
-    deployment_id: Optional[UUID] = Field(default=None, description="Filter by deployment ID")
-    statuses: Optional[list[RouteStatus]] = Field(
-        default=None, description="Filter by route status"
-    )
-    traffic_statuses: Optional[list[RouteTrafficStatus]] = Field(
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    statuses: list[RouteStatus] | None = Field(default=None, description="Filter by route status")
+    traffic_statuses: list[RouteTrafficStatus] | None = Field(
         default=None, description="Filter by traffic status"
     )
 
@@ -131,13 +129,13 @@ class RouteFilter(BaseRequestModel):
 class SearchRoutesRequest(BaseRequestModel):
     """Request body for searching routes with filters, orders, and pagination."""
 
-    filter: Optional[RouteFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[RouteOrder] = Field(default=None, description="Order specification")
+    filter: RouteFilter | None = Field(default=None, description="Filter conditions")
+    order: RouteOrder | None = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
     # Cursor-based pagination (optional, for forward/backward navigation)
-    cursor: Optional[str] = Field(default=None, description="Cursor for pagination")
-    cursor_direction: Optional[str] = Field(
+    cursor: str | None = Field(default=None, description="Cursor for pagination")
+    cursor_direction: str | None = Field(
         default=None, description="Cursor direction: 'forward' or 'backward'"
     )
 
@@ -181,15 +179,15 @@ class DeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
-    name: Optional[str] = Field(default=None, description="Deployment name")
-    tags: Optional[list[str]] = Field(default=None, description="Tags for the deployment")
+    name: str | None = Field(default=None, description="Deployment name")
+    tags: list[str] | None = Field(default=None, description="Tags for the deployment")
 
 
 class NetworkAccessInput(BaseRequestModel):
     """Network access configuration input."""
 
     open_to_public: bool = Field(default=False, description="Whether the deployment is public")
-    preferred_domain_name: Optional[str] = Field(
+    preferred_domain_name: str | None = Field(
         default=None, description="Preferred domain name for the deployment"
     )
 
@@ -199,10 +197,10 @@ class DeploymentStrategyInput(BaseRequestModel):
 
     type: DeploymentStrategy = Field(description="Strategy type (ROLLING or BLUE_GREEN)")
     rollback_on_failure: bool = Field(default=False, description="Rollback on failure")
-    rolling_update: Optional[RollingUpdateConfigInput] = Field(
+    rolling_update: RollingUpdateConfigInput | None = Field(
         default=None, description="Rolling update configuration"
     )
-    blue_green: Optional[BlueGreenConfigInput] = Field(
+    blue_green: BlueGreenConfigInput | None = Field(
         default=None, description="Blue-green deployment configuration"
     )
 
@@ -227,7 +225,7 @@ class ResourceConfigInput(BaseRequestModel):
     resource_slots: Mapping[str, Any] = Field(
         description='Resource slots (e.g., {"cpu": "1", "mem": "1073741824"})'
     )
-    resource_opts: Optional[Mapping[str, Any]] = Field(
+    resource_opts: Mapping[str, Any] | None = Field(
         default=None, description='Resource options (e.g., {"shmem": "64m"})'
     )
 
@@ -246,29 +244,29 @@ class ModelRuntimeConfigInput(BaseRequestModel):
     runtime_variant: RuntimeVariant = Field(
         default=RuntimeVariant.CUSTOM, description="Runtime variant"
     )
-    inference_runtime_config: Optional[Mapping[str, Any]] = Field(
+    inference_runtime_config: Mapping[str, Any] | None = Field(
         default=None, description="Inference runtime configuration"
     )
-    environ: Optional[Mapping[str, str]] = Field(default=None, description="Environment variables")
+    environ: Mapping[str, str] | None = Field(default=None, description="Environment variables")
 
 
 class ExtraVFolderMountInput(BaseRequestModel):
     """Extra vfolder mount input."""
 
     vfolder_id: UUID = Field(description="VFolder ID to mount")
-    mount_destination: Optional[str] = Field(default=None, description="Mount destination path")
+    mount_destination: str | None = Field(default=None, description="Mount destination path")
 
 
 class RevisionInput(BaseRequestModel):
     """Revision input for creating a new revision."""
 
-    name: Optional[str] = Field(default=None, description="Revision name")
+    name: str | None = Field(default=None, description="Revision name")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    extra_mounts: Optional[list[ExtraVFolderMountInput]] = Field(
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )
 
@@ -291,12 +289,12 @@ class CreateDeploymentRequest(BaseRequestModel):
 class CreateRevisionRequest(BaseRequestModel):
     """Request to create a new revision for an existing deployment."""
 
-    name: Optional[str] = Field(default=None, description="Revision name")
+    name: str | None = Field(default=None, description="Revision name")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    extra_mounts: Optional[list[ExtraVFolderMountInput]] = Field(
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import (
     Any,
     Literal,
-    Optional,
     override,
 )
 
@@ -93,7 +92,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     @override
     async def prepare_resource_spec(
         self,
-    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         # Ensure that we have intrinsic slots.
         if SlotName("cpu") not in slots:
@@ -176,7 +175,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         src: str | Path,
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(MountTypes.BIND, Path(), Path())
 
@@ -208,7 +207,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts: Optional[Mapping[str, Any]],
+        resource_opts: Mapping[str, Any] | None,
         preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
@@ -364,7 +363,7 @@ class DummyAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> DummyKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
@@ -383,7 +382,7 @@ class DummyAgent(
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["destroy-kernel"]
         await asyncio.sleep(delay)
@@ -392,7 +391,7 @@ class DummyAgent(
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["clean-kernel"]

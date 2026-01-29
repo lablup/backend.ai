@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Coroutine, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -462,9 +462,9 @@ class DeploymentExecutor:
         project_id: UUID,
         domain_name: str,
         runtime_variant: RuntimeVariant,
-        existing_url: Optional[str],
+        existing_url: str | None,
         open_to_public: bool,
-        health_check_config: Optional[ModelHealthCheck],
+        health_check_config: ModelHealthCheck | None,
         app_proxy_addr: str,
         app_proxy_api_token: str,
     ) -> str:
@@ -589,7 +589,7 @@ class DeploymentExecutor:
         deployment: DeploymentInfo,
         auto_scaling_rules: Mapping[UUID, Sequence[AutoScalingRule]],
         metrics_data: AutoScalingMetricsData,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Calculate desired replicas for a single deployment.
 
         Returns:
@@ -629,7 +629,7 @@ class DeploymentExecutor:
     async def _unregister_endpoint(
         self,
         deployment: DeploymentInfo,
-        proxy_targets: Mapping[str, Optional[ScalingGroupProxyTarget]],
+        proxy_targets: Mapping[str, ScalingGroupProxyTarget | None],
     ) -> None:
         """Unregister an endpoint from the proxy service."""
         pool = DeploymentRecorderContext.current_pool()

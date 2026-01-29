@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from aiodocker.docker import Docker
 from pydantic import ValidationError
@@ -31,9 +31,9 @@ class ModelServiceSpecCheckArgs:
     model_vfolder_mount: VFolderMount
     session_type: SessionTypes
     runtime_variant: RuntimeVariant
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
 
-    def to_model_service_spec(self, image_command: Optional[str]) -> "ModelServiceSpec":
+    def to_model_service_spec(self, image_command: str | None) -> "ModelServiceSpec":
         return ModelServiceSpec(
             session_type=self.session_type,
             model_vfolder_mount=self.model_vfolder_mount,
@@ -48,8 +48,8 @@ class ModelServiceSpec:
     session_type: SessionTypes
     model_vfolder_mount: VFolderMount
     runtime_variant: RuntimeVariant
-    model_definition_path: Optional[str]
-    image_command: Optional[str]
+    model_definition_path: str | None
+    image_command: str | None
 
 
 class ModelServiceSpecCheckProvisioner(Provisioner[ModelServiceSpecCheckArgs, ModelServiceSpec]):
@@ -68,7 +68,7 @@ class ModelServiceSpecCheckProvisioner(Provisioner[ModelServiceSpecCheckArgs, Mo
 
         return spec.to_model_service_spec(image_command)
 
-    async def _extract_image_command(self, image_canonical: str) -> Optional[str]:
+    async def _extract_image_command(self, image_canonical: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image_canonical)
             return result["Config"].get("Cmd")
@@ -153,7 +153,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
                 )
 
     async def _get_model_definition_from_vllm(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "vllm-model",
@@ -174,7 +174,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             raise InvalidModelConfigurationError(f"Invalid model definition for VLLM: {e}") from e
 
     async def _get_model_definition_from_tgi(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "tgi-model",
@@ -195,7 +195,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             raise InvalidModelConfigurationError(f"Invalid model definition for TGI: {e}") from e
 
     async def _get_model_definition_from_nim(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "nim-model",
@@ -216,7 +216,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             raise InvalidModelConfigurationError(f"Invalid model definition for NIM: {e}") from e
 
     async def _get_model_definition_from_sglang(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "sglang-model",
@@ -237,7 +237,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             raise InvalidModelConfigurationError(f"Invalid model definition for SGLang: {e}") from e
 
     async def _get_model_definition_from_modular_max(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "max-model",
@@ -260,7 +260,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             ) from e
 
     async def _get_model_definition_from_cmd(
-        self, model_folder: VFolderMount, image_command: Optional[str]
+        self, model_folder: VFolderMount, image_command: str | None
     ) -> ModelDefinition:
         _model = {
             "name": "image-model",
@@ -276,7 +276,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             raise InvalidModelConfigurationError(f"Invalid model definition for CMD: {e}") from e
 
     async def _get_model_definition_from_custom(
-        self, model_folder: VFolderMount, model_definition_path: Optional[str]
+        self, model_folder: VFolderMount, model_definition_path: str | None
     ) -> ModelDefinition:
         if model_definition_path:
             model_definition_candidates = [model_definition_path]
@@ -286,7 +286,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
                 "model-definition.yml",
             ]
 
-        final_model_definition_path: Optional[Path] = None
+        final_model_definition_path: Path | None = None
         for filename in model_definition_candidates:
             if (Path(model_folder.host_path) / filename).is_file():
                 final_model_definition_path = Path(model_folder.host_path) / filename

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from typing import Final, Optional, Self, cast
+from typing import Final, Self, cast
 
 from glide import Batch, ExpirySet, ExpiryType
 from pydantic import ValidationError
@@ -227,7 +227,7 @@ class ValkeyArtifactDownloadTrackingClient:
         current_bytes: int,
         total_bytes: int,
         success: bool = False,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         """
         Update file download progress in Redis.
@@ -302,7 +302,7 @@ class ValkeyArtifactDownloadTrackingClient:
         self,
         model_id: str,
         revision: str,
-    ) -> Optional[ArtifactDownloadTrackingData]:
+    ) -> ArtifactDownloadTrackingData | None:
         """
         Get overall artifact download progress.
 
@@ -338,7 +338,7 @@ class ValkeyArtifactDownloadTrackingClient:
         model_id: str,
         revision: str,
         file_path: str,
-    ) -> Optional[FileDownloadProgressData]:
+    ) -> FileDownloadProgressData | None:
         """
         Get specific file download progress.
 

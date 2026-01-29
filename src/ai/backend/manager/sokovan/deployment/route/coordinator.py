@@ -6,7 +6,6 @@ import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -60,7 +59,7 @@ class RouteTaskSpec:
     """Specification for a route lifecycle periodic task."""
 
     lifecycle_type: RouteLifecycleType
-    short_interval: Optional[float] = None  # None means no short-cycle task
+    short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 

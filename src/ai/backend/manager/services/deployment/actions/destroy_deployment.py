@@ -2,7 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
@@ -15,7 +15,7 @@ class DestroyDeploymentAction(DeploymentBaseAction):
     endpoint_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.endpoint_id)
 
     @override
@@ -29,5 +29,5 @@ class DestroyDeploymentActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

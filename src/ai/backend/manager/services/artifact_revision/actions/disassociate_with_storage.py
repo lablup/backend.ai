@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
@@ -13,7 +13,7 @@ class DisassociateWithStorageAction(ArtifactRevisionAction):
     storage_namespace_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.artifact_revision_id)
 
     @override
@@ -27,5 +27,5 @@ class DisassociateWithStorageActionResult(BaseActionResult):
     result: AssociationArtifactsStoragesData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

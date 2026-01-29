@@ -4,7 +4,7 @@ import platform
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
@@ -45,7 +45,7 @@ from .resources import get_resource_spec_from_container
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
+async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = ContainerId(container.id[:7])
     try:
         ret = await container.stats(stream=False)  # TODO: cache
@@ -101,7 +101,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -267,7 +267,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:

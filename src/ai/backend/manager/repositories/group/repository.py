@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, cast
+from typing import cast
 from uuid import UUID
 
 import aiotools
@@ -112,7 +112,7 @@ class GroupRepository:
         self._storage_manager = storage_manager
         self._role_manager = RoleManager()
 
-    async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
+    async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> GroupRow | None:
         """Private method to get a group by ID using an existing session."""
         result = await session.execute(sa.select(GroupRow).where(groups.c.id == group_id))
         return result.scalar_one_or_none()
@@ -168,9 +168,9 @@ class GroupRepository:
     async def modify_validated(
         self,
         updater: Updater[GroupRow],
-        user_update_mode: Optional[str] = None,
-        user_uuids: Optional[list[uuid.UUID]] = None,
-    ) -> Optional[GroupData]:
+        user_update_mode: str | None = None,
+        user_uuids: list[uuid.UUID] | None = None,
+    ) -> GroupData | None:
         """Modify a group with validation."""
         group_id = updater.pk_value
 
@@ -229,7 +229,7 @@ class GroupRepository:
         self,
         start_date: datetime,
         end_date: datetime,
-        group_ids: Optional[Sequence[UUID]] = None,
+        group_ids: Sequence[UUID] | None = None,
     ) -> list[dict]:
         """Get container statistics for groups within a time period."""
         async with self._db.begin_readonly() as conn:
@@ -410,7 +410,7 @@ class GroupRepository:
         self,
         start_date: datetime,
         end_date: datetime,
-        project_ids: Optional[Sequence[UUID]] = None,
+        project_ids: Sequence[UUID] | None = None,
     ) -> list[KernelRow]:
         """Fetch resource usage data for projects."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)

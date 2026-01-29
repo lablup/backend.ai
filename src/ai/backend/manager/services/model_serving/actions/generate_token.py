@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, override
+from typing import override
 
 from dateutil.relativedelta import relativedelta
 
@@ -14,12 +14,12 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class GenerateTokenAction(ModelServiceAction):
     service_id: uuid.UUID
 
-    duration: Optional[timedelta | relativedelta]
-    valid_until: Optional[int]
+    duration: timedelta | relativedelta | None
+    valid_until: int | None
     expires_at: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -33,5 +33,5 @@ class GenerateTokenActionResult(BaseActionResult):
     data: EndpointTokenData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import graphene
 import sqlalchemy as sa
@@ -41,7 +41,7 @@ class Routing(graphene.ObjectType):
     _endpoint_row: EndpointRow
 
     @classmethod
-    def from_dto(cls, dto: Any) -> Optional[Self]:
+    def from_dto(cls, dto: Any) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -59,7 +59,7 @@ class Routing(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: RoutingRow,
-        endpoint: Optional[EndpointRow] = None,
+        endpoint: EndpointRow | None = None,
     ) -> Routing:
         ret = cls(
             routing_id=row.id,
@@ -78,10 +78,10 @@ class Routing(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        endpoint_id: uuid.UUID | None = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from()
         if endpoint_id is not None:
@@ -103,12 +103,12 @@ class Routing(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
+        endpoint_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> Sequence[Routing]:
         query = (
             sa.select(RoutingRow)
@@ -144,9 +144,9 @@ class Routing(graphene.ObjectType):
         ctx: GraphQueryContext,
         endpoint_id: uuid.UUID,
         *,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> Sequence[Routing]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await RoutingRow.list(
@@ -164,9 +164,9 @@ class Routing(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         routing_id: uuid.UUID,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: uuid.UUID | None = None,
     ) -> Routing:
         try:
             async with ctx.db.begin_readonly_session() as session:
@@ -195,7 +195,7 @@ class Routing(graphene.ObjectType):
             ],
         )
 
-    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "EndpointStatistics.by_replica")
         return await loader.load((self._endpoint_row.id, self.routing_id))

@@ -7,7 +7,7 @@ import ssl
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Final, Optional, override
+from typing import Any, Final, override
 
 import aiohttp
 
@@ -77,7 +77,7 @@ _DOWNLOAD_RETRIABLE_ERROR = (
 @dataclass
 class _ProbeHeadInfo:
     total: int
-    etag: Optional[str]
+    etag: str | None
     accept_ranges: bool
 
 
@@ -85,26 +85,26 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     _url: str
     _chunk_size: int
     _max_retries: int
-    _content_type: Optional[str]
+    _content_type: str | None
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
     _file_path: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
-    _token: Optional[str]
+    _progress_task: asyncio.Task[None] | None
+    _token: str | None
 
     def __init__(
         self,
         url: str,
         chunk_size: int,
         max_retries: int,
-        content_type: Optional[str],
+        content_type: str | None,
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
         file_path: str,
-        token: Optional[str] = None,
+        token: str | None = None,
     ) -> None:
         self._url = url
         self._chunk_size = chunk_size
@@ -315,7 +315,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             await self._session.close()
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type
 
 
@@ -367,7 +367,7 @@ class HuggingFaceService:
         registry_name: str,
         limit: int,
         sort: ModelSortKey,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[ModelData]:
         """List HuggingFace models with metadata.
 
@@ -428,7 +428,7 @@ class HuggingFaceService:
         self,
         registry_name: str,
         model: ModelTarget,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get the commit hash for a specific model revision.
 
         Args:
@@ -540,7 +540,7 @@ class HuggingFaceService:
         model: ModelTarget,
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
-        storage_prefix: Optional[str] = None,
+        storage_prefix: str | None = None,
     ) -> None:
         """Import a HuggingFace model to storage using ImportPipeline.
 
@@ -558,7 +558,7 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
         success = False
-        verification_result: Optional[VerificationStepResult] = None
+        verification_result: VerificationStepResult | None = None
         try:
             # Create import context
             context = ImportStepContext(
@@ -600,7 +600,7 @@ class HuggingFaceService:
                 )
             )
 
-    async def _download_readme_content(self, download_url: str) -> Optional[str]:
+    async def _download_readme_content(self, download_url: str) -> str | None:
         """Download README content from the given URL.
 
         Args:
@@ -626,7 +626,7 @@ class HuggingFaceService:
         models: list[ModelTarget],
         storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
-        storage_prefix: Optional[str] = None,
+        storage_prefix: str | None = None,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
@@ -852,7 +852,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         download_chunk_size: int,
         redis_client: ValkeyArtifactDownloadTrackingClient,
         storage_key: str,
-        token: Optional[str] = None,
+        token: str | None = None,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
         storage = storage_target.resolve_storage(storage_pool)

@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
@@ -31,8 +30,8 @@ class RoleData:
     status: RoleStatus
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -40,7 +39,7 @@ class AssignedUserData:
     """Information about a user assigned to a role."""
 
     user_id: uuid.UUID
-    granted_by: Optional[uuid.UUID]
+    granted_by: uuid.UUID | None
     granted_at: datetime
 
 
@@ -61,8 +60,8 @@ class RoleDetailData:
 
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -95,14 +94,14 @@ class UserRoleAssignmentInput:
 
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.valkey_client.valkey_cache import ValkeyCache
@@ -48,7 +48,7 @@ class AppConfigRepository:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-    ) -> Optional[AppConfigData]:
+    ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
         return await self._db_source.get_config(scope_type, scope_id)
 

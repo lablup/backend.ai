@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 import strawberry
@@ -72,14 +72,14 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
 
 @strawberry.input(description="Added in 25.19.0")
 class ReplicaStatusFilter:
-    in_: Optional[list[ReplicaStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[ReplicaStatus] = None
+    in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
+    equals: ReplicaStatus | None = None
 
 
 @strawberry.input(description="Added in 25.19.0")
 class TrafficStatusFilter:
-    in_: Optional[list[TrafficStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[TrafficStatus] = None
+    in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
+    equals: TrafficStatus | None = None
 
 
 # ========== ModelReplica Types ==========
@@ -87,12 +87,12 @@ class TrafficStatusFilter:
 
 @strawberry.input(description="Added in 25.19.0")
 class ReplicaFilter(GQLFilter):
-    status: Optional[ReplicaStatusFilter] = None
-    traffic_status: Optional[TrafficStatusFilter] = None
+    status: ReplicaStatusFilter | None = None
+    traffic_status: TrafficStatusFilter | None = None
 
-    AND: Optional[list[ReplicaFilter]] = None
-    OR: Optional[list[ReplicaFilter]] = None
-    NOT: Optional[list[ReplicaFilter]] = None
+    AND: list[ReplicaFilter] | None = None
+    OR: list[ReplicaFilter] | None = None
+    NOT: list[ReplicaFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -844,8 +844,8 @@ class SessionService:
         try:
             await self._agent_registry.increment_session_usage(session)
 
-            run_id: Optional[str]
-            mode: Optional[str]
+            run_id: str | None
+            mode: str | None
 
             if api_version[0] == 1:
                 run_id = action.params.run_id or secrets.token_hex(8)
@@ -1052,7 +1052,7 @@ class SessionService:
                 )
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
-            service_ports = cast(Optional[list[dict[str, Any]]], sess.main_kernel.service_ports)
+            service_ports = cast(list[dict[str, Any]] | None, sess.main_kernel.service_ports)
             if service_ports is None:
                 raise KernelNotReady(
                     f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"

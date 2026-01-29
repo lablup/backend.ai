@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Self
+from typing import Self
 from unittest.mock import AsyncMock
 
 import pytest
@@ -15,7 +15,7 @@ class DummyBaseEvent(AbstractEvent):
     def __init__(self, domain_id: str) -> None:
         self._domain_id = domain_id
 
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return self._domain_id
 
     @classmethod
@@ -33,7 +33,7 @@ class DummyBaseEvent(AbstractEvent):
     def event_name(cls) -> str:
         return "dummy"
 
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 

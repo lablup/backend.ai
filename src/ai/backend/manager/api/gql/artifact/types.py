@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from aiotools import apartial
@@ -118,7 +118,7 @@ class ArtifactVerifierGQLResult:
     metadata: ArtifactVerifierMetadataGQL = strawberry.field(
         description="Added in 26.1.0. Additional metadata from the verifier."
     )
-    error: Optional[str] = strawberry.field(
+    error: str | None = strawberry.field(
         description="Fatal error message if the verifier failed to complete"
     )
 
@@ -195,15 +195,15 @@ class ArtifactVerificationGQLResult:
     """)
 )
 class ArtifactFilter(GQLFilter):
-    type: Optional[list[ArtifactType]] = None
-    name: Optional[StringFilter] = None
-    registry: Optional[StringFilter] = None
-    source: Optional[StringFilter] = None
-    availability: Optional[list[ArtifactAvailability]] = None
+    type: list[ArtifactType] | None = None
+    name: StringFilter | None = None
+    registry: StringFilter | None = None
+    source: StringFilter | None = None
+    availability: list[ArtifactAvailability] | None = None
 
-    AND: Optional[list[ArtifactFilter]] = None
-    OR: Optional[list[ArtifactFilter]] = None
-    NOT: Optional[list[ArtifactFilter]] = None
+    AND: list[ArtifactFilter] | None = None
+    OR: list[ArtifactFilter] | None = None
+    NOT: list[ArtifactFilter] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
@@ -315,14 +315,14 @@ class ArtifactOrderBy(GQLOrderBy):
     """)
 )
 class ArtifactRevisionStatusFilter:
-    in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[ArtifactStatus] = None
+    in_: list[ArtifactStatus] | None = strawberry.field(name="in", default=None)
+    equals: ArtifactStatus | None = None
 
 
 @strawberry.input(description="Added in 25.16.0")
 class ArtifactRevisionRemoteStatusFilter:
-    in_: Optional[list[ArtifactRemoteStatus]] = strawberry.field(name="in", default=None)
-    equals: Optional[ArtifactRemoteStatus] = None
+    in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
+    equals: ArtifactRemoteStatus | None = None
 
 
 @strawberry.input(
@@ -335,17 +335,17 @@ class ArtifactRevisionRemoteStatusFilter:
     """)
 )
 class ArtifactRevisionFilter(GQLFilter):
-    status: Optional[ArtifactRevisionStatusFilter] = None
-    remote_status: Optional[ArtifactRevisionRemoteStatusFilter] = strawberry.field(
+    status: ArtifactRevisionStatusFilter | None = None
+    remote_status: ArtifactRevisionRemoteStatusFilter | None = strawberry.field(
         default=None, description="Added in 25.16.0"
     )
-    version: Optional[StringFilter] = None
-    artifact_id: Optional[UUIDFilter] = strawberry.field(default=None)
-    size: Optional[IntFilter] = None
+    version: StringFilter | None = None
+    artifact_id: UUIDFilter | None = strawberry.field(default=None)
+    size: IntFilter | None = None
 
-    AND: Optional[list[ArtifactRevisionFilter]] = None
-    OR: Optional[list[ArtifactRevisionFilter]] = None
-    NOT: Optional[list[ArtifactRevisionFilter]] = None
+    AND: list[ArtifactRevisionFilter] | None = None
+    OR: list[ArtifactRevisionFilter] | None = None
+    NOT: list[ArtifactRevisionFilter] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
@@ -493,12 +493,12 @@ class ArtifactRevisionOrderBy(GQLOrderBy):
     """)
 )
 class ScanArtifactsInput:
-    registry_id: Optional[ID] = None
+    registry_id: ID | None = None
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
     )
-    artifact_type: Optional[ArtifactType] = None
-    search: Optional[str] = None
+    artifact_type: ArtifactType | None = None
+    search: str | None = None
 
 
 @strawberry.input(
@@ -533,7 +533,7 @@ class ImportArtifactsInput:
         default=None,
         description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
-    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+    options: ImportArtifactsOptionsGQL | None = strawberry.field(
         default=None,
         description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
@@ -559,20 +559,20 @@ class DelegateeTarget:
 """)
 )
 class DelegateScanArtifactsInput:
-    delegator_reservoir_id: Optional[ID] = strawberry.field(
+    delegator_reservoir_id: ID | None = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    delegatee_target: Optional[DelegateeTarget] = strawberry.field(
+    delegatee_target: DelegateeTarget | None = strawberry.field(
         default=None,
         description="Target delegatee reservoir registry and its remote registry to scan",
     )
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
     )
-    artifact_type: Optional[ArtifactType] = strawberry.field(
+    artifact_type: ArtifactType | None = strawberry.field(
         default=None, description="Filter artifacts by type (e.g., model, image, package)"
     )
-    search: Optional[str] = strawberry.field(
+    search: str | None = strawberry.field(
         default=None, description="Search term to filter artifacts by name or description"
     )
 
@@ -590,12 +590,12 @@ class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID] = strawberry.field(
         description="List of artifact revision IDs of delegatee artifact registry"
     )
-    delegator_reservoir_id: Optional[ID] = strawberry.field(
+    delegator_reservoir_id: ID | None = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the import request to"
     )
-    artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
-    delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
-    options: Optional[ImportArtifactsOptionsGQL] = strawberry.field(
+    artifact_type: ArtifactType | None = strawberry.field(default=None)
+    delegatee_target: DelegateeTarget | None = strawberry.field(default=None)
+    options: ImportArtifactsOptionsGQL | None = strawberry.field(
         default=None,
         description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
@@ -613,8 +613,8 @@ class DelegateImportArtifactsInput:
 )
 class UpdateArtifactInput:
     artifact_id: ID
-    readonly: Optional[bool] = UNSET
-    description: Optional[str] = UNSET
+    readonly: bool | None = UNSET
+    description: str | None = UNSET
 
 
 @strawberry.input(
@@ -723,7 +723,7 @@ class ArtifactStatusChangedInput:
 )
 class ModelTarget:
     model_id: str
-    revision: Optional[str] = None
+    revision: str | None = None
 
     def to_dataclass(self) -> ModelTargetData:
         return ModelTargetData(model_id=self.model_id, revision=self.revision)
@@ -742,7 +742,7 @@ class ModelTarget:
 )
 class ScanArtifactModelsInput:
     models: list[ModelTarget]
-    registry_id: Optional[uuid.UUID] = None
+    registry_id: uuid.UUID | None = None
 
 
 # Object Types
@@ -756,8 +756,8 @@ class ScanArtifactModelsInput:
     """)
 )
 class SourceInfo:
-    name: Optional[str]
-    url: Optional[str]
+    name: str | None
+    url: str | None
 
 
 @strawberry.type(
@@ -782,11 +782,11 @@ class Artifact(Node):
     id: NodeID[str]
     name: str
     type: ArtifactType
-    description: Optional[str]
+    description: str | None
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
-    extra: Optional[JSON]
+    extra: JSON | None
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
@@ -811,14 +811,14 @@ class Artifact(Node):
     async def revisions(
         self,
         info: Info[StrawberryGQLContext],
-        filter: Optional[ArtifactRevisionFilter] = None,
-        order_by: Optional[list[ArtifactRevisionOrderBy]] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter: ArtifactRevisionFilter | None = None,
+        order_by: list[ArtifactRevisionOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> ArtifactRevisionConnection:
         from .fetcher import fetch_artifact_revisions
 
@@ -857,16 +857,16 @@ class Artifact(Node):
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
-    remote_status: Optional[ArtifactRemoteStatus] = strawberry.field(description="Added in 25.15.0")
+    remote_status: ArtifactRemoteStatus | None = strawberry.field(description="Added in 25.15.0")
     version: str
-    readme: Optional[str]
-    size: Optional[ByteSize]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    digest: Optional[str] = strawberry.field(
+    readme: str | None
+    size: ByteSize | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    digest: str | None = strawberry.field(
         description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
     )
-    verification_result: Optional[ArtifactVerificationGQLResult] = strawberry.field(
+    verification_result: ArtifactVerificationGQLResult | None = strawberry.field(
         description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
     )
 
@@ -1011,7 +1011,7 @@ class DelegateScanArtifactsPayload:
     """)
 )
 class ArtifactRevisionImportTask:
-    task_id: Optional[ID]
+    task_id: ID | None
     artifact_revision: ArtifactRevision
 
 

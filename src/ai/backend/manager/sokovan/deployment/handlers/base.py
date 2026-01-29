@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
@@ -19,7 +18,7 @@ class DeploymentHandler:
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:
@@ -39,7 +38,7 @@ class DeploymentHandler:
 
     @classmethod
     @abstractmethod
-    def next_status(cls) -> Optional[EndpointLifecycle]:
+    def next_status(cls) -> EndpointLifecycle | None:
         """Get the next deployment status after this handler's operation.
 
         Returns:
@@ -49,7 +48,7 @@ class DeploymentHandler:
 
     @classmethod
     @abstractmethod
-    def failure_status(cls) -> Optional[EndpointLifecycle]:
+    def failure_status(cls) -> EndpointLifecycle | None:
         """Get the failure deployment status if applicable.
 
         Returns:

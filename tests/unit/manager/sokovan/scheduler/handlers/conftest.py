@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
-from typing import Optional
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -77,7 +76,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 
 def _create_session(
-    session_id: Optional[SessionId] = None,
+    session_id: SessionId | None = None,
     status: SessionStatus = SessionStatus.PENDING,
     scaling_group: str = "default",
     access_key: str = "test-access-key",
@@ -86,7 +85,7 @@ def _create_session(
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     phase_attempts: int = 0,
-    phase_started_at: Optional[datetime] = None,
+    phase_started_at: datetime | None = None,
 ) -> SessionWithKernels:
     """Create SessionWithKernels with sensible defaults."""
     sid = session_id or SessionId(uuid4())
@@ -239,10 +238,10 @@ def _create_session(
 
 
 def _create_kernel(
-    kernel_id: Optional[KernelId] = None,
+    kernel_id: KernelId | None = None,
     status: KernelStatus = KernelStatus.RUNNING,
-    agent_id: Optional[AgentId] = None,
-    agent_addr: Optional[str] = None,
+    agent_id: AgentId | None = None,
+    agent_addr: str | None = None,
     scaling_group: str = "default",
 ) -> KernelInfo:
     """Create KernelInfo with sensible defaults."""

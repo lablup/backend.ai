@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import Field
 
@@ -17,7 +16,7 @@ class DateTimeRangeFilter(BaseRequestModel):
     created_at, modified_at, terminated_at, etc.
     """
 
-    after: Optional[datetime] = Field(
+    after: datetime | None = Field(
         default=None,
         description=(
             "Include only records created on or after this datetime. "
@@ -25,7 +24,7 @@ class DateTimeRangeFilter(BaseRequestModel):
             "If not specified, there is no lower bound on the datetime range."
         ),
     )
-    before: Optional[datetime] = Field(
+    before: datetime | None = Field(
         default=None,
         description=(
             "Include only records created on or before this datetime. "
@@ -44,34 +43,32 @@ class StringFilter(BaseRequestModel):
     """
 
     # Basic operations (case-sensitive)
-    equals: Optional[str] = Field(default=None, description="Exact match (case-sensitive)")
-    contains: Optional[str] = Field(default=None, description="Contains (case-sensitive)")
-    starts_with: Optional[str] = Field(default=None, description="Starts with (case-sensitive)")
-    ends_with: Optional[str] = Field(default=None, description="Ends with (case-sensitive)")
+    equals: str | None = Field(default=None, description="Exact match (case-sensitive)")
+    contains: str | None = Field(default=None, description="Contains (case-sensitive)")
+    starts_with: str | None = Field(default=None, description="Starts with (case-sensitive)")
+    ends_with: str | None = Field(default=None, description="Ends with (case-sensitive)")
 
     # NOT operations (case-sensitive)
-    not_equals: Optional[str] = Field(default=None, description="Not equals (case-sensitive)")
-    not_contains: Optional[str] = Field(default=None, description="Not contains (case-sensitive)")
-    not_starts_with: Optional[str] = Field(
+    not_equals: str | None = Field(default=None, description="Not equals (case-sensitive)")
+    not_contains: str | None = Field(default=None, description="Not contains (case-sensitive)")
+    not_starts_with: str | None = Field(
         default=None, description="Not starts with (case-sensitive)"
     )
-    not_ends_with: Optional[str] = Field(default=None, description="Not ends with (case-sensitive)")
+    not_ends_with: str | None = Field(default=None, description="Not ends with (case-sensitive)")
 
     # Case-insensitive operations
-    i_equals: Optional[str] = Field(default=None, description="Exact match (case-insensitive)")
-    i_contains: Optional[str] = Field(default=None, description="Contains (case-insensitive)")
-    i_starts_with: Optional[str] = Field(default=None, description="Starts with (case-insensitive)")
-    i_ends_with: Optional[str] = Field(default=None, description="Ends with (case-insensitive)")
+    i_equals: str | None = Field(default=None, description="Exact match (case-insensitive)")
+    i_contains: str | None = Field(default=None, description="Contains (case-insensitive)")
+    i_starts_with: str | None = Field(default=None, description="Starts with (case-insensitive)")
+    i_ends_with: str | None = Field(default=None, description="Ends with (case-insensitive)")
 
     # Case-insensitive NOT operations
-    i_not_equals: Optional[str] = Field(default=None, description="Not equals (case-insensitive)")
-    i_not_contains: Optional[str] = Field(
-        default=None, description="Not contains (case-insensitive)"
-    )
-    i_not_starts_with: Optional[str] = Field(
+    i_not_equals: str | None = Field(default=None, description="Not equals (case-insensitive)")
+    i_not_contains: str | None = Field(default=None, description="Not contains (case-insensitive)")
+    i_not_starts_with: str | None = Field(
         default=None, description="Not starts with (case-insensitive)"
     )
-    i_not_ends_with: Optional[str] = Field(
+    i_not_ends_with: str | None = Field(
         default=None, description="Not ends with (case-insensitive)"
     )
 
@@ -83,13 +80,13 @@ class UUIDFilter(BaseRequestModel):
     """
 
     # Basic operations
-    equals: Optional[uuid.UUID] = Field(default=None, description="Exact UUID match")
-    in_: Optional[list[uuid.UUID]] = Field(default=None, alias="in", description="UUID is in list")
+    equals: uuid.UUID | None = Field(default=None, description="Exact UUID match")
+    in_: list[uuid.UUID] | None = Field(default=None, alias="in", description="UUID is in list")
 
     # NOT operations
-    not_equals: Optional[uuid.UUID] = Field(default=None, description="Not equals UUID")
-    not_in: Optional[list[uuid.UUID]] = Field(default=None, description="UUID is not in list")
+    not_equals: uuid.UUID | None = Field(default=None, description="Not equals UUID")
+    not_in: list[uuid.UUID] | None = Field(default=None, description="UUID is not in list")
 
 
 class ListGroupQuery(BaseRequestModel):
-    group_id: Optional[uuid.UUID] = Field(default=None, alias="groupId")
+    group_id: uuid.UUID | None = Field(default=None, alias="groupId")

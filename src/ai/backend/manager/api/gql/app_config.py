@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from strawberry import ID, Info
 
@@ -69,7 +67,7 @@ class UpsertUserConfigInput:
     """Input type for upserting user-level app configuration."""
 
     extra_config: strawberry.scalars.JSON
-    user_id: Optional[ID] = None
+    user_id: ID | None = None
 
     def to_updater_spec(self) -> AppConfigUpdaterSpec:
         return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
@@ -94,7 +92,7 @@ class DeleteDomainConfigInput:
 class DeleteUserConfigInput:
     """Input type for deleting user-level app configuration."""
 
-    user_id: Optional[ID] = None
+    user_id: ID | None = None
 
 
 @strawberry.type(
@@ -173,7 +171,7 @@ class DeleteUserConfigPayload:
 async def domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
-) -> Optional[AppConfig]:
+) -> AppConfig | None:
     """Get domain-level app configuration."""
     processors = info.context.processors
     me = current_user()
@@ -206,8 +204,8 @@ async def domain_app_config(
 )
 async def user_app_config(
     info: Info[StrawberryGQLContext],
-    user_id: Optional[ID] = None,
-) -> Optional[AppConfig]:
+    user_id: ID | None = None,
+) -> AppConfig | None:
     """Get user-level app configuration."""
     processors = info.context.processors
     me = current_user()

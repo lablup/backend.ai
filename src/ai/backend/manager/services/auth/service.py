@@ -2,7 +2,7 @@ import logging
 from collections import ChainMap
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Optional, cast
+from typing import cast
 
 from aiohttp import web
 from sqlalchemy import RowMapping
@@ -426,14 +426,12 @@ class AuthService:
             ),
         )
 
-    async def _check_password_age(
-        self, user: RowMapping, auth_config: Optional[AuthConfig]
-    ) -> None:
+    async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None
         ):
-            password_changed_at: Optional[datetime] = user.password_changed_at
+            password_changed_at: datetime | None = user.password_changed_at
             if password_changed_at is None:
                 return  # Skip check if password_changed_at is not set
 

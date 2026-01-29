@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
@@ -21,7 +20,7 @@ class RouteHandler(ABC):
 
     @property
     @abstractmethod
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Get the lock ID for this handler.
 
         Returns:
@@ -41,7 +40,7 @@ class RouteHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Get the next route status after this handler's operation.
 
         Returns:
@@ -51,7 +50,7 @@ class RouteHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Get the failure route status if applicable.
 
         Returns:
@@ -61,7 +60,7 @@ class RouteHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable.
 
         Returns:

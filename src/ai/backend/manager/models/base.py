@@ -15,7 +15,6 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    Optional,
     Self,
     TypeVar,
     cast,
@@ -140,16 +139,16 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
 
     def process_bind_param(
         self,
-        value: Optional[T_Enum],
+        value: T_Enum | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         return value.name if value else None
 
     def process_result_value(
         self,
         value: Any | None,
         dialect: Dialect,
-    ) -> Optional[T_Enum]:
+    ) -> T_Enum | None:
         return self._enum_cls[value] if value else None
 
     def copy(self, **_kw) -> Self:
@@ -181,16 +180,16 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
 
     def process_bind_param(
         self,
-        value: Optional[T_Enum],
+        value: T_Enum | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         return value.value if value else None
 
     def process_result_value(
         self,
         value: Any | None,
         dialect: Dialect,
-    ) -> Optional[T_Enum]:
+    ) -> T_Enum | None:
         return self._enum_cls(value) if value else None
 
     def copy(self, **_kw) -> Self:
@@ -219,9 +218,9 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[T_StrEnum],
+        value: T_StrEnum | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         if value is None:
             return None
         if self._use_name:
@@ -230,9 +229,9 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
 
     def process_result_value(
         self,
-        value: Optional[str],
+        value: str | None,
         dialect: Dialect,
-    ) -> Optional[T_StrEnum]:
+    ) -> T_StrEnum | None:
         if value is None:
             return None
         if self._use_name:
@@ -267,16 +266,16 @@ class CurvePublicKeyColumn(TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[PublicKey],
+        value: PublicKey | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         return value.decode("ascii") if value else None
 
     def process_result_value(
         self,
         value: str | None,
         dialect: Dialect,
-    ) -> Optional[PublicKey]:
+    ) -> PublicKey | None:
         if value is None:
             return None
         return PublicKey(value.encode("ascii"))
@@ -295,16 +294,16 @@ class QuotaScopeIDType(TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[QuotaScopeID],
+        value: QuotaScopeID | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         return str(value) if value else None
 
     def process_result_value(
         self,
-        value: Optional[str],
+        value: str | None,
         dialect: Dialect,
-    ) -> Optional[QuotaScopeID]:
+    ) -> QuotaScopeID | None:
         return QuotaScopeID.parse(value) if value else None
 
 
@@ -318,9 +317,9 @@ class ResourceSlotColumn(TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[ResourceSlot],
+        value: ResourceSlot | None,
         dialect: Dialect,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> Mapping[str, str] | None:
         if value is None:
             return None
         if isinstance(value, ResourceSlot):
@@ -329,9 +328,9 @@ class ResourceSlotColumn(TypeDecorator):
 
     def process_result_value(
         self,
-        value: Optional[dict[str, str]],
+        value: dict[str, str] | None,
         dialect: Dialect,
-    ) -> Optional[ResourceSlot]:
+    ) -> ResourceSlot | None:
         if value is None:
             return None
         try:
@@ -360,9 +359,9 @@ class StructuredJSONColumn(TypeDecorator):
 
     def process_bind_param(
         self,
-        value: Optional[Any],
+        value: Any | None,
         dialect: Dialect,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         if value is None:
             return self._schema.check({})
         try:
@@ -376,9 +375,9 @@ class StructuredJSONColumn(TypeDecorator):
 
     def process_result_value(
         self,
-        value: Optional[Any],
+        value: Any | None,
         dialect: Dialect,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         if value is None:
             return self._schema.check({})
         return self._schema.check(value)
@@ -401,14 +400,14 @@ class StructuredJSONObjectColumn(TypeDecorator):
 
     def process_bind_param(
         self, value: JSONSerializableMixin | None, _dialect: Dialect
-    ) -> Optional[dict]:
+    ) -> dict | None:
         if value is None:
             return None
         return self._schema.to_json(value)  # type: ignore[arg-type]
 
     def process_result_value(
         self, value: dict | None, _dialect: Dialect
-    ) -> Optional[JSONSerializableMixin]:
+    ) -> JSONSerializableMixin | None:
         if value is None:
             return None
         return self._schema.from_json(value)  # type: ignore[arg-type]
@@ -529,10 +528,10 @@ class URLColumn(TypeDecorator):
     impl = UnicodeText
     cache_ok = True
 
-    def process_bind_param(self, value: Optional[yarl.URL], _dialect: Dialect) -> Optional[str]:
+    def process_bind_param(self, value: yarl.URL | None, _dialect: Dialect) -> str | None:
         return str(value)
 
-    def process_result_value(self, value: Optional[str], _dialect: Dialect) -> Optional[yarl.URL]:
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> yarl.URL | None:
         if value is None:
             return None
         return yarl.URL(value)
@@ -546,9 +545,7 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(
-        self, value: str | ReadableCIDR | None, _dialect: Dialect
-    ) -> Optional[str]:
+    def process_bind_param(self, value: str | ReadableCIDR | None, _dialect: Dialect) -> str | None:
         if value is None:
             return value
         try:
@@ -560,7 +557,7 @@ class IPColumn(TypeDecorator):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value: str | None, _dialect: Dialect) -> Optional[ReadableCIDR]:
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> ReadableCIDR | None:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -682,7 +679,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
             return value.bytes
         return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, _dialect: Dialect) -> Optional[TUUIDSubType]:
+    def process_result_value(self, value: Any, _dialect: Dialect) -> TUUIDSubType | None:
         if value is None:
             return value
         cls = type(self)
@@ -901,16 +898,16 @@ class DecimalType(TypeDecorator, Decimal):
 
     def process_bind_param(
         self,
-        value: Optional[Decimal],
+        value: Decimal | None,
         dialect: Dialect,
-    ) -> Optional[str]:
+    ) -> str | None:
         return f"{value:f}" if value is not None else None
 
     def process_result_value(
         self,
         value: Any | None,
         dialect: Dialect,
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         return Decimal(value) if value is not None else None
 
     @property

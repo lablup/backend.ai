@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -22,7 +22,7 @@ class GetRuleAction(NotificationAction):
         return "get_rule"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_id)
 
 
@@ -33,5 +33,5 @@ class GetRuleActionResult(BaseActionResult):
     rule_data: NotificationRuleData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_data.id)

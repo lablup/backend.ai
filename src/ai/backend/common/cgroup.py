@@ -13,7 +13,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import aiohttp
 
@@ -75,7 +75,7 @@ def get_cgroup_of_pid(controller: str, pid: PID) -> str:
     raise RuntimeError(f"could not find the cgroup of PID {pid}")
 
 
-def get_container_id_of_cgroup(cgroup: str) -> Optional[str]:
+def get_container_id_of_cgroup(cgroup: str) -> str | None:
     # cgroupfs driver: docker/<id>
     cgroupfs_prefix = "docker/"
     if cgroup.startswith(cgroupfs_prefix):

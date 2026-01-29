@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -14,7 +13,7 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 async def load_error_logs_by_ids(
     processor: ErrorLogProcessors,
     error_log_ids: Sequence[uuid.UUID],
-) -> list[Optional[ErrorLogData]]:
+) -> list[ErrorLogData | None]:
     """Batch load error logs by their IDs.
 
     Args:

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -12,7 +12,7 @@ class GetReservoirRegistriesAction(ArtifactRegistryAction):
     registry_ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -26,5 +26,5 @@ class GetReservoirRegistriesActionResult(BaseActionResult):
     result: list[ReservoirRegistryData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

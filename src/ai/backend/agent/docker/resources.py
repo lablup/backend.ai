@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 
@@ -85,7 +85,7 @@ async def scan_available_resources(
 
 async def get_resource_spec_from_container(
     container_info: Mapping[str, Any],
-) -> Optional[KernelResourceSpec]:
+) -> KernelResourceSpec | None:
     for mount in container_info["HostConfig"]["Mounts"]:
         if mount["Target"] == "/home/config":
             async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:

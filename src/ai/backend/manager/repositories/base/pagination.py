@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
@@ -148,7 +148,7 @@ class CursorForwardPagination(QueryPagination):
     cursor_order: QueryOrder
     """Ordering for cursor-based pagination (e.g., ORDER BY created_at ASC)."""
 
-    cursor_condition: Optional[QueryCondition] = None
+    cursor_condition: QueryCondition | None = None
     """Optional QueryCondition for cursor position. If None, starts from the beginning."""
 
     @property
@@ -200,7 +200,7 @@ class CursorBackwardPagination(QueryPagination):
     cursor_order: QueryOrder
     """Ordering for cursor-based pagination (e.g., ORDER BY created_at DESC)."""
 
-    cursor_condition: Optional[QueryCondition] = None
+    cursor_condition: QueryCondition | None = None
     """Optional QueryCondition for cursor position. If None, starts from the end."""
 
     @property

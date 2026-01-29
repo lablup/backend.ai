@@ -1,4 +1,4 @@
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -20,11 +20,11 @@ class BaseScheduleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -56,11 +56,11 @@ class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -90,11 +90,11 @@ class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -126,11 +126,11 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -162,11 +162,11 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -198,11 +198,11 @@ class DoRouteLifecycleIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -234,9 +234,9 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

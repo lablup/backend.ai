@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 import strawberry
@@ -116,7 +116,7 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
 class UserFairShareFilter(GQLFilter):
     """Filter for user fair shares."""
 
-    resource_group: Optional[StringFilter] = strawberry.field(
+    resource_group: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by scaling group name. Scaling groups define resource pool boundaries "
@@ -124,21 +124,21 @@ class UserFairShareFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
-    user_uuid: Optional[UUIDFilter] = strawberry.field(
+    user_uuid: UUIDFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by user UUID. Users are individual accounts that create and run sessions. "
             "Supports equals operation for exact match or 'in' operation for multiple UUIDs."
         ),
     )
-    project_id: Optional[UUIDFilter] = strawberry.field(
+    project_id: UUIDFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by project UUID. This filters users by their project membership. "
             "Supports equals operation for exact match or 'in' operation for multiple UUIDs."
         ),
     )
-    domain_name: Optional[StringFilter] = strawberry.field(
+    domain_name: StringFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by domain name. This filters users belonging to a specific domain. "
@@ -146,15 +146,15 @@ class UserFairShareFilter(GQLFilter):
         ),
     )
 
-    AND: Optional[list[UserFairShareFilter]] = strawberry.field(
+    AND: list[UserFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: Optional[list[UserFairShareFilter]] = strawberry.field(
+    OR: list[UserFairShareFilter] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: Optional[list[UserFairShareFilter]] = strawberry.field(
+    NOT: list[UserFairShareFilter] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

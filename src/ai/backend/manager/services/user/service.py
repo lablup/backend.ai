@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -42,7 +42,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class MutationResult:
     success: bool
     message: str
-    data: Optional[Any]
+    data: Any | None
 
 
 class UserService:

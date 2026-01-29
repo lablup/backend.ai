@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -75,7 +74,7 @@ class ROCmPlugin(AbstractComputePlugin):
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[list[ROCmDevice]]
+    _all_devices: list[ROCmDevice] | None
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None
@@ -122,7 +121,7 @@ class ROCmPlugin(AbstractComputePlugin):
             raw_info = libhip.get_device_props(int(dev_id))
             pci_bus_id = raw_info["pciBusID_str"]
             sysfs_node_path = f"/sys/bus/pci/devices/{pci_bus_id}/numa_node"
-            node: Optional[int]
+            node: int | None
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
             except OSError:

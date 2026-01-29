@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from .user_event import UserEvent
 
@@ -13,11 +13,11 @@ class UserBgtaskUpdatedEvent(UserEvent):
     total_progress: float
 
     @override
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         return "bgtask_updated"
 
     @override
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         return 5
 
     @override
@@ -35,11 +35,11 @@ class UserBgtaskDoneEvent(UserEvent):
     message: str
 
     @override
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         return "bgtask_done"
 
     @override
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         return None
 
     @override
@@ -58,11 +58,11 @@ class UserBgtaskPartialSuccessEvent(UserEvent):
     errors: list[str]
 
     @override
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         return "bgtask_done"
 
     @override
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         return None
 
     @override
@@ -80,11 +80,11 @@ class UserBgtaskCancelledEvent(UserEvent):
     message: str
 
     @override
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         return "bgtask_cancelled"
 
     @override
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         return None
 
     @override
@@ -102,11 +102,11 @@ class UserBgtaskFailedEvent(UserEvent):
     message: str
 
     @override
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         return "bgtask_failed"
 
     @override
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         return None
 
     @override

@@ -1,7 +1,7 @@
 """Action for getting deployment policy."""
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
@@ -18,7 +18,7 @@ class GetDeploymentPolicyAction(DeploymentPolicyBaseAction):
     endpoint_id: UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.endpoint_id)
 
     @override
@@ -34,5 +34,5 @@ class GetDeploymentPolicyActionResult(BaseActionResult):
     data: DeploymentPolicyData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

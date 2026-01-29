@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Self
+from typing import Self
 
 from glide import ExpirySet, ExpiryType
 
@@ -90,7 +90,7 @@ class ValkeySessionClient:
         await self._client.disconnect()
 
     @valkey_session_resilience.apply()
-    async def get_session_data(self, session_key: str) -> Optional[bytes]:
+    async def get_session_data(self, session_key: str) -> bytes | None:
         """
         Get session data by session key.
 
@@ -117,7 +117,7 @@ class ValkeySessionClient:
         )
 
     @valkey_session_resilience.apply()
-    async def get_login_history(self, username: str) -> Optional[bytes]:
+    async def get_login_history(self, username: str) -> bytes | None:
         """
         Get login failure history for a user.
 

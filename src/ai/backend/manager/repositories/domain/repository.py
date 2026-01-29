@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -148,7 +148,7 @@ class DomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node(
-        self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
+        self, creator: Creator[DomainRow], scaling_groups: list[str] | None = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups.
@@ -180,8 +180,8 @@ class DomainRepository:
     async def modify_domain_node(
         self,
         updater: Updater[DomainRow],
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
+        sgroups_to_add: set[str] | None = None,
+        sgroups_to_remove: set[str] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes.
@@ -282,7 +282,7 @@ class DomainRepository:
         self,
         creator: Creator[DomainRow],
         user_info: UserInfo,
-        scaling_groups: Optional[list[str]] = None,
+        scaling_groups: list[str] | None = None,
     ) -> DomainData:
         """
         Creates a domain node with scaling groups and permission checks.
@@ -301,8 +301,8 @@ class DomainRepository:
         self,
         updater: Updater[DomainRow],
         user_info: UserInfo,
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
+        sgroups_to_add: set[str] | None = None,
+        sgroups_to_remove: set[str] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes and permission checks.

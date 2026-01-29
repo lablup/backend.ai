@@ -4,7 +4,7 @@ import asyncio
 import signal
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import aiotools
 
@@ -32,7 +32,7 @@ class AgentRuntime:
     _primary_agent: AbstractAgent
     _kernel_registry: KernelRegistry
     _resource_allocator: ResourceAllocator
-    _metadata_server: Optional[MetadataServer]
+    _metadata_server: MetadataServer | None
 
     _stop_signal: signal.Signals
     _timer_tasks: Sequence[asyncio.Task[None]]
@@ -44,7 +44,7 @@ class AgentRuntime:
         etcd: AsyncEtcd,
         stats_monitor: AgentStatsPluginContext,
         error_monitor: AgentErrorPluginContext,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
     ) -> AgentRuntime:
         kernel_registry = KernelRegistry()
         resource_allocator = await ResourceAllocator.new(local_config, etcd)
@@ -123,7 +123,7 @@ class AgentRuntime:
         agent_config: AgentUnifiedConfig,
         stats_monitor: AgentStatsPluginContext,
         error_monitor: AgentErrorPluginContext,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
@@ -150,7 +150,7 @@ class AgentRuntime:
         primary_agent: AbstractAgent,
         kernel_registry: KernelRegistry,
         resource_allocator: ResourceAllocator,
-        metadata_server: Optional[MetadataServer] = None,
+        metadata_server: MetadataServer | None = None,
     ) -> None:
         self._local_config = local_config
         self._etcd_views = etcd_views
@@ -177,7 +177,7 @@ class AgentRuntime:
     def get_agents(self) -> list[AbstractAgent]:
         return list(self._agents.values())
 
-    def get_agent(self, agent_id: Optional[AgentId]) -> AbstractAgent:
+    def get_agent(self, agent_id: AgentId | None) -> AbstractAgent:
         if agent_id is None:
             return self._primary_agent
         if agent_id not in self._agents:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Optional, Self, override
+from typing import Self, override
 from uuid import UUID
 
 import strawberry
@@ -42,8 +42,8 @@ class AutoScalingMetricSource(StrEnum):
 class AutoScalingRuleFilter(GQLFilter):
     """Filter for auto-scaling rules."""
 
-    created_at: Optional[DateTimeFilter] = None
-    last_triggered_at: Optional[DateTimeFilter] = None
+    created_at: DateTimeFilter | None = None
+    last_triggered_at: DateTimeFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -94,10 +94,10 @@ class AutoScalingRule(Node):
     )
     metric_name: str = strawberry.field()
 
-    min_threshold: Optional[Decimal] = strawberry.field(
+    min_threshold: Decimal | None = strawberry.field(
         description="Added in 25.19.0: The minimum threshold for scaling (e.g. 0.5)"
     )
-    max_threshold: Optional[Decimal] = strawberry.field(
+    max_threshold: Decimal | None = strawberry.field(
         description="Added in 25.19.0: The maximum threshold for scaling (e.g. 21.0)"
     )
 
@@ -108,10 +108,10 @@ class AutoScalingRule(Node):
         description="Added in 25.19.0: The time window (seconds) for scaling (e.g. 60)."
     )
 
-    min_replicas: Optional[int] = strawberry.field(
+    min_replicas: int | None = strawberry.field(
         description="Added in 25.19.0: The minimum number of replicas (e.g. 1)."
     )
-    max_replicas: Optional[int] = strawberry.field(
+    max_replicas: int | None = strawberry.field(
         description="Added in 25.19.0: The maximum number of replicas (e.g. 10)."
     )
 
@@ -153,12 +153,12 @@ class CreateAutoScalingRuleInput:
     model_deployment_id: ID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
     step_size: int
     time_window: int
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    min_replicas: int | None
+    max_replicas: int | None
 
     def to_creator(self) -> ModelDeploymentAutoScalingRuleCreator:
         return ModelDeploymentAutoScalingRuleCreator(
@@ -177,14 +177,14 @@ class CreateAutoScalingRuleInput:
 @strawberry.input
 class UpdateAutoScalingRuleInput:
     id: ID
-    metric_source: Optional[AutoScalingMetricSource]
-    metric_name: Optional[str]
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
-    step_size: Optional[int]
-    time_window: Optional[int]
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    metric_source: AutoScalingMetricSource | None
+    metric_name: str | None
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
+    step_size: int | None
+    time_window: int | None
+    min_replicas: int | None
+    max_replicas: int | None
 
     def to_action(self) -> UpdateAutoScalingRuleAction:
         optional_state_metric_source = OptionalState[CommonAutoScalingMetricSource].nop()

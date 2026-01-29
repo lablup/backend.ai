@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Optional, TypeVar, final
+from typing import TYPE_CHECKING, TypeVar, final
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker import ServiceHealthChecker
@@ -46,7 +46,7 @@ class DependencyProvider[SetupInputT, ResourceT](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def gen_health_checkers(self, resource: ResourceT) -> Optional[ServiceHealthChecker]:
+    def gen_health_checkers(self, resource: ResourceT) -> ServiceHealthChecker | None:
         """
         Return a health checker for the provided resource.
 

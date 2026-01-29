@@ -6,7 +6,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 import zmq
@@ -30,7 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class PeerInvoker(Peer):
     class _CallStub:
         _cached_funcs: dict[str, Callable]
-        order_key: ContextVar[Optional[str]]
+        order_key: ContextVar[str | None]
 
         def __init__(self, peer: Peer) -> None:
             self._cached_funcs = {}
@@ -84,7 +84,7 @@ class AgentRPCCache:
         self,
         agent_id: AgentId,
         agent_addr: str,
-        public_key: Optional[PublicKey],
+        public_key: PublicKey | None,
     ) -> None:
         self._cache[agent_id] = (agent_addr, public_key)
 
@@ -96,7 +96,7 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Optional[Row]:
+        async def _fetch_agent() -> Row | None:
             async with self.db.begin_readonly() as conn:
                 query = (
                     sa.select(agents.c.addr, agents.c.public_key)
@@ -118,8 +118,8 @@ class AgentRPCCache:
         self,
         agent_id: AgentId,
         *,
-        invoke_timeout: Optional[float] = None,
-        _order_key: Optional[str] = None,
+        invoke_timeout: float | None = None,
+        _order_key: str | None = None,
     ) -> AsyncIterator[PeerInvoker]:
         agent_addr, agent_public_key = await self.get_rpc_args(agent_id)
         keepalive_retry_count = 3

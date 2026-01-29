@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -46,15 +45,15 @@ def get_access_token_pagination_spec() -> PaginationSpec:
 
 async def fetch_access_tokens(
     info: Info[StrawberryGQLContext],
-    filter: Optional[AccessTokenFilter] = None,
-    order_by: Optional[list[AccessTokenOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: AccessTokenFilter | None = None,
+    order_by: list[AccessTokenOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> AccessTokenConnection:
     """Fetch access tokens with optional filtering, ordering, and pagination.
 

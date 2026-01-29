@@ -12,7 +12,7 @@ import traceback
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Optional, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
 import aiohttp
 import click
@@ -265,7 +265,7 @@ def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_mount_arg(
-    mount_args: Optional[Sequence[str]] = None,
+    mount_args: Sequence[str] | None = None,
     *,
     escape: bool = True,
 ) -> tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:

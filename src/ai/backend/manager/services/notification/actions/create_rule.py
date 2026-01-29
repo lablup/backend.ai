@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, cast, override
+from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationRuleData
@@ -26,7 +26,7 @@ class CreateRuleAction(NotificationAction):
         return "create_rule"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         spec = cast(NotificationRuleCreatorSpec, self.creator.spec)
         return spec.name
 
@@ -38,5 +38,5 @@ class CreateRuleActionResult(BaseActionResult):
     rule_data: NotificationRuleData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_data.id)
