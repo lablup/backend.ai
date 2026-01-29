@@ -6,7 +6,6 @@ This module provides GraphQL mutation fields for ImageV2.
 
 from __future__ import annotations
 
-import logging
 from typing import Optional
 from uuid import UUID
 
@@ -14,7 +13,6 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.types import ImageID
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -37,9 +35,6 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 )
 
 from .types import ImageV2GQL
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
 
 # =============================================================================
 # Mutation Input Types
@@ -206,11 +201,10 @@ class ClearImageResourceLimitByIdResultGQL:
     **Required Role:** SUPERADMIN, ADMIN, or USER
     """)
 )
-async def forget_image_by_id(
+async def forget_image(
     input: ForgetImageByIdInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ForgetImageByIdResultGQL:
-    log.info("forget image {} by API request", input.image_id)
     ctx = info.context
 
     result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
@@ -232,11 +226,10 @@ async def forget_image_by_id(
     **Required Role:** SUPERADMIN, ADMIN, or USER
     """)
 )
-async def purge_image_by_id(
+async def purge_image(
     input: PurgeImageByIdInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> PurgeImageByIdResultGQL:
-    log.info("purge image row {} by API request", input.image_id)
     ctx = info.context
     image_uuid = UUID(input.image_id)
 
@@ -264,11 +257,10 @@ async def purge_image_by_id(
     **Required Role:** SUPERADMIN
     """)
 )
-async def alias_image_by_id(
+async def alias_image(
     input: AliasImageByIdInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> AliasImageByIdResultGQL:
-    log.info("alias image {} -> {} by API request", input.image_id, input.alias)
     ctx = info.context
 
     result = await ctx.processors.image.alias_image_by_id.wait_for_complete(
@@ -297,7 +289,6 @@ async def dealias_image(
     input: DealiasImageInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> DealiasImageResultGQL:
-    log.info("dealias image {} by API request", input.alias)
     ctx = info.context
 
     result = await ctx.processors.image.dealias_image.wait_for_complete(
@@ -322,11 +313,10 @@ async def dealias_image(
     **Required Role:** SUPERADMIN
     """)
 )
-async def clear_image_resource_limit_by_id(
+async def clear_image_resource_limit(
     input: ClearImageResourceLimitByIdInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ClearImageResourceLimitByIdResultGQL:
-    log.info("clear custom resource limits for image {} by API request", input.image_id)
     ctx = info.context
 
     result = await ctx.processors.image.clear_image_custom_resource_limit_by_id.wait_for_complete(

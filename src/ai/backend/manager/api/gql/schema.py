@@ -91,13 +91,13 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
-    alias_image_by_id,
-    clear_image_resource_limit_by_id,
+    alias_image,
+    clear_image_resource_limit,
     dealias_image,
-    forget_image_by_id,
+    forget_image,
     image_v2,
     images_v2,
-    purge_image_by_id,
+    purge_image,
 )
 from .notification import (
     create_notification_channel,
@@ -276,11 +276,11 @@ class Mutation:
     # Resource Group
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Image
-    forget_image_by_id = forget_image_by_id
-    purge_image_by_id = purge_image_by_id
-    alias_image_by_id = alias_image_by_id
+    forget_image = forget_image
+    purge_image = purge_image
+    alias_image = alias_image
     dealias_image = dealias_image
-    clear_image_resource_limit_by_id = clear_image_resource_limit_by_id
+    clear_image_resource_limit = clear_image_resource_limit
 
 
 @strawberry.type

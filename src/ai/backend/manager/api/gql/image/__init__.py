@@ -7,11 +7,11 @@ See BEP-1038 for detailed specifications.
 
 from .fetcher import fetch_image_by_id, fetch_images
 from .mutations import (
-    alias_image_by_id,
-    clear_image_resource_limit_by_id,
+    alias_image,
+    clear_image_resource_limit,
     dealias_image,
-    forget_image_by_id,
-    purge_image_by_id,
+    forget_image,
+    purge_image,
 )
 from .resolver import image_v2, images_v2
 from .types import (
@@ -60,9 +60,9 @@ __all__ = [
     "images_v2",
     "image_v2",
     # Mutation fields
-    "forget_image_by_id",
-    "purge_image_by_id",
-    "alias_image_by_id",
+    "forget_image",
+    "purge_image",
+    "alias_image",
     "dealias_image",
-    "clear_image_resource_limit_by_id",
+    "clear_image_resource_limit",
 ]
