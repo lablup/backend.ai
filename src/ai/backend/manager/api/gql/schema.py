@@ -119,10 +119,15 @@ from .huggingface_registry import (
 from .image import (
     admin_image_aliases,
     admin_images_v2,
+    alias_image_by_id,
+    clear_image_resource_limit_by_id,
     container_registry_images_v2,
+    dealias_image,
+    forget_image_by_id,
     image_alias,
     image_scoped_aliases,
     image_v2,
+    purge_image_by_id,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
@@ -461,6 +466,12 @@ class Mutation:
     admin_update_resource_group = admin_update_resource_group
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # Image Mutations
+    forget_image_by_id = forget_image_by_id
+    purge_image_by_id = purge_image_by_id
+    alias_image_by_id = alias_image_by_id
+    dealias_image = dealias_image
+    clear_image_resource_limit_by_id = clear_image_resource_limit_by_id
     # User V2 APIs
     admin_create_user = admin_create_user
     admin_bulk_create_users = admin_bulk_create_users
