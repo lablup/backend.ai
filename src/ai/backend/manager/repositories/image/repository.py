@@ -25,8 +25,9 @@ from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageRow,
 )
+from ai.backend.manager.models.image.row import ImageAliasRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
@@ -275,11 +276,11 @@ class ImageRepository:
         return await self._db_source.clear_image_resource_limits(image_canonical, architecture)
 
     @image_repository_resilience.apply()
-    async def add_image_alias_by_id(self, image_id: UUID, alias: str) -> ImageAliasData:
+    async def add_image_alias_by_id(self, creator: Creator[ImageAliasRow]) -> ImageAliasData:
         """
-        Creates an image alias directly using image ID.
+        Creates an image alias using the Creator pattern.
         """
-        return await self._db_source.insert_image_alias_by_id(image_id, alias)
+        return await self._db_source.insert_image_alias_by_id(creator)
 
     @image_repository_resilience.apply()
     async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:

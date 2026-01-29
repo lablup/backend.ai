@@ -40,8 +40,10 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -320,16 +322,17 @@ class ImageDBSource:
             image_row._resources = {}
             return image_row.to_dataclass()
 
-    async def insert_image_alias_by_id(self, image_id: UUID, alias: str) -> ImageAliasData:
+    async def insert_image_alias_by_id(self, creator: Creator[ImageAliasRow]) -> ImageAliasData:
         """
-        Creates an image alias directly using image ID.
+        Creates an image alias using the Creator pattern.
         """
+        spec = cast(ImageAliasCreatorSpec, creator.spec)
         try:
             async with self._db.begin_session() as session:
-                image_row = await self._get_image_by_id(session, image_id)
-                image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
-                image_row.aliases.append(image_alias)
-                return ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
+                # Validate that the image exists
+                await self._get_image_by_id(session, spec.image_id)
+                result = await execute_creator(session, creator)
+                return ImageAliasData(id=result.row.id, alias=result.row.alias or "")
         except ValueError as e:
             raise AliasImageActionValueError from e
         except DBAPIError as e:
