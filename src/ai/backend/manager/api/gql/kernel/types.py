@@ -25,18 +25,18 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
-KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.1.0")
+KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.2.0")
 
 
 @strawberry.enum(
-    name="KernelOrderField", description="Added in 26.1.0. Fields available for ordering kernels."
+    name="KernelOrderField", description="Added in 26.2.0. Fields available for ordering kernels."
 )
 class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
 
 
 @strawberry.input(
-    name="KernelStatusFilter", description="Added in 26.1.0. Filter for kernel status."
+    name="KernelStatusFilter", description="Added in 26.2.0. Filter for kernel status."
 )
 class KernelStatusFilterGQL:
     in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
@@ -54,7 +54,7 @@ class KernelStatusFilterGQL:
 
 
 @strawberry.input(
-    name="KernelFilter", description="Added in 26.1.0. Filter criteria for querying kernels."
+    name="KernelFilter", description="Added in 26.2.0. Filter criteria for querying kernels."
 )
 class KernelFilterGQL(GQLFilter):
     id: UUIDFilter | None = None
@@ -85,7 +85,7 @@ class KernelFilterGQL(GQLFilter):
 
 
 @strawberry.input(
-    name="KernelOrderBy", description="Added in 26.1.0. Ordering specification for kernels."
+    name="KernelOrderBy", description="Added in 26.2.0. Ordering specification for kernels."
 )
 class KernelOrderByGQL(GQLOrderBy):
     field: KernelOrderFieldGQL
@@ -105,7 +105,7 @@ class KernelOrderByGQL(GQLOrderBy):
 
 @strawberry.type(
     name="KernelSessionInfo",
-    description="Added in 26.1.0. Information about the session this kernel belongs to.",
+    description="Added in 26.2.0. Information about the session this kernel belongs to.",
 )
 class KernelSessionInfoGQL:
     session_id: UUID = strawberry.field(
@@ -122,7 +122,7 @@ class KernelSessionInfoGQL:
 
 @strawberry.type(
     name="KernelClusterInfo",
-    description="Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.",
+    description="Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.",
 )
 class KernelClusterInfoGQL:
     cluster_role: str = strawberry.field(
@@ -141,7 +141,7 @@ class KernelClusterInfoGQL:
 
 @strawberry.type(
     name="KernelUserInfo",
-    description="Added in 26.1.0. User and ownership information for a kernel.",
+    description="Added in 26.2.0. User and ownership information for a kernel.",
 )
 class KernelUserInfoGQL:
     user_id: UUID | None = strawberry.field(
@@ -171,7 +171,7 @@ class ResourceAllocationGQL:
 
 @strawberry.type(
     name="KernelResourceInfo",
-    description="Added in 26.1.0. Resource allocation information for a kernel.",
+    description="Added in 26.2.0. Resource allocation information for a kernel.",
 )
 class KernelResourceInfoGQL:
     agent_id: str | None = strawberry.field(
@@ -196,7 +196,7 @@ class KernelResourceInfoGQL:
 
 @strawberry.type(
     name="KernelNetworkInfo",
-    description="Added in 26.1.0. Network configuration for a kernel.",
+    description="Added in 26.2.0. Network configuration for a kernel.",
 )
 class KernelNetworkInfoGQL:
     service_ports: ServicePortsGQL | None = strawberry.field(
@@ -209,7 +209,7 @@ class KernelNetworkInfoGQL:
 
 @strawberry.type(
     name="KernelLifecycleInfo",
-    description="Added in 26.1.0. Lifecycle and status information for a kernel.",
+    description="Added in 26.2.0. Lifecycle and status information for a kernel.",
 )
 class KernelLifecycleInfoGQL:
     status: KernelStatusGQL = strawberry.field(
@@ -237,7 +237,7 @@ class KernelLifecycleInfoGQL:
 
 @strawberry.type(
     name="KernelV2",
-    description="Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.",
+    description="Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.",
 )
 class KernelV2GQL(Node):
     """Kernel type representing a compute container."""
@@ -349,7 +349,7 @@ KernelEdgeGQL = Edge[KernelV2GQL]
 
 @strawberry.type(
     name="KernelConnectionV2",
-    description="Added in 26.1.0. Connection type for paginated kernel results.",
+    description="Added in 26.2.0. Connection type for paginated kernel results.",
 )
 class KernelConnectionV2GQL(Connection[KernelV2GQL]):
     count: int

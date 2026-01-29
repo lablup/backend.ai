@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
 
 
-@strawberry.field(description="Added in 26.1.0. Query a single kernel by ID.")
+@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -31,7 +31,7 @@ async def kernel_v2(
     return None
 
 
-@strawberry.field(description="Added in 26.1.0. Query kernels with pagination and filtering.")
+@strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")
 async def kernels_v2(
     info: Info[StrawberryGQLContext],
     filter: Optional[KernelFilterGQL] = None,
