@@ -428,10 +428,13 @@ class ImageService:
         """
         Retrieves multiple images by their IDs.
         """
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
         images_with_agent_install_status = await self._image_repository.get_images_by_ids(
             action.image_ids,
             status_filter=action.image_status,
-            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            hide_agents=hide_agents,
         )
         return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 

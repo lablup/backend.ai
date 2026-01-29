@@ -291,7 +291,7 @@ class ImageRepository:
         self,
         image_ids: list[UUID],
         status_filter: list[ImageStatus] | None = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
         """
         Retrieves multiple images by their IDs with agent install status.
@@ -300,10 +300,6 @@ class ImageRepository:
         image_id_list = list(images_data.keys())
         installed_agents_for_images = await self._stateful_source.list_agents_with_images(
             image_id_list
-        )
-
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []

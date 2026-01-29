@@ -1016,7 +1016,6 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[image_data.id],
-            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 
@@ -1036,7 +1035,6 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[],
-            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 
