@@ -66,6 +66,8 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
     ModifyImageActionUnknownImageReferenceError,
+    ModifyImageByIdAction,
+    ModifyImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -267,6 +269,15 @@ class ImageService:
             raise ModifyImageActionUnknownImageReferenceError from e
 
         return ModifyImageActionResult(image=updated_image_data)
+
+    async def modify_image_by_id(
+        self, action: ModifyImageByIdAction
+    ) -> ModifyImageByIdActionResult:
+        # Create Updater with image ID
+        updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=action.image_id)
+        # Pass Updater to repository
+        updated_image_data = await self._image_repository.update_image_properties(updater)
+        return ModifyImageByIdActionResult(image=updated_image_data)
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
         # Regular users need ownership validation
