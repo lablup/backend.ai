@@ -15,7 +15,7 @@ from ai.backend.common.types import ServicePortProtocols
 @strawberry.type(
     name="ResourceOptsEntry",
     description=(
-        "Added in 26.2.0. A single resource option entry with name and value. "
+        "Added in 26.1.0. A single resource option entry with name and value. "
         "Resource options provide additional configuration like shared memory settings."
     ),
 )
@@ -29,7 +29,7 @@ class ResourceOptsEntryGQL:
 @strawberry.type(
     name="ResourceOpts",
     description=(
-        "Added in 26.2.0. A collection of additional resource options. "
+        "Added in 26.1.0. A collection of additional resource options. "
         "Contains configuration like shared memory and other resource-specific settings."
     ),
 )
@@ -50,7 +50,7 @@ class ResourceOptsGQL:
 
 
 @strawberry.input(
-    description="Added in 26.2.0. A single key-value entry representing a resource option."
+    description="Added in 26.1.0. A single key-value entry representing a resource option."
 )
 class ResourceOptsEntryInput:
     """Single resource option entry input with name and value."""
@@ -60,7 +60,7 @@ class ResourceOptsEntryInput:
 
 
 @strawberry.input(
-    description="Added in 26.2.0. A collection of additional resource options for input."
+    description="Added in 26.1.0. A collection of additional resource options for input."
 )
 class ResourceOptsInput:
     """Resource options input containing multiple key-value entries."""
