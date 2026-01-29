@@ -104,8 +104,11 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+)
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -1947,7 +1950,11 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
 
     await root_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
         PurgeVFolderAction(
-            purger=Purger(row_class=VFolderRow, pk_value=folder_id),
+            purger=RBACEntityPurger(
+                row_class=VFolderRow,
+                pk_value=folder_id,
+                spec=VFolderPurgerSpec(vfolder_id=folder_id),
+            ),
         )
     )
 

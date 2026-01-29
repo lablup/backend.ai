@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, create_autospec
 
 import pytest
 import sqlalchemy as sa
@@ -15,6 +14,7 @@ import sqlalchemy as sa
 from ai.backend.common.types import BinarySize, VFolderHostPermissionMap, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderMountPermission,
@@ -34,6 +34,13 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -50,8 +57,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 
@@ -101,6 +108,7 @@ class TestVfolderRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -117,6 +125,9 @@ class TestVfolderRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 VFolderPermissionRow,
+                AssociationScopesEntitiesRow,
+                PermissionGroupRow,
+                ObjectPermissionRow,
             ],
         ):
             yield database_connection
@@ -217,6 +228,24 @@ class TestVfolderRepository:
             db_sess.add(user)
             await db_sess.flush()
 
+            # Create system role for the user
+            role_id = uuid.uuid4()
+            role = RoleRow(
+                id=role_id,
+                name=f"user-role-{user_uuid.hex[:8]}",
+                source=RoleSource.SYSTEM,
+            )
+            db_sess.add(role)
+            await db_sess.flush()
+
+            # Map user to the system role
+            user_role = UserRoleRow(
+                user_id=user_uuid,
+                role_id=role_id,
+            )
+            db_sess.add(user_role)
+            await db_sess.flush()
+
         yield user_uuid
 
     @pytest.fixture
@@ -247,22 +276,12 @@ class TestVfolderRepository:
         yield group_uuid
 
     @pytest.fixture
-    def mock_role_manager(self) -> RoleManager:
-        """Create a mock RoleManager with autospec"""
-        mock = create_autospec(RoleManager, instance=True)
-        mock.map_entity_to_scope = AsyncMock()
-        mock.add_object_permission_to_user_role = AsyncMock()
-        return mock
-
-    @pytest.fixture
     async def vfolder_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        mock_role_manager: RoleManager,
     ) -> AsyncGenerator[VfolderRepository, None]:
-        """Create VfolderRepository instance with database and mocked RoleManager"""
+        """Create VfolderRepository instance with database"""
         repo = VfolderRepository(db=db_with_cleanup)
-        repo._role_manager = mock_role_manager
         yield repo
 
     async def test_model_store_vfolder_permission_is_overridden_to_read_only(
@@ -495,6 +514,7 @@ class TestVfolderRepositoryPurge:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                EntityFieldRow,
             ],
         ):
             yield database_connection
@@ -667,7 +687,11 @@ class TestVfolderRepositoryPurge:
         # Verify vfolder exists before purge
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
 
-        purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
+        purger = RBACEntityPurger(
+            row_class=VFolderRow,
+            pk_value=vfolder_id,
+            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
+        )
         result = await vfolder_repository.purge_vfolder(purger)
 
         assert result.id == vfolder_id
@@ -681,7 +705,11 @@ class TestVfolderRepositoryPurge:
     ) -> None:
         """Test purge fails when vfolder doesn't exist."""
         non_existent_id = uuid.uuid4()
-        purger = Purger(row_class=VFolderRow, pk_value=non_existent_id)
+        purger = RBACEntityPurger(
+            row_class=VFolderRow,
+            pk_value=non_existent_id,
+            spec=VFolderPurgerSpec(vfolder_id=non_existent_id),
+        )
 
         with pytest.raises(VFolderNotFound):
             await vfolder_repository.purge_vfolder(purger)
@@ -708,7 +736,11 @@ class TestVfolderRepositoryPurge:
         """Test purge fails when vfolder has non-purgable status."""
         vfolder_id = vfolder_in_db
 
-        purger = Purger(row_class=VFolderRow, pk_value=vfolder_id)
+        purger = RBACEntityPurger(
+            row_class=VFolderRow,
+            pk_value=vfolder_id,
+            spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
+        )
 
         with pytest.raises(VFolderFilterStatusFailed):
             await vfolder_repository.purge_vfolder(purger)
