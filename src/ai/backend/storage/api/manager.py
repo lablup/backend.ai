@@ -1087,6 +1087,46 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
+async def create_archive_download_session(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        files: list[str]
+
+    async with cast(
+        AbstractAsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("files"): t.List(t.String, min_length=1),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "create_archive_download_session", params)
+        ctx: RootContext = request.app["ctx"]
+        token_data = {
+            "operation": "download",
+            "volume": params["volume"],
+            "vfolder_id": str(params["vfid"]),
+            "files": params["files"],
+            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
+        }
+        token = jwt.encode(
+            token_data,
+            ctx.local_config.storage_proxy.secret,
+            algorithm="HS256",
+        )
+        return web.json_response(
+            {
+                "token": token,
+            },
+        )
+
+
 async def create_upload_session(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1295,6 +1335,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
+    app.router.add_route("POST", "/folder/file/download-archive", create_archive_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
     app.router.add_route(
