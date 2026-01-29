@@ -41,7 +41,6 @@ class ForgetImageActionResult(BaseActionResult):
 @dataclass
 class ForgetImageByIdAction(ImageAction):
     user_id: uuid.UUID
-    client_role: UserRole
     image_id: uuid.UUID
 
     @override

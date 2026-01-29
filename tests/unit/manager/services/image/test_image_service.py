@@ -15,6 +15,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
@@ -177,6 +179,30 @@ class ImageServiceBaseFixtures:
         return ImageAliasData(
             id=image_alias_id,
             alias="python",
+        )
+
+    @pytest.fixture
+    def superadmin_user_data(self) -> UserData:
+        """Superadmin user data for testing."""
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+        )
+
+    @pytest.fixture
+    def regular_user_data(self) -> UserData:
+        """Regular user data for testing."""
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
         )
 
 
@@ -365,6 +391,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        superadmin_user_data: UserData,
     ) -> None:
         """Superadmin can forget any image by ID."""
         deleted_image = replace(image_data, status=ImageStatus.DELETED)
@@ -372,11 +399,11 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=image_data.id,
         )
 
-        result = await processors.forget_image_by_id.wait_for_complete(action)
+        with with_user(superadmin_user_data):
+            result = await processors.forget_image_by_id.wait_for_complete(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.soft_delete_image_by_id.assert_called_once_with(image_data.id)
@@ -386,6 +413,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        regular_user_data: UserData,
     ) -> None:
         """Regular user can forget image they own by ID."""
         user_id = uuid.uuid4()
@@ -395,11 +423,11 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(
             user_id=user_id,
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
-        result = await processors.forget_image_by_id.wait_for_complete(action)
+        with with_user(regular_user_data):
+            result = await processors.forget_image_by_id.wait_for_complete(action)
 
         assert result.image.status == ImageStatus.DELETED
         mock_image_repository.validate_image_ownership.assert_called_once()
@@ -410,35 +438,37 @@ class TestForgetImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        regular_user_data: UserData,
     ) -> None:
         """Regular user cannot forget image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
-        with pytest.raises(ImageAccessForbiddenError):
-            await processors.forget_image_by_id.wait_for_complete(action)
+        with with_user(regular_user_data):
+            with pytest.raises(ImageAccessForbiddenError):
+                await processors.forget_image_by_id.wait_for_complete(action)
 
     async def test_forget_image_by_id_not_found(
         self,
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
+        superadmin_user_data: UserData,
     ) -> None:
         """Forget non-existent image should raise ImageNotFound."""
         mock_image_repository.soft_delete_image_by_id = AsyncMock(side_effect=ImageNotFound())
 
         action = ForgetImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=uuid.uuid4(),
         )
 
-        with pytest.raises(ImageNotFound):
-            await processors.forget_image_by_id.wait_for_complete(action)
+        with with_user(superadmin_user_data):
+            with pytest.raises(ImageNotFound):
+                await processors.forget_image_by_id.wait_for_complete(action)
 
 
 class TestModifyImage(ImageServiceBaseFixtures):
@@ -566,17 +596,18 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        superadmin_user_data: UserData,
     ) -> None:
         """Superadmin can purge any image by ID."""
         mock_image_repository.delete_image_with_aliases = AsyncMock(return_value=image_data)
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=image_data.id,
         )
 
-        result = await processors.purge_image_by_id.wait_for_complete(action)
+        with with_user(superadmin_user_data):
+            result = await processors.purge_image_by_id.wait_for_complete(action)
 
         assert result.image == image_data
         mock_image_repository.delete_image_with_aliases.assert_called_once_with(image_data.id)
@@ -586,6 +617,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        regular_user_data: UserData,
     ) -> None:
         """Regular user can purge image they own by ID."""
         user_id = uuid.uuid4()
@@ -594,11 +626,11 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         action = PurgeImageByIdAction(
             user_id=user_id,
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
-        result = await processors.purge_image_by_id.wait_for_complete(action)
+        with with_user(regular_user_data):
+            result = await processors.purge_image_by_id.wait_for_complete(action)
 
         assert result.image == image_data
         mock_image_repository.validate_image_ownership.assert_called_once()
@@ -609,35 +641,37 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
         image_data: ImageData,
+        regular_user_data: UserData,
     ) -> None:
         """Regular user cannot purge image they don't own."""
         mock_image_repository.validate_image_ownership = AsyncMock(return_value=False)
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.USER,
             image_id=image_data.id,
         )
 
-        with pytest.raises(ImageAccessForbiddenError):
-            await processors.purge_image_by_id.wait_for_complete(action)
+        with with_user(regular_user_data):
+            with pytest.raises(ImageAccessForbiddenError):
+                await processors.purge_image_by_id.wait_for_complete(action)
 
     async def test_purge_image_by_id_not_found(
         self,
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
+        superadmin_user_data: UserData,
     ) -> None:
         """Purge non-existent image should raise ImageNotFound."""
         mock_image_repository.delete_image_with_aliases = AsyncMock(side_effect=ImageNotFound())
 
         action = PurgeImageByIdAction(
             user_id=uuid.uuid4(),
-            client_role=UserRole.SUPERADMIN,
             image_id=uuid.uuid4(),
         )
 
-        with pytest.raises(ImageNotFound):
-            await processors.purge_image_by_id.wait_for_complete(action)
+        with with_user(superadmin_user_data):
+            with pytest.raises(ImageNotFound):
+                await processors.purge_image_by_id.wait_for_complete(action)
 
 
 class TestPurgeImages(ImageServiceBaseFixtures):

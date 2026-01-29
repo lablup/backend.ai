@@ -777,7 +777,6 @@ class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
         result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
             ForgetImageByIdAction(
                 user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 image_id=image_uuid,
             )
         )
@@ -878,7 +877,6 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(
                 user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 image_id=image_uuid,
             )
         )
