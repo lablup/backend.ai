@@ -5,7 +5,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import AgentId, ImageAlias
+from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
@@ -230,7 +230,7 @@ class ImageService:
         except UnknownImageReference as e:
             raise ImageNotFound from e
         return AliasImageActionResult(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             image_alias=image_alias,
         )
 
@@ -238,7 +238,7 @@ class ImageService:
         result = await self._image_repository.delete_image_alias(action.alias)
         image_id, alias_data = result
         return DealiasImageActionResult(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             image_alias=alias_data,
         )
 

@@ -1,8 +1,7 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -79,7 +78,7 @@ class PurgeImagesActionResult(BaseActionResult):
 
 @dataclass
 class PurgeImageByIdAction(ImageAction):
-    image_id: uuid.UUID
+    image_id: ImageID
 
     @override
     def entity_id(self) -> Optional[str]:

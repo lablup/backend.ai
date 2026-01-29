@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
-from uuid import UUID
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -9,7 +9,7 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class UnloadImageAction(ImageAction):
-    image_ids: list[UUID]
+    image_ids: list[ImageID]
     agents: list[str]
 
     @override
