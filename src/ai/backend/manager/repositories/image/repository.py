@@ -92,7 +92,7 @@ class ImageRepository:
         self,
         image_canonicals: list[str],
         status_filter: Optional[list[ImageStatus]] = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
         """
         Deprecated. Use get_images_by_ids instead.
@@ -102,10 +102,6 @@ class ImageRepository:
         )
         image_ids = list(images_data.keys())
         installed_agents_for_images = await self._stateful_source.list_agents_with_images(image_ids)
-
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
         for image_id, image in images_data.items():
@@ -127,7 +123,7 @@ class ImageRepository:
         self,
         identifier: ImageIdentifier,
         status_filter: Optional[list[ImageStatus]] = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> ImageWithAgentInstallStatus:
         """
         Deprecated. Use get_image_by_id instead.
@@ -136,9 +132,6 @@ class ImageRepository:
             identifier, status_filter
         )
         installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         return ImageWithAgentInstallStatus(
             image=image_data,
@@ -154,15 +147,12 @@ class ImageRepository:
         image_id: UUID,
         load_aliases: bool = False,
         status_filter: Optional[list[ImageStatus]] = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
             image_id, load_aliases, status_filter
         )
         installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         return ImageWithAgentInstallStatus(
             image=image_data,
@@ -299,7 +289,7 @@ class ImageRepository:
         self,
         image_ids: list[UUID],
         status_filter: Optional[list[ImageStatus]] = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
         """
         Retrieves multiple images by their IDs with agent install status.
@@ -308,10 +298,6 @@ class ImageRepository:
         image_id_list = list(images_data.keys())
         installed_agents_for_images = await self._stateful_source.list_agents_with_images(
             image_id_list
-        )
-
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
