@@ -122,7 +122,7 @@ BEP numbers start from 1000.
 | [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
 | [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
-| [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | - | Draft |
+| [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | Gyubong Lee | Draft |
 | [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Rejected |
 | [1037](BEP-1037-storage-proxy-health-monitoring.md) | Volume Host Availability Check | Gyubong Lee | Draft |
 | [1038](BEP-1038-image-v2-gql-implementation.md) | ImageV2 GQL Implementation | Gyubong Lee | Draft |
