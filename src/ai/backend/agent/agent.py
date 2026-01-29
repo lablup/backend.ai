@@ -2431,7 +2431,8 @@ class AbstractAgent(
             "exec": startup_command,
         }
         try:
-            async with asyncio.timeout(timeout):
+            # Treat 0 or 0.0 as no timeout (None) since asyncio.timeout(0) immediately times out
+            async with asyncio.timeout(timeout or None):
                 while True:
                     try:
                         result = await self.execute(
