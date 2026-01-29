@@ -240,7 +240,6 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
             GetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
-                user_role=graph_ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -291,7 +290,6 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
             GetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
-                user_role=ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )

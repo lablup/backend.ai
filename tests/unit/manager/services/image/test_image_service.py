@@ -91,15 +91,24 @@ class ImageServiceBaseFixtures:
         return MagicMock(spec="AgentRegistry")
 
     @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        """Mock ManagerConfigProvider for testing."""
+        mock = MagicMock()
+        mock.config.manager.hide_agents = False
+        return mock
+
+    @pytest.fixture
     def image_service(
         self,
         mock_image_repository: MagicMock,
         mock_agent_registry: MagicMock,
+        mock_config_provider: MagicMock,
     ) -> ImageService:
         """Create ImageService with mock dependencies."""
         return ImageService(
             agent_registry=mock_agent_registry,
             image_repository=mock_image_repository,
+            config_provider=mock_config_provider,
         )
 
     @pytest.fixture
@@ -996,7 +1005,6 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[image_data.id],
-            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 
@@ -1016,7 +1024,6 @@ class TestGetImagesByIds(ImageServiceBaseFixtures):
 
         action = GetImagesByIdsAction(
             image_ids=[],
-            user_role=UserRole.SUPERADMIN,
             image_status=None,
         )
 

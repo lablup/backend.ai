@@ -7,6 +7,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
@@ -106,14 +107,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ImageService:
     _agent_registry: AgentRegistry
     _image_repository: ImageRepository
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         agent_registry: AgentRegistry,
         image_repository: ImageRepository,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
+        self._config_provider = config_provider
 
     async def _validate_image_ownership(self, image_id: UUID, user_id: UUID) -> None:
         """
@@ -132,12 +136,15 @@ class ImageService:
         """
         Deprecated. Use get_images_by_ids instead.
         """
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
         images_with_agent_install_status: list[
             ImageWithAgentInstallStatus
         ] = await self._image_repository.get_images_by_canonicals(
             action.image_canonicals,
             status_filter=action.image_status,
-            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            hide_agents=hide_agents,
         )
         return GetImagesByCanonicalsActionResult(
             images_with_agent_install_status=images_with_agent_install_status
@@ -149,11 +156,14 @@ class ImageService:
         """
         Deprecated. Use get_image_by_id instead.
         """
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
         image_with_agent_install_status: ImageWithAgentInstallStatus = (
             await self._image_repository.get_image_by_identifier(
                 action.image_identifier,
                 status_filter=action.image_status,
-                requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+                hide_agents=hide_agents,
             )
         )
         return GetImageByIdentifierActionResult(
@@ -174,12 +184,13 @@ class ImageService:
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
         image_with_agent_install_status: ImageWithAgentInstallStatus = (
             await self._image_repository.get_image_by_id(
                 action.image_id,
                 load_aliases=True,
                 status_filter=action.image_status,
-                requested_by_superadmin=is_superadmin,
+                hide_agents=hide_agents,
             )
         )
         return GetImageByIdActionResult(
@@ -397,10 +408,13 @@ class ImageService:
         """
         Retrieves multiple images by their IDs.
         """
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
         images_with_agent_install_status = await self._image_repository.get_images_by_ids(
             action.image_ids,
             status_filter=action.image_status,
-            requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            hide_agents=hide_agents,
         )
         return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 
