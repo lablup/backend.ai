@@ -40,7 +40,7 @@ async def wget(
 ) -> None:
     chunk_size = 16384
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(target_path, "wb") as out:
+    with target_path.open("wb") as out:
         async with request("GET", url, raise_for_status=True) as r:
             if progress is not None and r.content_length:
                 progress.update(total=r.content_length)

@@ -452,7 +452,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
 
-    async def _heartbeat(interval: float) -> None:
+    async def _heartbeat(_interval: float) -> None:
         try:
             async for attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -609,7 +609,7 @@ async def status(request: web.Request) -> web.Response:
 
 async def handle_proxy_route_event(
     context: RootContext,
-    agent_id: AgentId,
+    _agent_id: AgentId,
     event: AppProxyCircuitCreatedEvent
     | AppProxyCircuitRouteUpdatedEvent
     | AppProxyCircuitRemovedEvent,
@@ -650,13 +650,13 @@ async def handle_proxy_route_event(
                 await context.proxy_frontend.break_circuit(Circuit.from_serialized_circuit(circuit))
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -758,7 +758,7 @@ def build_root_app(
             ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
@@ -770,7 +770,7 @@ def build_root_app(
                 await stack.enter_async_context(cctx_instance)
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:

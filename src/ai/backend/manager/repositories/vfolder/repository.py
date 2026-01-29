@@ -1158,7 +1158,7 @@ class VfolderRepository:
         self,
         vfolder_info: VFolderCloneInfo,
         storage_manager: StorageSessionManager,
-        background_task_manager: BackgroundTaskManager,
+        _background_task_manager: BackgroundTaskManager,
     ) -> tuple[uuid.UUID, uuid.UUID]:
         """
         Initiate VFolder cloning process.

@@ -227,13 +227,13 @@ class AgentService:
         )
 
     async def recalculate_usage(
-        self, action: RecalculateUsageAction
+        self, _action: RecalculateUsageAction
     ) -> RecalculateUsageActionResult:
         await self._agent_registry.recalc_resource_usage()
         return RecalculateUsageActionResult()
 
     async def get_total_resources(
-        self, action: GetTotalResourcesAction
+        self, _action: GetTotalResourcesAction
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)

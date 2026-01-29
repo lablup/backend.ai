@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import os
 import sys
 import tempfile
 from asyncio import create_subprocess_exec, subprocess
@@ -21,9 +21,14 @@ async def write_file(
 ) -> None:
     filename = filename.format_map(variables)
     open_mode = "w" + ("+" if append else "")
-    with open(filename, open_mode) as fw:
-        fw.writelines(line.format_map(variables) + "\n" for line in body)
-    os.chmod(filename, int(mode, 8))
+    filepath = Path(filename)
+
+    def _write() -> None:
+        with filepath.open(open_mode) as fw:
+            fw.writelines(line.format_map(variables) + "\n" for line in body)
+        filepath.chmod(int(mode, 8))
+
+    await asyncio.to_thread(_write)
 
 
 async def write_tempfile(
@@ -31,11 +36,16 @@ async def write_tempfile(
     body: Iterable[str],
     mode: str = "644",
 ) -> Optional[str]:
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".py", delete=False) as config:
-        for line in body:
-            config.write(line.format_map(variables))
-    os.chmod(config.name, int(mode, 8))
-    return config.name
+    def _write() -> str:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".py", delete=False
+        ) as config:
+            for line in body:
+                config.write(line.format_map(variables))
+        Path(config.name).chmod(int(mode, 8))
+        return config.name
+
+    return await asyncio.to_thread(_write)
 
 
 async def run_command(

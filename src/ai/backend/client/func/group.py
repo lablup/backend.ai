@@ -141,7 +141,7 @@ class Group(BaseFunction):
         total_resource_slots: Optional[str] = None,
         allowed_vfolder_hosts: Optional[str] = None,
         integration_id: Optional[str] = None,
-        fields: Iterable[FieldSpec | str] | None = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Creates a new group with the given options.
@@ -155,7 +155,7 @@ class Group(BaseFunction):
             }
         """)
         resolved_fields = resolve_fields(
-            fields,
+            _fields,
             group_fields,
             (group_fields["id"], group_fields["domain_name"], group_fields["name"]),
         )
@@ -187,7 +187,7 @@ class Group(BaseFunction):
         total_resource_slots: Optional[str] | Undefined = undefined,
         allowed_vfolder_hosts: Optional[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
-        fields: Iterable[FieldSpec | str] | None = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Update existing group.
@@ -251,7 +251,10 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Optional[Iterable[FieldSpec | str]] = None
+        cls,
+        gid: str,
+        user_uuids: Iterable[str],
+        _fields: Optional[Iterable[FieldSpec | str]] = None,
     ) -> dict:
         """
         Add users to a group.
@@ -277,7 +280,10 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Optional[Iterable[FieldSpec | str]] = None
+        cls,
+        gid: str,
+        user_uuids: Iterable[str],
+        _fields: Optional[Iterable[FieldSpec | str]] = None,
     ) -> dict:
         """
         Remove users from a group.

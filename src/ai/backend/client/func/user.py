@@ -335,7 +335,7 @@ class User(BaseFunction):
         container_uid: int | None | Undefined = undefined,
         container_main_gid: int | None | Undefined = undefined,
         container_gids: Iterable[int] | None | Undefined = undefined,
-        fields: Iterable[FieldSpec | str] | None = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Update existing user.

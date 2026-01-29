@@ -69,7 +69,7 @@ class CustomGraphQLView(GraphQLView):
         raise AuthorizationFailed("Unauthorized access to GraphQL endpoint")
 
     async def get_context(  # type: ignore[override]
-        self, request: web.Request, response: web.Response | web.WebSocketResponse
+        self, request: web.Request, _response: web.Response | web.WebSocketResponse
     ) -> StrawberryGQLContext:
         root_context: RootContext = request.app["_root.context"]
         return StrawberryGQLContext(

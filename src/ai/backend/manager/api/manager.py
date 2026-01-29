@@ -269,13 +269,13 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
 
 
 @superadmin_required
-async def scheduler_trigger(request: web.Request) -> web.Response:
+async def scheduler_trigger(_request: web.Request) -> web.Response:
     # Legacy scheduler events are no longer supported with Sokovan scheduler
     raise InvalidAPIParameters("Legacy scheduler trigger API is no longer supported")
 
 
 @superadmin_required
-async def scheduler_healthcheck(request: web.Request) -> web.Response:
+async def scheduler_healthcheck(_request: web.Request) -> web.Response:
     # Legacy scheduler status check is no longer supported with Sokovan scheduler
     raise InvalidAPIParameters("Legacy scheduler healthcheck API is no longer supported")
 
@@ -285,7 +285,7 @@ class SQLAlchemyConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
-    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return f"""{metric_name}{{mgr_id="{self.mgr_id}"}} {self.val}"""
 
 
@@ -337,7 +337,7 @@ class RedisConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
-    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return (
             f"""{metric_name}{{mgr_id="{self.mgr_id}",name="{self.redis_obj_name}"}} {self.val}"""
         )

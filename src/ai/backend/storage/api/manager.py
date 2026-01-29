@@ -1325,7 +1325,7 @@ def init_internal_app(ctx: RootContext) -> web.Application:
 
 async def handle_volume_mount(
     context: RootContext,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
     if context.pidx != 0:
@@ -1372,7 +1372,7 @@ async def handle_volume_mount(
 
 async def handle_volume_umount(
     context: RootContext,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
     if context.pidx != 0:

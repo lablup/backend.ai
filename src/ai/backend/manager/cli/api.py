@@ -96,7 +96,7 @@ def generate_supergraph_schema(
     type=click.Path(file_okay=False, writable=True),
     help="Output directory for supergraph.graphql (default: same as schema file directory)",
 )
-def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> None:
+def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) -> None:
     """Post-process GraphQL schema and generate supergraph."""
     try:
         generate_supergraph_schema(
@@ -132,7 +132,7 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
     default=False,  # TODO: Set default to True after v2 migration is complete
     help="Generate strawberry based v2 GraphQL schema (default: False)",
 )
-def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
     """
     Generates GraphQL schema of Backend.AI API.
     """
@@ -151,7 +151,7 @@ def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
+def dump_openapi(_cli_ctx: CLIContext, output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
@@ -159,5 +159,5 @@ def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
     if output == "-" or output is None:
         print(pretty_json_str(openapi))
     else:
-        with open(output, mode="w") as fw:
+        with Path(output).open(mode="w") as fw:
             fw.write(pretty_json_str(openapi))

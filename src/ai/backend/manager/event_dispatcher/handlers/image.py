@@ -32,8 +32,8 @@ class ImageEventHandler:
 
     async def handle_image_pull_started(
         self,
-        context: None,
-        agent_id: AgentId,
+        _context: None,
+        _agent_id: AgentId,
         ev: ImagePullStartedEvent,
     ) -> None:
         dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
@@ -44,7 +44,7 @@ class ImageEventHandler:
         )
 
     async def handle_image_pull_finished(
-        self, context: None, agent_id: AgentId, ev: ImagePullFinishedEvent
+        self, _context: None, _agent_id: AgentId, ev: ImagePullFinishedEvent
     ) -> None:
         dt = datetime.fromtimestamp(ev.timestamp, tz=UTC)
         log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
@@ -55,8 +55,8 @@ class ImageEventHandler:
 
     async def handle_image_pull_failed(
         self,
-        context: None,
-        agent_id: AgentId,
+        _context: None,
+        _agent_id: AgentId,
         ev: ImagePullFailedEvent,
     ) -> None:
         log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)

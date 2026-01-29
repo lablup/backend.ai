@@ -103,7 +103,7 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 
 
 async def upgrade_2_to_3(
-    ctx: RootContext,
+    _ctx: RootContext,
     dsn: str,
     volume: AbstractVolume,
     outfile: str,

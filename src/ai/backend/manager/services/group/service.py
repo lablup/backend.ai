@@ -20,7 +20,6 @@ from ai.backend.manager.models.resource_usage import (
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -82,7 +81,6 @@ class GroupService:
 
         group_data = await self._group_repository.modify_validated(
             action.updater,
-            UserRole.USER,  # Default role since group operations don't require role-based logic
             action.user_update_mode.optional_value(),
             user_uuids_converted,
         )

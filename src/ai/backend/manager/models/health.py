@@ -92,7 +92,7 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
     )
 
 
-async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
+async def get_redis_object_info_list(_root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
     log.warning("get_redis_object_info_list is deprecated.")
     return []
 

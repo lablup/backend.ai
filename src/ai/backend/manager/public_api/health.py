@@ -47,7 +47,7 @@ class SQLAlchemyConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
-    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return f"""{metric_name}{{mgr_id="{self.mgr_id}"}} {self.val}"""
 
 
@@ -99,7 +99,7 @@ class RedisConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
-    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+    def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return (
             f"""{metric_name}{{mgr_id="{self.mgr_id}",name="{self.redis_obj_name}"}} {self.val}"""
         )

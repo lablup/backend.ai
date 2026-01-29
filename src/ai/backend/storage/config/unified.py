@@ -80,7 +80,7 @@ class VolumeInfoConfig(BaseConfigSchema):
     ]
     fsprefix: Annotated[
         Optional[PurePath],
-        Field(default=PurePath(".")),
+        Field(default=PurePath()),
         BackendAIConfigMeta(
             description=(
                 "An optional subdirectory prefix within the volume path. All storage operations "

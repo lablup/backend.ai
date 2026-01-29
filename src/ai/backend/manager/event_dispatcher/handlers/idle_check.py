@@ -21,8 +21,8 @@ class IdleCheckEventHandler:
 
     async def handle_do_idle_check(
         self,
-        context: None,
-        source: AgentId,
-        event: DoIdleCheckEvent,
+        _context: None,
+        _source: AgentId,
+        _event: DoIdleCheckEvent,
     ) -> None:
         await self._idle_checker_host.do_idle_check()

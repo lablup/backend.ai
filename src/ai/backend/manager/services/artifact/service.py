@@ -504,7 +504,7 @@ class ArtifactService:
         return RestoreArtifactsActionResult(artifacts=restored_artifacts)
 
     async def _resolve_artifact_registry_meta(
-        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             # TODO: Handle `artifact_type` for other types

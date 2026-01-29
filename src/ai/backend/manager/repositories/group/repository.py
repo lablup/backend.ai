@@ -51,7 +51,7 @@ from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -168,7 +168,6 @@ class GroupRepository:
     async def modify_validated(
         self,
         updater: Updater[GroupRow],
-        user_role: UserRole,
         user_update_mode: Optional[str] = None,
         user_uuids: Optional[list[uuid.UUID]] = None,
     ) -> Optional[GroupData]:

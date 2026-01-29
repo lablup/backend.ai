@@ -235,7 +235,7 @@ def create_proxy_app() -> web.Application:
     help="The TCP port to accept non-encrypted non-authorized API requests.",
 )
 @click.pass_context
-def proxy(ctx: click.Context, bind: str, port: int) -> None:
+def proxy(_ctx: click.Context, bind: str, port: int) -> None:
     """
     Run a non-encrypted non-authorized API proxy server.
     Use this only for development and testing!

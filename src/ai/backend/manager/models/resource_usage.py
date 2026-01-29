@@ -240,7 +240,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     session_row: SessionRow
     kernel_row: KernelRow
 
-    def to_json(self, child: bool = False) -> dict[str, Any]:
+    def to_json(self, _child: bool = False) -> dict[str, Any]:
         return {
             **self.to_json_base(),
             "agents": list(self.agents) if self.agents is not None else [],
@@ -276,7 +276,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
 
     def register_resource_group(
         self,
-        other: BaseResourceUsageGroup,
+        _other: BaseResourceUsageGroup,
     ) -> bool:
         return True
 

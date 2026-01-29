@@ -160,7 +160,7 @@ class UtilizationMetricObserver:
                     except KeyError:
                         continue
 
-        def callback(task: asyncio.Task) -> None:
+        def callback(_task: asyncio.Task) -> None:
             self._removal_tasks.pop(kernel_id, None)
             kernel_metrics.pop(kernel_id, None)
 

@@ -303,8 +303,12 @@ class Context(metaclass=ABCMeta):
         if lines_to_add:
             bashrc_addition = "\n# Added by Backend.AI installer for Rover CLI\n"
             bashrc_addition += "\n".join(lines_to_add) + "\n"
-            with open(bashrc_path, "a") as f:
-                f.write(bashrc_addition)
+
+            def _write_bashrc() -> None:
+                with bashrc_path.open("a") as f:
+                    f.write(bashrc_addition)
+
+            await asyncio.to_thread(_write_bashrc)
             self.log_header("Added Rover PATH and license to ~/.bashrc")
 
         self.log_header("Rover CLI installed successfully.")
@@ -341,8 +345,12 @@ class Context(metaclass=ABCMeta):
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
-        with open(output_path, "wb") as f:
-            f.write(stdout)
+
+        def _write_supergraph() -> None:
+            with Path(output_path).open("wb") as f:
+                f.write(stdout)
+
+        await asyncio.to_thread(_write_supergraph)
         self.log_header(f"Wrote supergraph schema to {output_path}")
 
         base_path = self.install_info.base_path
@@ -945,7 +953,7 @@ class Context(metaclass=ABCMeta):
         service = self.install_info.service_config
         with tempfile.TemporaryDirectory() as tmpdir:
             fixture_path = Path(tmpdir) / "fixture.json"
-            with open(fixture_path, "w") as fw:
+            with fixture_path.open("w") as fw:
                 fw.write(
                     json.dumps({
                         "__mode": "update",
@@ -975,7 +983,7 @@ class Context(metaclass=ABCMeta):
                 username = match.group(1)
             else:
                 continue
-            with open(base_path / f"env-local-{username}-api.sh", "w") as fp:
+            with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
                 print("# Directly access to the manager using API keypair (admin)", file=fp)
                 print(
                     "export"
@@ -990,7 +998,7 @@ class Context(metaclass=ABCMeta):
             user_data = json.loads(Path(user_path).read_bytes())
         for user in user_data["users"]:
             username = user["username"]
-            with open(base_path / f"env-local-{username}-session.sh", "w") as fp:
+            with (base_path / f"env-local-{username}-session.sh").open("w") as fp:
                 print(
                     "# Indirectly access to the manager via the web server using a cookie-based"
                     " login session",
@@ -1420,7 +1428,7 @@ class PackageContext(Context):
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = self.dist_info.target_path / "checksum.txt"
 
-        with open(csum_path) as f:
+        with csum_path.open() as f:
             lines = f.readlines()
             for line in lines:
                 if pkg_name in line:
@@ -1430,7 +1438,7 @@ class PackageContext(Context):
                 raise ValueError(f"Checksum for {pkg_name} not found in {csum_path}")
 
         individual_csum_path = dst_path.with_name(pkg_name + ".sha256")
-        with open(individual_csum_path, "w") as f:
+        with individual_csum_path.open("w") as f:
             f.write(csum_line)
 
         await self._validate_checksum(dst_path, individual_csum_path)

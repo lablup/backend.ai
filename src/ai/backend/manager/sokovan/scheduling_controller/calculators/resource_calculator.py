@@ -119,7 +119,7 @@ class ResourceCalculator:
         validated_scaling_group: AllowedScalingGroup,
         creation_config: dict,
         image_info: ImageInfo,
-        scaling_group_network: ScalingGroupNetworkInfo,
+        _scaling_group_network: ScalingGroupNetworkInfo,
     ) -> tuple[ResourceSlot, dict]:
         """
         Calculate resource requirements for a kernel.
@@ -329,7 +329,7 @@ class ResourceCalculator:
         self,
         requested_slots: ResourceSlot,
         image_min_slots: ResourceSlot,
-        image_max_slots: ResourceSlot,
+        _image_max_slots: ResourceSlot,
         shmem: Optional[BinarySize],
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> None:

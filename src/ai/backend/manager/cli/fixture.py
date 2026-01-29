@@ -69,6 +69,6 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
 
 @cli.command()
 @click.pass_obj
-def list(cli_ctx: CLIContext) -> None:
+def list(_cli_ctx: CLIContext) -> None:
     """List all available fixtures."""
     log.warning("This command is deprecated.")

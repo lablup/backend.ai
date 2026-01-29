@@ -104,7 +104,7 @@ class ContainerUtilizationMetricService:
 
     async def query_metadata(
         self,
-        action: ContainerMetricMetadataAction,
+        _action: ContainerMetricMetadataAction,
     ) -> ContainerMetricMetadataActionResult:
         result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
         return ContainerMetricMetadataActionResult(result.data)

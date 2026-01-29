@@ -252,7 +252,7 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
 
     @cached(
         cache=LRUCache(maxsize=32),
-        key=lambda self, distro, krunner_volumes: (distro, tuple(sorted(krunner_volumes.items()))),
+        key=lambda _self, distro, krunner_volumes: (distro, tuple(sorted(krunner_volumes.items()))),
     )
     def _get_krunner_info(
         self, distro: str, krunner_volumes: Mapping[str, str]

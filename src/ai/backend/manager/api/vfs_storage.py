@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import AsyncIterator, Iterable
 from http import HTTPStatus
+from pathlib import Path
 from typing import Optional, cast, override
 
 import aiohttp_cors
@@ -131,7 +131,7 @@ class APIHandler:
         )
 
         # Prepare response headers
-        filename = os.path.basename(filepath)
+        filename = Path(filepath).name
         content_type = cast(str, stream_reader.content_type())
         headers = {
             "Content-Type": content_type,

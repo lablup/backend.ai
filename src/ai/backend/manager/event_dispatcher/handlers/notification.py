@@ -35,7 +35,7 @@ class NotificationEventHandler:
 
     async def handle_notification_triggered(
         self,
-        context: None,
+        _context: None,
         source: str,
         event: NotificationTriggeredEvent,
     ) -> None:

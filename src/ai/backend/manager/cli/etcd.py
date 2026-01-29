@@ -291,7 +291,7 @@ def dealias(cli_ctx: CLIContext, alias: str) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def quote(cli_ctx: CLIContext, value: str) -> None:
+def quote(_cli_ctx: CLIContext, value: str) -> None:
     """
     Quote the given string for use as a URL piece in etcd keys.
     Use this to generate argument inputs for aliases and raw image keys.
@@ -302,7 +302,7 @@ def quote(cli_ctx: CLIContext, value: str) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def unquote(cli_ctx: CLIContext, value: str) -> None:
+def unquote(_cli_ctx: CLIContext, value: str) -> None:
     """
     Unquote the given string used as a URL piece in etcd keys.
     """

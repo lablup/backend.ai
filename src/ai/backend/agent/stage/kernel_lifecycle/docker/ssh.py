@@ -58,7 +58,7 @@ class Chowner:
                     valid_uid = uid if uid is not None else self._spec.agent_kernel_uid
                     valid_gid = gid if gid is not None else self._spec.agent_kernel_gid
                 else:
-                    stat = os.stat(p)
+                    stat = p.stat()
                     valid_uid = uid if uid is not None else stat.st_uid
                     valid_gid = gid if gid is not None else stat.st_gid
                 os.chown(p, valid_uid, valid_gid)

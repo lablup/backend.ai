@@ -555,7 +555,7 @@ class ScheduleCoordinator:
     async def _process_kernel_scaling_group(
         self,
         handler: KernelLifecycleHandler,
-        schedule_type: ScheduleType,
+        _schedule_type: ScheduleType,
         scaling_group: str,
     ) -> None:
         """Process a single scaling group for the given kernel handler.

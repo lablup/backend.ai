@@ -9,6 +9,7 @@ import math
 import random
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 
 def pbkdf2_hex(data: str, salt: str, iterations: int, keylen: int, hashfunc: str = "sha1") -> str:
@@ -22,7 +23,7 @@ def load_dictionary(dictionary_file: str | None = None) -> list:
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
-    with open(dictionary_file) as f:
+    with Path(dictionary_file).open() as f:
         return json.load(f)
 
 

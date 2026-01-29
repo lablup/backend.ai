@@ -598,7 +598,7 @@ class AgentRPCServer(aobject):
         self, scaling_group: str, agent_id: AgentId | None = None
     ) -> None:
         cfg_src_path = config.find_config_file("agent")
-        with open(cfg_src_path) as f:
+        with cfg_src_path.open() as f:
             data = tomlkit.load(f)
         agent = self.runtime.get_agent(agent_id)
         if "agents" in data:
@@ -606,7 +606,7 @@ class AgentRPCServer(aobject):
         else:
             self._update_scaling_group_default(data, scaling_group)
         shutil.copy(cfg_src_path, f"{cfg_src_path}.bak")
-        with open(cfg_src_path, "w") as f:
+        with cfg_src_path.open("w") as f:
             tomlkit.dump(data, f)
 
         agent.update_scaling_group(scaling_group)
@@ -971,7 +971,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
-        timeout: Optional[float],
+        timeout_seconds: Optional[float],
         agent_id: AgentId | None = None,
     ) -> None:
         log.info(
@@ -979,11 +979,11 @@ class AgentRPCServer(aobject):
             kernel_id,
             session_id,
             code,
-            timeout,
+            timeout_seconds,
         )
         agent = self.runtime.get_agent(agent_id)
         await agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout_seconds
         )
 
     @rpc_function
@@ -1068,11 +1068,11 @@ class AgentRPCServer(aobject):
 
         image_push_timeout = cast(Optional[float], self.local_config.api.push_timeout)
 
-        async def _push_image(reporter: ProgressReporter) -> None:
+        async def _push_image(_reporter: ProgressReporter) -> None:
             await agent.push_image(
                 image_ref,
                 registry_conf,
-                timeout=image_push_timeout,
+                timeout_seconds=image_push_timeout,
             )
 
         task_id = await bgtask_mgr.start(_push_image)

@@ -21,7 +21,7 @@ class MountNameValidationRule(SessionValidatorRule):
     def validate(
         self,
         spec: SessionCreationSpec,
-        context: SessionCreationContext,
+        _context: SessionCreationContext,
     ) -> None:
         """Validate mount names if mount map is provided."""
         mount_map = spec.creation_spec.get("mount_map") or {}

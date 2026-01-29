@@ -362,7 +362,6 @@ class CreateDeploymentAdapter:
         self,
         request: CreateDeploymentRequest,
         user_uuid: UUID,
-        user_domain: str,
     ) -> NewDeploymentCreator:
         """
         Convert CreateDeploymentRequest to NewDeploymentCreator.
@@ -370,7 +369,6 @@ class CreateDeploymentAdapter:
         Args:
             request: Create deployment request DTO
             user_uuid: UUID of the user creating the deployment
-            user_domain: Domain name of the user
 
         Returns:
             NewDeploymentCreator for service layer

@@ -78,7 +78,7 @@ def generate_example_configuration(output: Path) -> None:
     if output == "-" or output is None:
         print(tomli_w.dumps(ensure_json_serializable(generated_example)))
     else:
-        with open(output, mode="w") as fw:
+        with Path(output).open(mode="w") as fw:
             fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
 
 
@@ -124,7 +124,7 @@ def generate_openapi_spec(output: Path) -> None:
     if output == "-" or output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
     else:
-        with open(output, mode="w") as fw:
+        with Path(output).open(mode="w") as fw:
             fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 

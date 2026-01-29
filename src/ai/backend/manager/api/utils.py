@@ -462,12 +462,12 @@ def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any
     return default
 
 
-async def not_impl_stub(request: web.Request) -> web.Response:
+async def not_impl_stub(_request: web.Request) -> web.Response:
     raise NotImplementedAPI
 
 
 def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    async def deprecated_stub_impl(request: web.Request) -> web.Response:
+    async def deprecated_stub_impl(_request: web.Request) -> web.Response:
         raise DeprecatedAPI(extra_msg=msg)
 
     return deprecated_stub_impl

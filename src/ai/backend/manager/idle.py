@@ -435,7 +435,7 @@ class AbstractIdleCheckReporter(ABC):
         return f"session.{session_id}.{cls.name}.report"
 
     @classmethod
-    def get_extra_info_key(cls, session_id: SessionId) -> str | None:
+    def get_extra_info_key(cls, _session_id: SessionId) -> str | None:
         return None
 
     @abstractmethod
@@ -514,7 +514,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         )
 
     async def get_extra_info(
-        self, redis_obj: ValkeyLiveClient, session_id: SessionId
+        self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
@@ -744,7 +744,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         )
 
     async def get_extra_info(
-        self, redis_obj: ValkeyLiveClient, session_id: SessionId
+        self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
@@ -815,7 +815,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         pass
 
     async def get_extra_info(
-        self, redis_obj: ValkeyLiveClient, session_id: SessionId
+        self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 

@@ -1,7 +1,7 @@
 import json
-import os
 from contextlib import closing
 from io import TextIOWrapper
+from pathlib import Path
 
 import pytest
 
@@ -139,10 +139,10 @@ def test_download_file(run_user: ClientRunnerFunc):
         assert "Done." in decode(p.before), "File download failed."
 
     # Check if the file has been successfully downloaded
-    assert os.path.isfile(file_name), "File was not downloaded successfully."
+    assert Path(file_name).is_file(), "File was not downloaded successfully."
 
     # remove the file for testing
-    os.remove(file_name)
+    Path(file_name).unlink()
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder"])

@@ -326,7 +326,7 @@ class DummyAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout_seconds: float | None,
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
@@ -337,7 +337,7 @@ class DummyAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)

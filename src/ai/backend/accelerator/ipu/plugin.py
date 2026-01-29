@@ -97,7 +97,8 @@ class IPUPlugin(AbstractComputePlugin):
         log.info("Read IPU device configs from {}", cfg_src_path)
 
         def _read_json() -> dict[str, Any]:
-            with open(self.ipu_config["ipuof-config-path"]) as fr:
+            ipuof_config_path = Path(self.ipu_config["ipuof-config-path"])
+            with ipuof_config_path.open() as fr:
                 return json.loads(fr.read())
 
         try:
@@ -358,7 +359,7 @@ class IPUPlugin(AbstractComputePlugin):
 
         def _write() -> None:
             generated_ipuof_config_path.parent.mkdir(parents=True)
-            with open(generated_ipuof_config_path, "w") as fw:
+            with generated_ipuof_config_path.open("w") as fw:
                 fw.write(json.dumps(generated_ipuof_config))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)

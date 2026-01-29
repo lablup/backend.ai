@@ -45,7 +45,7 @@ class ExportService:
         """
         self._repository = repository
 
-    async def list_reports(self, action: ListReportsAction) -> ListReportsActionResult:
+    async def list_reports(self, _action: ListReportsAction) -> ListReportsActionResult:
         """List all available export reports.
 
         Args:

@@ -152,7 +152,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> Optional[T_Enum]:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -193,7 +193,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> Optional[T_Enum]:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -239,7 +239,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -383,7 +383,7 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -400,20 +400,20 @@ class StructuredJSONObjectColumn(TypeDecorator):
         self._schema = schema
 
     def process_bind_param(
-        self, value: JSONSerializableMixin | None, dialect: Dialect
+        self, value: JSONSerializableMixin | None, _dialect: Dialect
     ) -> Optional[dict]:
         if value is None:
             return None
         return self._schema.to_json(value)  # type: ignore[arg-type]
 
     def process_result_value(
-        self, value: dict | None, dialect: Dialect
+        self, value: dict | None, _dialect: Dialect
     ) -> Optional[JSONSerializableMixin]:
         if value is None:
             return None
         return self._schema.from_json(value)  # type: ignore[arg-type]
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -430,22 +430,22 @@ class StructuredJSONObjectListColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op: Any, value: Any) -> JSONB:
+    def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
     def process_bind_param(
-        self, value: list[JSONSerializableMixin] | None, dialect: Dialect
+        self, value: list[JSONSerializableMixin] | None, _dialect: Dialect
     ) -> list[dict]:
         return [self._schema.to_json(item) for item in value] if value is not None else []
 
     def process_result_value(
-        self, value: list | None, dialect: Dialect
+        self, value: list | None, _dialect: Dialect
     ) -> list[JSONSerializableMixin]:
         if value is None:
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -482,7 +482,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
             return self._schema.model_validate(value)
         return None
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -499,16 +499,16 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def coerce_compared_value(self, op: Any, value: Any) -> JSONB:
+    def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value: list[TBaseModel] | None, dialect: Dialect) -> list:
+    def process_bind_param(self, value: list[TBaseModel] | None, _dialect: Dialect) -> list:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
             return [item.model_dump(mode="json") for item in value]
         return []
 
-    def process_result_value(self, value: list | str | None, dialect: Dialect) -> list[TBaseModel]:
+    def process_result_value(self, value: list | str | None, _dialect: Dialect) -> list[TBaseModel]:
         # JSONB returns already parsed Python objects, not strings
         # Handle case where value is stored as JSON string (legacy data)
         if value is not None:
@@ -517,7 +517,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
             return [self._schema.model_validate(item) for item in value]
         return []
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **_kw) -> Self:
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -529,10 +529,10 @@ class URLColumn(TypeDecorator):
     impl = UnicodeText
     cache_ok = True
 
-    def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
+    def process_bind_param(self, value: Optional[yarl.URL], _dialect: Dialect) -> Optional[str]:
         return str(value)
 
-    def process_result_value(self, value: Optional[str], dialect: Dialect) -> Optional[yarl.URL]:
+    def process_result_value(self, value: Optional[str], _dialect: Dialect) -> Optional[yarl.URL]:
         if value is None:
             return None
         return yarl.URL(value)
@@ -547,7 +547,7 @@ class IPColumn(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(
-        self, value: str | ReadableCIDR | None, dialect: Dialect
+        self, value: str | ReadableCIDR | None, _dialect: Dialect
     ) -> Optional[str]:
         if value is None:
             return value
@@ -560,7 +560,7 @@ class IPColumn(TypeDecorator):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value: str | None, dialect: Dialect) -> Optional[ReadableCIDR]:
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> Optional[ReadableCIDR]:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -682,7 +682,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
             return value.bytes
         return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect: Dialect) -> Optional[TUUIDSubType]:
+    def process_result_value(self, value: Any, _dialect: Dialect) -> Optional[TUUIDSubType]:
         if value is None:
             return value
         cls = type(self)
@@ -719,10 +719,10 @@ class SlugType(TypeDecorator):
             allow_unicode=allow_unicode,
         )
 
-    def coerce_compared_value(self, op: Any, value: Any) -> Unicode:
+    def coerce_compared_value(self, _op: Any, _value: Any) -> Unicode:
         return Unicode()
 
-    def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | None:
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
         if value is None:
             return value
         try:

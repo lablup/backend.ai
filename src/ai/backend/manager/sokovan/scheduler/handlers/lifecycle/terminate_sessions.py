@@ -86,7 +86,7 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
 
     async def execute(
         self,
-        scaling_group: str,
+        _scaling_group: str,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Send termination RPC calls for TERMINATING sessions.

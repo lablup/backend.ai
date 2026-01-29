@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -167,7 +168,8 @@ def export_users(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_users_csv(
                             fields=field_list,
@@ -315,7 +317,8 @@ def export_sessions(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_sessions_csv(
                             fields=field_list,
@@ -426,7 +429,8 @@ def export_projects(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_projects_csv(
                             fields=field_list,
@@ -558,7 +562,8 @@ def export_audit_logs(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_audit_logs_csv(
                             fields=field_list,

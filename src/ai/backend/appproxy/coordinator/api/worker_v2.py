@@ -327,7 +327,7 @@ async def get_token(request: web.Request) -> PydanticResponse[TokenResponseModel
 
 
 async def check_worker_lost(
-    app: web.Application, src: AgentId, event: DoCheckWorkerLostEvent
+    app: web.Application, _src: AgentId, _event: DoCheckWorkerLostEvent
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
 

@@ -56,7 +56,7 @@ class Runner(BaseRunner):
 
         # Add support for interactive input in batch mode by copying
         # sitecustomize.py to USER_SITE of runtime python.
-        sitecustomize_path = Path(os.path.dirname(__file__)) / "sitecustomize.py"
+        sitecustomize_path = Path(__file__).parent / "sitecustomize.py"
         user_site_path = Path(user_site)
         user_site_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(str(sitecustomize_path), str(user_site_path / "sitecustomize.py"))

@@ -16,7 +16,7 @@ async def aexecute_interactive(
     user_expressions: Optional[Mapping[str, Any]] = None,
     allow_stdin: Optional[bool] = None,
     stop_on_error: bool = True,
-    timeout: Optional[float] = None,
+    timeout_seconds: Optional[float] = None,
     output_hook: Callable[[Mapping[str, Any]], Any]
     | Callable[[Mapping[str, Any]], Awaitable[Any]]
     | None = None,
@@ -46,8 +46,8 @@ async def aexecute_interactive(
     output_hook = output_hook if output_hook else kernel_client._output_hook_default  # type: ignore[assignment]
 
     # set deadline based on timeout
-    if timeout is not None:
-        deadline = monotonic() + timeout
+    if timeout_seconds is not None:
+        deadline = monotonic() + timeout_seconds
     else:
         timeout_ms = None
 
@@ -61,10 +61,11 @@ async def aexecute_interactive(
         stdin_socket = None
 
     # Wait for zmq events and handle them
+    timeout_seconds_remaining: float | None
     while True:
-        if timeout is not None:
-            timeout = max(0, deadline - monotonic())
-            timeout_ms = 1e3 * timeout
+        if timeout_seconds is not None:
+            timeout_seconds_remaining = max(0, deadline - monotonic())
+            timeout_ms = 1e3 * timeout_seconds_remaining
         events = dict(await poller.poll(timeout_ms))
         if not events:
             raise TimeoutError("Timeout waiting for output")
@@ -97,6 +98,8 @@ async def aexecute_interactive(
             break
 
     # output is done, get the reply
-    if timeout is not None:
-        timeout = max(0, deadline - monotonic())
-    return await kernel_client._recv_reply(msg_id, timeout=timeout)
+    if timeout_seconds is not None:
+        timeout_seconds_remaining = max(0, deadline - monotonic())
+    else:
+        timeout_seconds_remaining = None
+    return await kernel_client._recv_reply(msg_id, timeout=timeout_seconds_remaining)

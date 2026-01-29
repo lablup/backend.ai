@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from collections.abc import Mapping
@@ -68,7 +67,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
             / LAST_USED_MARKER_SOCKET_NAME
         )
         if path.exists():
-            os.remove(path)
+            path.unlink()
 
         await self.runner.setup()
         site = web.UnixSite(self.runner, path)
@@ -94,7 +93,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         await self.last_used_time_marker_writer_task
         await self.active_circuit_writer_task
 
-    async def _last_used_time_marker_writer(self, interval: float) -> None:
+    async def _last_used_time_marker_writer(self, _interval: float) -> None:
         try:
             async with self.redis_keys_lock:
                 if len(self.redis_keys) == 0:
@@ -131,7 +130,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
 
         return web.StreamResponse(status=204)
 
-    async def _active_circuit_writer(self, interval: float) -> None:
+    async def _active_circuit_writer(self, _interval: float) -> None:
         try:
             if len(self.active_circuits) > 0:
                 now = time.time()

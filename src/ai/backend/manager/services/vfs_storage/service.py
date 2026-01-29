@@ -78,7 +78,7 @@ class VFSStorageService:
 
         return GetVFSStorageActionResult(result=storage_data)
 
-    async def list(self, action: ListVFSStorageAction) -> ListVFSStorageActionResult:
+    async def list(self, _action: ListVFSStorageAction) -> ListVFSStorageActionResult:
         """
         List all VFS storages.
         """

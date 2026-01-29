@@ -15,11 +15,11 @@ class DoLogCleanupEvent(AbstractAnycastEvent):
         return tuple()
 
     @classmethod
-    def deserialize(cls, data: tuple) -> Self:
+    def deserialize(cls, value: tuple) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
-    def event_domain(self) -> EventDomain:
+    def event_domain(cls) -> EventDomain:
         return EventDomain.LOG
 
     def domain_id(self) -> Optional[str]:

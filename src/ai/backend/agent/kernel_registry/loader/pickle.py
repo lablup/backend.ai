@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import pickle
 import shutil
 from collections.abc import MutableMapping
@@ -37,7 +36,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
         legacy_registry_file = self._legacy_registry_file_path
         final_file_path = self._last_registry_file_path
         try:
-            if os.path.isfile(legacy_registry_file):
+            if legacy_registry_file.is_file():
                 shutil.move(legacy_registry_file, final_file_path)
         except Exception as e:
             log.warning(
@@ -47,7 +46,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 str(e),
             )
         try:
-            with open(final_file_path, "rb") as f:
+            with final_file_path.open("rb") as f:
                 return pickle.load(f)
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))

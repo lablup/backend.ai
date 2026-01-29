@@ -160,7 +160,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     file_size = path.stat().st_size
 
     def _read_tail() -> bytes:
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 

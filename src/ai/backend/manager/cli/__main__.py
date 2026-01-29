@@ -180,7 +180,7 @@ def dbshell(
 
 @main.command()
 @click.pass_obj
-def generate_api_keypair(cli_ctx: CLIContext) -> None:
+def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
@@ -208,7 +208,7 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
     type=str,
 )
 @click.pass_obj
-def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
+def generate_rpc_keypair(_cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
     """
     Generate a ZeroMQ CURVE keypair for use in manager-agent RPC and print it out to stdout.
 

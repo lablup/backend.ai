@@ -105,7 +105,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
     }),
 )
-async def list_template(request: web.Request, params: Any) -> web.Response:
+async def list_template(request: web.Request, _params: Any) -> web.Response:
     resp = []
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]

@@ -74,7 +74,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         # Calculate desired replicas and adjust
         return await self._deployment_executor.calculate_desired_replicas(deployments)
 
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
+    async def post_process(self, _result: DeploymentExecutionResult) -> None:
         """Handle post-processing after checking replicas."""
         log.debug("Post-processing after checking deployment replicas")
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.SCALING)

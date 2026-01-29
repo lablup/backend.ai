@@ -123,17 +123,17 @@ async def exception_middleware(
         return resp
 
 
-async def hello(request: web.Request) -> web.Response:
+async def hello(_request: web.Request) -> web.Response:
     return web.Response()
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -186,8 +186,8 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Optional[Sequence[str]] = None,
-    scheduler_opts: Optional[Mapping[str, Any]] = None,
+    _subapp_pkgs: Optional[Sequence[str]] = None,
+    _scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
@@ -281,7 +281,7 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], _subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 

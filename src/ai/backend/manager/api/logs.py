@@ -211,7 +211,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         return web.json_response({"success": True}, status=HTTPStatus.OK)
 
 
-async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
+async def log_cleanup_task(app: web.Application, _src: AgentId, _event: DoLogCleanupEvent) -> None:
     root_ctx: RootContext = app["_root.context"]
     raw_lifetime = await root_ctx.etcd.get("config/logs/error/retention")
     if raw_lifetime is None:

@@ -15,7 +15,7 @@ def mock_corofunc(return_value: Any) -> Mock:
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args: Any, **kargs: Any) -> Any:
+    async def _mock_corofunc(*_args: Any, **_kargs: Any) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
@@ -181,7 +181,7 @@ def mock_aioresponses_sequential_payloads(
     """
     cb_call_counter = 0
 
-    def _callback(*args: Any, **kwargs: Any) -> CallbackResult:
+    def _callback(*_args: Any, **_kwargs: Any) -> CallbackResult:
         nonlocal cb_call_counter
 
         if cb_call_counter >= len(mock_responses):

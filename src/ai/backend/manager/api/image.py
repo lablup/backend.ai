@@ -15,7 +15,7 @@ async def shutdown(app: web.Application) -> None:
 
 
 def create_app(
-    default_cors_options: CORSOptions,
+    _default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)

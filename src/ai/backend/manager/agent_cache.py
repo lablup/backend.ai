@@ -119,7 +119,7 @@ class AgentRPCCache:
         agent_id: AgentId,
         *,
         invoke_timeout: Optional[float] = None,
-        order_key: Optional[str] = None,
+        _order_key: Optional[str] = None,
     ) -> AsyncIterator[PeerInvoker]:
         agent_addr, agent_public_key = await self.get_rpc_args(agent_id)
         keepalive_retry_count = 3

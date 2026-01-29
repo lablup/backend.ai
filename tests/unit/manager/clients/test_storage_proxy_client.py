@@ -75,7 +75,7 @@ class TestStorageProxyClient:
         # Verify that non-JSON response raises PassthroughError with correct error code
         with pytest.raises(PassthroughError) as exc_info:
             await storage_proxy_client.request(
-                method="GET", url=test_endpoint, timeout=DEFAULT_TIMEOUT
+                method="GET", url=test_endpoint, request_timeout=DEFAULT_TIMEOUT
             )
 
         assert exc_info.value.status_code == test_status_code
@@ -107,7 +107,7 @@ class TestStorageProxyClient:
             await storage_proxy_client.request(
                 method="GET",
                 url=test_endpoint,
-                timeout=timeout,
+                request_timeout=timeout,
             )
 
         assert "Request to storage proxy timed out" in str(exc_info.value)

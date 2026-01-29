@@ -27,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 async def check_reserved_batch_session(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     """
@@ -88,7 +88,7 @@ async def check_concurrency(
 
 async def check_dependencies(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     j = sa.join(
@@ -288,7 +288,7 @@ async def check_domain_resource_limit(
 
 async def check_pending_session_count_limit(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     result = True

@@ -321,7 +321,7 @@ class ValkeyStreamClient:
         channel: str,
         cache_id: str,
         payload: Mapping[str, str],
-        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+        expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Broadcast a message to a channel with caching.
@@ -329,12 +329,12 @@ class ValkeyStreamClient:
         :param channel: The channel to broadcast the message to.
         :param cache_id: The ID for caching the message.
         :param payload: The payload of the message.
-        :param timeout: The expiration time for the cached message in seconds.
+        :param expiry_seconds: The expiration time for the cached message in seconds.
         :raises: GlideClientError if the message cannot be broadcasted or cached.
         """
         message = dump_json(payload)
         tx = self._create_batch()
-        tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+        tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, expiry_seconds))
         tx.publish(
             message=message,
             channel=channel,
@@ -363,14 +363,14 @@ class ValkeyStreamClient:
         self,
         channel: str,
         events: list[BroadcastPayload],
-        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+        expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Broadcast multiple messages to a channel in a batch with optional caching.
 
         :param channel: The channel to broadcast the messages to.
         :param events: List of BroadcastPayload objects containing payload and optional cache_id.
-        :param timeout: The expiration time for the cached messages in seconds.
+        :param expiry_seconds: The expiration time for the cached messages in seconds.
         :raises: GlideClientError if the messages cannot be broadcasted or cached.
         """
         if not events:
@@ -381,7 +381,11 @@ class ValkeyStreamClient:
             message = dump_json(event.payload)
             # Only set cache if cache_id is provided
             if event.cache_id:
-                tx.set(key=event.cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+                tx.set(
+                    key=event.cache_id,
+                    value=message,
+                    expiry=ExpirySet(ExpiryType.SEC, expiry_seconds),
+                )
             tx.publish(
                 message=message,
                 channel=channel,

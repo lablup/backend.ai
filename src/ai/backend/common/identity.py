@@ -192,7 +192,7 @@ def _define_functions() -> None:
                     _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
                 )
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
                 return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
             async def _get_instance_type() -> str:
@@ -224,7 +224,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
@@ -281,7 +281,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
                 return await curl(
                     _metadata_prefix + "instance/network-interfaces/0/ip",
                     "127.0.0.1",
@@ -310,13 +310,13 @@ def _define_functions() -> None:
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
-                if subnet_hint is not None and subnet_hint.prefixlen > 0:
-                    local_ipaddrs = [*fetch_local_ipaddrs(subnet_hint)]
+            async def _get_instance_ip(_subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+                if _subnet_hint is not None and _subnet_hint.prefixlen > 0:
+                    local_ipaddrs = [*fetch_local_ipaddrs(_subnet_hint)]
                     if local_ipaddrs:
                         return str(local_ipaddrs[0])
                     raise RuntimeError(
-                        f"Could not find my IP address bound to subnet {subnet_hint}"
+                        f"Could not find my IP address bound to subnet {_subnet_hint}"
                     )
                 try:
                     myself = socket.gethostname()

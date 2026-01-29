@@ -1276,7 +1276,7 @@ async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
-    storage_ptask_group: Optional[aiotools.PersistentTaskGroup] = None,
+    _storage_ptask_group: Optional[aiotools.PersistentTaskGroup] = None,
     *,
     force: bool = False,
 ) -> int:
@@ -1837,7 +1837,7 @@ async def get_vfolders(
     ctx: ClientContext,
     target_scope: ScopeType,
     requested_permission: VFolderRBACPermission,
-    extra_scope: StorageHost | None = None,
+    _extra_scope: StorageHost | None = None,
     *,
     vfolder_id: uuid.UUID | None = None,
     vfolder_name: str | None = None,

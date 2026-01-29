@@ -150,7 +150,7 @@ def fail_with_compose_install_request() -> None:
     )
 
 
-async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
+async def get_preferred_pants_local_exec_root(_ctx: Context) -> str:
     docker_version = await detect_snap_docker()
     build_root_path = get_build_root()
     build_root_name = build_root_path.name

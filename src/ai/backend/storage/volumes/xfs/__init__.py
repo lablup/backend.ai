@@ -105,11 +105,11 @@ class XfsProjectRegistry:
 
         def _delete_temp_files() -> None:
             try:
-                os.unlink(temp_name_projects)
+                Path(temp_name_projects).unlink()
             except FileNotFoundError:
                 pass
             try:
-                os.unlink(temp_name_projid)
+                Path(temp_name_projid).unlink()
             except FileNotFoundError:
                 pass
 

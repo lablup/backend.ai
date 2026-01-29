@@ -53,9 +53,9 @@ def main_job(
     worker_pidx: int,
     insock_prefix: str | None,
     outsock_prefix: str | None,
-    intr_event: Any,
-    pidx: int,
-    args: Sequence[Any],
+    _intr_event: Any,
+    _pidx: int,
+    _args: Sequence[Any],
 ) -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

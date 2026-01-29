@@ -352,7 +352,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.network_plugin_ctx = network_plugin_ctx
 
     def _kernel_resource_spec_read(self, filename: Path | str) -> KernelResourceSpec:
-        with open(filename) as f:
+        filepath = Path(filename)
+        with filepath.open() as f:
             return KernelResourceSpec.read_from_file(f)
 
     @override
@@ -400,7 +401,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     valid_uid = uid if uid is not None else self.local_config.container.kernel_uid
                     valid_gid = gid if gid is not None else self.local_config.container.kernel_gid
                 else:
-                    stat = os.stat(p)
+                    stat = p.stat()
                     valid_uid = uid if uid is not None else stat.st_uid
                     valid_gid = gid if gid is not None else stat.st_gid
                 try:
@@ -1829,7 +1830,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: Optional[float] | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1845,8 +1846,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         async with closing_async(Docker()) as docker:
             kwargs: dict[str, Any] = {"auth": auth_config}
-            if timeout != Sentinel.TOKEN:
-                kwargs["timeout"] = timeout
+            if timeout_seconds != Sentinel.TOKEN:
+                kwargs["timeout"] = timeout_seconds
             result = await docker.images.push(image_ref.canonical, **kwargs)
 
             if not result:
@@ -1860,7 +1861,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: Optional[float],
+        timeout_seconds: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1873,7 +1874,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
             result = await docker.images.pull(
-                image_ref.canonical, auth=auth_config, timeout=timeout
+                image_ref.canonical, auth=auth_config, timeout=timeout_seconds
             )
 
             if not result:
@@ -2183,7 +2184,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
 
         async def handle_action_oom(
-            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+            _session_id: SessionId, kernel_id: KernelId, _evdata: Mapping[str, Any]
         ) -> None:
             kernel_obj = self.kernel_registry.get(kernel_id, None)
             if kernel_obj is None:

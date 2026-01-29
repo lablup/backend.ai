@@ -1393,7 +1393,6 @@ class TestGroupRepository:
 
         result = await group_repository.modify_validated(
             updater=updater,
-            user_role=UserRole.ADMIN,
         )
 
         assert result is not None
@@ -1414,7 +1413,6 @@ class TestGroupRepository:
         with pytest.raises(ProjectNotFound):
             await group_repository.modify_validated(
                 updater=updater,
-                user_role=UserRole.ADMIN,
             )
 
     async def test_modify_validated_add_users(
@@ -1430,7 +1428,6 @@ class TestGroupRepository:
 
         await group_repository.modify_validated(
             updater=updater,
-            user_role=UserRole.ADMIN,
             user_update_mode="add",
             user_uuids=test_users_for_group[:2],
         )
@@ -1462,7 +1459,6 @@ class TestGroupRepository:
         # First add all users
         await group_repository.modify_validated(
             updater=updater,
-            user_role=UserRole.ADMIN,
             user_update_mode="add",
             user_uuids=test_users_for_group,
         )
@@ -1470,7 +1466,6 @@ class TestGroupRepository:
         # Then remove first user
         await group_repository.modify_validated(
             updater=updater,
-            user_role=UserRole.ADMIN,
             user_update_mode="remove",
             user_uuids=test_users_for_group[:1],
         )

@@ -54,7 +54,7 @@ class VASTQuotaModel(BaseQuotaModel):
 
         def _read() -> VASTQuotaID | None:
             try:
-                with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
+                with (qs_path / VAST_QUOTA_ID_FILE_NAME).open() as f:
                     return VASTQuotaID(f.read())
             except FileNotFoundError:
                 return None
@@ -68,7 +68,7 @@ class VASTQuotaModel(BaseQuotaModel):
 
         def _write() -> None:
             qs_path.mkdir(parents=True, exist_ok=True)
-            with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "w") as f:
+            with (qs_path / VAST_QUOTA_ID_FILE_NAME).open("w") as f:
                 f.write(str(vast_quota_id))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)

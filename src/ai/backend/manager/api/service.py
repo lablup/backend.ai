@@ -1037,7 +1037,9 @@ class RuntimeInfoModel(LegacyBaseResponseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @pydantic_response_api_handler
-async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
+async def list_supported_runtimes(
+    request: web.Request,  # noqa: ARG001
+) -> RuntimeInfoModel:
     return RuntimeInfoModel(
         runtimes=[
             RuntimeInfo(name=v.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)
