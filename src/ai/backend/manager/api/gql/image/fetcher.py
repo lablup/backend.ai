@@ -7,19 +7,16 @@ This module provides data fetching logic for ImageV2 queries.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
-from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
 from .types import (
@@ -44,15 +41,15 @@ def _get_image_pagination_spec() -> PaginationSpec:
 
 async def fetch_images(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ImageFilterGQL] = None,
-    order_by: Optional[list[ImageOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: ImageFilterGQL | None = None,
+    order_by: list[ImageOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> ImageConnectionV2GQL:
     """Fetch images with optional filtering, ordering, and pagination.
 
@@ -103,25 +100,20 @@ async def fetch_images(
     )
 
 
-async def fetch_image_by_id(
+async def fetch_image(
     info: Info[StrawberryGQLContext],
-    image_id: UUID,
-) -> Optional[ImageV2GQL]:
-    """Fetch a single image by ID.
+    image_id: ImageID,
+) -> ImageV2GQL | None:
+    """Fetch a single image by ID using dataloader.
 
     Args:
         info: GraphQL context info
-        image_id: The UUID of the image to fetch
+        image_id: The ImageID of the image to fetch
 
     Returns:
         ImageV2GQL if found, None otherwise
     """
-    action_result = await info.context.processors.image.get_image_by_id.wait_for_complete(
-        GetImageByIdAction(
-            image_id=image_id,
-            user_role=UserRole.USER,
-            image_status=None,
-        )
-    )
-
-    return ImageV2GQL.from_detailed_data(action_result.image_with_agent_install_status.image)
+    image_data = await info.context.data_loaders.image_loader.load(image_id)
+    if image_data is None:
+        return None
+    return ImageV2GQL.from_detailed_data(image_data)
