@@ -175,10 +175,10 @@ class SetImageResourceLimitInputGQL:
     description=dedent_strip("""
     Added in 26.2.0.
 
-    Key-value pair input for labels.
+    Input for an image label (key-value pair).
     """)
 )
-class KVPairInputGQL:
+class ImageLabelInputGQL:
     key: str = strawberry.field(description="The key of the label.")
     value: str = strawberry.field(description="The value of the label.")
 
@@ -227,7 +227,7 @@ class ModifyImagePropsInputGQL:
     digest: Optional[str] = strawberry.field(
         default=None, description="The config digest of the image."
     )
-    labels: Optional[list[KVPairInputGQL]] = strawberry.field(
+    labels: Optional[list[ImageLabelInputGQL]] = strawberry.field(
         default=None, description="The labels for the image."
     )
     supported_accelerators: Optional[list[str]] = strawberry.field(
@@ -422,8 +422,6 @@ class ModifyImageResultGQL:
 
     The image is not removed from the database but its status changes to DELETED.
     This is a soft delete operation.
-
-    **Required Role:** SUPERADMIN, ADMIN, or USER
     """)
 )
 async def forget_image(
@@ -447,8 +445,6 @@ async def forget_image(
 
     The image is permanently removed from the database. Optionally, the image
     can also be untagged from the container registry (HarborV2 only).
-
-    **Required Role:** SUPERADMIN, ADMIN, or USER
     """)
 )
 async def purge_image(
@@ -478,8 +474,6 @@ async def purge_image(
 
     An alias is an alternative name that can be used to reference the image.
     Multiple aliases can be created for the same image.
-
-    **Required Role:** SUPERADMIN
     """)
 )
 async def alias_image(
@@ -506,8 +500,6 @@ async def alias_image(
     Added in 26.2.0.
 
     Remove an alias from an image.
-
-    **Required Role:** SUPERADMIN
     """)
 )
 async def dealias_image(
@@ -534,8 +526,6 @@ async def dealias_image(
 
     This removes any user-defined resource limits and reverts to the defaults
     specified in the image labels.
-
-    **Required Role:** SUPERADMIN
     """)
 )
 async def clear_image_resource_limit(
@@ -558,8 +548,6 @@ async def clear_image_resource_limit(
     Untag an image from its container registry by its ID.
 
     This removes the image tag from the registry. Only available for HarborV2 registries.
-
-    **Required Role:** SUPERADMIN, ADMIN, or USER
     """)
 )
 async def untag_image_from_registry(
@@ -582,8 +570,6 @@ async def untag_image_from_registry(
     Set custom resource limits for an image by its ID.
 
     This allows overriding the default resource limits specified in the image labels.
-
-    **Required Role:** SUPERADMIN
     """)
 )
 async def set_image_resource_limit(
@@ -620,8 +606,6 @@ async def set_image_resource_limit(
 
     This allows updating various image metadata such as labels, resource limits,
     and supported accelerators.
-
-    **Required Role:** SUPERADMIN
     """)
 )
 async def modify_image(
