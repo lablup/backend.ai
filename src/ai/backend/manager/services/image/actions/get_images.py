@@ -9,7 +9,6 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageWithAgentInstallStatus,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
@@ -93,7 +92,6 @@ class GetImagesByCanonicalsActionResult(BaseActionResult):
 @dataclass
 class GetImagesByIdsAction(ImageAction):
     image_ids: list[UUID]
-    user_role: UserRole
     image_status: list[ImageStatus] | None
 
     @override

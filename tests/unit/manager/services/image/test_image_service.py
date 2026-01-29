@@ -22,11 +22,13 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
+    ImageAgentInstallStatus,
     ImageAliasData,
     ImageData,
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
+    ImageWithAgentInstallStatus,
     ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
@@ -57,6 +59,7 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionUnknownImageReferenceError,
 )
+from ai.backend.manager.services.image.actions.get_images import GetImagesByIdsAction
 from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
@@ -991,6 +994,54 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         assert isinstance(creator_arg.spec, ImageAliasCreatorSpec)
         assert creator_arg.spec.alias == "python"
         assert creator_arg.spec.image_id == image_id
+
+
+class TestGetImagesByIds(ImageServiceBaseFixtures):
+    """Tests for ImageService.get_images_by_ids"""
+
+    async def test_get_images_by_ids_success(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+        image_data: ImageData,
+    ) -> None:
+        """Get images by IDs should return images with agent install status."""
+        # Use MagicMock for ImageDataWithDetails to avoid complex field construction
+        mock_image_with_details = MagicMock()
+        mock_image_with_details.id = image_data.id
+        image_with_status = ImageWithAgentInstallStatus(
+            image=mock_image_with_details,
+            agent_install_status=ImageAgentInstallStatus(installed=True, agent_names=["agent1"]),
+        )
+        mock_image_repository.get_images_by_ids = AsyncMock(return_value=[image_with_status])
+
+        action = GetImagesByIdsAction(
+            image_ids=[image_data.id],
+            image_status=None,
+        )
+
+        result = await processors.get_images_by_ids.wait_for_complete(action)
+
+        assert len(result.images) == 1
+        assert result.images[0].image.id == image_data.id
+        mock_image_repository.get_images_by_ids.assert_called_once()
+
+    async def test_get_images_by_ids_empty_list(
+        self,
+        processors: ImageProcessors,
+        mock_image_repository: MagicMock,
+    ) -> None:
+        """Get images by empty ID list should return empty result."""
+        mock_image_repository.get_images_by_ids = AsyncMock(return_value=[])
+
+        action = GetImagesByIdsAction(
+            image_ids=[],
+            image_status=None,
+        )
+
+        result = await processors.get_images_by_ids.wait_for_complete(action)
+
+        assert len(result.images) == 0
 
 
 class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
