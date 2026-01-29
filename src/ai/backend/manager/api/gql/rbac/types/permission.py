@@ -19,7 +19,7 @@ from .enums import EntityTypeGQL, OperationTypeGQL
 
 
 @strawberry.type(
-    description="Added in 26.1.0. Scoped Permission: grants permission for an operation on ALL entities"
+    description="Added in 26.2.0. Scoped Permission: grants permission for an operation on ALL entities"
 )
 class ScopedPermission(Node):
     id: NodeID[str]
@@ -36,7 +36,7 @@ class ScopedPermission(Node):
 
 
 @strawberry.type(
-    description="Added in 26.1.0. Object Permission: grants permission for a SPECIFIC entity instance"
+    description="Added in 26.2.0. Object Permission: grants permission for a SPECIFIC entity instance"
 )
 class ObjectPermission(Node):
     id: NodeID[str]
@@ -62,7 +62,7 @@ class ObjectPermission(Node):
 ScopedPermissionEdge = Edge[ScopedPermission]
 
 
-@strawberry.type(description="Added in 26.1.0. Connection type for paginated scoped permissions")
+@strawberry.type(description="Added in 26.2.0. Connection type for paginated scoped permissions")
 class ScopedPermissionConnection(Connection[ScopedPermission]):
     count: int
 
@@ -74,7 +74,7 @@ class ScopedPermissionConnection(Connection[ScopedPermission]):
 ObjectPermissionEdge = Edge[ObjectPermission]
 
 
-@strawberry.type(description="Added in 26.1.0. Connection type for paginated object permissions")
+@strawberry.type(description="Added in 26.2.0. Connection type for paginated object permissions")
 class ObjectPermissionConnection(Connection[ObjectPermission]):
     count: int
 

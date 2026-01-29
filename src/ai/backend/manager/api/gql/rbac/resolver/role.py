@@ -56,7 +56,7 @@ log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 # ==============================================================================
 
 
-@strawberry.field(description="Added in 26.1.0. Get a specific role by ID")
+@strawberry.field(description="Added in 26.2.0. Get a specific role by ID")
 async def role(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Role]:
     """Get a single role with full details."""
     me = current_user()
@@ -66,7 +66,7 @@ async def role(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Role]:
     return await fetch_role(info, role_id=uuid.UUID(id))
 
 
-@strawberry.field(description="Added in 26.1.0. List roles with optional filtering and pagination")
+@strawberry.field(description="Added in 26.2.0. List roles with optional filtering and pagination")
 async def roles(
     info: Info[StrawberryGQLContext],
     filter: Optional[RoleFilter] = None,
@@ -101,7 +101,7 @@ async def roles(
 # ==============================================================================
 
 
-@strawberry.field(description="Added in 26.1.0. Create a new custom role")
+@strawberry.field(description="Added in 26.2.0. Create a new custom role")
 async def create_role(input: CreateRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Create a new custom role.
 
@@ -127,7 +127,7 @@ async def create_role(input: CreateRoleInput, info: Info[StrawberryGQLContext]) 
     return Role.from_dataclass(detail_result.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Update an existing role")
+@strawberry.field(description="Added in 26.2.0. Update an existing role")
 async def update_role(input: UpdateRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Update a role's name and/or description.
 
@@ -153,7 +153,7 @@ async def update_role(input: UpdateRoleInput, info: Info[StrawberryGQLContext]) 
     return Role.from_dataclass(detail_result.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Delete a role (soft delete)")
+@strawberry.field(description="Added in 26.2.0. Delete a role (soft delete)")
 async def delete_role(input: DeleteRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Soft-delete a role.
 
@@ -185,7 +185,7 @@ async def delete_role(input: DeleteRoleInput, info: Info[StrawberryGQLContext]) 
     return Role.from_dataclass(detail_result_before.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Purge a role (hard delete)")
+@strawberry.field(description="Added in 26.2.0. Purge a role (hard delete)")
 async def purge_role(input: PurgeRoleInput, info: Info[StrawberryGQLContext]) -> Role:
     """Purge a role.
 
@@ -214,7 +214,7 @@ async def purge_role(input: PurgeRoleInput, info: Info[StrawberryGQLContext]) ->
     return Role.from_dataclass(detail_result_before.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Update role permissions")
+@strawberry.field(description="Added in 26.2.0. Update role permissions")
 async def update_role_permissions(
     input: UpdateRolePermissionsInput, info: Info[StrawberryGQLContext]
 ) -> Role:
@@ -252,7 +252,7 @@ async def update_role_permissions(
     return Role.from_dataclass(action_result.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Assign a role to a user")
+@strawberry.field(description="Added in 26.2.0. Assign a role to a user")
 async def create_role_assignment(
     input: CreateRoleAssignmentInput, info: Info[StrawberryGQLContext]
 ) -> Role:
@@ -288,7 +288,7 @@ async def create_role_assignment(
     return Role.from_dataclass(detail_result.role)
 
 
-@strawberry.field(description="Added in 26.1.0. Revoke a role assignment")
+@strawberry.field(description="Added in 26.2.0. Revoke a role assignment")
 async def delete_role_assignment(
     input: DeleteRoleAssignmentInput, info: Info[StrawberryGQLContext]
 ) -> Role:
