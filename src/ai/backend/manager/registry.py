@@ -2995,11 +2995,14 @@ class AgentRegistry:
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
             async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
+                batch_timeout = (
+                    float(session.batch_timeout) if session.batch_timeout is not None else None
+                )
                 return await client.trigger_batch_execution(
                     session.id,
                     session.main_kernel.id,
                     session.main_kernel.startup_command or "",
-                    float(session.batch_timeout) if session.batch_timeout else None,
+                    batch_timeout,
                 )
 
     async def interrupt_session(

@@ -124,11 +124,16 @@ class RunningTransitionHook(StatusTransitionHook):
                 success_detail=f"Triggered batch execution on agent {agent_id}",
             ):
                 async with self._deps.agent_client_pool.acquire(agent_id) as client:
+                    batch_timeout = (
+                        float(session.session_info.lifecycle.batch_timeout)
+                        if session.session_info.lifecycle.batch_timeout is not None
+                        else None
+                    )
                     await client.trigger_batch_execution(
                         session_id,
                         main_kernel.id,
                         main_kernel.runtime.startup_command or "",
-                        float(session.session_info.lifecycle.batch_timeout or 0),
+                        batch_timeout,
                     )
         log.info(
             "Successfully triggered batch execution for session {} on agent {}",
