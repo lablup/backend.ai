@@ -2007,7 +2007,7 @@ class AgentRegistry:
                     session.id,
                     session.main_kernel.id,
                     session.main_kernel.startup_command or "",
-                    float(session.batch_timeout) if session.batch_timeout else 0.0,
+                    float(session.batch_timeout) if session.batch_timeout is not None else None,
                 )
 
     async def interrupt_session(

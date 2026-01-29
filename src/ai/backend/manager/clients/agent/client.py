@@ -230,7 +230,7 @@ class AgentClient(BackendAIClient):
         session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
-        batch_timeout: float,
+        batch_timeout: float | None,
     ) -> None:
         """Trigger batch execution on the agent."""
         await self._peer.call.trigger_batch_execution(
