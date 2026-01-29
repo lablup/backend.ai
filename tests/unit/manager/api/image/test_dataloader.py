@@ -73,7 +73,7 @@ class TestLoadAliasesByImageIds:
     """Tests for load_aliases_by_image_ids function."""
 
     @staticmethod
-    def create_mock_processor(aliases_map: dict[uuid.UUID, list[str]]) -> MagicMock:
+    def create_mock_processor(aliases_map: dict[ImageID, list[str]]) -> MagicMock:
         mock_processor = MagicMock()
         mock_action_result = MagicMock()
         mock_action_result.aliases_map = aliases_map
@@ -94,7 +94,7 @@ class TestLoadAliasesByImageIds:
 
     async def test_returns_aliases_in_request_order(self) -> None:
         # Given
-        id1, id2, id3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        id1, id2, id3 = ImageID(uuid.uuid4()), ImageID(uuid.uuid4()), ImageID(uuid.uuid4())
         aliases_map = {
             id1: ["alias1", "alias1-alt"],
             id2: ["alias2"],
@@ -114,8 +114,8 @@ class TestLoadAliasesByImageIds:
 
     async def test_returns_empty_list_for_missing_ids(self) -> None:
         # Given
-        existing_id = uuid.uuid4()
-        missing_id = uuid.uuid4()
+        existing_id = ImageID(uuid.uuid4())
+        missing_id = ImageID(uuid.uuid4())
         aliases_map = {
             existing_id: ["existing-alias"],
         }
@@ -129,9 +129,9 @@ class TestLoadAliasesByImageIds:
 
     async def test_returns_empty_list_for_image_without_aliases(self) -> None:
         # Given
-        id_with_aliases = uuid.uuid4()
-        id_without_aliases = uuid.uuid4()
-        aliases_map: dict[uuid.UUID, list[str]] = {
+        id_with_aliases = ImageID(uuid.uuid4())
+        id_without_aliases = ImageID(uuid.uuid4())
+        aliases_map: dict[ImageID, list[str]] = {
             id_with_aliases: ["some-alias"],
             id_without_aliases: [],
         }
