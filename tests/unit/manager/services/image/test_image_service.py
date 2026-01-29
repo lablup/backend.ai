@@ -62,7 +62,7 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesKeyData,
 )
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
-from ai.backend.manager.services.image.actions.set_image_resource_limit_by_id import (
+from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
 )
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (

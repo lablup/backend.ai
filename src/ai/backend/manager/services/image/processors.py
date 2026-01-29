@@ -65,7 +65,7 @@ from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
     SearchImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.set_image_resource_limit_by_id import (
+from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
     SetImageResourceLimitByIdActionResult,
 )
