@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common import msgpack
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -56,8 +57,8 @@ class TestProjectConfigRepository:
                 DomainRow(
                     name=domain_name,
                     is_active=True,
-                    total_resource_slots={},
-                    allowed_vfolder_hosts={},
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     allowed_docker_registries=[],
                     dotfiles=b"",
                 )
@@ -76,8 +77,8 @@ class TestProjectConfigRepository:
                     name=project_name,
                     is_active=True,
                     domain_name=domain_name,
-                    total_resource_slots={},
-                    allowed_vfolder_hosts={},
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     resource_policy=policy_name,
                     type=ProjectType.GENERAL,
                     dotfiles=msgpack.packb(dotfiles),

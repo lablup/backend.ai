@@ -63,7 +63,8 @@ class ProjectConfigService:
         Validates that admin has permission to modify the project's dotfiles.
         """
         user = current_user()
-        assert user is not None
+        if user is None:
+            raise InsufficientPrivilege("Authentication required")
 
         project = await self._project_config_repository.resolve_project(
             domain_name, project_id_or_name
@@ -88,7 +89,8 @@ class ProjectConfigService:
         Validates that user has permission to access the project's dotfiles.
         """
         user = current_user()
-        assert user is not None
+        if user is None:
+            raise InsufficientPrivilege("Authentication required")
 
         project = await self._project_config_repository.resolve_project(
             domain_name, project_id_or_name
