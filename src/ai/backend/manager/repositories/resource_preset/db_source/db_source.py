@@ -78,10 +78,10 @@ class ResourcePresetDBSource:
         async with self._db.begin_session() as session:
             try:
                 result = await execute_creator(session, creator)
-            except sa.exc.IntegrityError:
+            except sa.exc.IntegrityError as e:
                 raise ResourcePresetConflict(
                     f"Duplicate resource preset name (name:{spec.name}, scaling_group:{spec.scaling_group_name})"
-                )
+                ) from e
             return result.row.to_dataclass()
 
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:

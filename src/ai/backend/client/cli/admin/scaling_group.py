@@ -124,7 +124,7 @@ def add(
     use_host_network: bool,
     wsproxy_addr: str,
     wsproxy_api_token: str,
-):
+) -> None:
     """
     Add a new scaling group.
 
@@ -247,7 +247,7 @@ def update(
     use_host_network: bool | Undefined,
     wsproxy_addr: str | Undefined,
     wsproxy_api_token: str | Undefined,
-):
+) -> None:
     """
     Update existing scaling group.
 
@@ -293,7 +293,7 @@ def update(
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def delete(ctx: CLIContext, name):
+def delete(ctx: CLIContext, name: str) -> None:
     """
     Delete an existing scaling group.
 
@@ -328,7 +328,7 @@ def delete(ctx: CLIContext, name):
 @pass_ctx_obj
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
-def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
+def associate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:
     """
     Associate a domain with a scaling_group.
 
@@ -365,7 +365,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
 @pass_ctx_obj
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
-def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
+def dissociate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:
     """
     Dissociate a domain from a scaling_group.
 

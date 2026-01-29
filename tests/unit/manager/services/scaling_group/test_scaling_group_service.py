@@ -206,8 +206,6 @@ class TestScalingGroupService:
         sample_scaling_group: ScalingGroupData,
     ) -> None:
         """Test searching scaling groups with querier"""
-        from ai.backend.manager.repositories.base import OffsetPagination
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
@@ -35,8 +38,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AllocationBatch,
     KernelCreationInfo,
     SessionRunningData,
@@ -44,10 +46,12 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
+from ai.backend.manager.types import UserScope
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
+from .types.results import ScheduledSessionData
 from .types.scheduling import SchedulingData
 from .types.search import (
     SessionWithKernelsAndUserSearchResult,
@@ -230,7 +234,7 @@ class SchedulerRepository:
         self,
         spec: SessionCreationSpec,
         scaling_group_name: str,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
     ) -> SessionCreationContext:
         """
@@ -291,9 +295,9 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
         self,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
-        user_scope,
+        user_scope: UserScope,
         resource_policy: dict,
         combined_mounts: list,
         combined_mount_map: dict,
@@ -315,7 +319,7 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def prepare_dotfiles(
         self,
-        user_scope,
+        user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list[VFolderMount],
     ) -> dict:

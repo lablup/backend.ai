@@ -27,7 +27,7 @@ class ExtraVFolderMount(Node):
 
     @strawberry.field
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
-        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", self._vfolder_id)
+        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", str(self._vfolder_id))
         return VFolder(id=ID(vfolder_global_id))
 
     @classmethod

@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Optional,
     Self,
-    TypeAlias,
     TypedDict,
     cast,
     override,
@@ -83,7 +82,7 @@ def row_to_data(row: DomainRow | Row) -> DomainData:
     )
 
 
-def _get_network_join_condition():
+def _get_network_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.network import NetworkRow
 
     return DomainRow.name == foreign(NetworkRow.domain_name)
@@ -247,9 +246,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.READ_ATTRIBUTE])
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 @dataclass

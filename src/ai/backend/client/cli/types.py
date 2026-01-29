@@ -7,7 +7,7 @@ import attr
 
 if TYPE_CHECKING:
     from ai.backend.client.config import APIConfig
-    from ai.backend.client.output import BaseOutputHandler
+    from ai.backend.client.output.types import BaseOutputHandler
 
 
 class OutputMode(enum.Enum):

@@ -14,7 +14,14 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -25,7 +32,7 @@ from .exceptions import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-    from ai.backend.manager.sokovan.scheduler.types import AgentOccupancy
+    from ai.backend.manager.sokovan.data import AgentOccupancy
 
 
 @dataclass
@@ -471,8 +478,6 @@ class AgentSelector:
 
                 # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
                 if resource_name == "mem":
-                    from ai.backend.common.types import BinarySize
-
                     insufficient_details[resource_name] = (
                         str(BinarySize(requested)),
                         str(BinarySize(available)),

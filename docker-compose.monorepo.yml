@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  backend-ai-manager:
+    image: backend.ai/manager:26.1.0rc1
+    container_name: backend-ai-manager
+    networks:
+      - half
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./fixtures:/app/fixtures:ro
+      - ./manager.toml:/etc/backend.ai/manager.toml:ro
+      - ./logs:/var/log/backend.ai
+      - /tmp/backend.ai/ipc:/tmp/backend.ai/ipc
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  backend-ai-webserver:
+    image: backend.ai/webserver:26.1.0rc1
+    container_name: backend-ai-webserver
+    networks:
+      - half
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./webserver.conf:/etc/backend.ai/webserver.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - backend-ai-manager
+
+networks:
+  half:
+    external: true
+    name: backendai_half

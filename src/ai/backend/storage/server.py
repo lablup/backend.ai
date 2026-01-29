@@ -81,7 +81,15 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.storage.context_types import ArtifactVerifierContext
 
+try:
+    import uvloop
+except ImportError:
+    uvloop = None  # type: ignore[assignment]
+
 from . import __version__ as VERSION
+from .api.client import init_client_app
+from .api.manager import init_internal_app, init_manager_app
+from .bgtask.registry import BgtaskHandlerRegistryCreator
 from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import (
@@ -90,12 +98,21 @@ from .config.unified import (
     ReservoirConfig,
     StorageProxyUnifiedConfig,
 )
+from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .errors import InvalidConfigurationSourceError, InvalidSocketPathError
-from .watcher import WatcherClient
+from .migration import check_latest
+from .plugin import (
+    StorageClientWebappPluginContext,
+    StorageManagerWebappPluginContext,
+    StoragePluginContext,
+)
+from .storages.storage_pool import StoragePool
+from .volumes.noop import init_noop_volume
+from .volumes.pool import VolumePool
+from .watcher import WatcherClient, main_job
 
 if TYPE_CHECKING:
-    from .context import RootContext
-    from .volumes.pool import VolumePool
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -194,8 +211,6 @@ async def bgtask_ctx(
     event_producer: EventProducer,
     volume_pool: VolumePool,
 ) -> AsyncGenerator[BackgroundTaskManager]:
-    from .bgtask.registry import BgtaskHandlerRegistryCreator
-
     redis_profile_target = redis_config.to_redis_profile_target()
     valkey_client = await ValkeyBgtaskClient.create(
         redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
@@ -221,8 +236,6 @@ async def _make_message_queue(
     local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
-    from .context import EVENT_DISPATCHER_CONSUMER_GROUP
-
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = local_config.storage_proxy.node_id
     args = RedisMQArgs(
@@ -324,8 +337,6 @@ async def volume_ctx(
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
 ) -> AsyncGenerator[VolumePool]:
-    from .volumes.pool import VolumePool
-
     volume_pool = await VolumePool.create(
         local_config=local_config,
         etcd=etcd,
@@ -344,14 +355,6 @@ async def api_ctx(
     etcd: AsyncEtcd,
     root_ctx: RootContext,
 ) -> AsyncGenerator[tuple[web.Application, web.Application, web.Application]]:
-    from .api.client import init_client_app
-    from .api.manager import init_internal_app, init_manager_app
-    from .plugin import (
-        StorageClientWebappPluginContext,
-        StorageManagerWebappPluginContext,
-        StoragePluginContext,
-    )
-
     @asynccontextmanager
     async def _init_storage_plugin() -> AsyncGenerator[StoragePluginContext]:
         plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
@@ -556,7 +559,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(_on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["ctx"] = root_app["ctx"]
@@ -576,11 +579,6 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    from .context import DEFAULT_BACKENDS, RootContext
-    from .migration import check_latest
-    from .storages.storage_pool import StoragePool
-    from .volumes.noop import init_noop_volume
-
     local_config: StorageProxyUnifiedConfig = _args[0]
     loop.set_debug(local_config.debug.asyncio)
 
@@ -748,8 +746,6 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
-    from .watcher import main_job
-
     log_level = LogLevel.DEBUG if debug else log_level
     try:
         local_config = load_local_config(config_path, log_level=log_level)
@@ -759,7 +755,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     # Note: logging configuration is handled separately in Logger class
     # Debug mode is already set during config loading if needed
 
@@ -796,8 +792,10 @@ def main(
                     pprint(local_config.model_dump())
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
+                        if uvloop is None:
+                            raise ImportError(
+                                "uvloop is not installed. Install it with: pip install uvloop"
+                            )
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

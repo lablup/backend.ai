@@ -9,7 +9,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     overload,
     override,
@@ -259,7 +258,7 @@ class ScalingGroupForKeypairsRow(Base):
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
-def _get_resource_preset_join_condition():
+def _get_resource_preset_join_condition() -> Any:
     from ai.backend.manager.models.resource_preset import ResourcePresetRow
 
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
@@ -556,9 +555,7 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
 
 ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 @dataclass

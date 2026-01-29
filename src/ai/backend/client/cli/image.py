@@ -26,7 +26,7 @@ def get_image_id(
     architecture: str | None = None,
 ) -> str:
     try:
-        session.Image.get_by_id(name_or_id, fields=[image_fields["id"]])
+        _ = session.Image.get_by_id(name_or_id, fields=[image_fields["id"]])
         return name_or_id
     except Exception:
         image = session.Image.get(name_or_id, architecture, fields=[image_fields["id"]])
@@ -66,7 +66,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
 @image.command()
 @click.argument("reference_or_id", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
-def forget(reference_or_id, arch):
+def forget(reference_or_id: str, arch: str | None) -> None:
     """Mark image as deleted from server. This command will only work for image customized by user
     unless callee has superadmin privileges.
 
@@ -89,14 +89,14 @@ def forget(reference_or_id, arch):
         if result["ok"]:
             print_done(f"Image forgotten: {reference_or_id}")
         else:
-            print_fail("Image forget has failed: {0}".format(result["msg"]))
+            print_fail("Image forget has failed: {}".format(result["msg"]))
 
 
 @image.command()
 @click.argument("reference_or_id", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
 @click.option("--remove-from-registry", is_flag=True, help="Remove image from registry.")
-def purge(reference_or_id: str, arch: str, remove_from_registry: bool):
+def purge(reference_or_id: str, arch: str, remove_from_registry: bool) -> None:
     """Delete image deleted from server. This command will only work for image customized by user
     unless callee has superadmin privileges.
 
@@ -112,7 +112,7 @@ def purge(reference_or_id: str, arch: str, remove_from_registry: bool):
                 )
             sys.exit(ExitCode.FAILURE)
         try:
-            session.Image.purge_image_by_id(image_id, remove_from_registry=remove_from_registry)
+            _ = session.Image.purge_image_by_id(image_id, remove_from_registry=remove_from_registry)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

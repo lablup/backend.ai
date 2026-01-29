@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import weakref
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TypeAlias
 
 from aiohttp import web
 
-WeakTaskSet: TypeAlias = weakref.WeakSet[asyncio.Task]
+type WeakTaskSet = weakref.WeakSet[asyncio.Task]
 
 
 @dataclass
@@ -25,7 +27,10 @@ class WebStats:
 
 
 @web.middleware
-async def track_active_handlers(request: web.Request, handler) -> web.StreamResponse:
+async def track_active_handlers(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_handlers.add(asyncio.current_task())  # type: ignore
     return await handler(request)

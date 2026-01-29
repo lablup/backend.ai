@@ -8,7 +8,7 @@ from . import admin
 
 
 @admin.group()
-def permission():
+def permission() -> None:
     """
     Permission administration commands.
     """

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
@@ -88,7 +88,7 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api.manager import ManagerStatus
+    from ai.backend.manager.api import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -97,7 +97,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
 
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -175,7 +179,6 @@ from .group import (
     GroupNode,
     GroupPermissionField,
     ModifyGroup,
-    ProjectType,
     PurgeGroup,
 )
 from .image import (
@@ -258,7 +261,6 @@ from .session import (
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
-    SessionStatus,
     TotalResourceSlot,
 )
 from .storage import StorageVolume, StorageVolumeList
@@ -271,8 +273,6 @@ from .user import (
     UserConnection,
     UserList,
     UserNode,
-    UserRole,
-    UserStatus,
 )
 from .vfolder import (
     ModelCard,
@@ -1469,7 +1469,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> GroupNode | None:
         return await GroupNode.get_node(info, id)
 
     @staticmethod
@@ -1508,7 +1508,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> VirtualFolderNode | None:
         return await VirtualFolderNode.get_node(info, id)
 
     @staticmethod
@@ -1757,7 +1757,7 @@ class Query(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         is_installed: bool | None = None,
-        is_operation=False,
+        is_operation: bool = False,
         filter_by_statuses: Optional[list[ImageStatus]] = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
@@ -1776,7 +1776,7 @@ class Query(graphene.ObjectType):
                 allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
                 raise InvalidAPIParameters(
                     f"{e}. All elements of `load_filters` should be one of ({allowed_filter_values})"
-                )
+                ) from e
             image_load_types.update([ImageLoadFilter(f) for f in _filters])
             if (
                 client_role == UserRole.SUPERADMIN
@@ -1862,7 +1862,7 @@ class Query(graphene.ObjectType):
         is_active: Optional[bool] = None,
         status: Optional[UserStatus] = None,
     ) -> Sequence[User]:
-        from .user import UserRole
+        from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1901,7 +1901,7 @@ class Query(graphene.ObjectType):
         is_active: Optional[bool] = None,
         status: Optional[UserStatus] = None,
     ) -> UserList:
-        from .user import UserRole
+        from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1943,7 +1943,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> UserNode | None:
         return await UserNode.get_node(info, id)
 
     @staticmethod
@@ -2289,12 +2289,14 @@ class Query(graphene.ObjectType):
     async def resolve_scaling_groups_for_user_group(
         root: Any,
         info: graphene.ResolveInfo,
-        user_group,
+        user_group: str,
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
+        from uuid import UUID
+
         return await ScalingGroup.load_by_group(
             info.context,
-            user_group,
+            UUID(user_group),
             is_active=is_active,
         )
 
@@ -3173,7 +3175,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> ModelCard | None:
         return await ModelCard.get_node(info, id)
 
     @staticmethod
@@ -3205,7 +3207,7 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
+    ) -> NetworkNode | None:
         return await NetworkNode.get_node(info, id)
 
     @staticmethod
@@ -3294,7 +3296,9 @@ class Query(graphene.ObjectType):
 
 
 class GQLMutationPrivilegeCheckMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
             mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)
@@ -3311,7 +3315,9 @@ class GQLMutationPrivilegeCheckMiddleware:
 
 
 class GQLExceptionMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         try:
             res = next(root, info, **args)
         except BackendAIError as e:
@@ -3324,7 +3330,7 @@ class GQLExceptionMiddleware:
                 extensions={
                     "code": str(e.error_code()),
                 },
-            )
+            ) from e
         except Exception as e:
             log.exception("GraphQL unexpected error: {}", e)
             raise GraphQLError(
@@ -3332,12 +3338,14 @@ class GQLExceptionMiddleware:
                 extensions={
                     "code": str(ErrorCode.default()),
                 },
-            )
+            ) from e
         return res
 
 
 class GQLMetricMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         operation_type = info.operation.operation
         field_name = info.field_name

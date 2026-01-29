@@ -10,7 +10,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     TypedDict,
     cast,
     overload,
@@ -19,6 +18,7 @@ from typing import (
 
 import sqlalchemy as sa
 import trafaret as t
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
@@ -30,7 +30,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack
@@ -85,19 +84,19 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_networks_join_condition():
+def _get_networks_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.network import NetworkRow
 
     return GroupRow.id == foreign(NetworkRow.project)
 
 
-def _get_vfolder_rows_join_condition():
+def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.vfolder import VFolderRow
 
     return GroupRow.id == foreign(VFolderRow.group)
 
 
-def _get_association_container_registries_groups_join_condition():
+def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
@@ -547,7 +546,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
-WhereClauseType: TypeAlias = (
+type WhereClauseType = (
     sa.sql.expression.BinaryExpression[Any]
     | sa.sql.expression.BooleanClauseList
     | sa.sql.elements.ColumnElement[bool]

@@ -1,23 +1,29 @@
 import inspect
+from collections.abc import Awaitable, Callable, Mapping
 from time import monotonic
+from typing import Any, Optional
 
 import zmq
 import zmq.asyncio
-from jupyter_client import AsyncKernelClient
+from jupyter_client.asynchronous.client import AsyncKernelClient
 
 
 async def aexecute_interactive(
     kernel_client: AsyncKernelClient,
     code: str,
-    silent=False,
-    store_history=True,
-    user_expressions=None,
-    allow_stdin=None,
-    stop_on_error=True,
-    timeout=None,
-    output_hook=None,
-    stdin_hook=None,
-):
+    silent: bool = False,
+    store_history: bool = True,
+    user_expressions: Optional[Mapping[str, Any]] = None,
+    allow_stdin: Optional[bool] = None,
+    stop_on_error: bool = True,
+    timeout: Optional[float] = None,
+    output_hook: Callable[[Mapping[str, Any]], Any]
+    | Callable[[Mapping[str, Any]], Awaitable[Any]]
+    | None = None,
+    stdin_hook: Callable[[Mapping[str, Any]], Any]
+    | Callable[[Mapping[str, Any]], Awaitable[Any]]
+    | None = None,
+) -> dict:
     """Async version of jupyter_client's execute_interactive method.
 
     https://github.com/jupyter/jupyter_client/blob/9f1c379/jupyter_client/client.py#L415
@@ -36,8 +42,8 @@ async def aexecute_interactive(
         allow_stdin=allow_stdin,
         stop_on_error=stop_on_error,
     )
-    stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default
-    output_hook = output_hook if output_hook else kernel_client._output_hook_default
+    stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default  # type: ignore[assignment]
+    output_hook = output_hook if output_hook else kernel_client._output_hook_default  # type: ignore[assignment]
 
     # set deadline based on timeout
     if timeout is not None:
@@ -64,6 +70,8 @@ async def aexecute_interactive(
             raise TimeoutError("Timeout waiting for output")
         if stdin_socket in events:
             req = await kernel_client.stdin_channel.get_msg(timeout=0)
+            if stdin_hook is None:
+                raise RuntimeError("stdin_hook is None")
             if inspect.iscoroutinefunction(stdin_hook):
                 await stdin_hook(req)
             else:
@@ -77,6 +85,8 @@ async def aexecute_interactive(
         if msg["parent_header"].get("msg_id") != msg_id:
             # not from my request
             continue
+        if output_hook is None:
+            raise RuntimeError("output_hook is None")
         if inspect.iscoroutinefunction(output_hook):
             await output_hook(msg)
         else:

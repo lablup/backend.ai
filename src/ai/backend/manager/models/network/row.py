@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.manager.models.base import (
     GUID,
@@ -34,13 +34,13 @@ class NetworkType(enum.StrEnum):
     HOST = "host"
 
 
-def _get_project_join_condition():
+def _get_project_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.group import GroupRow
 
     return GroupRow.id == foreign(NetworkRow.project)
 
 
-def _get_domain_join_condition():
+def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(NetworkRow.domain_name)
@@ -121,8 +121,8 @@ class NetworkRow(Base):
         cls,
         session: AsyncSession,
         network_id: uuid.UUID,
-        load_project=False,
-        load_domain=False,
+        load_project: bool = False,
+        load_domain: bool = False,
     ) -> NetworkRow:
         query = sa.select(NetworkRow).filter(NetworkRow.id == network_id)
         if load_project:

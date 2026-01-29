@@ -27,6 +27,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import VFolderNotFound
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -35,7 +36,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -44,8 +44,9 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
@@ -113,7 +114,7 @@ class VFolderPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(node: Any, _variables: dict | None = None) -> VFolderRBACPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return VFolderRBACPermission(node.value)
         return None
@@ -438,7 +439,9 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> VirtualFolderNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> VirtualFolderNode:
         vfolder_node = await VirtualFolderNode.get_node(info, self.id)
         if vfolder_node is None:
             raise VFolderNotFound(f"Virtual folder not found: {self.id}")
@@ -669,7 +672,7 @@ class ModelCard(graphene.ObjectType):
             except t.DataError as e:
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{e!s})"
-                )
+                ) from e
             if model_definition is None:
                 raise DataTransformationFailed(
                     "Model definition validation returned None unexpectedly"
@@ -1455,7 +1458,7 @@ class QuotaScope(graphene.ObjectType):
                 hard_limit_bytes=quota_config["limit_bytes"] or None,
                 usage_count=None,  # TODO: Implement
             )
-        except QuotaScopeNotFoundError:
+        except QuotaScopeNotFoundError as e:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
@@ -1469,7 +1472,7 @@ class QuotaScope(graphene.ObjectType):
                     if result is None:
                         raise QuotaScopeNotFoundError(
                             f"User not found for quota scope id: {self.quota_scope_id}"
-                        )
+                        ) from e
                     resource_policy_constraint: int | None = (
                         result.resource_policy_row.max_quota_scope_size
                     )
@@ -1483,7 +1486,7 @@ class QuotaScope(graphene.ObjectType):
                     if result is None:
                         raise QuotaScopeNotFoundError(
                             f"Group not found for quota scope id: {self.quota_scope_id}"
-                        )
+                        ) from e
                     resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
@@ -1515,7 +1518,7 @@ class SetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
@@ -1564,7 +1567,7 @@ class UnsetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,

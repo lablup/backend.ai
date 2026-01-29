@@ -47,7 +47,7 @@ class TCPBackend(BaseBackend):
         async def _pipe(
             reader: asyncio.StreamReader,
             writer: asyncio.StreamWriter,
-            tag="(unknown)",
+            tag: str = "(unknown)",
         ) -> None:
             nonlocal total_bytes
 

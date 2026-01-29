@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Final, Optional, Self
+from typing import TYPE_CHECKING, Any, Final, Optional, Self
 
 import graphene
 
@@ -76,7 +76,7 @@ class ServiceConfigNode(graphene.ObjectType):
     async def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
         ctx: GraphQueryContext = info.context
 
-        def _fallback(x):
+        def _fallback(x: Any) -> str:
             return str(x)
 
         unified_config = ctx.config_provider.config.model_dump(
@@ -182,7 +182,7 @@ class ModifyServiceConfigNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         input: ModifyServiceConfigNodeInput,
     ) -> ModifyServiceConfigNodePayload:

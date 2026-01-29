@@ -20,7 +20,7 @@ import aiohttp
 import ifaddr
 import psutil
 
-from .utils import curl
+from .networking import curl
 
 __all__ = (
     "current_provider",
@@ -107,10 +107,12 @@ def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
             continue
         for entry in adapter.ips:
             if entry.is_IPv4 and proto == socket.AF_INET:
-                assert isinstance(entry.ip, str)
+                if not isinstance(entry.ip, str):
+                    raise TypeError(f"Expected str for IPv4 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip)
             elif entry.is_IPv6 and proto == socket.AF_INET6:
-                assert isinstance(entry.ip, tuple)
+                if not isinstance(entry.ip, tuple):
+                    raise TypeError(f"Expected tuple for IPv6 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip[0])
             else:
                 continue
@@ -170,7 +172,7 @@ get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
 
-def _define_functions():
+def _define_functions() -> None:
     global _defined
     global get_instance_id
     global get_instance_ip
@@ -304,7 +306,6 @@ def _define_functions():
                 return f"google/{region}"
 
         case _:
-            _metadata_prefix = None
 
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"

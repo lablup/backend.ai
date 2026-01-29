@@ -73,6 +73,8 @@ from .exception import (
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
+__all__ = ["KernelOwnershipData"]
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # msg types visible to the API client.
@@ -128,7 +130,7 @@ def _dump_json_bytes(obj: Any) -> bytes:
 class RunEvent(Exception):
     data: Any
 
-    def __init__(self, data=None) -> None:
+    def __init__(self, data: Any = None) -> None:
         super().__init__()
         self.data = data
 
@@ -256,7 +258,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         del props["clean_event"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
@@ -289,7 +291,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     # - restoration from running containers is done by computer's classmethod
     #   "restore_from_container"
 
-    def release_slots(self, computer_ctxs) -> None:
+    def release_slots(self, computer_ctxs: Mapping[str, Any]) -> None:
         """
         Release the resource slots occupied by the kernel
         to the allocation maps.
@@ -315,51 +317,51 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any] | None:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts) -> CodeCompletionResp:
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def shutdown_service(self, service):
+    async def shutdown_service(self, service: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
         extra_labels: dict[str, str] | None = None,
-    ):
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -401,7 +403,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         """
         List the directory entries of the designated path.
         The path should be inside /home/work of the container.
@@ -410,7 +412,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
     async def ping(self) -> dict[str, float] | None:
@@ -448,10 +450,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                     await self.runner.feed_input(text)
                 elif mode == "continue":
                     pass
-            except zmq.ZMQError:
+            except zmq.ZMQError as e:
                 # cancel the operation by myself
                 # since the peer is gone.
-                raise asyncio.CancelledError
+                raise asyncio.CancelledError from e
+
             return await self.runner.get_next_result(
                 api_ver=api_version,
                 flush_timeout=flush_timeout,
@@ -604,7 +607,7 @@ class RobustSocket:
             _zctx = zmq.asyncio.Context()
         self._zctx = _zctx
 
-    def recreate_socket(self):
+    def recreate_socket(self) -> None:
         self._init_zctx()
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
@@ -639,7 +642,8 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
-                raise InvalidSocket
+                raise InvalidSocket from e
+
             raise
 
     def close(self) -> None:
@@ -754,7 +758,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["event_producer"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         global _zctx
         self.__dict__.update(props)
         if _zctx is None:
@@ -825,7 +829,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("AbstractCodeRunner.ping(): unexpected error")
             return None
 
-    async def ping_status(self):
+    async def ping_status(self) -> None:
         """
         This is to keep the REPL in/out port mapping in the Linux
         kernel's NAT table alive.
@@ -841,7 +845,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except Exception:
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
-    async def feed_batch(self, opts):
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
@@ -865,15 +869,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             exec_cmd.encode("utf8"),
         ])
 
-    async def feed_code(self, text: str):
+    async def feed_code(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"code", text.encode("utf8")])
 
-    async def feed_input(self, text: str):
+    async def feed_input(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"input", text.encode("utf8")])
 
-    async def feed_event(self, evdata: AgentEventData):
+    async def feed_event(self, evdata: AgentEventData) -> None:
         sock = await self._get_socket_pair()
         data = {
             "type": evdata.type,
@@ -881,7 +885,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         }
         await sock.send_multipart([b"event", _dump_json_bytes(data)])
 
-    async def feed_interrupt(self):
+    async def feed_interrupt(self) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"interrupt", b""])
 
@@ -895,7 +899,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
+    async def feed_and_get_completion(
+        self, code_text: str, opts: Mapping[str, Any]
+    ) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -912,7 +918,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return CodeCompletionResult.failure()
 
-    async def feed_start_model_service(self, model_info):
+    async def feed_start_model_service(self, model_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
@@ -934,7 +940,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_start_service(self, service_info):
+    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
@@ -950,14 +956,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_shutdown_service(self, service_name: str):
+    async def feed_shutdown_service(self, service_name: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
             _dump_json_bytes(service_name),
         ])
 
-    async def feed_service_apps(self):
+    async def feed_service_apps(self) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"get-apps",
@@ -1046,7 +1052,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         else:
             raise AssertionError("Unrecognized API version")
 
-    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+    async def get_next_result(self, api_ver: int = 2, flush_timeout: float = 2.0) -> NextResult:
         # Context: per API request
         has_continuation = ClientFeatures.CONTINUATION in self.client_features
         records = []

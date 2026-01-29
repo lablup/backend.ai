@@ -2,16 +2,16 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from typing import Optional
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
+    BaseAction,
+    BaseActionResult,
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
-    TAction,
-    TActionResult,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import OperationStatus
@@ -20,7 +20,7 @@ from ai.backend.manager.actions.validator.base import ActionValidator
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ActionRunner(Generic[TAction, TActionResult]):
+class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
     _func: Callable[[TAction], Awaitable[TActionResult]]
     _monitors: Sequence[ActionMonitor]
 
@@ -104,7 +104,7 @@ class ActionRunner(Generic[TAction, TActionResult]):
             )
 
 
-class ActionProcessor(Generic[TAction, TActionResult]):
+class ActionProcessor[TAction: BaseAction, TActionResult: BaseActionResult]:
     _validators: Sequence[ActionValidator]
 
     _runner: ActionRunner[TAction, TActionResult]

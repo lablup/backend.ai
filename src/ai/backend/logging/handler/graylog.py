@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import socket
 import ssl
+from typing import Any
 
 import graypy
 
@@ -12,7 +13,16 @@ from ai.backend.logging.config import LoggingConfig
 class GELFTLSHandler(graypy.GELFTLSHandler):
     ssl_ctx: ssl.SSLContext
 
-    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 12204,
+        validate: bool = False,
+        ca_certs: str | None = None,
+        certfile: str | None = None,
+        keyfile: str | None = None,
+        **kwargs,
+    ) -> None:
         """Initialize the GELFTLSHandler
 
         :param host: GELF TLS input host.
@@ -36,7 +46,7 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
             self.ssl_ctx.check_hostname = False
             self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    def makeSocket(self, timeout: float = 1):
+    def makeSocket(self, timeout: float = 1) -> ssl.SSLSocket:
         """Create a TLS wrapped socket"""
         plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -54,8 +64,9 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
 
 def setup_graylog_handler(config: LoggingConfig) -> logging.Handler:
     drv_config = config.graylog
-    assert drv_config is not None
-    graylog_params = {
+    if drv_config is None:
+        raise RuntimeError("Graylog configuration is required but not provided")
+    graylog_params: dict[str, Any] = {
         "host": drv_config.host,
         "port": drv_config.port,
         "validate": drv_config.ssl_verify,

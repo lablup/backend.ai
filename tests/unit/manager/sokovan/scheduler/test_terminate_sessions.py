@@ -6,6 +6,7 @@ Tests the batch termination of sessions marked with TERMINATING status.
 from __future__ import annotations
 
 import asyncio
+import time
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -332,8 +333,6 @@ class TestTerminateSessions:
         session_ids = [s.session_id for s in sessions]
 
         # Execute - wrap in RecorderContext scope with entity_ids
-        import time
-
         start_time = time.time()
         with RecorderContext[SessionId].scope("terminate", session_ids):
             result = await terminator._terminate_sessions_internal(sessions)

@@ -11,7 +11,6 @@ from typing import (
     Optional,
     Protocol,
     Self,
-    TypeAlias,
 )
 from uuid import UUID
 
@@ -65,7 +64,7 @@ class CoordinatorMetricRegistry:
         self.system = SystemMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -149,10 +148,10 @@ class CircuitManager:
         try:
             async with asyncio.timeout(15.0):
                 await worker_ready_evt.wait()
-        except TimeoutError:
+        except TimeoutError as e:
             raise ServiceUnavailable(
                 "E10001: Proxy worker not responding", extra_data={"worker": authority}
-            )
+            ) from e
 
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
@@ -294,7 +293,7 @@ class RootContext:
     leader_election: ValkeyLeaderElection
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):

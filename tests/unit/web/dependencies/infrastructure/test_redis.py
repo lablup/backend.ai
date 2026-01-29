@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.testutils.bootstrap import HostPortPairModel
-from ai.backend.web.config.unified import WebServerUnifiedConfig
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import HostPortPair
+from ai.backend.web.config.unified import SessionConfig, WebServerUnifiedConfig
 from ai.backend.web.dependencies.infrastructure.redis import RedisProvider
 
 
@@ -17,9 +19,6 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> WebServerUnifiedConfig:
         """Create a web config pointing to the test redis container."""
-        from ai.backend.common.config import redis_config_iv
-        from ai.backend.common.types import HostPortPair
-
         container_id, redis_addr = redis_container
 
         # Create Redis config with single endpoint for all roles
@@ -32,8 +31,6 @@ class TestRedisProvider:
         redis_config = redis_config_iv.check(redis_config_data)
 
         # Create minimal WebServerUnifiedConfig with just session.redis settings
-        from ai.backend.web.config.unified import SessionConfig
-
         session_config = SessionConfig(redis=redis_config)  # type: ignore[call-arg]
         return WebServerUnifiedConfig(session=session_config)  # type: ignore[call-arg]
 

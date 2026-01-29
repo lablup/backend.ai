@@ -4,8 +4,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
     PendingSessionSnapshot,
@@ -15,6 +14,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 
 
 class TestFIFOSequencer:

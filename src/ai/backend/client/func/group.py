@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import textwrap
 from collections.abc import Iterable, Sequence
 from typing import Any, Optional
@@ -214,7 +216,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, gid: str):
+    async def delete(cls, gid: str) -> dict:
         """
         Inactivates the existing group. Does not actually delete it for safety.
         """
@@ -231,7 +233,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def purge(cls, gid: str):
+    async def purge(cls, gid: str) -> dict:
         """
         Delete the existing group. This action cannot be undone.
         """

@@ -4,6 +4,8 @@ import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel as PydanticBaseModel
+
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
@@ -273,8 +275,6 @@ def generate_composite_example(
         >>> generate_composite_example(SessionConfig, ConfigEnvironment.PROD)
         {'cpu': '8'}
     """
-    from pydantic import BaseModel as PydanticBaseModel
-
     result: dict[str, Any] = {}
 
     for name in model.model_fields:

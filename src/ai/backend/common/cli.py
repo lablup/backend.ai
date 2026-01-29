@@ -1,5 +1,6 @@
 import functools
 import re
+from collections.abc import Callable
 from decimal import Decimal
 from enum import Enum
 from importlib import import_module
@@ -9,9 +10,9 @@ from typing import Any, Optional
 import click
 
 
-def wrap_method(method):
+def wrap_method(method: Callable) -> Callable:
     @functools.wraps(method)
-    def wrapped(self, *args, **kwargs):
+    def wrapped(self: Any, *args, **kwargs) -> Any:
         return method(self._impl, *args, **kwargs)
 
     return wrapped
@@ -30,7 +31,7 @@ class LazyClickMixin:
     _import_name: str
     _loaded_impl: Optional[click.Command | click.Group]
 
-    def __init__(self, *, import_name, **kwargs) -> None:
+    def __init__(self, *, import_name: str, **kwargs) -> None:
         self._import_name = import_name
         self._loaded_impl = None
         super().__init__(**kwargs)
@@ -41,7 +42,7 @@ class LazyClickMixin:
                 setattr(self, key, wrap_method(val).__get__(self, self.__class__))
 
     @property
-    def _impl(self):
+    def _impl(self) -> click.Command | click.Group:
         if self._loaded_impl:
             return self._loaded_impl
         # Load when first invoked.
@@ -62,14 +63,16 @@ class EnumChoice(click.Choice):
         super().__init__(enum_members)
         self.enum = enum
 
-    def convert(self, value: Any, param, ctx):
+    def convert(
+        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
+    ) -> Enum:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
             return next(e for e in self.enum if e == value)
         value = super().convert(value, param, ctx)
-        return next(k for k in self.enum.__members__.keys() if k == value)
+        return self.enum[value]
 
-    def get_metavar(self, param):
+    def get_metavar(self, param: click.Parameter) -> str:
         name = self.enum.__name__
         name = re.sub(r"([A-Z\d]+)([A-Z][a-z])", r"\1_\2", name)
         name = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", name)
@@ -79,7 +82,9 @@ class EnumChoice(click.Choice):
 class MinMaxRangeParamType(click.ParamType):
     name = "min-max decimal range"
 
-    def convert(self, value, param, ctx):
+    def convert(
+        self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]
+    ) -> tuple[Decimal | None, Decimal | None]:
         try:
             left, _, right = value.partition(":")
             if left:
@@ -94,7 +99,7 @@ class MinMaxRangeParamType(click.ParamType):
         except (ArithmeticError, ValueError):
             self.fail(f"{value!r} contains an invalid number", param, ctx)
 
-    def get_metavar(self, param):
+    def get_metavar(self, param: click.Parameter) -> str:
         return "MIN:MAX"
 
 

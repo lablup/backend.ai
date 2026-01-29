@@ -27,9 +27,14 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, groups
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import (
+    ExternalTableFilterSpec,
+    FieldSpecItem,
+    OrderSpecItem,
+    ORMFieldItem,
+)
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -187,7 +192,7 @@ class UserNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
         _, user_id = AsyncNode.resolve_global_id(info, id)
@@ -459,7 +464,7 @@ class UserNode(graphene.ObjectType):
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> UserNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
         return await UserNode.get_node(info, self.id)
 
 
@@ -474,7 +479,7 @@ class UserGroup(graphene.ObjectType):
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserGroup]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[Self]:
         if row is None:
             return None
         return cls(
@@ -483,7 +488,9 @@ class UserGroup(graphene.ObjectType):
         )
 
     @classmethod
-    async def batch_load_by_user_id(cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]):
+    async def batch_load_by_user_id(
+        cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
+    ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
             j = agus.join(groups, agus.c.group_id == groups.c.id)
             query = (
@@ -1067,7 +1074,7 @@ class CreateUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: UserInput,
@@ -1104,7 +1111,7 @@ class ModifyUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: ModifyUserInput,
@@ -1143,7 +1150,7 @@ class DeleteUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
     ) -> DeleteUser:
@@ -1184,7 +1191,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: PurgeUserInput,

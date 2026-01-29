@@ -88,8 +88,10 @@ class AutoScalingService:
     ) -> CreateEndpointAutoScalingRuleActionResult:
         try:
             _threshold = decimal.Decimal(action.creator.threshold)
-        except decimal.InvalidOperation:
-            raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
+        except decimal.InvalidOperation as e:
+            raise InvalidAPIParameters(
+                f"Cannot convert {action.creator.threshold} to Decimal"
+            ) from e
 
         # Validate access to the endpoint first
         validation_data = await self._repository.get_endpoint_access_validation_data(
@@ -185,8 +187,7 @@ class AutoScalingService:
         if user_data is None:
             raise GenericForbidden("User context not available.")
 
-        user_role = UserRole(user_data.role)
-        match user_role:
+        match user_data.role:
             case UserRole.SUPERADMIN | UserRole.MONITOR:
                 pass  # No additional conditions for SUPERADMIN and MONITOR
             case UserRole.ADMIN:

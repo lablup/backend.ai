@@ -3,15 +3,16 @@ import json
 import logging
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
+from typing import Any
 
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 
 
-async def init_sshd_service(child_env):
+async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
@@ -127,7 +128,7 @@ async def init_sshd_service(child_env):
             f.write(b"\n")
 
 
-async def prepare_sshd_service(service_info):
+async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
     cmdargs = [
         "/opt/kernel/dropbearmulti",
         "dropbear",
@@ -149,11 +150,11 @@ async def prepare_sshd_service(service_info):
             cmdargs.extend(["-p", f"0.0.0.0:{port}"])
     else:
         cmdargs.extend(["-p", f"0.0.0.0:{port_config}"])
-    env = {}
+    env: dict[str, str] = {}
     return cmdargs, env
 
 
-async def prepare_ttyd_service(service_info):
+async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
     shell = "sh"
     if Path("/bin/zsh").exists():
         shell = "zsh"

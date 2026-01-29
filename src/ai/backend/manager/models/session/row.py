@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -14,7 +14,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
@@ -46,16 +45,11 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.event_types.schedule.anycast import (
-    DoStartSessionEvent,
-)
 from ai.backend.common.events.event_types.session.anycast import (
-    DoUpdateSessionStatusEvent,
     SessionStartedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
-    SessionStartedBroadcastEvent,
     SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -452,8 +446,8 @@ async def handle_session_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     session_id: SessionId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]
@@ -517,15 +511,15 @@ async def handle_session_exception(
 
 
 def _build_session_fetch_query(
-    base_cond,
+    base_cond: Any,
     access_key: AccessKey | None = None,
     *,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
     max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-):
+    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+) -> sa.sql.Select:
     cond = base_cond
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
@@ -662,13 +656,13 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition():
+def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
@@ -1514,7 +1508,7 @@ class SessionRow(Base):
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
         max_load_count: Optional[int] = None,
     ) -> Iterable[SessionRow]:
@@ -1550,8 +1544,8 @@ class SessionRow(Base):
         )
         try:
             return session_list
-        except IndexError:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
 
     @classmethod
     async def get_session_by_id(
@@ -1563,7 +1557,7 @@ class SessionRow(Base):
         max_matches: int | None = None,
         allow_stale: bool = True,
         for_update: bool = False,
-        eager_loading_op=None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         sessions = await _match_sessions_by_id(
             db_session,
@@ -1577,8 +1571,8 @@ class SessionRow(Base):
         )
         try:
             return sessions[0]
-        except IndexError:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
     @classmethod
     async def get_sgroup_managed_sessions(
@@ -1721,7 +1715,7 @@ class SessionLifecycleManager:
             session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
             transited = session_row.determine_and_set_status(status_changed_at=now)
 
-            def _calculate_session_occupied_slots(session_row: SessionRow):
+            def _calculate_session_occupied_slots(session_row: SessionRow) -> None:
                 session_occupying_slots = ResourceSlot()
                 for row in session_row.kernels:
                     kernel_row = cast(KernelRow, row)
@@ -1748,8 +1742,6 @@ class SessionLifecycleManager:
         session_row: SessionRow,
     ) -> None:
         match session_row.status:
-            case SessionStatus.PREPARED:
-                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 creation_id = session_row.creation_id or ""
                 log.debug(
@@ -1757,9 +1749,8 @@ class SessionLifecycleManager:
                     session_row.id,
                     creation_id,
                 )
-                await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedAnycastEvent(session_row.id, creation_id),
-                    SessionStartedBroadcastEvent(session_row.id, creation_id),
+                await self.event_producer.anycast_event(
+                    SessionStartedAnycastEvent(session_row.id, creation_id)
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1838,7 +1829,6 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{e!r})")
-        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         try:
@@ -1956,9 +1946,7 @@ MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 class ComputeSessionPermissionContext(

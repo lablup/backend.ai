@@ -81,8 +81,8 @@ class UserTemplate(WrapperTestTemplate):
         return CreatedUserMeta(
             email=user_info["email"],
             password=password,
-            access_key=keypair_info["access_key"],
-            secret_key=keypair_info["secret_key"],
+            access_key=keypair_info["access_key"],  # type: ignore[call-overload]
+            secret_key=keypair_info["secret_key"],  # type: ignore[call-overload]
         )
 
     @override

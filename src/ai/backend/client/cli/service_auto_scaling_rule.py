@@ -236,8 +236,8 @@ def update(
 
         try:
             rule_instance = session.ServiceAutoScalingRule(rule)
-            rule_instance.get()
-            rule_instance.update(
+            _ = rule_instance.get()
+            _ = rule_instance.update(
                 metric_source=metric_source,
                 metric_name=metric_name,
                 threshold=_threshold,
@@ -261,8 +261,8 @@ def delete(ctx: CLIContext, rule: UUID) -> None:
     with Session() as session:
         rule_instance = session.ServiceAutoScalingRule(rule)
         try:
-            rule_instance.get(fields=[service_auto_scaling_rule_fields["id"]])
-            rule_instance.delete()
+            _ = rule_instance.get(fields=[service_auto_scaling_rule_fields["id"]])
+            _ = rule_instance.delete()
             print_done(f"Autosscaling rule {rule_instance.rule_id} has been deleted.")
         except BackendAPIError as e:
             ctx.output.print_fail(f"Failed to delete rule {rule_instance.rule_id}:")

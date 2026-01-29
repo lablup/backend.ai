@@ -11,7 +11,7 @@ import psutil
 import zmq
 
 if TYPE_CHECKING:
-    from ai.backend.logging.logger import MsgpackOptions
+    from ai.backend.logging.types import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):
@@ -28,7 +28,8 @@ class RelayHandler(logging.Handler):
         # lost of synchronization sentinel messages.
         if endpoint:
             self._sock = self._zctx.socket(zmq.PUSH)
-            assert self._sock is not None
+            if self._sock is None:
+                raise RuntimeError("Failed to create ZMQ PUSH socket")
             self._sock.setsockopt(zmq.LINGER, 100)
             self._sock.connect(self.endpoint)
         else:

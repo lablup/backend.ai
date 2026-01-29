@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 import redis
 from redis.asyncio import Redis
@@ -56,8 +58,6 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
 @pytest.mark.asyncio
 async def test_instantiate_redisconninfo() -> None:
     """Test RedisConnectionInfo instantiation with Sentinel configuration."""
-    from typing import Any
-
     sentinels = "127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381"
     r1 = redis_helper.get_redis_object(
         RedisTarget(

@@ -6,7 +6,7 @@ import os
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Generic, TypeAlias
+from typing import TYPE_CHECKING
 
 import aiotools
 from aiohttp import web
@@ -22,7 +22,6 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
     SubdomainFrontendInfo,
-    TCircuitKey,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -32,10 +31,12 @@ if TYPE_CHECKING:
     pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
+type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
-class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):
+class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
+    BaseFrontend[TraefikBackend, TCircuitKeyType]
+):
     runner: web.AppRunner
     last_used_time_marker_writer_task: asyncio.Task
     active_circuit_writer_task: asyncio.Task

@@ -11,8 +11,8 @@ if batch_enabled:
     if sys.version_info.major > 2:
         import builtins
 
-        def _input(prompt=""):
-            sys.stdout.write(prompt)
+        def _input(prompt: object = "") -> str:
+            sys.stdout.write(str(prompt))
             sys.stdout.flush()
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 try:
@@ -31,8 +31,8 @@ if batch_enabled:
 
         builtins = __builtin__
 
-        def _raw_input(prompt=""):
-            sys.stdout.write(prompt)
+        def _raw_input(prompt: object = "") -> str:
+            sys.stdout.write(str(prompt))
             sys.stdout.flush()
             try:
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

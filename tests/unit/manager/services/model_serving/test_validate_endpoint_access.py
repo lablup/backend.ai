@@ -157,7 +157,7 @@ def test_validate_endpoint_access(case: EndpointAccessCase) -> None:
         is_authorized=True,
         is_admin=case.requester_role == UserRole.ADMIN,
         is_superadmin=case.requester_role == UserRole.SUPERADMIN,
-        role=case.requester_role.value,
+        role=case.requester_role,
         domain_name=case.requester_domain,
     )
 

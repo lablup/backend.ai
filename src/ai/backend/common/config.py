@@ -392,10 +392,10 @@ def read_from_file(
         discovered_path = Path(toml_path)
     try:
         config = cast(dict[str, Any], tomli.loads(discovered_path.read_text()))
-    except OSError:
+    except OSError as e:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
-        })
+        }) from e
     else:
         return config, discovered_path
 
@@ -412,7 +412,7 @@ async def read_from_etcd(
     return config
 
 
-def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any):
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             table[k] = {}
@@ -420,18 +420,20 @@ def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], val
     table[key_path[-1]] = value
 
 
-def override_with_env(table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str):
+def override_with_env(
+    table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str
+) -> None:
     val = os.environ.get(env_key, None)
     if val is None:
         return
     override_key(table, key_path, val)
 
 
-def check(table: Any, iv: t.Trafaret):
+def check(table: Any, iv: t.Trafaret) -> Any:
     try:
         config = iv.check(table)
     except t.DataError as e:
-        raise ConfigurationError(e.as_dict())
+        raise ConfigurationError(e.as_dict()) from e
     else:
         return config
 
@@ -441,7 +443,8 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
     for k, v in updates.items():
         if isinstance(v, Mapping):
             orig = result.get(k, {})
-            assert isinstance(orig, Mapping)
+            if not isinstance(orig, Mapping):
+                raise TypeError(f"Cannot merge non-mapping value at key {k!r}")
             result[k] = merge(orig, v)
         else:
             result[k] = v

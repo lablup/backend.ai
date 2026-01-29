@@ -16,6 +16,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -289,5 +290,6 @@ class AuthDBSource:
         """Fetch current time from database."""
         async with self._db.begin_readonly() as db_conn:
             result = await db_conn.scalar(sa.select(sa.func.now()))
-            assert result is not None
+            if result is None:
+                raise InternalServerError("Failed to retrieve current database timestamp")
             return result

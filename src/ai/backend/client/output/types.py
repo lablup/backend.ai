@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 import attr
 
@@ -116,14 +116,14 @@ T = TypeVar("T")
 
 
 @attr.define(slots=True)
-class PaginatedResult(Generic[T]):
+class PaginatedResult[T]:
     total_count: int
     items: Sequence[T]
     fields: Sequence[FieldSpec]
 
 
 @attr.define(slots=True)
-class RelayPaginatedResult(Generic[T]):
+class RelayPaginatedResult[T]:
     total_count: int
     items: Sequence[T]
     fields: Sequence[FieldSpec]

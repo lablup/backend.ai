@@ -15,6 +15,7 @@ from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.resources import ResourceAllocator
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
+from ai.backend.common import config as common_config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import HostPortPair
@@ -22,7 +23,6 @@ from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
-    HostPortPairModel,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -62,7 +62,6 @@ def logging_config():
 @pytest.fixture(scope="session", autouse=True)
 def patch_dummy_agent_config():
     """Patch read_from_file to provide default config for DummyAgent in tests."""
-    from ai.backend.common import config as common_config
 
     original_read_from_file = common_config.read_from_file
 

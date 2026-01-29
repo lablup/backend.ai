@@ -3,6 +3,8 @@ import ctypes
 import logging
 import os
 import threading
+from collections.abc import Mapping
+from typing import Any
 
 import janus
 
@@ -30,7 +32,7 @@ class Runner(BaseRunner):
             "AWS_DEFAULT_REGION", "ap-northeast-2"
         )
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         self.input_queue = janus.Queue()
         self.output_queue = janus.Queue()
 
@@ -40,10 +42,12 @@ class Runner(BaseRunner):
     async def execute_heuristic(self) -> int:
         raise NotImplementedError
 
-    async def query(self, code_text) -> int:
+    async def query(self, code_text: str) -> int:
         self.ensure_inproc_runner()
-        assert self.input_queue is not None
-        assert self.output_queue is not None
+        if self.input_queue is None:
+            raise RuntimeError("Input queue is not initialized")
+        if self.output_queue is None:
+            raise RuntimeError("Output queue is not initialized")
         await self.input_queue.async_q.put(code_text)
         # Read the generated outputs until done
         while True:
@@ -57,13 +61,13 @@ class Runner(BaseRunner):
             self.outsock.send_multipart(msg)
         return 0
 
-    async def complete(self, data):
+    async def complete(self, data: Any) -> None:
         self.outsock.send_multipart([
             b"completion",
             [],
         ])
 
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         if self.inproc_runner is None:
             log.error("No user code is running!")
             return
@@ -81,10 +85,10 @@ class Runner(BaseRunner):
             ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.c_long(0))
             log.error("Interrupt broke the interpreter state -- recommended to reset the session.")
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[None, dict]:
         return None, {}
 
-    def ensure_inproc_runner(self):
+    def ensure_inproc_runner(self) -> None:
         if self.inproc_runner is None:
             self.inproc_runner = PollyInprocRunner(
                 self.input_queue.sync_q,

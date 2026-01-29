@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
 
@@ -12,7 +12,7 @@ class TestMessageMetadata:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
         metadata = MessageMetadata(request_id="req-123", user=user)
@@ -46,7 +46,7 @@ class TestMessageMetadata:
             is_authorized=True,
             is_admin=True,
             is_superadmin=False,
-            role="admin",
+            role=UserRole.ADMIN,
             domain_name="test-domain",
         )
         metadata = MessageMetadata(request_id=None, user=user)
@@ -76,7 +76,7 @@ class TestMessageMetadata:
                 "is_authorized": True,
                 "is_admin": False,
                 "is_superadmin": False,
-                "role": "member",
+                "role": "user",
                 "domain_name": "org1",
             },
         }
@@ -89,7 +89,7 @@ class TestMessageMetadata:
         assert metadata.user.is_authorized is True
         assert metadata.user.is_admin is False
         assert metadata.user.is_superadmin is False
-        assert metadata.user.role == "member"
+        assert metadata.user.role == UserRole.USER
         assert metadata.user.domain_name == "org1"
 
     def test_deserialize_from_string(self):
@@ -166,9 +166,9 @@ class TestMessageMetadata:
         user = UserData(
             user_id=UUID("fedcba98-7654-3210-fedc-ba9876543210"),
             is_authorized=True,
-            is_admin=True,
+            is_admin=False,
             is_superadmin=False,
-            role="manager",
+            role=UserRole.USER,
             domain_name="enterprise",
         )
         original = MessageMetadata(request_id="roundtrip-test", user=user)

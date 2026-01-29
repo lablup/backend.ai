@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final
+from typing import Any, Final, Optional
 
 import aiofiles
 import aiofiles.os
@@ -18,7 +18,7 @@ from ai.backend.storage.errors import (
     SubprocessStdoutNotAvailableError,
 )
 from ai.backend.storage.subproc import run
-from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
@@ -46,7 +46,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return
 
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
-        def _read():
+        def _read() -> int | None:
             try:
                 with open(pid_file_path) as f:
                     return int(f.read())
@@ -56,7 +56,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return await asyncio.get_running_loop().run_in_executor(None, _read)
 
     async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
-        def _write():
+        def _write() -> None:
             with open(pid_file_path, "w") as f:
                 f.write(str(pid))
 
@@ -85,7 +85,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 path,
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs setquota -p {pid}' command failed: {e.stderr}"
+            ) from e
 
     async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
         await self._set_quota_by_project(pid, path, QuotaConfig(0))
@@ -172,7 +174,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 str(qspath),
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs project -p {project_id}' command failed: {e.stderr}"
+            ) from e
 
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)

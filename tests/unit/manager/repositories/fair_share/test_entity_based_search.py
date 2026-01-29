@@ -55,6 +55,11 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
 )
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareSearchScope,
+    ProjectFairShareSearchScope,
+    UserFairShareSearchScope,
+)
 from ai.backend.testutils.db import with_tables
 
 
@@ -295,8 +300,6 @@ class TestSearchDomainFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group="nonexistent-rg")
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -316,8 +319,6 @@ class TestSearchDomainFairSharesEntityBased:
         scaling_group_without_domains: str,
     ) -> None:
         """Valid resource_group with no domains should return empty result (not error)."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group=scaling_group_without_domains)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -340,8 +341,6 @@ class TestSearchDomainFairSharesEntityBased:
         domain_with_record: str,
     ) -> None:
         """Domain with fair share record should have details populated."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -365,8 +364,6 @@ class TestSearchDomainFairSharesEntityBased:
         domain_without_record: str,
     ) -> None:
         """Domain without fair share record should have details as None."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -391,8 +388,6 @@ class TestSearchDomainFairSharesEntityBased:
         domain_without_record: str,
     ) -> None:
         """Search should return both domains with and without records."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -418,8 +413,6 @@ class TestSearchDomainFairSharesEntityBased:
         two_scaling_groups_with_domains: TwoScalingGroupsFixture,
     ) -> None:
         """Search should only return domains associated with resource_group in scope."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         fixture = two_scaling_groups_with_domains
         scope = DomainFairShareSearchScope(resource_group=fixture.rg1)
         querier = BatchQuerier(
@@ -442,8 +435,6 @@ class TestSearchDomainFairSharesEntityBased:
         five_domains_two_with_records: list[str],
     ) -> None:
         """Pagination total_count should include entities without records."""
-        from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
-
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
@@ -631,8 +622,6 @@ class TestSearchProjectFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
-
         scope = ProjectFairShareSearchScope(resource_group="nonexistent-rg")
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -653,8 +642,6 @@ class TestSearchProjectFairSharesEntityBased:
         project_with_record: uuid.UUID,
     ) -> None:
         """Project with fair share record should have details populated."""
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
-
         scope = ProjectFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -678,8 +665,6 @@ class TestSearchProjectFairSharesEntityBased:
         project_without_record: uuid.UUID,
     ) -> None:
         """Project without fair share record should have details as None."""
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
-
         scope = ProjectFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -704,8 +689,6 @@ class TestSearchProjectFairSharesEntityBased:
         project_without_record: uuid.UUID,
     ) -> None:
         """Search should return both projects with and without records."""
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
-
         scope = ProjectFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -954,7 +937,6 @@ class TestSearchUserFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 
         scope = UserFairShareSearchScope(resource_group="nonexistent-rg")
         querier = BatchQuerier(
@@ -977,7 +959,6 @@ class TestSearchUserFairSharesEntityBased:
         user_with_record: uuid.UUID,
     ) -> None:
         """User with fair share record should have details populated."""
-        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 
         scope = UserFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
@@ -1004,7 +985,6 @@ class TestSearchUserFairSharesEntityBased:
         user_without_record: uuid.UUID,
     ) -> None:
         """User without fair share record should have details as None."""
-        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 
         scope = UserFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
@@ -1032,7 +1012,6 @@ class TestSearchUserFairSharesEntityBased:
         user_without_record: uuid.UUID,
     ) -> None:
         """Search should return both users with and without records."""
-        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 
         scope = UserFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(

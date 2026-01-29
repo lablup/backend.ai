@@ -17,7 +17,6 @@ from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
 from typing import (
     Any,
-    Generic,
     Literal,
     Optional,
     TypeVar,
@@ -74,7 +73,7 @@ class StringLengthMeta(TrafaretMeta):
     A metaclass that makes string-like trafarets to have sliced min/max length indicator.
     """
 
-    def __getitem__(cls, slice_) -> t.Trafaret:
+    def __getitem__(cls, slice_: slice) -> t.Trafaret:
         return cls(min_length=slice_.start, max_length=slice_.stop)
 
 
@@ -91,7 +90,7 @@ class AliasedKey(t.Key):
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data, context=None) -> Generator[tuple, None, None]:  # type: ignore[override]
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple, None, None]:  # type: ignore[override]
         for name in self.names:
             if name in data:
                 key = name
@@ -122,14 +121,14 @@ class AliasedKey(t.Key):
 
 
 class MultiKey(t.Key):
-    def get_data(self, data, default):
+    def get_data(self, data: Any, default: Any) -> list[Any]:
         if isinstance(data, (multidict.MultiDict, multidict.MultiDictProxy)):
-            return data.getall(self.name, default)
+            return data.getall(self.name, default)  # type: ignore[attr-defined]
         # fallback for plain dicts
-        raw_value = data.get(self.name, default)
+        raw_value = data.get(self.name, default)  # type: ignore[attr-defined]
         if isinstance(raw_value, (list, tuple)):
             # if plain dict already contains list of values, just return it.
-            return raw_value
+            return list(raw_value)
         # otherwise, wrap the value in a list.
         return [raw_value]
 
@@ -147,7 +146,7 @@ class BinarySize(t.Trafaret):
 TItem = TypeVar("TItem")
 
 
-class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
+class DelimiterSeperatedList[TItem](t.Trafaret):
     def __init__(
         self,
         trafaret: type[t.Trafaret] | t.Trafaret,
@@ -198,7 +197,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret, Generic[T_enum]):
+class Enum[T_enum: enum.Enum](t.Trafaret):
     def __init__(self, enum_cls: type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name
@@ -533,7 +532,8 @@ class TimeDuration(t.Trafaret):
             self._failure("value must be a number or string", value=value)
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         if len(value) == 0:
             self._failure("value must not be empty", value=value)
         try:

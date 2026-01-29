@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MappingProxyType, TracebackType
-from typing import Any, LiteralString, TypeAlias, TypedDict, cast, override
+from typing import Any, LiteralString, TypedDict, cast, override
 
 from ai.backend.logging.otel import OpenTelemetrySpec
 
@@ -31,10 +31,10 @@ def _register_custom_loglevels() -> None:
 
 
 # Taken from the typeshed module for logging
-_SysExcInfoType: TypeAlias = (
+type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
-_ExcInfoType: TypeAlias = None | bool | _SysExcInfoType | BaseException
+type _ExcInfoType = None | bool | _SysExcInfoType | BaseException
 
 
 class ContextKWArgs(TypedDict):
@@ -83,7 +83,8 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
                 "extra": extra,
             }
             msg, context_kwargs = self.process(msg, context_kwargs)  # type: ignore
-            assert isinstance(msg, str)
+            if not isinstance(msg, str):
+                raise TypeError("msg must be a string after processing")
             user_kwargs["extra"] = context_kwargs["extra"]
             self.logger._log(level, BraceMessage(msg, args, user_kwargs), (), **context_kwargs)
 

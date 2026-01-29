@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import janus
 
@@ -54,7 +54,9 @@ class AsyncFileWriter:
                     f.write(item)
                 self._q.sync_q.task_done()
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: Any
+    ) -> None:
         await self._q.async_q.put(Sentinel.TOKEN)
         try:
             await self._fut
@@ -62,5 +64,5 @@ class AsyncFileWriter:
             self._q.close()
             await self._q.wait_closed()
 
-    async def write(self, item) -> None:
+    async def write(self, item: str | bytes) -> None:
         await self._q.async_q.put(item)

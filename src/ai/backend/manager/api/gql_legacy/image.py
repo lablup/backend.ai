@@ -400,7 +400,7 @@ class ImagePermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(node: Any, _variables: dict | None = None) -> ImagePermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
         return None
@@ -525,19 +525,27 @@ class ImageNode(graphene.ObjectType):
     @overload
     @classmethod
     def from_row(
-        cls, graph_ctx, row: ImageRow, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: ImageRow,
+        *,
+        permissions: Optional[Iterable[ImagePermission]] = None,
     ) -> ImageNode: ...
 
     @overload
     @classmethod
     def from_row(
-        cls, graph_ctx, row: None, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: None,
+        *,
+        permissions: Optional[Iterable[ImagePermission]] = None,
     ) -> None: ...
 
     @classmethod
     def from_row(
         cls,
-        graph_ctx,
+        graph_ctx: GraphQueryContext,
         row: Optional[ImageRow],
         *,
         permissions: Optional[Iterable[ImagePermission]] = None,
@@ -722,7 +730,7 @@ class ImageNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     # TODO: Introduce access control logic considering scope and permission
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> Image:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(

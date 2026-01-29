@@ -63,6 +63,10 @@ class SchedulingResultGQL(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
     STALE = "STALE"
+    NEED_RETRY = "NEED_RETRY"
+    EXPIRED = "EXPIRED"
+    GIVE_UP = "GIVE_UP"
+    SKIPPED = "SKIPPED"
 
     @classmethod
     def from_internal(cls, value: SchedulingResult) -> SchedulingResultGQL:
@@ -73,6 +77,14 @@ class SchedulingResultGQL(StrEnum):
                 return cls.FAILURE
             case SchedulingResult.STALE:
                 return cls.STALE
+            case SchedulingResult.NEED_RETRY:
+                return cls.NEED_RETRY
+            case SchedulingResult.EXPIRED:
+                return cls.EXPIRED
+            case SchedulingResult.GIVE_UP:
+                return cls.GIVE_UP
+            case SchedulingResult.SKIPPED:
+                return cls.SKIPPED
             case _:
                 raise ValueError(f"Unknown SchedulingResult: {value}")
 
@@ -84,6 +96,14 @@ class SchedulingResultGQL(StrEnum):
                 return SchedulingResult.FAILURE
             case SchedulingResultGQL.STALE:
                 return SchedulingResult.STALE
+            case SchedulingResultGQL.NEED_RETRY:
+                return SchedulingResult.NEED_RETRY
+            case SchedulingResultGQL.EXPIRED:
+                return SchedulingResult.EXPIRED
+            case SchedulingResultGQL.GIVE_UP:
+                return SchedulingResult.GIVE_UP
+            case SchedulingResultGQL.SKIPPED:
+                return SchedulingResult.SKIPPED
 
 
 @strawberry.enum

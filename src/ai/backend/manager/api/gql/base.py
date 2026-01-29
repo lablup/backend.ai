@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 import graphene
 import strawberry
 from graphql import StringValueNode
+from graphql.language.ast import ValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
 
@@ -58,7 +59,7 @@ class ByteSize(str):
         return value
 
     @staticmethod
-    def parse_literal(ast) -> str:
+    def parse_literal(ast: ValueNode) -> str:
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
         return ast.value
@@ -428,7 +429,7 @@ class HasCursor(Protocol):
 TEdge = TypeVar("TEdge", bound=HasCursor)
 
 
-def build_page_info(
+def build_page_info[TEdge: HasCursor](
     edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
 ) -> PageInfo:
     """Build PageInfo from edges and pagination options"""

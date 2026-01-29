@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 import graphene
 import sqlalchemy as sa
@@ -43,9 +43,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
 class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
@@ -79,7 +77,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         props: CreateContainerRegistryNodeInputV2,
     ) -> CreateContainerRegistryNodeV2:
@@ -129,7 +127,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
             )
         except Exception as e:
-            raise GraphQLError(str(e))
+            raise GraphQLError(str(e)) from e
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
@@ -195,7 +193,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyContainerRegistryNodeInputV2,
@@ -230,7 +228,7 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> DeleteContainerRegistryNodeV2:

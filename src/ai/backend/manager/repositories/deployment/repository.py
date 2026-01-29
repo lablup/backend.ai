@@ -16,6 +16,7 @@ from ruamel.yaml import YAML
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -29,7 +30,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
-from ai.backend.manager.data.deployment.creator import DeploymentCreator, DeploymentPolicyConfig
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
     AutoScalingRuleCreator,
@@ -46,7 +47,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
-    EndpointLifecycle,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -55,6 +55,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     ScalingGroupCleanupConfig,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
@@ -80,6 +81,7 @@ from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
@@ -145,7 +147,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
-        creator: Creator[EndpointRow],
+        creator: RBACEntityCreator[EndpointRow],
         policy_config: DeploymentPolicyConfig | None = None,
     ) -> DeploymentInfo:
         """Create a new endpoint and return DeploymentInfo.
@@ -162,19 +164,25 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_endpoint_legacy(
         self,
-        creator: DeploymentCreator,
+        creator: RBACEntityCreator[EndpointRow],
     ) -> DeploymentInfo:
         """Create a new endpoint using legacy DeploymentCreator.
 
         This is for backward compatibility with legacy deployment creation flow.
 
         Args:
-            creator: Legacy DeploymentCreator with ImageIdentifier
+            creator: RBACEntityCreator with LegacyEndpointCreatorSpec.
+                The spec MUST be an instance of LegacyEndpointCreatorSpec.
 
         Returns:
             DeploymentInfo for the created endpoint
         """
         return await self._db_source.create_endpoint_legacy(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
+        """Get image ID from ImageIdentifier."""
+        return await self._db_source.get_image_id(image)
 
     @deployment_repository_resilience.apply()
     async def get_modified_endpoint(

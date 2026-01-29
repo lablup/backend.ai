@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.storage.services.artifacts.types import ImportStepContext
+from ai.backend.storage.data.storage.types import ImportStepContext
 
 if TYPE_CHECKING:
     from .api.types import CORSOptions, WebMiddleware

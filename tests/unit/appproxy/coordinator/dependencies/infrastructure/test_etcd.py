@@ -5,12 +5,18 @@ from unittest.mock import Mock
 
 import pytest
 
-from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig, ServerConfig
+from ai.backend.appproxy.coordinator.config import (
+    ProxyCoordinatorConfig,
+    ServerConfig,
+    TraefikConfig,
+)
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd import (
     EtcdProvider,
 )
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class TestEtcdProvider:
@@ -28,13 +34,6 @@ class TestEtcdProvider:
         test_ns: str,
     ) -> ServerConfig:
         """Create a coordinator config with Traefik enabled."""
-        from ai.backend.appproxy.coordinator.config import (
-            EtcdConfig,
-            ProxyCoordinatorConfig,
-            TraefikConfig,
-        )
-        from ai.backend.common.typed_validators import HostPortPair
-
         container_id, etcd_addr = etcd_container
 
         # Create etcd config

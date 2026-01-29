@@ -16,7 +16,6 @@ from typing import (
     Any,
     Concatenate,
     ParamSpec,
-    cast,
 )
 
 import aiohttp
@@ -70,6 +69,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
@@ -104,6 +104,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -114,6 +115,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     GetVFolderAction,
     ListVFolderAction,
     MoveToTrashVFolderAction,
+    PurgeVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
 )
@@ -140,6 +142,7 @@ from ai.backend.manager.types import OptionalState
 
 from .auth import admin_required, auth_required, superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+from .types import CORSOptions
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
@@ -338,7 +341,7 @@ def with_vfolder_rows_resolved(
     return _wrapper
 
 
-def vfolder_check_exists(
+def vfolder_check_exists[**P](
     handler: Callable[Concatenate[web.Request, Mapping[str, Any], P], Awaitable[web.Response]],
 ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
     """
@@ -370,8 +373,9 @@ def vfolder_check_exists(
             )
             try:
                 result = await conn.execute(query)
-            except sa.exc.DataError:
-                raise InvalidAPIParameters
+            except sa.exc.DataError as e:
+                raise InvalidAPIParameters from e
+
             row = result.first()
             if row is None:
                 raise VFolderNotFound()
@@ -457,9 +461,10 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             )
         )
     except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
     except BackendAIError as e:
-        raise InternalServerError(str(e))
+        raise InternalServerError(str(e)) from e
+
     resp = {
         "id": result.id.hex,
         "name": result.name,
@@ -1560,8 +1565,6 @@ async def share(request: web.Request, params: Any, row: Mapping[str, Any]) -> we
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly sharable.")
     async with root_ctx.db.begin() as conn:
-        from ai.backend.manager.models.group import association_groups_users as agus
-
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -1719,8 +1722,10 @@ async def _delete(
         allowed_vfolder_types = (
             await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Get connection from session
+        conn = await db_session.connection()
         await ensure_host_permission_allowed(
-            db_session.bind,
+            conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
@@ -1771,7 +1776,8 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
             )
         )
     except VFolderInvalidParameter as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
+
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1882,9 +1888,11 @@ async def delete_from_trash_bin(
             )
         )
     except VFolderInvalidParameter as e:
-        raise InvalidAPIParameters(str(e))
-    except TooManyVFoldersFound:
-        raise InternalServerError("Too many vfolders found")
+        raise InvalidAPIParameters(str(e)) from e
+
+    except TooManyVFoldersFound as e:
+        raise InternalServerError("Too many vfolders found") from e
+
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1937,14 +1945,11 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    async with root_ctx.db.begin_session() as db_session:
-        row = await db_session.scalar(sa.select(VFolderRow).where(VFolderRow.id == folder_id))
-        row = cast(VFolderRow | None, row)
-        if row is None:
-            raise VFolderNotFound(extra_data=folder_id)
-        await check_vfolder_status({"status": row.status}, VFolderStatusSet.PURGABLE)
-        delete_stmt = sa.delete(VFolderRow).where(VFolderRow.id == folder_id)
-        await db_session.execute(delete_stmt)
+    await root_ctx.processors.vfolder.purge_vfolder.wait_for_complete(
+        PurgeVFolderAction(
+            purger=Purger(row_class=VFolderRow, pk_value=folder_id),
+        )
+    )
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
@@ -2311,21 +2316,22 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
                     )
         except asyncio.CancelledError:
             raise
-        except TimeoutError:
+        except TimeoutError as e:
             log.error(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): timeout from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
-        except Exception:
+            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
+        except Exception as e:
             log.exception(
                 "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
                 "unexpected error while reading from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
-            raise InternalServerError
+            raise InternalServerError from e
+
     else:
         resp = {
             "content": (
@@ -2715,8 +2721,9 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         )
         try:
             result = await conn.execute(query)
-        except sa.exc.DataError:
-            raise InvalidAPIParameters
+        except sa.exc.DataError as e:
+            raise InvalidAPIParameters from e
+
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")
@@ -2810,7 +2817,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options):
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

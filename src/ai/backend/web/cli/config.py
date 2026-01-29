@@ -4,6 +4,8 @@ Configuration management CLI commands for Backend.AI Web Server.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+from __future__ import annotations
+
 import logging
 import pathlib
 
@@ -106,7 +108,7 @@ Generated using BackendAIConfigMeta annotations.
         generator.generate_to_file(WebServerUnifiedConfig, output, header=header_comment.strip())
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        raise click.ClickException(f"Failed to generate sample configuration: {e}")
+        raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 
 
 if __name__ == "__main__":

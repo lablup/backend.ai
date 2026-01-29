@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 import graphene
@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -27,7 +28,6 @@ from .base import (
     batch_result,
     batch_result_in_scalar_stream,
 )
-from .user import UserRole
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
@@ -240,7 +240,7 @@ class CreateResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: CreateResourcePresetInput,
@@ -278,7 +278,7 @@ class ModifyResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: Optional[UUID],
         name: Optional[str],
@@ -316,7 +316,7 @@ class DeleteResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: Optional[UUID],
         name: Optional[str],

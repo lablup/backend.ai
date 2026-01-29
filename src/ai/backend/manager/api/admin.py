@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
 
@@ -51,7 +51,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class CustomGraphQLView(GraphQLView):
     """Custom GraphQL view for Backend.AI with OpenAPI compatibility."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.__name__ = "handle_graphql_strawberry"
         self.__doc__ = """
@@ -84,7 +84,7 @@ class CustomGraphQLView(GraphQLView):
 
 
 class GQLLoggingMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         if info.path.prev is None:  # indicates the root query
             graph_ctx = info.context
             log.info(
@@ -98,7 +98,7 @@ class GQLLoggingMiddleware:
 
 
 class CustomIntrospectionRule(ValidationRule):
-    def enter_field(self, node: FieldNode, *_args):
+    def enter_field(self, node: FieldNode, *_args: Any) -> None:
         field_name = node.name.value
         if field_name.startswith("__"):
             # Allow __typename field for GraphQL Federation, @connection directive

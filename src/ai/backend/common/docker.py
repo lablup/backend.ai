@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
+    Any,
     Final,
     Literal,
     NamedTuple,
@@ -386,7 +387,7 @@ class PlatformTagSet(Mapping):
     def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
-    def has(self, key: str, version: Optional[str] = None):
+    def has(self, key: str, version: Optional[str] = None) -> bool:
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)
@@ -401,7 +402,7 @@ class PlatformTagSet(Mapping):
     def __len__(self) -> int:
         return len(self._data)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
         return self._data == other
@@ -589,7 +590,7 @@ class ImageRef:
             image = default_repository + "/" + image
         return image, tag
 
-    def _update_tag_set(self):
+    def _update_tag_set(self) -> None:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
@@ -624,7 +625,9 @@ class ImageRef:
         return ret
 
     @staticmethod
-    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, ImageRef]:
+    def merge_aliases(
+        genned_aliases_1: Mapping[str, ImageRef], genned_aliases_2: Mapping[str, ImageRef]
+    ) -> Mapping[str, ImageRef]:
         ret = {}
         aliases_set_1, aliases_set_2 = set(genned_aliases_1.keys()), set(genned_aliases_2.keys())
         aliases_dup = aliases_set_1 & aliases_set_2
@@ -668,7 +671,9 @@ class ImageRef:
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ImageRef):
+            return NotImplemented
         if self == other:  # call __eq__ first for resolved check
             return False
         if not (self.name == other.name and self.project == other.project):

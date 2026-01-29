@@ -18,6 +18,13 @@ from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.loaders import load_local_config
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
+from ai.backend.storage.volumes.cephfs import CephFSVolume
+from ai.backend.storage.volumes.gpfs import GPFSVolume
+from ai.backend.storage.volumes.netapp import NetAppVolume
+from ai.backend.storage.volumes.purestorage import FlashBladeVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
+from ai.backend.storage.volumes.weka import WekaVolume
+from ai.backend.storage.volumes.xfs import XfsVolume
 from ai.backend.testutils.bootstrap import minio_container  # noqa: F401
 
 
@@ -89,32 +96,18 @@ async def volume(
         volume_path = Path(backend_config["path"])
     match request.param:
         case "cephfs":
-            from ai.backend.storage.volumes.cephfs import CephFSVolume
-
             volume_cls = CephFSVolume
         case "gpfs":
-            from ai.backend.storage.volumes.gpfs import GPFSVolume
-
             volume_cls = GPFSVolume
         case "netapp":
-            from ai.backend.storage.volumes.netapp import NetAppVolume
-
             volume_cls = NetAppVolume
         case "purestorage":
-            from ai.backend.storage.volumes.purestorage import FlashBladeVolume
-
             volume_cls = FlashBladeVolume
         case "vfs":
-            from ai.backend.storage.volumes.vfs import BaseVolume
-
             volume_cls = BaseVolume
         case "weka":
-            from ai.backend.storage.volumes.weka import WekaVolume
-
             volume_cls = WekaVolume
         case "xfs":
-            from ai.backend.storage.volumes.xfs import XfsVolume
-
             volume_cls = XfsVolume
         case _:
             raise RuntimeError(f"Unknown volume backend: {request.param}")

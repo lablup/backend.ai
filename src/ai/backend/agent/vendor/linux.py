@@ -47,7 +47,7 @@ def parse_cpuset(value: str) -> Iterator[int]:
 
 class libnuma:
     @staticmethod
-    def node_of_cpu(core) -> int:
+    def node_of_cpu(core: int) -> int:
         if _numa_supported:
             return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
         return 0
@@ -163,7 +163,7 @@ class libnuma:
             log.debug("read the available cpuset from {}", cpuset_source)
 
     @staticmethod
-    async def get_core_topology(limit_cpus=None) -> tuple[list[int], ...]:
+    async def get_core_topology(limit_cpus: set[int] | None = None) -> tuple[list[int], ...]:
         topo: tuple[list[int], ...] = tuple([] for _ in range(libnuma.num_nodes()))
         for c in await libnuma.get_available_cores():
             if limit_cpus is not None and c not in limit_cpus:

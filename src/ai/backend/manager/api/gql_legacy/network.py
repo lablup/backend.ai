@@ -10,8 +10,8 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.common import (
@@ -127,8 +127,8 @@ class NetworkNode(graphene.ObjectType):
                 return cls.from_row(
                     await NetworkRow.get(db_session, uuid.UUID(raw_network_id), load_project=True)
                 )
-            except NoResultFound:
-                raise ValueError(f"Network not found (id: {raw_network_id})")
+            except NoResultFound as e:
+                raise ValueError(f"Network not found (id: {raw_network_id})") from e
 
     @classmethod
     async def get_connection(
@@ -242,8 +242,8 @@ class CreateNetwork(graphene.Mutation):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
                 project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="project")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="project") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -322,15 +322,15 @@ class ModifyNetwork(graphene.Mutation):
 
         try:
             _network_id = uuid.UUID(raw_network_id)
-        except ValueError:
-            raise ObjectNotFound("network")
+        except ValueError as e:
+            raise ObjectNotFound("network") from e
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="network")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="network") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -371,14 +371,14 @@ class DeleteNetwork(graphene.Mutation):
 
         try:
             _network_id = uuid.UUID(raw_network_id)
-        except ValueError:
-            raise ObjectNotFound("network")
+        except ValueError as e:
+            raise ObjectNotFound("network") from e
 
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="network")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="network") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -388,8 +388,8 @@ class DeleteNetwork(graphene.Mutation):
 
             try:
                 network_plugin = graph_ctx.network_plugin_ctx.plugins[row.driver]
-            except KeyError:
-                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured")
+            except KeyError as e:
+                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured") from e
             await network_plugin.destroy_network(row.ref_name)
 
             async def _do_mutate() -> DeleteNetwork:

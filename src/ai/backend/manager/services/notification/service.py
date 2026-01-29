@@ -206,8 +206,6 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
         """
-        from ai.backend.common.data.notification import NotifiableMessage
-
         # Fetch the rule to know its rule_type
         rule = await self._repository.get_rule_by_id(action.rule_id)
 

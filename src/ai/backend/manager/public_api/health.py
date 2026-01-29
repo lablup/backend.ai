@@ -192,7 +192,7 @@ async def shutdown(app: web.Application) -> None:
             await app_ctx.db_status_report_task
 
 
-def create_app(default_cors_options: CORSOptions):
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
     app = web.Application()
     app["health.context"] = PrivateContext()
     app["prefix"] = "health"

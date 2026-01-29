@@ -6,6 +6,7 @@ Installation Guides
 
    install-from-source
    install-from-package
+   install-docker
    install-on-clouds
    install-on-premise
    install-monitoring-and-logging-tools

@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
 
 
 class DeploymentLifecycleType(StrEnum):
@@ -58,14 +63,16 @@ class RouteCreationSpec:
 
     # Extension methods for DeploymentInfo compatibility
     @staticmethod
-    def get_target_replicas_from_deployment(deployment_info) -> int:
+    def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
         """Get the target number of replicas for a DeploymentInfo."""
         # DeploymentInfo has replica_spec.replica_count
         return deployment_info.replica_spec.replica_count
 
     # Extension methods for DeploymentInfoWithRoutes compatibility
     @staticmethod
-    def get_healthy_route_count_from_deployment(deployment_with_routes) -> int:
+    def get_healthy_route_count_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes,
+    ) -> int:
         """Get the count of healthy routes."""
         return sum(
             1
@@ -74,7 +81,9 @@ class RouteCreationSpec:
         )
 
     @staticmethod
-    def get_routes_to_remove_from_deployment(deployment_with_routes, target_count: int):
+    def get_routes_to_remove_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes, target_count: int
+    ) -> list[RouteInfo]:
         """Get routes that should be removed to reach target count."""
         healthy_routes = [
             r

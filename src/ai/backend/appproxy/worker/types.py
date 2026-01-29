@@ -12,10 +12,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Generic,
     Optional,
     Self,
-    TypeAlias,
     TypeVar,
 )
 from uuid import UUID
@@ -282,7 +280,7 @@ class WorkerMetricRegistry:
         self.system = SystemMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -320,7 +318,7 @@ class RootContext:
     health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 
@@ -458,7 +456,7 @@ TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
-class InferenceMeasurement(Generic[TMeasurement]):
+class InferenceMeasurement[TMeasurement: Measurement | HistogramMeasurement]:
     """
     Collection of per-inference framework statistics for a specific metric.
     """
@@ -504,7 +502,7 @@ class MovingStatistics:
             point = (initial_value, time.perf_counter())
             self._last.append(point)
 
-    def update(self, value: Decimal):
+    def update(self, value: Decimal) -> None:
         self._sum += value
         self._min = min(self._min, value)
         self._max = max(self._max, value)
@@ -569,7 +567,7 @@ class Metric:
     capacity: Optional[Decimal] = None
     current_hook: Optional[Callable[[Metric], Decimal]] = None
 
-    def update(self, value: Measurement):
+    def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
         self.stats.update(value.value)
@@ -621,7 +619,7 @@ class HistogramMetric:
         buckets: Mapping[str, Decimal],
         count: Optional[int] = None,
         sum: Optional[Decimal] = None,
-    ):
+    ) -> None:
         self.buckets = buckets
         self.count = count
         self.sum = sum

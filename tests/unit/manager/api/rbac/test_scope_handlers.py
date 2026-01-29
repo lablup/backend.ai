@@ -17,7 +17,7 @@ from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rbac.handler import RBACAPIHandler
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
@@ -104,7 +104,7 @@ class TestGetScopeTypesHandler:
             is_authorized=True,
             is_admin=True,
             is_superadmin=True,
-            role="superadmin",
+            role=UserRole.SUPERADMIN,
             domain_name="default",
         )
 
@@ -116,7 +116,7 @@ class TestGetScopeTypesHandler:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
 
@@ -146,8 +146,9 @@ class TestGetScopeTypesHandler:
             response = await handler.get_scope_types(superadmin_request)
 
         assert response.status == HTTPStatus.OK
-        assert response.body is not None
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        assert response_body is not None
+        response_data = json.loads(cast(bytes, response_body))
         assert "items" in response_data
         assert len(response_data["items"]) == self.EXPECTED_SCOPE_TYPES_COUNT
 
@@ -281,7 +282,7 @@ class TestSearchScopesHandler:
             is_authorized=True,
             is_admin=True,
             is_superadmin=True,
-            role="superadmin",
+            role=UserRole.SUPERADMIN,
             domain_name="default",
         )
 
@@ -293,7 +294,7 @@ class TestSearchScopesHandler:
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
 
@@ -364,8 +365,9 @@ class TestSearchScopesHandler:
             response = await handler.search_scopes(superadmin_request)
 
         assert response.status == HTTPStatus.OK
-        assert response.body is not None
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        assert response_body is not None
+        response_data = json.loads(cast(bytes, response_body))
         assert "items" in response_data
         assert "pagination" in response_data
         assert len(response_data["items"]) == len(single_scope_result.items)
@@ -406,7 +408,8 @@ class TestSearchScopesHandler:
         ):
             response = await handler.search_scopes(superadmin_request)
 
-        response_data = json.loads(cast(bytes, response.body))
+        response_body = cast(web.Response, response).body
+        response_data = json.loads(cast(bytes, response_body))
         assert response_data is not None
         assert response_data["pagination"]["total"] == self.PAGINATION_TOTAL
         assert response_data["pagination"]["offset"] == self.DEFAULT_OFFSET

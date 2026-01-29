@@ -48,6 +48,11 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.data import (
+    KernelCreationInfo,
+    PromotionSpec,
+    SessionWithKernels,
+)
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
@@ -75,7 +80,6 @@ from .results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
-from .types import KernelCreationInfo, PromotionSpec, SessionWithKernels
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

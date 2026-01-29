@@ -1,6 +1,8 @@
 import os
 import signal
 import sys
+from collections.abc import Callable
+from typing import Any, Optional
 
 import click
 from click.exceptions import Abort, ClickException
@@ -17,12 +19,12 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     continuing the shell/batch script.
     """
 
-    def main(self, *args, **kwargs):
+    def main(self, *args, **kwargs) -> None:  # type: ignore[override]
         try:
             _interrupted = False
             kwargs.pop("standalone_mode", None)
             kwargs.pop("prog_name", None)
-            super().main(
+            super().main(  # type: ignore[call-overload]
                 *args,
                 standalone_mode=False,
                 prog_name="backend.ai",
@@ -78,13 +80,13 @@ class AliasGroupMixin(click.Group):
         self._commands: dict[str, click.Command] = {}
         self._aliases: dict[str, str] = {}
 
-    def command(self, *args, **kwargs):
+    def command(self, *args, **kwargs) -> Any:
         aliases = kwargs.pop("aliases", [])
         decorator = super().command(*args, **kwargs)
         if not aliases:
             return decorator
 
-        def _decorator(f):
+        def _decorator(f: Callable) -> click.Command:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -94,7 +96,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def group(self, *args, **kwargs):
+    def group(self, *args, **kwargs) -> Any:
         aliases = kwargs.pop("aliases", [])
         # keep the same class type unless explicitly specified
         if "cls" not in kwargs:
@@ -103,7 +105,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f):
+        def _decorator(f: Callable) -> click.Group:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -113,7 +115,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def get_command(self, ctx, cmd_name):
+    def get_command(self, ctx: click.Context, cmd_name: str) -> Optional[click.Command]:
         if cmd_name in self._aliases:
             cmd_name = self._aliases[cmd_name]
         command = super().get_command(ctx, cmd_name)
@@ -121,7 +123,7 @@ class AliasGroupMixin(click.Group):
             return command
         return None
 
-    def format_commands(self, ctx, formatter):
+    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         commands = []
         for subcommand in self.list_commands(ctx):
             cmd = self.get_command(ctx, subcommand)
@@ -131,7 +133,7 @@ class AliasGroupMixin(click.Group):
             if cmd.hidden:
                 continue
             if subcommand in self._commands:
-                aliases = ",".join(sorted(self._commands[subcommand]))
+                aliases = ",".join(sorted(self._commands[subcommand]))  # type: ignore[call-overload]
                 subcommand = f"{subcommand} ({aliases})"
             commands.append((subcommand, cmd))
 

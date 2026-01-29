@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import (
     Any,
     Optional,
-    TypeVar,
     cast,
 )
 
@@ -72,10 +71,7 @@ A struct that represents an attached file to the API request.
 """
 
 
-_T = TypeVar("_T")
-
-
-async def _coro_return(val: _T) -> _T:
+async def _coro_return[T](val: T) -> T:
     return val
 
 
@@ -194,9 +190,8 @@ class Request:
         """
         Sets the content of the request.
         """
-        assert self._attached_files is None, (
-            "cannot set content because you already attached files."
-        )
+        if self._attached_files is not None:
+            raise ValueError("Cannot set content because files are already attached")
         guessed_content_type = "application/octet-stream"
         if value is None:
             guessed_content_type = "text/plain"
@@ -221,7 +216,8 @@ class Request:
         """
         Attach a list of files represented as AttachedFile.
         """
-        assert not self._content, "content must be empty to attach files."
+        if self._content:
+            raise ValueError("Content must be empty to attach files")
         self.content_type = "multipart/form-data"
         self._attached_files = files
 
@@ -244,7 +240,8 @@ class Request:
             secret_key = self.config.secret_key
         if hash_type is None:
             hash_type = self.config.hash_type
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Request date is not set")
         if self.config.endpoint_type == "api":
             hdrs, _ = generate_signature(
                 method=self.method,
@@ -273,7 +270,8 @@ class Request:
             data = aiohttp.FormData()
             for f in self._attached_files:
                 data.add_field("src", f.stream, filename=f.filename, content_type=f.content_type)
-            assert data.is_multipart, "Failed to pack files as multipart."
+            if not data.is_multipart:
+                raise RuntimeError("Failed to pack files as multipart")
             # Let aiohttp fill up the content-type header including
             # multipart boundaries.
             self.headers.pop("Content-Type", None)
@@ -311,15 +309,17 @@ class Request:
             async with rqst.fetch() as resp:
               print(await resp.text())
         """
-        assert self.method in self._allowed_methods, f"Disallowed HTTP method: {self.method}"
+        if self.method not in self._allowed_methods:
+            raise ValueError(f"Disallowed HTTP method: {self.method}")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         if self.content_type is not None and "Content-Type" not in self.headers:
             self.headers["Content-Type"] = self.content_type
         force_anonymous = kwargs.pop("anonymous", False)
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,
@@ -356,17 +356,18 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(self.session, AsyncSession), (
-            "Cannot use websockets with sessions in the synchronous mode"
-        )
-        assert self.method == "GET", "Invalid websocket method"
+        if not isinstance(self.session, AsyncSession):
+            raise RuntimeError("Cannot use websockets with sessions in the synchronous mode")
+        if self.method != "GET":
+            raise ValueError("Invalid websocket method")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         # websocket is always a "binary" stream.
         self.content_type = "application/octet-stream"
 
-        def _ws_ctx_builder():
+        def _ws_ctx_builder() -> _WSRequestContextManager:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
@@ -394,16 +395,17 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(self.session, AsyncSession), (
-            "Cannot use event streams with sessions in the synchronous mode"
-        )
-        assert self.method == "GET", "Invalid event stream method"
+        if not isinstance(self.session, AsyncSession):
+            raise RuntimeError("Cannot use event streams with sessions in the synchronous mode")
+        if self.method != "GET":
+            raise ValueError("Invalid event stream method")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         self.content_type = "application/octet-stream"
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,
@@ -432,7 +434,7 @@ class AsyncResponseMixin:
     async def text(self) -> str:
         return await self._raw_response.text()
 
-    async def json(self, *, loads=modjson.loads) -> Any:
+    async def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
@@ -453,7 +455,7 @@ class SyncResponseMixin:
             self._raw_response.text(),
         )
 
-    def json(self, *, loads=modjson.loads) -> Any:
+    def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(
@@ -589,7 +591,8 @@ class FetchContextManager:
             try:
                 retry_count += 1
                 self._rqst_ctx = self.rqst_ctx_builder()
-                assert self._rqst_ctx is not None
+                if self._rqst_ctx is None:
+                    raise RuntimeError("Failed to build request context")
                 raw_resp = await self._rqst_ctx.__aenter__()
                 if self.check_status and raw_resp.status // 100 not in [2, 3]:
                     match self._session_mode:
@@ -620,7 +623,8 @@ class FetchContextManager:
                 self.session.config.load_balance_endpoints()
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._rqst_ctx is not None
+        if self._rqst_ctx is None:
+            raise RuntimeError("Request context is not initialized")
         await self._rqst_ctx.__aexit__(*exc_info)
         self._rqst_ctx = None
         return None
@@ -740,7 +744,8 @@ class WebSocketContextManager:
             try:
                 retry_count += 1
                 self._ws_ctx = self.ws_ctx_builder()
-                assert self._ws_ctx is not None
+                if self._ws_ctx is None:
+                    raise RuntimeError("Failed to build WebSocket context")
                 raw_ws = await self._ws_ctx.__aenter__()
             except aiohttp.ClientConnectionError as e:
                 if retry_count == max_retries:
@@ -766,7 +771,8 @@ class WebSocketContextManager:
         return wrapped_ws
 
     async def __aexit__(self, *args) -> Optional[bool]:
-        assert self._ws_ctx is not None
+        if self._ws_ctx is None:
+            raise RuntimeError("WebSocket context is not initialized")
         await self._ws_ctx.__aexit__(*args)
         self._ws_ctx = None
         return None
@@ -888,7 +894,8 @@ class SSEContextManager:
         if self._rqst_ctx is not None:
             await self._rqst_ctx.__aexit__(None, None, None)
         self._rqst_ctx = self.rqst_ctx_builder()
-        assert self._rqst_ctx is not None
+        if self._rqst_ctx is None:
+            raise RuntimeError("Failed to build request context for SSE")
         raw_resp = await self._rqst_ctx.__aenter__()
         if raw_resp.status // 100 != 2:
             msg = await raw_resp.text()
@@ -920,7 +927,8 @@ class SSEContextManager:
                 self.session.config.load_balance_endpoints()
 
     async def __aexit__(self, *args) -> Optional[bool]:
-        assert self._rqst_ctx is not None
+        if self._rqst_ctx is None:
+            raise RuntimeError("SSE request context is not initialized")
         await self._rqst_ctx.__aexit__(*args)
         self._rqst_ctx = None
         return None

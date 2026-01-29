@@ -22,6 +22,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCreateParams,
     VFolderData,
 )
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
@@ -71,6 +72,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
@@ -266,8 +269,6 @@ class VFolderService:
             action.mount_permission = VFolderPermission.READ_ONLY
 
         # Use repository to create VFolder
-        from ai.backend.manager.data.vfolder.types import VFolderCreateParams
-
         params = VFolderCreateParams(
             id=folder_id,
             name=action.name,
@@ -291,8 +292,8 @@ class VFolderService:
             await self._vfolder_repository.create_vfolder_with_permission(
                 params, create_owner_permission=create_owner_permission
             )
-        except sa_exc.DataError:
-            raise VFolderInvalidParameter
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
 
         return CreateVFolderActionResult(
             id=folder_id,
@@ -532,6 +533,11 @@ class VFolderService:
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
+    async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
+        """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
+        data = await self._vfolder_repository.purge_vfolder(action.purger)
+        return PurgeVFolderActionResult(vfolder_uuid=data.id)
+
     async def force_delete(
         self, action: ForceDeleteVFolderAction
     ) -> ForceDeleteVFolderActionResult:
@@ -738,7 +744,7 @@ class VFolderService:
                 await response.write(chunk)
 
         except aiohttp.ClientResponseError as e:
-            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message)
+            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message) from e
         finally:
             if prepared:
                 await response.write_eof()

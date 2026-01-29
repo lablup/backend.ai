@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
 
@@ -61,14 +63,13 @@ class KeyPair(BaseFunction):
         """
         uid_type = "Int!" if isinstance(user_id, int) else "String!"
         q = _d(
-            """
-            mutation($user_id: %s, $input: KeyPairInput!) {
-                create_keypair(user_id: $user_id, props: $input) {
-                    ok msg keypair { $fields }
-                }
-            }
+            f"""
+            mutation($user_id: {uid_type}, $input: KeyPairInput!) {{
+                create_keypair(user_id: $user_id, props: $input) {{
+                    ok msg keypair {{ $fields }}
+                }}
+            }}
         """
-            % uid_type
         )
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         inputs = {
@@ -119,7 +120,7 @@ class KeyPair(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, access_key: str):
+    async def delete(cls, access_key: str) -> dict:
         """
         Deletes an existing keypair with given ACCESSKEY.
         """
@@ -159,14 +160,13 @@ class KeyPair(BaseFunction):
         else:
             uid_type = "Int!" if isinstance(user_id, int) else "String!"
             q = _d(
-                """
-                query($email: %s, $is_active: Boolean) {
-                    keypairs(email: $email, is_active: $is_active) {
+                f"""
+                query($email: {uid_type}, $is_active: Boolean) {{
+                    keypairs(email: $email, is_active: $is_active) {{
                         $fields
-                    }
-                }
+                    }}
+                }}
             """
-                % uid_type
             )
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables: dict[str, Any] = {

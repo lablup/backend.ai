@@ -15,8 +15,8 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined, UndefinedType
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.exception import InvalidAPIParameters
@@ -57,8 +57,9 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -206,8 +207,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             raw_rule_id = rule_id
         try:
             _rule_id = RuleId(UUID(raw_rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -276,12 +277,12 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                 raw_endpoint_id = endpoint
             try:
                 _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-            except ValueError:
-                raise ObjectNotFound(object_name="Endpoint")
+            except ValueError as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -371,8 +372,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
 
             try:
                 return decimal.Decimal(value)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
+            except decimal.InvalidOperation as e:
+                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal") from e
 
         spec = EndpointAutoScalingRuleUpdaterSpec(
             metric_source=OptionalState.from_graphql(
@@ -427,7 +428,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint: str,
         props: EndpointAutoScalingRuleInput,
@@ -438,8 +439,8 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raw_endpoint_id = endpoint
         try:
             _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint") from e
 
         action = props.to_action(
             endpoint_id=_endpoint_id,
@@ -475,7 +476,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyEndpointAutoScalingRuleInput,
@@ -485,8 +486,8 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
@@ -521,15 +522,15 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         graph_ctx: GraphQueryContext = info.context
 
@@ -658,7 +659,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
         creator = cast(Optional[UserRow], row.created_user_row)
@@ -698,13 +699,13 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
+            routings=[await Routing.from_row(ctx, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
             runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
-    def from_dto(cls, ctx, dto: Optional[EndpointData]) -> Optional[Self]:
+    def from_dto(cls, ctx: GraphQueryContext, dto: Optional[EndpointData]) -> Optional[Self]:
         if dto is None:
             return None
         return cls(
@@ -748,7 +749,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         project: UUID | None = None,
         domain_name: Optional[str] = None,
@@ -775,12 +776,12 @@ class Endpoint(graphene.ObjectType):
 
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  #: GraphQueryContext,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -830,7 +831,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         domain_name: Optional[str] = None,
         user_uuid: Optional[UUID] = None,
@@ -851,7 +852,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: UUID,
         domain_name: Optional[str] = None,
@@ -875,8 +876,8 @@ class Endpoint(graphene.ObjectType):
                     load_session_owner=True,
                 )
                 return await cls.from_row(ctx, row)
-        except NoResultFound:
-            raise EndpointNotFound
+        except NoResultFound as e:
+            raise EndpointNotFound from e
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
@@ -1036,8 +1037,8 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             try:
                 return RuntimeVariant(value)
-            except KeyError:
-                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}")
+            except KeyError as e:
+                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}") from e
 
         if self.desired_session_count is not Undefined and self.replicas is not Undefined:
             raise InvalidAPIParameters(
@@ -1110,7 +1111,7 @@ class ModifyEndpoint(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint_id: UUID,
         props: ModifyEndpointInput,
@@ -1148,7 +1149,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointTokenRow,
     ) -> Self:
         return cls(
@@ -1163,7 +1164,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: Optional[UUID] = None,
         project: Optional[UUID] = None,
@@ -1181,12 +1182,12 @@ class EndpointToken(graphene.ObjectType):
             query = query.filter(EndpointTokenRow.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -1246,7 +1247,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         token: str,
         *,
         project: Optional[UUID] = None,
@@ -1258,8 +1259,8 @@ class EndpointToken(graphene.ObjectType):
                 row = await EndpointTokenRow.get(
                     session, token, project=project, domain=domain_name, user_uuid=user_uuid
                 )
-        except NoResultFound:
-            raise EndpointTokenNotFound
+        except NoResultFound as e:
+            raise EndpointTokenNotFound from e
         return await cls.from_row(ctx, row)
 
     async def resolve_valid_until(

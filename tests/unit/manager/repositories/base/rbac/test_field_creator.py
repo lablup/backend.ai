@@ -11,8 +11,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.manager.data.permission.id import FieldRef, ObjectId
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.base.rbac.field_creator import (
     execute_rbac_bulk_field_creator,
     execute_rbac_field_creator,
 )
+from ai.backend.manager.repositories.base.rbac.utils import insert_on_conflict_do_nothing
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -59,7 +60,7 @@ class RBACFieldCreatorTestRow(Base):
         )
 
     def field_ref(self) -> FieldRef:
-        return FieldRef(field_type=EntityType.VFOLDER, field_id=str(self.id))
+        return FieldRef(field_type=FieldType.KERNEL, field_id=str(self.id))
 
 
 # =============================================================================
@@ -152,7 +153,7 @@ class TestRBACFieldCreatorBasic:
                 spec=spec,
                 entity_type=EntityType.VFOLDER,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
             )
             result = await execute_rbac_field_creator(db_sess, creator)
 
@@ -178,7 +179,7 @@ class TestRBACFieldCreatorBasic:
             assert entity_field_row is not None
             assert entity_field_row.entity_type == EntityType.VFOLDER.value
             assert entity_field_row.entity_id == parent_entity_id
-            assert entity_field_row.field_type == EntityType.VFOLDER.value
+            assert entity_field_row.field_type == FieldType.KERNEL.value
             assert entity_field_row.field_id == str(result.row.id)
 
     async def test_create_multiple_fields_for_same_parent(
@@ -202,7 +203,7 @@ class TestRBACFieldCreatorBasic:
                     spec=spec,
                     entity_type=EntityType.VFOLDER,
                     entity_id=parent_entity_id,
-                    field_type=EntityType.VFOLDER,
+                    field_type=FieldType.KERNEL,
                 )
                 await execute_rbac_field_creator(db_sess, creator)
 
@@ -243,7 +244,7 @@ class TestRBACFieldCreatorIdempotent:
                 spec=spec,
                 entity_type=EntityType.VFOLDER,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
             )
             await execute_rbac_field_creator(db_sess, creator)
 
@@ -255,14 +256,10 @@ class TestRBACFieldCreatorIdempotent:
 
         async with database_connection.begin_session() as db_sess:
             # Try to insert duplicate EntityFieldRow
-            from ai.backend.manager.repositories.base.rbac.utils import (
-                insert_on_conflict_do_nothing,
-            )
-
             duplicate_field = EntityFieldRow(
                 entity_type=EntityType.VFOLDER.value,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER.value,
+                field_type=FieldType.KERNEL.value,
                 field_id=str(field_id),  # Same field_id as first
             )
             # Should not raise an error
@@ -306,7 +303,7 @@ class TestRBACBulkFieldCreator:
                 specs=specs,
                 entity_type=EntityType.VFOLDER,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
             )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
@@ -337,7 +334,7 @@ class TestRBACBulkFieldCreator:
                 specs=[],
                 entity_type=EntityType.VFOLDER,
                 entity_id="dummy",
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
             )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
@@ -378,7 +375,7 @@ class TestRBACBulkFieldCreator:
                 specs=specs,
                 entity_type=EntityType.VFOLDER,
                 entity_id=parent_entity_id,
-                field_type=EntityType.VFOLDER,
+                field_type=FieldType.KERNEL,
             )
             result = await execute_rbac_bulk_field_creator(db_sess, creator)
 
@@ -445,7 +442,7 @@ class TestRBACFieldCreatorCompositePK:
                     spec=spec,
                     entity_type=EntityType.VFOLDER,
                     entity_id="parent-123",
-                    field_type=EntityType.VFOLDER,
+                    field_type=FieldType.KERNEL,
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):
@@ -476,7 +473,7 @@ class TestRBACFieldCreatorCompositePK:
                     specs=specs,
                     entity_type=EntityType.VFOLDER,
                     entity_id="parent-123",
-                    field_type=EntityType.VFOLDER,
+                    field_type=FieldType.KERNEL,
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):

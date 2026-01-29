@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 import textwrap
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path, PurePosixPath
 from typing import Any, Final, Optional, cast, override
 
@@ -29,12 +29,12 @@ from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import closing_async, get_arch_name
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
-from ai.backend.common.utils import current_loop
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -82,7 +82,7 @@ class DockerKernel(AbstractKernel):
     def __getstate__(self) -> Mapping[str, Any]:
         return super().__getstate__()
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
@@ -110,13 +110,13 @@ class DockerKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()
 
     @override
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         container_id = self.data["container_id"]
         async with closing_async(Docker()) as docker:
             container = await docker.containers.get(container_id)
@@ -124,14 +124,14 @@ class DockerKernel(AbstractKernel):
         return {"logs": "".join(logs)}
 
     @override
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
     @override
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
@@ -153,19 +153,19 @@ class DockerKernel(AbstractKernel):
         })
 
     @override
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_start_model_service(model_service)
 
     @override
-    async def shutdown_service(self, service: str):
+    async def shutdown_service(self, service: str) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
     @override
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_service_apps()
@@ -186,8 +186,8 @@ class DockerKernel(AbstractKernel):
     @override
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
@@ -204,8 +204,8 @@ class DockerKernel(AbstractKernel):
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
-        except ValueError:  # parent_path does not start with work_dir!
-            raise ValueError("malformed committed path.")
+        except ValueError as e:  # parent_path does not start with work_dir!
+            raise ValueError("malformed committed path.") from e
 
         def _write_chunks(
             fileobj: gzip.GzipFile,
@@ -304,7 +304,7 @@ class DockerKernel(AbstractKernel):
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
-        def _write_to_disk():
+        def _write_to_disk() -> None:
             host_abspath.parent.mkdir(parents=True, exist_ok=True)
             host_abspath.write_bytes(filedata)
 
@@ -313,7 +313,7 @@ class DockerKernel(AbstractKernel):
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
-            )
+            ) from e
 
     @override
     async def download_file(self, container_path: os.PathLike | str) -> bytes:
@@ -339,8 +339,9 @@ class DockerKernel(AbstractKernel):
                         raise ValueError("Too large archive file exceeding 1 MiB")
                     tar_fobj.seek(0, io.SEEK_SET)
                     tarbytes = tar_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return tarbytes
 
     @override
@@ -378,12 +379,13 @@ class DockerKernel(AbstractKernel):
                         )
                     # FYI: To get the size of extracted file, seek and tell with inner_fobj.
                     content_bytes = inner_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return content_bytes
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
@@ -437,7 +439,7 @@ class DockerKernel(AbstractKernel):
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
     @override
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_event(evdata)
@@ -450,15 +452,15 @@ class DockerCodeRunner(AbstractCodeRunner):
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: int = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,
@@ -563,6 +565,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 ])
                 if await proc.wait() != 0:
                     raise RuntimeError("extracting krunner environment has failed!")
+
     except Exception:
         log.exception("unexpected error")
         return distro, None

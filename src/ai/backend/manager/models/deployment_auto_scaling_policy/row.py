@@ -27,7 +27,7 @@ __all__ = ("DeploymentAutoScalingPolicyRow",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-def _get_endpoint_join_condition():
+def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id

@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Generic,
     Optional,
     Protocol,
     TypeVar,
@@ -87,7 +86,7 @@ TVal = TypeVar("TVal")
 
 
 @dataclass
-class TriState(Generic[TVal]):
+class TriState[TVal]:
     """
     TriState is a class that represents partial updates to an attribute of an object.
     It is used to indicate whether an attribute should be updated, set to None, or not modified at all.
@@ -160,7 +159,7 @@ class TriState(Generic[TVal]):
                 pass
 
 
-class OptionalState(Generic[TVal]):
+class OptionalState[TVal]:
     """
     OptionalState is a class that represents partial updates to an attribute of an object.
     It is used to indicate whether an attribute should be updated or not modified at all.

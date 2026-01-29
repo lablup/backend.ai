@@ -38,6 +38,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactUpdateError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,8 +54,8 @@ from ai.backend.manager.repositories.types import (
     BaseFilterApplier,
     BaseOrderingApplier,
     GenericQueryBuilder,
-    PaginationOptions,
 )
+from ai.backend.manager.types import PaginationOptions
 
 
 class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
@@ -72,15 +73,17 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
 
         # Handle StringFilter-based filters
         if filters.name_filter is not None:
-            name_condition = filters.name_filter.apply_to_column(ArtifactRow.name)
+            name_condition = filters.name_filter.apply_to_column(
+                cast(sa.sql.elements.ColumnElement[str], ArtifactRow.name)
+            )
             if name_condition is not None:
                 conditions.append(name_condition)
 
         # Handle registry_filter by joining with registry tables
         if filters.registry_filter is not None:
-            from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
-            registry_condition = filters.registry_filter.apply_to_column(ArtifactRegistryRow.name)
+            registry_condition = filters.registry_filter.apply_to_column(
+                cast(sa.sql.elements.ColumnElement[str], ArtifactRegistryRow.name)
+            )
             if registry_condition is not None:
                 # Join with artifact registry table and add condition
                 stmt = stmt.join(
@@ -91,10 +94,10 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
 
         # Handle source_filter by joining with source registry tables
         if filters.source_filter is not None:
-            from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-
             source_registry = sa.orm.aliased(ArtifactRegistryRow)
-            source_condition = filters.source_filter.apply_to_column(source_registry.name)
+            source_condition = filters.source_filter.apply_to_column(
+                cast(sa.sql.elements.ColumnElement[str], source_registry.name)
+            )
             if source_condition is not None:
                 # Join with source registry table (using alias to avoid conflicts)
                 stmt = stmt.join(
@@ -167,14 +170,18 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
             version_filter = filters.version_filter.to_dataclass()
-            version_condition = version_filter.apply_to_column(ArtifactRevisionRow.version)
+            version_condition = version_filter.apply_to_column(
+                cast(sa.sql.elements.ColumnElement[str], ArtifactRevisionRow.version)
+            )
             if version_condition is not None:
                 conditions.append(version_condition)
 
         # Handle IntFilter-based size filter
         if filters.size_filter is not None:
             size_filter = filters.size_filter.to_dataclass()
-            size_condition = size_filter.apply_to_column(ArtifactRevisionRow.size)
+            size_condition = size_filter.apply_to_column(
+                cast(sa.sql.elements.ColumnElement[int], ArtifactRevisionRow.size)
+            )
             if size_condition is not None:
                 conditions.append(size_condition)
 

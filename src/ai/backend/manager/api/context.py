@@ -49,7 +49,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.plugin.webapp import WebappPluginContext
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
-    from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
     from ai.backend.manager.service.base import ServicesContext
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment import DeploymentController
@@ -98,7 +97,6 @@ class RootContext(BaseContext):
     registry: AgentRegistry
     agent_cache: AgentRPCCache
     agent_client_pool: AgentClientPool
-    scheduler_dispatcher: SchedulerDispatcher
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController

@@ -4,6 +4,7 @@ from http import HTTPStatus
 from pathlib import Path
 from time import time
 from unittest import mock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -14,7 +15,6 @@ from yarl import URL
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.request import Request, Response
 from ai.backend.client.session import AsyncSession
-from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(config, path: str) -> URL:

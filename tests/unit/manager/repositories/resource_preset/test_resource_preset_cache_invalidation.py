@@ -13,7 +13,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
+from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -135,8 +135,6 @@ class TestResourcePresetCacheInvalidation:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyStatClient, None]:
         """Create ValkeyStatClient instance with real Redis"""
-        from ai.backend.common.types import ValkeyTarget
-
         redis_addr = redis_container[1]
         valkey_target = ValkeyTarget(
             addr=f"{redis_addr.host}:{redis_addr.port}",

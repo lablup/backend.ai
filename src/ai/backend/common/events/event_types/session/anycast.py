@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -31,14 +33,6 @@ class SessionLifecycleEvent(AbstractAnycastEvent):
     @override
     def user_event(self) -> Optional[UserEvent]:
         return None
-
-
-@dataclass
-class DoUpdateSessionStatusEvent(SessionLifecycleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_update_session_status"
 
 
 @dataclass
@@ -98,7 +92,7 @@ class SessionCreationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -119,27 +113,11 @@ class SessionEnqueuedAnycastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_scheduled"
-
-
-@dataclass
 class SessionCheckingPrecondAnycastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "session_checking_precondition"
-
-
-@dataclass
-class SessionPreparingAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_preparing"
 
 
 @dataclass
@@ -171,7 +149,7 @@ class SessionTerminationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -211,7 +189,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -247,7 +225,7 @@ class BaseSessionExecutionEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
         )

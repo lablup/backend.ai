@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Generic, Optional, TypeVar, final
+from typing import TYPE_CHECKING, Optional, TypeVar, final
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker import ServiceHealthChecker
@@ -12,7 +12,7 @@ ResourceT = TypeVar("ResourceT")
 ResourcesT = TypeVar("ResourcesT")
 
 
-class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
+class DependencyProvider[SetupInputT, ResourceT](ABC):
     """Base class for all dependency providers.
 
     Dependency providers are stateless objects that provide async context managers
@@ -85,7 +85,7 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
         return
 
 
-class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
+class DependencyComposer[SetupInputT, ResourcesT](ABC):
     """Abstract base for dependency composers.
 
     Composers compose multiple dependency providers into a larger unit,

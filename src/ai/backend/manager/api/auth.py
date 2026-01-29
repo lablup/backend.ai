@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -13,15 +13,17 @@ from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
 import aiohttp_cors
+import jwt as pyjwt
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
 from ai.backend.common import validators as tx
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.auth.field import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -299,7 +301,7 @@ _whois_timezone_info: Final = {
 whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
-def _extract_auth_params(request):
+def _extract_auth_params(request: web.Request) -> tuple[str, str, str] | None:
     """
     HTTP Authorization header must be formatted as:
     "Authorization: BackendAI signMethod=HMAC-SHA256,
@@ -324,8 +326,8 @@ def _extract_auth_params(request):
     try:
         access_key, signature = params["credential"].split(":", 1)
         return params["signMethod"], access_key, signature
-    except (KeyError, ValueError):
-        raise InvalidAuthParameters("Missing or malformed authorization parameters")
+    except (KeyError, ValueError) as e:
+        raise InvalidAuthParameters("Missing or malformed authorization parameters") from e
 
 
 def check_date(request: web.Request) -> bool:
@@ -394,11 +396,11 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         ).digest()
         sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
-    except ValueError:
-        raise AuthorizationFailed("Invalid signature")
+    except ValueError as e:
+        raise AuthorizationFailed("Invalid signature") from e
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]):
+def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     allowed_client_ip = user.get("allowed_client_ip", None)
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list
@@ -410,8 +412,8 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
         raise AuthorizationFailed("Not allowed IP address")
     try:
         client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr, is_network=False)
-    except InvalidIpAddressValue:
-        raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value")
+    except InvalidIpAddressValue as e:
+        raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value") from e
     if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
         return
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
@@ -545,8 +547,6 @@ async def _authenticate_via_jwt(
     Raises:
         AuthorizationFailed: If JWT validation fails or access_key not found
     """
-    import jwt as pyjwt
-
     try:
         # 1. Decode token without verification to extract access_key
         unverified_payload = pyjwt.decode(
@@ -702,7 +702,7 @@ def _setup_user_context(request: web.Request) -> ExitStack:
                         is_authorized=request.get("is_authorized", False),
                         is_admin=request.get("is_admin", False),
                         is_superadmin=request.get("is_superadmin", False),
-                        role=request["user"]["role"],
+                        role=UserRole(request["user"]["role"]),
                         domain_name=request["user"]["domain_name"],
                     )
                 )
@@ -717,7 +717,7 @@ def _setup_user_context(request: web.Request) -> ExitStack:
 
 
 @web.middleware
-async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+async def auth_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     """
     Unified authentication middleware - routes to appropriate authentication flow.
 
@@ -760,11 +760,11 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
 
 
-def auth_required(handler):
+def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request) -> web.StreamResponse:
         if request.get("is_authorized", False):
-            return await handler(request, *args, **kwargs)
+            return await handler(request)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
@@ -772,9 +772,13 @@ def auth_required(handler):
     return wrapped
 
 
-def auth_required_for_method(method):
+def auth_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
     @functools.wraps(method)
-    async def wrapped(self, request, *args, **kwargs):
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -784,9 +788,9 @@ def auth_required_for_method(method):
     return wrapped
 
 
-def admin_required(handler):
+def admin_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_admin", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -796,11 +800,47 @@ def admin_required(handler):
     return wrapped
 
 
-def superadmin_required(handler):
+def admin_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
+    """Decorator for class methods that require admin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_admin", False):
+            return await method(self, request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "admin")
+    return wrapped
+
+
+def superadmin_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False) and request.get("is_superadmin", False):
             return await handler(request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "superadmin")
+    return wrapped
+
+
+def superadmin_required_for_method(
+    method: Callable[..., Awaitable[web.StreamResponse]],
+) -> Callable[..., Awaitable[web.StreamResponse]]:
+    """Decorator for class methods that require superadmin authentication."""
+
+    @functools.wraps(method)
+    async def wrapped(
+        self: Any, request: web.Request, *args: Any, **kwargs: Any
+    ) -> web.StreamResponse:
+        if request.get("is_authorized", False) and request.get("is_superadmin", False):
+            return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)

@@ -15,7 +15,7 @@ import secrets
 import uuid
 import weakref
 from collections import defaultdict
-from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, MutableMapping
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -69,7 +69,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @server_status_required(READ_ALLOWED)
 @auth_required
 @adefer
-async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
+async def stream_pty(
+    defer: Callable[[Callable[[], None]], None], request: web.Request
+) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["stream.context"]
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
@@ -136,7 +138,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     defer(lambda: app_ctx.stream_stdin_socks[stream_key].discard(socks[0]))
     stream_sync = asyncio.Event()
 
-    async def stream_stdin():
+    async def stream_stdin() -> None:
         nonlocal socks
         try:
             async for msg in ws:
@@ -154,7 +156,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                             socks[0] = stdin_sock
                             socks[1] = stdout_sock
                             app_ctx.stream_stdin_socks[stream_key].add(socks[0])
-                            socks[0].write([raw_data])
+                            await socks[0].send_multipart([raw_data])
                             log.debug("stream_stdin({0}): zmq stream reset", stream_key)
                             stream_sync.set()
                             continue
@@ -224,7 +226,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             if not socks[0].closed:
                 socks[0].close()
 
-    async def stream_stdout():
+    async def stream_stdout() -> None:
         nonlocal socks
         log.debug("stream_stdout({0}): started", stream_key)
         try:
@@ -276,7 +278,9 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
 @server_status_required(READ_ALLOWED)
 @auth_required
 @adefer
-async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
+async def stream_execute(
+    defer: Callable[[Callable[[], None]], None], request: web.Request
+) -> web.StreamResponse:
     """
     WebSocket-version of gateway.kernel.execute().
     """
@@ -423,7 +427,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
 )
 @adefer
 async def stream_proxy(
-    defer, request: web.Request, params: Mapping[str, Any]
+    defer: Callable[[Callable[[], None]], None], request: web.Request, params: Mapping[str, Any]
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["stream.context"]
@@ -469,10 +473,10 @@ async def stream_proxy(
                 # using one of the primary/secondary ports of the app
                 try:
                     hport_idx = sport["container_ports"].index(params["port"])
-                except ValueError:
+                except ValueError as e:
                     raise InvalidAPIParameters(
                         f"Service {service} does not open the port number {params['port']}."
-                    )
+                    ) from e
                 host_port = sport["host_ports"][hport_idx]
             else:  # using the default (primary) port of the app
                 if "host_ports" not in sport:

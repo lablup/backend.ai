@@ -45,7 +45,7 @@ def filter_by_id(id: UUID) -> Callable[[WhereableStatement[Any]], WhereableState
 type QueryOption = Callable[[WhereableStatement[Any]], WhereableStatement[Any]]
 
 
-def _get_scaling_group_join_condition():
+def _get_scaling_group_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.scaling_group import ScalingGroupRow
 
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)

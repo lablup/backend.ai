@@ -7,9 +7,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Generic,
     Optional,
-    TypeVar,
 )
 
 import aiodocker
@@ -65,10 +63,7 @@ _atom_config_iv = t.Dict({
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-TATOMDevice = TypeVar("TATOMDevice", bound=AbstractATOMDevice)
-
-
-class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=ABCMeta):
+class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin, metaclass=ABCMeta):
     key = DeviceName("atom")
     slot_types: Sequence[tuple[SlotName, SlotTypes]] = (
         (SlotName("atom.device"), SlotTypes("count")),
@@ -285,7 +280,8 @@ class AbstractATOMPlugin(AbstractComputePlugin, Generic[TATOMDevice], metaclass=
         numa_node_indexes: set[int] = set()
         for dev in await self._list_devices():
             if dev.device_id in device_alloc.get(self.slot_types[0][0], {}).keys():
-                assert dev.numa_node is not None, "NUMA node index of accelerator cannot be null!"
+                if dev.numa_node is None:
+                    raise RuntimeError("NUMA node index of accelerator cannot be null!")
                 assigned_devices.append(dev)
                 device_files.extend([Path(x) for x in await self.list_device_files(dev)])
                 numa_node_indexes.add(dev.numa_node)

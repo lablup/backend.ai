@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from ai.backend.manager.models.base import Base
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 TRow = TypeVar("TRow", bound=Base)
 
 
-class CreatorSpec(ABC, Generic[TRow]):
+class CreatorSpec[TRow: Base](ABC):
     """Abstract base class defining a row to insert.
 
     Implementations specify what to create by providing:
@@ -33,7 +33,7 @@ class CreatorSpec(ABC, Generic[TRow]):
 
 
 @dataclass
-class Creator(Generic[TRow]):
+class Creator[TRow: Base]:
     """Bundles creator spec for insert operations.
 
     Attributes:
@@ -47,13 +47,13 @@ class Creator(Generic[TRow]):
 
 
 @dataclass
-class CreatorResult(Generic[TRow]):
+class CreatorResult[TRow: Base]:
     """Result of executing a create operation."""
 
     row: TRow
 
 
-async def execute_creator(
+async def execute_creator[TRow: Base](
     db_sess: SASession,
     creator: Creator[TRow],
 ) -> CreatorResult[TRow]:
@@ -88,7 +88,7 @@ async def execute_creator(
 
 
 @dataclass
-class BulkCreator(Generic[TRow]):
+class BulkCreator[TRow: Base]:
     """Bundles multiple creator specs for bulk insert operations.
 
     Attributes:
@@ -102,13 +102,13 @@ class BulkCreator(Generic[TRow]):
 
 
 @dataclass
-class BulkCreatorResult(Generic[TRow]):
+class BulkCreatorResult[TRow: Base]:
     """Result of executing a bulk create operation."""
 
     rows: list[TRow]
 
 
-async def execute_bulk_creator(
+async def execute_bulk_creator[TRow: Base](
     db_sess: SASession,
     bulk_creator: BulkCreator[TRow],
 ) -> BulkCreatorResult[TRow]:

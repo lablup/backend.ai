@@ -208,8 +208,8 @@ class UserIDValidator:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        raise UserNotFoundError(f"No such user {value} in system")
+                    except KeyError as e:
+                        raise UserNotFoundError(f"No such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -268,8 +268,8 @@ class GroupIDValidator:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        raise GroupNotFoundError(f"No such group {value} in system")
+                    except KeyError as e:
+                        raise GroupNotFoundError(f"No such group {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(

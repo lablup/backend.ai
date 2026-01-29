@@ -6,5 +6,4 @@ RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-client==${PKGVER} --
 
 FROM python:${PYTHON_VERSION}
 COPY --from=builder /wheels /wheels
-RUN mkdir -p /root/.ssh
 RUN pip install --no-cache-dir /wheels/*.whl

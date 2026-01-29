@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import click
 
@@ -9,11 +9,14 @@ from ai.backend.common.cli import LazyGroup
 
 from .context import CLIContext
 
+if TYPE_CHECKING:
+    from ai.backend.logging import BraceStyleAdapter
+
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger():
+def _get_logger() -> BraceStyleAdapter:
     import logging
 
     from ai.backend.logging import BraceStyleAdapter
@@ -109,7 +112,7 @@ async def _generate() -> dict[str, Any]:
     subapps: list[web.Application] = []
     for subapp in global_subapp_pkgs:
         pkg = importlib.import_module("ai.backend.appproxy.coordinator.api" + subapp)
-        app, _ = pkg.create_app(cors_options)
+        app, _ = pkg.create_app(cors_options)  # type: ignore
         subapps.append(app)
     return generate_openapi("Proxy Coordinator", subapps, verbose=True)
 
@@ -165,7 +168,9 @@ def generate_openapi_spec(output: Path) -> None:
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(
+    cli_ctx: CLIContext, container_name: str | None, psql_help: bool, psql_args: list[str]
+) -> None:
     """
     Run the database shell.
 
@@ -238,23 +243,27 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> click.Group:  # type: ignore[empty-body]
     """Command set for dependency verification and validation."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
-def health():
+def health() -> click.Group:  # type: ignore[empty-body]
     """Command set for health checking."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dbschema:cli")
-def schema():
+def schema() -> click.Group:  # type: ignore[empty-body]
     """Command set for managing the database schema."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.config:cli")
-def config():
+def config() -> click.Group:  # type: ignore[empty-body]
     """Configuration management commands."""
+    ...
 
 
 if __name__ == "__main__":

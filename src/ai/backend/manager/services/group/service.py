@@ -20,6 +20,7 @@ from ai.backend.manager.models.resource_usage import (
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -73,8 +74,6 @@ class GroupService:
         return CreateGroupActionResult(data=group_data)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        from ai.backend.manager.models.user import UserRole
-
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()
@@ -122,8 +121,8 @@ class GroupService:
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
             end_date = start_date + relativedelta(months=+1)
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         result = await self._group_repository.get_container_stats_for_period(
             start_date, end_date, action.group_ids
         )
@@ -141,8 +140,8 @@ class GroupService:
             end_date = end_date + timedelta(days=1)  # include sessions in end_date
             if end_date - start_date > timedelta(days=100):
                 raise InvalidAPIParameters("Cannot query more than 100 days")
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         if end_date <= start_date:
             raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
         log.info(

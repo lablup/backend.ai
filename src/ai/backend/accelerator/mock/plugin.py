@@ -284,6 +284,7 @@ class MockPlugin(AbstractComputePlugin):
                 "memory_size": dev_info["memory_size"],
                 "processing_units": dev_info["subproc_count"],
                 "model_name": dev_info["model_name"],
+                "device_name": self.key,
             }
             match self.key:
                 case "cuda":
@@ -612,8 +613,8 @@ class MockPlugin(AbstractComputePlugin):
         return docker_config
 
     def _get_share(self, device: MockDevice) -> Decimal:
-        if isinstance(device, CUDADevice):
-            assert not device.is_mig_device
+        if isinstance(device, CUDADevice) and device.is_mig_device:
+            raise ValueError("Cannot calculate share for MIG devices")
         return self._get_share_raw(device.memory_size, device.processing_units)
 
     def _get_share_raw(self, memory_size: int, subproc_count: int) -> Decimal:
@@ -641,16 +642,17 @@ class MockPlugin(AbstractComputePlugin):
         active_device_id_list: list[DeviceId] = []
         for slot_type, per_device_alloc in device_alloc.items():
             if slot_type == SlotTypes.UNIQUE:
-                assert len(device_alloc) == 1
-                assert len(per_device_alloc) == 1
+                if len(device_alloc) != 1:
+                    raise ValueError("UNIQUE slot type requires exactly one slot allocation")
+                if len(per_device_alloc) != 1:
+                    raise ValueError("UNIQUE slot type requires exactly one device allocation")
                 device_id = list(per_device_alloc.keys())[0]
                 active_device_id_list.append(device_id)
                 is_unique = True
                 break
-            else:
-                for dev_id, alloc in per_device_alloc.items():
-                    if alloc > 0:
-                        active_device_id_list.append(dev_id)
+            for dev_id, alloc in per_device_alloc.items():
+                if alloc > 0:
+                    active_device_id_list.append(dev_id)
 
         match self.key:
             case "cuda":
@@ -787,7 +789,8 @@ class MockPlugin(AbstractComputePlugin):
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
-        assert self._all_devices is not None
+        if self._all_devices is None:
+            raise RuntimeError("Devices not initialized. Call list_devices() first.")
         format_key = ""
         if self._mode == AllocationModes.DISCRETE:
             format_key = "device"
@@ -795,7 +798,8 @@ class MockPlugin(AbstractComputePlugin):
             format_key = "shares"
         if self.key == DeviceName("cuda"):
             for device in self._all_devices:
-                assert isinstance(device, CUDADevice)
+                if not isinstance(device, CUDADevice):
+                    raise RuntimeError(f"Expected CUDADevice but got {type(device).__name__}")
                 if device.is_mig_device:
                     format_key = "*-mig"
                     break

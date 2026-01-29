@@ -211,7 +211,7 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
     if isinstance(params["value"], Mapping):
         updates = {}
 
-        def flatten(prefix, o):
+        def flatten(prefix: str, o: Mapping[str, Any]) -> None:
             for k, v in o.items():
                 inner_prefix = prefix if k == "" else f"{prefix}/{k}"
                 if isinstance(v, Mapping):
@@ -284,7 +284,7 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
 
 
 @superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
+async def get_docker_registries(request: web.Request) -> web.StreamResponse:
     """
     Returns the list of all registered docker registries.
     """

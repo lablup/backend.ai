@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, Optional, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -49,7 +51,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -104,7 +106,7 @@ class KernelCancelledBroadcastEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -134,7 +136,7 @@ class KernelTerminationEvent(BaseKernelEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),

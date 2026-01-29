@@ -48,7 +48,6 @@ from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     EventHandler,
     EventProducer,
 )
@@ -59,6 +58,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
 )
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -121,7 +121,8 @@ def calculate_remaining_time(
 
 async def get_db_now(dbconn: SAConnection) -> datetime:
     result = await dbconn.scalar(sa.select(sa.func.now()))
-    assert result is not None
+    if result is None:
+        raise IdlePolicyNotFound("Failed to retrieve current database timestamp")
     return result
 
 
@@ -208,14 +209,14 @@ class IdleCheckerHost:
         # NewUserGracePeriodChecker will be initialized in start() method
         self._grace_period_checker = NewUserGracePeriodChecker(self._valkey_live)
 
-    def add_checker(self, checker: BaseIdleChecker):
+    def add_checker(self, checker: BaseIdleChecker) -> None:
         if self._frozen:
             raise RuntimeError(
                 "Cannot add a new idle checker after the idle checker host is frozen."
             )
         self._checkers.append(checker)
 
-    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker):
+    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker) -> None:
         if self._frozen:
             raise RuntimeError(
                 "Cannot add a new event dispatch idle checker after the idle checker host is frozen."
@@ -337,7 +338,7 @@ class IdleCheckerHost:
                     if isinstance(check_result, BaseExceptionGroup):
                         errors.extend(check_result.exceptions)
                         continue
-                    elif isinstance(check_result, BaseException):
+                    if isinstance(check_result, BaseException):
                         # mark to be destroyed afterwards
                         errors.append(check_result)
                         continue

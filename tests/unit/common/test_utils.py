@@ -45,9 +45,9 @@ def test_generate_uuid() -> None:
 def test_random_seq() -> None:
     assert [*get_random_seq(10, 11, 1)] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert [*get_random_seq(10, 6, 2)] == [0, 2, 4, 6, 8, 10]
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         [*get_random_seq(10, 12, 1)]
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         [*get_random_seq(10, 7, 2)]
     for _ in range(30):
         result = [*get_random_seq(10, 9, 1)]

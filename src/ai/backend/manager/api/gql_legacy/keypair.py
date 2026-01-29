@@ -38,8 +38,9 @@ __all__ = (
     "UserInfo",
 )
 
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import agg_to_array
 
@@ -74,9 +75,9 @@ class UserInfo(graphene.ObjectType):
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
     ) -> Sequence[Optional[UserInfo]]:
-        async with ctx.db.begin_readonly() as conn:
-            from .user import users
+        from ai.backend.manager.models.user.row import users
 
+        async with ctx.db.begin_readonly() as conn:
             query = (
                 sa.select(users.c.uuid, users.c.email, users.c.full_name)
                 .select_from(users)
@@ -199,7 +200,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_compute_sessions(
         self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
-    ):
+    ) -> list[ComputeSession]:
         ctx: GraphQueryContext = info.context
 
         if raw_status is not None:
@@ -234,7 +235,7 @@ class KeyPair(graphene.ObjectType):
         is_active: Optional[bool] = None,
         limit: Optional[int] = None,
     ) -> Sequence[KeyPair]:
-        from .user import users
+        from ai.backend.manager.models.user.row import users
 
         j = sa.join(
             keypairs,
@@ -295,8 +296,8 @@ class KeyPair(graphene.ObjectType):
         is_active: Optional[bool] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -330,8 +331,8 @@ class KeyPair(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[KeyPair]:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -380,8 +381,8 @@ class KeyPair(graphene.ObjectType):
         domain_name: Optional[str] = None,
         is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -421,8 +422,8 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: Optional[str] = None,
     ) -> Sequence[Optional[KeyPair]]:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -501,12 +502,12 @@ class CreateKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from .user import users
+        from ai.backend.manager.models.user.row import users
 
         graph_ctx: GraphQueryContext = info.context
         data = prepare_new_keypair(user_id, props.to_creator())
@@ -530,7 +531,7 @@ class ModifyKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
         props: ModifyKeyPairInput,
@@ -558,11 +559,11 @@ class DeleteKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        from .user import UserRow
+        from ai.backend.manager.models.user.row import UserRow
 
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:

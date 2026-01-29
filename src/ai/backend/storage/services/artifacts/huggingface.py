@@ -12,7 +12,8 @@ from typing import Any, Final, Optional, override
 import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -40,7 +41,7 @@ from ai.backend.storage.client.huggingface import (
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
@@ -54,7 +55,6 @@ from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportPipeline,
     ImportStep,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.storage_pool import StoragePool
 

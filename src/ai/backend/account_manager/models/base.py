@@ -5,7 +5,6 @@ from collections.abc import Callable
 from typing import (
     Any,
     ClassVar,
-    Generic,
     Self,
     TypeVar,
     cast,
@@ -46,7 +45,7 @@ pgsql_connect_opts = {
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID(TypeDecorator, Generic[UUID_SubType]):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -56,12 +55,14 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator:
         if dialect.name == "postgresql":
-            return dialect.type_descriptor(UUID())
-        return dialect.type_descriptor(CHAR(16))
+            return cast(TypeDecorator, dialect.type_descriptor(UUID()))
+        return cast(TypeDecorator, dialect.type_descriptor(CHAR(16)))
 
-    def process_bind_param(self, value: UUID_SubType | uuid.UUID | None, dialect):
+    def process_bind_param(
+        self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect
+    ) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -81,7 +82,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 case _:
                     return uuid.UUID(value).bytes
 
-    def process_result_value(self, value: Any, dialect) -> UUID_SubType | None:
+    def process_result_value(self, value: Any, dialect: Dialect) -> UUID_SubType | None:
         if value is None:
             return value
         cls = type(self)
@@ -95,7 +96,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
-class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -133,9 +134,9 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
 class PasswordColumn(TypeDecorator):
     impl = VARCHAR
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(self, value: Any, dialect: Dialect) -> str:
         return hash_password(value)
 
 
-def IDColumn(name="id"):
+def IDColumn(name: str = "id") -> sa.Column:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))

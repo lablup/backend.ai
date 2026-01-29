@@ -36,11 +36,11 @@ class WebSocketProxy:
         self.upstream_buffer = asyncio.Queue()
         self.upstream_buffer_task = None
 
-    async def proxy(self):
+    async def proxy(self) -> None:
         asyncio.ensure_future(self.downstream())
         await self.upstream()
 
-    async def upstream(self):
+    async def upstream(self) -> None:
         try:
             async for msg in self.down_conn:
                 if msg.type in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
@@ -57,7 +57,7 @@ class WebSocketProxy:
         finally:
             await self.close_downstream()
 
-    async def downstream(self):
+    async def downstream(self) -> None:
         try:
             self.upstream_buffer_task = asyncio.ensure_future(self.consume_upstream_buffer())
             print_info("websocket proxy started")
@@ -77,7 +77,7 @@ class WebSocketProxy:
             await self.close_upstream()
             print_info("websocket proxy terminated")
 
-    async def consume_upstream_buffer(self):
+    async def consume_upstream_buffer(self) -> None:
         try:
             while True:
                 data, tp = await self.upstream_buffer.get()
@@ -89,14 +89,14 @@ class WebSocketProxy:
         except asyncio.CancelledError:
             pass
 
-    async def send(self, msg: str, tp: aiohttp.WSMsgType):
+    async def send(self, msg: str, tp: aiohttp.WSMsgType) -> None:
         await self.upstream_buffer.put((msg, tp))
 
-    async def close_downstream(self):
+    async def close_downstream(self) -> None:
         if not self.down_conn.closed:
             await self.down_conn.close()
 
-    async def close_upstream(self):
+    async def close_upstream(self) -> None:
         if not self.upstream_buffer_task.done():
             self.upstream_buffer_task.cancel()
             await self.upstream_buffer_task
@@ -108,14 +108,15 @@ def _translate_headers(upstream_request: Request, client_request: Request) -> No
     for k, v in client_request.headers.items():
         upstream_request.headers[k] = v
     api_endpoint = upstream_request.config.endpoint
-    assert api_endpoint.host is not None
+    if api_endpoint.host is None:
+        raise RuntimeError("API endpoint host is not configured")
     if api_endpoint.is_default_port():
         upstream_request.headers["Host"] = api_endpoint.host
     else:
         upstream_request.headers["Host"] = f"{api_endpoint.host}:{api_endpoint.port}"
 
 
-async def web_handler(request):
+async def web_handler(request: web.Request) -> web.StreamResponse:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         # We treat all requests and responses as streaming universally
@@ -166,7 +167,7 @@ async def web_handler(request):
         )
 
 
-async def websocket_handler(request):
+async def websocket_handler(request: web.Request) -> web.WebSocketResponse | web.Response:
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
         api_request = Request(
@@ -212,7 +213,7 @@ async def proxy_context(app: web.Application) -> AsyncIterator[None]:
         yield
 
 
-def create_proxy_app():
+def create_proxy_app() -> web.Application:
     app = web.Application()
     app.cleanup_ctx.append(proxy_context)
 
@@ -234,7 +235,7 @@ def create_proxy_app():
     help="The TCP port to accept non-encrypted non-authorized API requests.",
 )
 @click.pass_context
-def proxy(ctx, bind, port):
+def proxy(ctx: click.Context, bind: str, port: int) -> None:
     """
     Run a non-encrypted non-authorized API proxy server.
     Use this only for development and testing!

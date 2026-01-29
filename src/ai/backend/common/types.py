@@ -23,7 +23,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Generic,
     Literal,
     NewType,
     NotRequired,
@@ -217,7 +216,8 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
@@ -236,7 +236,7 @@ class CIStrEnum(enum.StrEnum):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """
@@ -248,8 +248,10 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
         try:
             # Assume that the enum values are lowercases.
             return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+        except (KeyError, ValueError) as e:
+            raise self._failure(
+                f"value is not a valid member of {self.enum_cls.__name__}", value=value
+            ) from e
 
 
 T1 = TypeVar("T1")
@@ -259,28 +261,28 @@ T4 = TypeVar("T4")
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1](
     value: tuple[Any],
     types: tuple[type[T1]],
 ) -> tuple[T1]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2](
     value: tuple[Any, Any],
     types: tuple[type[T1], type[T2]],
 ) -> tuple[T1, T2]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3](
     value: tuple[Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3]],
 ) -> tuple[T1, T2, T3]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3, T4](
     value: tuple[Any, Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3], type[T4]],
 ) -> tuple[T1, T2, T3, T4]: ...
@@ -514,7 +516,8 @@ class ClusterMode(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: object) -> Optional[ClusterMode]:
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
         match value.lower():
             case "single-node" | "single_node":
@@ -663,10 +666,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         return f"{self.host}:{self.port}"
 
 
-_Address = TypeVar("_Address", bound=ipaddress.IPv4Network | ipaddress.IPv6Network)
-
-
-class ReadableCIDR(Generic[_Address]):
+class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     """
     Convert wild-card based IP address into CIDR.
 
@@ -674,16 +674,16 @@ class ReadableCIDR(Generic[_Address]):
     192.10.*.* -> 192.10.0.0/16
     """
 
-    _address: _Address | None
+    _address: Address | None
 
     def __init__(self, address: str | None, is_network: bool = True) -> None:
         self._is_network = is_network
         self._address = self._convert_to_cidr(address) if address is not None else None
 
-    def _convert_to_cidr(self, value: str) -> _Address:
+    def _convert_to_cidr(self, value: str) -> Address:
         str_val = str(value)
         if not self._is_network:
-            return cast(_Address, ip_address(str_val))
+            return cast(Address, ip_address(str_val))
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
@@ -695,14 +695,14 @@ class ReadableCIDR(Generic[_Address]):
         return self._to_ip_network(str_val)
 
     @staticmethod
-    def _to_ip_network(val: str) -> _Address:
+    def _to_ip_network(val: str) -> Address:
         try:
-            return cast(_Address, ip_network(val))
-        except ValueError:
-            raise InvalidIpAddressValue
+            return cast(Address, ip_network(val))
+        except ValueError as e:
+            raise InvalidIpAddressValue from e
 
     @property
-    def address(self) -> _Address | None:
+    def address(self) -> Address | None:
         return self._address
 
     def __str__(self) -> str:
@@ -711,7 +711,8 @@ class ReadableCIDR(Generic[_Address]):
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
+        if not isinstance(other, ReadableCIDR):
+            raise TypeError("Only can compare ReadableCIDR objects.")
         return self.address == other.address
 
 
@@ -766,12 +767,12 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except (ArithmeticError, IndexError):
-                raise ValueError("Unconvertible value", orig_expr, ending)
+            except (ArithmeticError, IndexError) as e:
+                raise ValueError("Unconvertible value", orig_expr, ending) from e
             try:
                 multiplier = cls.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_expr)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_expr) from e
             return cls(dec_expr * multiplier)
 
     @classmethod
@@ -801,8 +802,8 @@ class BinarySize(int):
             return cls(int(expr))
         return cls._parse_str(expr)
 
-    def _preformat(self):
-        scale = self
+    def _preformat(self) -> int:
+        scale: int = int(self)
         suffix_idx = 0
         while scale >= 1024:
             scale //= 1024
@@ -810,7 +811,7 @@ class BinarySize(int):
         return suffix_idx
 
     @staticmethod
-    def _quantize(val, multiplier):
+    def _quantize(val: int | Decimal, multiplier: int) -> Decimal:
         d = Decimal(val) / Decimal(multiplier)
         if d == d.to_integral():
             value = d.quantize(Decimal(1))
@@ -829,7 +830,7 @@ class BinarySize(int):
         value = self._quantize(self, multiplier)
         return f"{value:f} {suffix.upper()}iB"
 
-    def __format__(self, format_spec) -> str:
+    def __format__(self, format_spec: str) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
@@ -927,14 +928,16 @@ class ResourceSlot(UserDict[str, Decimal]):
             self.data[k] = Decimal(0)
 
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can add ResourceSlot to ResourceSlot.")
         self.sync_keys(other)
         return type(self)({
             k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
         })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can subtract ResourceSlot from ResourceSlot.")
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
@@ -944,19 +947,22 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in sorted(self.data.keys())]
         other_values = [other.data[k] for k in sorted(other.data.keys())]
         return self_values == other_values
 
     def __ne__(self, other: object) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         return not self.__eq__(other)
 
     def eq_contains(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_other_keys = other.keys() - self.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -964,22 +970,25 @@ class ResourceSlot(UserDict[str, Decimal]):
         return self_values == other_values and all(other[k] == 0 for k in only_other_keys)
 
     def eq_contained(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_self_keys = self.keys() - other.keys()
         self_values = [self.data[k] for k in common_keys]
         other_values = [other.data[k] for k in common_keys]
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
-    def __le__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
-    def __lt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
@@ -987,15 +996,17 @@ class ResourceSlot(UserDict[str, Decimal]):
             self_values == other_values
         )
 
-    def __ge__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
-    def __gt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
@@ -1029,8 +1040,8 @@ class ResourceSlot(UserDict[str, Decimal]):
         except (
             ArithmeticError,
             ValueError,  # catch wrapped errors from BinarySize.from_str()
-        ):
-            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
+        ) as e:
+            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}") from e
         return value
 
     @classmethod
@@ -1066,7 +1077,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
         return cls(data)
 
     @classmethod
@@ -1098,7 +1109,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             extra_guide = ""
             if e.args[0] == "shmem":
                 extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
@@ -1109,7 +1120,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
@@ -1217,7 +1228,7 @@ class VFolderID:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
     def __hash__(self) -> int:
@@ -1315,8 +1326,8 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
-            except ValueError:
-                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            except ValueError as e:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})") from e
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
@@ -1733,7 +1744,7 @@ class RedisProfileTarget:
         return self._base_target
 
     @staticmethod
-    def _parse_addr(addr_data) -> HostPortPair:
+    def _parse_addr(addr_data: Any) -> HostPortPair:
         match addr_data:
             case HostPortPair(host=host, port=port):
                 return HostPortPair(host, port)
@@ -1839,7 +1850,7 @@ class VolumeMountableNodeType(enum.StrEnum):
     STORAGE_PROXY = enum.auto()
 
 
-SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
+type SSLContextType = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):
@@ -1899,10 +1910,7 @@ class PromMetric(metaclass=ABCMeta):
         pass
 
 
-MetricType = TypeVar("MetricType", bound=PromMetric)
-
-
-class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
+class PromMetricGroup[MetricType: PromMetric](metaclass=ABCMeta):
     """
     Support text format to expose metric data to Prometheus.
     ref: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
@@ -1959,7 +1967,7 @@ ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class DispatchResult(Generic[ResultType]):
+class DispatchResult[ResultType]:
     result: Optional[ResultType] = None
     errors: list[str] = field(default_factory=list)
 

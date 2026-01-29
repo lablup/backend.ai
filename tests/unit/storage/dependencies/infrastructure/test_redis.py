@@ -5,14 +5,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.storage.config.unified import EtcdConfig, StorageProxyUnifiedConfig
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.storage.config.loaders import make_etcd
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.redis import (
     RedisProvider,
     StorageProxyValkeyClients,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestRedisProvider:
@@ -44,8 +46,6 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[AsyncEtcd, None]:
         """Create an etcd client for testing."""
-        from ai.backend.storage.config.loaders import make_etcd
-
         redis_container_id, redis_addr = redis_container
 
         async with make_etcd(storage_config) as etcd:

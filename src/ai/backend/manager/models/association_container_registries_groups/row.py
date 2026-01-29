@@ -20,13 +20,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 
 
-def _get_container_registry_join_condition():
+def _get_container_registry_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-def _get_group_join_condition():
+def _get_group_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.group import GroupRow
 
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)

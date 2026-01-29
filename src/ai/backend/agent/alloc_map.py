@@ -54,7 +54,7 @@ class DeviceSlotInfo:
     amount: Decimal
 
 
-def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
+def distribute[T](num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
     base, extra = divmod(num_items, len(groups))
     return dict(
         zip(
@@ -65,7 +65,7 @@ def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
     )
 
 
-def round_down(from_dec: Decimal, with_dec: Decimal):
+def round_down(from_dec: Decimal, with_dec: Decimal) -> Decimal:
     remainder = from_dec.remainder_near(with_dec)
     if remainder < 0:
         remainder += with_dec

@@ -32,7 +32,7 @@ class RevisionHistory(TypedDict):
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 
@@ -45,7 +45,7 @@ def cli(args) -> None:
     help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
-def show(cli_ctx: CLIContext, alembic_config) -> None:
+def show(cli_ctx: CLIContext, alembic_config: str) -> None:
     """Show the current schema information."""
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext

@@ -7,8 +7,11 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -17,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -42,9 +46,10 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.dotfile import prepare_dotfiles
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
@@ -52,21 +57,37 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session import (
+    PRIVATE_SESSION_TYPES,
+    SessionDependencyRow,
+    SessionRow,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
+from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.rbac.field_creator import (
+    RBACBulkFieldCreator,
+    execute_rbac_bulk_field_creator,
+)
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
+from ai.backend.manager.repositories.scheduler.types.results import (
+    ScheduledSessionData,
+)
 from ai.backend.manager.repositories.scheduler.types.scaling_group import ScalingGroupMeta
 from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
 from ai.backend.manager.repositories.scheduler.types.search import (
@@ -93,10 +114,11 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionEnqueueData,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
+from ai.backend.manager.repositories.session.creators import (
+    KernelRowCreatorSpec,
+    SessionRowCreatorSpec,
 )
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AgentOccupancy,
     AllocationBatch,
     ImageConfigData,
@@ -117,6 +139,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWithKernels,
     UserResourcePolicy,
 )
+from ai.backend.manager.types import UserScope
 
 from .types import KeypairConcurrencyData, SessionRowCache
 
@@ -1114,9 +1137,23 @@ class ScheduleDBSource:
                 )
                 kernels.append(kernel_row)
 
-            # Add session and kernels to database
-            db_sess.add(session)
-            db_sess.add_all(kernels)
+            # Use RBACEntityCreator to create session with RBAC scope association
+            rbac_creator = RBACEntityCreator(
+                spec=SessionRowCreatorSpec(row=session),
+                scope_type=ScopeType.USER,
+                scope_id=str(session_data.user_uuid),
+                entity_type=EntityType.SESSION,
+            )
+            await execute_rbac_entity_creator(db_sess, rbac_creator)
+
+            # Use RBACBulkFieldCreator to create kernels with RBAC field association
+            kernel_field_creator = RBACBulkFieldCreator(
+                specs=[KernelRowCreatorSpec(row=k) for k in kernels],
+                entity_type=EntityType.SESSION,
+                entity_id=str(session_data.id),
+                field_type=FieldType.KERNEL,
+            )
+            await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
             await db_sess.flush()
 
             # Add session dependencies if any
@@ -1138,7 +1175,7 @@ class ScheduleDBSource:
         self,
         spec: SessionCreationSpec,
         scaling_group_name: str,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
     ) -> SessionCreationContext:
         """
@@ -1329,9 +1366,9 @@ class ScheduleDBSource:
     async def _fetch_vfolder_mounts(
         self,
         db_sess: SASession,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
-        user_scope,
+        user_scope: UserScope,
         resource_policy: dict[str, Any],
         combined_mounts: list[str],
         combined_mount_map: dict[str | UUID, str],
@@ -1340,8 +1377,6 @@ class ScheduleDBSource:
         """
         Fetch vfolder mounts for the session using existing DB session.
         """
-        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-
         # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
@@ -1360,15 +1395,13 @@ class ScheduleDBSource:
     async def _fetch_dotfiles(
         self,
         db_sess: SASession,
-        user_scope,
+        user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list,
     ) -> dict[str, Any]:
         """
         Fetch dotfile data for the session using existing DB session.
         """
-        from ai.backend.manager.models.dotfile import prepare_dotfiles
-
         # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
@@ -1401,9 +1434,9 @@ class ScheduleDBSource:
 
     async def prepare_vfolder_mounts(
         self,
-        storage_manager,
+        storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
-        user_scope,
+        user_scope: UserScope,
         resource_policy: dict[str, Any],
         combined_mounts: list[str],
         combined_mount_map: dict[str | UUID, str],
@@ -1412,8 +1445,6 @@ class ScheduleDBSource:
         """
         Prepare vfolder mounts for the session.
         """
-        from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-
         async with self._begin_readonly_read_committed() as conn:
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -1429,16 +1460,13 @@ class ScheduleDBSource:
 
     async def prepare_dotfiles(
         self,
-        user_scope,
+        user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list,
     ) -> dict[str, Any]:
         """
         Prepare dotfile data for the session.
         """
-
-        from ai.backend.manager.models.dotfile import prepare_dotfiles
-
         async with self._begin_readonly_read_committed() as conn:
             dotfile_data = await prepare_dotfiles(
                 conn,
@@ -2808,8 +2836,6 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        from collections import defaultdict
-
         session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 
@@ -3030,9 +3056,6 @@ class ScheduleDBSource:
         :param access_key: The access key to query
         :return: KeypairConcurrencyData with both regular and sftp counts
         """
-        from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-        from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
-
         async with self._begin_readonly_session_read_committed() as db_sess:
             # Base query for active kernels
             base_query = (
@@ -3596,8 +3619,6 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        from collections import defaultdict
-
         session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 

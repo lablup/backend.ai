@@ -3,6 +3,7 @@ Simple tests for User Service functionality based on test scenarios.
 Tests the core user service actions to verify compatibility with test scenarios.
 """
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -223,8 +224,6 @@ class TestUserServiceCompatibility:
         )
 
         # Use a valid UUID format instead of "test-user-id"
-        import uuid
-
         test_user_uuid = str(uuid.uuid4())
         action = UserMonthStatsAction(user_id=test_user_uuid)
 

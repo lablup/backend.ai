@@ -1,11 +1,15 @@
 import uuid
+from collections.abc import Iterator
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.user.types import UserData
-from ai.backend.manager.models.user import UserRole
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
@@ -16,48 +20,93 @@ from ai.backend.manager.services.model_serving.exceptions import (
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
+from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
 
 
-@pytest.fixture
-def mock_check_user_access_scale(mocker, auto_scaling_service):
-    mock = mocker.patch.object(
-        auto_scaling_service,
-        "check_user_access",
-        new_callable=AsyncMock,
-    )
-    mock.return_value = None
-    return mock
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_scale(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_endpoint_by_id",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_access_validation_data_scale(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_endpoint_access_validation_data",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_update_endpoint_replicas(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "update_endpoint_replicas",
-        new_callable=AsyncMock,
-    )
-
-
 class TestScaleServiceReplicas:
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, user_data: UserData) -> Iterator[None]:
+        with with_user(user_data):
+            yield
+
+    @pytest.fixture
+    def mock_action_monitor(self) -> MagicMock:
+        return MagicMock(spec=ActionMonitor)
+
+    @pytest.fixture
+    def mock_repositories(self) -> MagicMock:
+        mock = MagicMock(spec=ModelServingRepositories)
+        mock.repository = MagicMock(spec=ModelServingRepository)
+        return mock
+
+    @pytest.fixture
+    def auto_scaling_service(
+        self,
+        mock_repositories: MagicMock,
+    ) -> AutoScalingService:
+        return AutoScalingService(
+            repository=mock_repositories.repository,
+        )
+
+    @pytest.fixture
+    def auto_scaling_processors(
+        self,
+        mock_action_monitor: MagicMock,
+        auto_scaling_service: AutoScalingService,
+    ) -> ModelServingAutoScalingProcessors:
+        return ModelServingAutoScalingProcessors(
+            service=auto_scaling_service,
+            action_monitors=[mock_action_monitor],
+        )
+
+    @pytest.fixture
+    def mock_check_user_access_scale(self, mocker, auto_scaling_service) -> AsyncMock:
+        mock = mocker.patch.object(
+            auto_scaling_service,
+            "check_user_access",
+            new_callable=AsyncMock,
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_get_endpoint_by_id_scale(self, mocker, mock_repositories) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "get_endpoint_by_id",
+            new_callable=AsyncMock,
+        )
+
+    @pytest.fixture
+    def mock_get_endpoint_access_validation_data_scale(
+        self, mocker, mock_repositories
+    ) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "get_endpoint_access_validation_data",
+            new_callable=AsyncMock,
+        )
+
+    @pytest.fixture
+    def mock_update_endpoint_replicas(self, mocker, mock_repositories) -> AsyncMock:
+        return mocker.patch.object(
+            mock_repositories.repository,
+            "update_endpoint_replicas",
+            new_callable=AsyncMock,
+        )
+
     @pytest.mark.parametrize(
         "scenario",
         [

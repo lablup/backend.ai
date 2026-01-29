@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from ai.backend.kernel import BaseRunner
 
@@ -17,7 +19,7 @@ class Runner(BaseRunner):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         self.user_input_queue = asyncio.Queue()
 
         # Load H2O Daemon.
@@ -53,7 +55,7 @@ class Runner(BaseRunner):
         log.error('cannot find the main script ("main.py").')
         return 127
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[list, dict] | None:
         if service_info["name"] in ["jupyter", "jupyterlab"]:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", suffix=".py", delete=False

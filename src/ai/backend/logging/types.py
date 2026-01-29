@@ -4,7 +4,7 @@ import enum
 from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, Self, TypedDict, TypeVar, override
+from typing import Any, Self, TypedDict, TypeVar, override
 
 import trafaret as t
 
@@ -18,7 +18,8 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
@@ -37,7 +38,7 @@ class CIStrEnum(enum.StrEnum):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """
@@ -109,12 +110,12 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_value)
+            except ArithmeticError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             try:
                 multiplier = self.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_value)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             return int(dec_expr * multiplier)
 
 

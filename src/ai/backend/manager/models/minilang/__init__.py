@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import sqlalchemy as sa
 
@@ -21,7 +21,7 @@ class ORMFieldItem(NamedTuple):
 TEnum = TypeVar("TEnum", bound=Enum)
 
 
-class EnumFieldItem(NamedTuple, Generic[TEnum]):
+class EnumFieldItem[TEnum: Enum](NamedTuple):
     column_name: str
     enum_cls: TEnum
 
@@ -34,12 +34,13 @@ OrderSpecItem = tuple[
 ]
 
 
-def get_col_from_table(table, column_name: str):
-    try:
+def get_col_from_table(
+    table: sa.Table | sa.sql.Join | type, column_name: str
+) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
+    if isinstance(table, (sa.Table, sa.sql.Join)):
         return table.c[column_name]
-    except AttributeError:
-        # For ORM class table
-        return getattr(table, column_name)
+    # For ORM class table
+    return getattr(table, column_name)
 
 
 class ExternalTableFilterSpec:

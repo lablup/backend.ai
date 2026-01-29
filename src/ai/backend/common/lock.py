@@ -39,7 +39,8 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
     config_iv: ClassVar[t.Trafaret] = t.Dict().allow_extra("*")
 
     def __init__(self, *, lifetime: Optional[float] = None) -> None:
-        assert lifetime is None or lifetime >= 0.0
+        if lifetime is not None and lifetime < 0.0:
+            raise ValueError("Lifetime must be non-negative")
         self._lifetime = lifetime
 
     @abc.abstractmethod
@@ -85,8 +86,10 @@ class FileLock(AbstractDistributedLock):
             log.debug("file lock implicitly released: {}", self._path)
 
     async def acquire(self) -> None:
-        assert self._file is None
-        assert not self._locked
+        if self._file is not None:
+            raise RuntimeError("File is already opened")
+        if self._locked:
+            raise RuntimeError("Lock is already acquired")
         if not self._path.exists():
             self._path.touch()
         self._file = open(self._path, "wb")
@@ -106,11 +109,12 @@ class FileLock(AbstractDistributedLock):
                         )
                     if self._debug:
                         log.debug("file lock acquired: {}", self._path)
-        except RetryError:
-            raise TimeoutError(f"failed to lock file: {self._path}")
+        except RetryError as e:
+            raise TimeoutError(f"failed to lock file: {self._path}") from e
 
     def release(self) -> None:
-        assert self._file is not None
+        if self._file is None:
+            raise RuntimeError("No file to release")
         if task := self._watchdog_task:
             if not task.done():
                 task.cancel()
@@ -135,10 +139,11 @@ class FileLock(AbstractDistributedLock):
         self.release()
         return None
 
-    async def _watchdog_timer(self, ttl: float):
+    async def _watchdog_timer(self, ttl: float) -> None:
         await asyncio.sleep(ttl)
         if self._locked:
-            assert self._file is not None
+            if self._file is None:
+                raise RuntimeError("File is not opened but lock is marked as acquired")
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
@@ -192,7 +197,8 @@ class EtcdLock(AbstractDistributedLock):
         return etcd_communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._etcd_client is not None
+        if self._etcd_client is None:
+            raise RuntimeError("Etcd client is not initialized")
         await self._etcd_client.__aexit__(*exc_info)
 
         if self._debug:
@@ -251,12 +257,13 @@ class RedisLock(AbstractDistributedLock):
         try:
             await self._lock.__aenter__()
         except LockError as e:
-            raise TimeoutError(str(e))
+            raise TimeoutError(str(e)) from e
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._lock is not None
+        if self._lock is None:
+            raise RuntimeError("Lock is not initialized")
         try:
             val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
         except LockNotOwnedError:

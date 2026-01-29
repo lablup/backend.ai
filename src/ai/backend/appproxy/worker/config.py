@@ -809,10 +809,10 @@ class ProxyWorkerConfig(BaseSchema):
     def validate_metric_access_allowed_hosts(self) -> Self:
         try:
             ipaddress.IPv4Network(self.metric_access_allowed_hosts)
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 "metric_access_allowed_hosts should be either a valid IPv4 Address or Network"
-            ) from None
+            ) from e
         return self
 
     @model_validator(mode="after")
@@ -1012,7 +1012,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
         else:
             detail = pformat(e)
         print(textwrap.indent(detail, prefix="  "), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         if server_config.debug.enabled:
             print("== Proxy Worker configuration ==", file=sys.stderr)

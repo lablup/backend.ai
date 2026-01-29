@@ -95,10 +95,11 @@ class ConsoleOutputHandler(BaseOutputHandler):
         is_scalar: bool = False,
     ) -> None:
         if is_scalar:
-            assert len(fields) == 1
+            if len(fields) != 1:
+                raise ValueError("Scalar output requires exactly one field")
         if sys.stdout.isatty():
 
-            def infinite_fetch():
+            def infinite_fetch() -> Iterator[_Item]:
                 current_offset = 0
                 page_size = get_preferred_page_size()
                 while True:
@@ -146,7 +147,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
         page_size: Optional[int] = None,
-        plain=False,
+        plain: bool = False,
     ) -> None:
         fields: list[FieldSpec] = []
 

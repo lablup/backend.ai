@@ -26,6 +26,7 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
@@ -52,6 +53,7 @@ from .exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
+from .models.utils import connect_database
 from .types import AppCreator, EventLoopType, WebRequestHandler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -99,14 +101,14 @@ async def exception_middleware(
         raise
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -115,8 +117,8 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
@@ -146,8 +148,6 @@ def handle_loop_error(
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -161,7 +161,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -234,7 +234,9 @@ def build_root_app(
             database_ctx,
         ]
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(
+        cctx: CleanupContext, app: web.Application
+    ) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         cctx_instance = cctx(app["_root.context"])
         app["_cctx_instances"].append(cctx_instance)
@@ -320,9 +322,8 @@ async def server_main(
     try:
         ssl_ctx = None
         if am_config.ssl_enabled:
-            assert am_config.ssl_cert is not None, (
-                "Should set `account_manager.ssl-cert` in config file."
-            )
+            if am_config.ssl_cert is None:
+                raise ValueError("Should set `account_manager.ssl-cert` in config file.")
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
                 str(am_config.ssl_cert),
@@ -458,8 +459,6 @@ def main(
                 log_config = logging.getLogger("ai.backend.account_manager.config")
                 log_config.debug("debug mode enabled.")
                 if account_manager_cfg.event_loop == EventLoopType.UVLOOP:
-                    import uvloop
-
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
                 try:

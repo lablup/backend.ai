@@ -41,7 +41,7 @@ from .types import CLIContext
 
 
 @click.group()
-def notification():
+def notification() -> None:
     """Set of notification operations (channels and rules)"""
 
 
@@ -49,7 +49,7 @@ def notification():
 
 
 @notification.group()
-def channel():
+def channel() -> None:
     """Manage notification channels"""
 
 
@@ -349,7 +349,8 @@ def validate_channel_cmd(
 
             # Get test message content
             test_message = data_file.read() if data_file else data
-            assert test_message is not None  # Type narrowing
+            if test_message is None:
+                raise RuntimeError("Test message is not provided")
 
             request = ValidateNotificationChannelRequest(test_message=test_message)
             result = session.Notification.validate_channel(UUID(channel_id), request)
@@ -369,7 +370,7 @@ def validate_channel_cmd(
 
 
 @notification.group()
-def rule():
+def rule() -> None:
     """Manage notification rules"""
 
 
@@ -536,7 +537,8 @@ def create_rule_cmd(
 
             # Get template content
             message_template = template_file.read() if template_file else template
-            assert message_template is not None  # Already validated above
+            if message_template is None:
+                raise RuntimeError("Message template is not provided")
 
             request = CreateNotificationRuleRequest(
                 name=name,

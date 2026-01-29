@@ -30,5 +30,5 @@ class ModifyDomainNodeActionResult(BaseActionResult):
     domain_data: DomainData
 
     @override
-    def entity_id(self):
+    def entity_id(self) -> str:
         return self.domain_data.name

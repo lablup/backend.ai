@@ -21,7 +21,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import (
     ImageRef,
     arch_name_aliases,

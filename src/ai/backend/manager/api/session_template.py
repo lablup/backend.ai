@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -27,7 +27,7 @@ from ai.backend.manager.models.user import users
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:
@@ -67,8 +67,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except json.JSONDecodeError:
             try:
                 body = yaml.safe_load_all(params["payload"])
-            except (yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed payload")
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
         for st in body:
             template_data = check_task_template(st["template"])
             template_id = uuid.uuid4().hex
@@ -256,9 +256,10 @@ async def put(request: web.Request, params: Any) -> web.Response:
         try:
             body = load_json(params["payload"])
         except json.JSONDecodeError:
-            body = yaml.safe_load(params["payload"])
-        except (yaml.YAMLError, yaml.MarkedYAMLError):
-            raise InvalidAPIParameters("Malformed payload")
+            try:
+                body = yaml.safe_load(params["payload"])
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
         for st in body:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]

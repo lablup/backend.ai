@@ -135,8 +135,8 @@ class Worker(Base, BaseMixin):
         cls,
         session: AsyncSession,
         worker_id: UUID,
-        load_filters=False,
-        load_circuits=False,
+        load_filters: bool = False,
+        load_circuits: bool = False,
     ) -> "Worker":
         query = sa.select(Worker).filter(Worker.id == worker_id)
         if load_filters:
@@ -153,8 +153,8 @@ class Worker(Base, BaseMixin):
         cls,
         session: AsyncSession,
         authority: str,
-        load_filters=False,
-        load_circuits=False,
+        load_filters: bool = False,
+        load_circuits: bool = False,
     ) -> "Worker":
         query = sa.select(Worker).filter(Worker.authority == authority)
         if load_filters:
@@ -170,8 +170,8 @@ class Worker(Base, BaseMixin):
     async def list_workers(
         cls,
         session: AsyncSession,
-        load_filters=False,
-        load_circuits=False,
+        load_filters: bool = False,
+        load_circuits: bool = False,
     ) -> list["Worker"]:
         query = sa.select(Worker)
         if load_filters:
@@ -198,8 +198,8 @@ class Worker(Base, BaseMixin):
         wildcard_domain: str | None = None,
         wildcard_traffic_port: int | None = None,
         traefik_last_used_marker_path: str | None = None,
-        filtered_apps_only=False,
-        status=WorkerStatus.LOST,
+        filtered_apps_only: bool = False,
+        status: WorkerStatus = WorkerStatus.LOST,
     ) -> "Worker":
         w = cls()
         w.id = id
@@ -408,7 +408,7 @@ async def add_circuit(
     *,
     envs: dict[str, Any] | None = None,
     args: str | None = None,
-    open_to_public=False,
+    open_to_public: bool = False,
     allowed_client_ips: str | None = None,
     preferred_port: int | None = None,
     preferred_subdomain: str | None = None,

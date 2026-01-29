@@ -7,7 +7,7 @@ import orjson
 
 
 class ExtendedJSONEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         if isinstance(o, uuid.UUID):
             return str(o)
         if isinstance(o, datetime.datetime):

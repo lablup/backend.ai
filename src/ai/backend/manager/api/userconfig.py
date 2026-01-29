@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
@@ -20,7 +21,7 @@ from ai.backend.manager.models.vfolder import query_accessible_vfolders, vfolder
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:

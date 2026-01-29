@@ -2,13 +2,16 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from typing import Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
-from ai.backend.manager.actions.action.batch import TBatchAction, TBatchActionResult
+from ai.backend.manager.actions.action.batch import (
+    BaseBatchAction,
+    BaseBatchActionResult,
+)
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validator.batch import BatchActionValidator
 
@@ -17,7 +20,10 @@ from .base import ActionRunner
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BatchActionProcessor(Generic[TBatchAction, TBatchActionResult]):
+class BatchActionProcessor[
+    TBatchAction: BaseBatchAction,
+    TBatchActionResult: BaseBatchActionResult,
+]:
     _validators: Sequence[BatchActionValidator]
 
     _runner: ActionRunner[TBatchAction, TBatchActionResult]

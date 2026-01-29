@@ -8,9 +8,8 @@ import trafaret as t
 
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.logging import BraceStyleAdapter, LocalLogger, Logger
-from ai.backend.logging.config import ConsoleConfig, LogDriver, LogFormat, LoggingConfig
-from ai.backend.logging.logger import MsgpackOptions
-from ai.backend.logging.types import LogLevel
+from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
+from ai.backend.logging.types import LogFormat, LogLevel, MsgpackOptions
 
 test_log_config = LoggingConfig(
     version=1,

@@ -6,8 +6,8 @@ to ensure transactional consistency.
 """
 
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
+from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
+from ai.backend.manager.sokovan.data import AllocationBatch
 
 from .allocator import SchedulingAllocator
 

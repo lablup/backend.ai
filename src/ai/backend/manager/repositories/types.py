@@ -1,11 +1,11 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Optional, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
-from sqlalchemy.sql.elements import BooleanClauseList
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -80,7 +80,7 @@ class ModelConverter(Protocol):
         ...
 
 
-class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
+class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering]:
     """
     Generic query builder for constructing SQLAlchemy queries with pagination support.
     """
@@ -104,7 +104,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         order_clauses: list[tuple[sa.Column, bool]],
         cursor_uuid: uuid.UUID,
         pagination_order: Optional[ConnectionPaginationOrder],
-    ) -> list[BooleanClauseList]:
+    ) -> list[ColumnElement[bool]]:
         """
         Build lexicographic cursor conditions for multiple ordering fields.
         Generic implementation that works with any model.
@@ -121,7 +121,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         # Cache subqueries to avoid duplication
         subquery_cache = {}
 
-        def get_cursor_value_subquery(column):
+        def get_cursor_value_subquery(column: sa.Column[Any]) -> sa.ScalarSelect[Any]:
             """Get or create cached subquery for cursor value"""
             if column not in subquery_cache:
                 id_column = self.model_class.id
@@ -314,7 +314,7 @@ class BaseFilterOptions(Protocol):
     NOT: Optional[list[Any]]
 
 
-class BaseFilterApplier(ABC, Generic[T]):
+class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
     """Base class for applying filters to queries with common logical operations"""
 
     def apply_filters(self, stmt: Select, filters: T) -> Select:
@@ -419,7 +419,7 @@ class BaseOrderingOptions(Protocol):
     order_by: list[tuple[Any, bool]]
 
 
-class BaseOrderingApplier(ABC, Generic[TOrderingOptions]):
+class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
     """Base class for applying ordering to queries"""
 
     def apply_ordering(

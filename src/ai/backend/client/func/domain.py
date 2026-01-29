@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -177,7 +179,7 @@ class Domain(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, name: str):
+    async def delete(cls, name: str) -> dict:
         """
         Deletes an existing domain.
 
@@ -198,7 +200,7 @@ class Domain(BaseFunction):
 
     @api_function
     @classmethod
-    async def purge(cls, name: str):
+    async def purge(cls, name: str) -> dict:
         """
         Purges an existing domain.
 

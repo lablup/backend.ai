@@ -121,7 +121,7 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
 @click.argument("alias", type=str)
 @click.argument("target", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
-def alias(alias, target, arch):
+def alias(alias: str, target: str, arch: str | None) -> None:
     """Add an image alias."""
     from ai.backend.client.session import Session
 
@@ -134,12 +134,12 @@ def alias(alias, target, arch):
         if result["ok"]:
             print_done(f"An alias has created: {alias} -> {target}")
         else:
-            print_fail("Aliasing has failed: {0}".format(result["msg"]))
+            print_fail("Aliasing has failed: {}".format(result["msg"]))
 
 
 @image.command()
 @click.argument("alias", type=str)
-def dealias(alias):
+def dealias(alias: str) -> None:
     """Remove an image alias."""
     from ai.backend.client.session import Session
 
@@ -152,4 +152,4 @@ def dealias(alias):
         if result["ok"]:
             print_done(f"The alias has been removed: {alias}")
         else:
-            print_fail("Dealiasing has failed: {0}".format(result["msg"]))
+            print_fail("Dealiasing has failed: {}".format(result["msg"]))

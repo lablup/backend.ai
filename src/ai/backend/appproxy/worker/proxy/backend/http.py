@@ -221,8 +221,8 @@ class HTTPBackend(BaseBackend):
                 e,
             )
             raise
-        except ConnectionResetError:
-            raise asyncio.CancelledError()
+        except ConnectionResetError as e:
+            raise asyncio.CancelledError() from e
         except aiohttp.ClientOSError as e:
             raise ContainerConnectionRefused from e
         except:
@@ -237,7 +237,7 @@ class HTTPBackend(BaseBackend):
         async def _proxy_task(
             left: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
             right: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
-            tag="(unknown)",
+            tag: str = "(unknown)",
         ) -> None:
             nonlocal total_bytes
 

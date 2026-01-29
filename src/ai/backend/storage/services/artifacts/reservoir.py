@@ -13,7 +13,8 @@ import aiofiles
 import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -35,7 +36,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
@@ -50,7 +51,6 @@ from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportPipeline,
     ImportStep,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
@@ -840,8 +840,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool and verify it's ObjectStorage type
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(
@@ -883,8 +883,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool to access configuration
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage type")

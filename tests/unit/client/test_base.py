@@ -1,12 +1,12 @@
 import asyncio
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.func.base import BaseFunction, api_function
 from ai.backend.client.session import AsyncSession, Session
-from ai.backend.testutils.mock import AsyncMock
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable, Mapping
 from typing import Optional, Self
 
@@ -51,7 +53,7 @@ class SecurityPolicy:
             for policy_name in response_policy_config:
                 response_policies.append(response_policy_map[policy_name])
         except KeyError as e:
-            raise ValueError(f"Unknown security policy name: {e}")
+            raise ValueError(f"Unknown security policy name: {e}") from e
         if csp_config is not None:
             response_policies.append(csp_policy_builder(csp_config))
         return cls(request_policies, response_policies)

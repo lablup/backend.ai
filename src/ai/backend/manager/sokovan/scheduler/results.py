@@ -18,16 +18,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 
-
-@dataclass
-class ScheduledSessionData:
-    """Data for a scheduled session."""
-
-    session_id: SessionId
-    creation_id: str
-    access_key: AccessKey
-    reason: str
+__all__ = ["ScheduleResult"]
 
 
 @dataclass

@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import Never, Optional, Self, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
@@ -52,7 +54,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],
@@ -96,7 +98,7 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],
@@ -144,7 +146,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Never:
         raise UnreachableError("BgtaskAlreadyDoneEvent should not be deserialized.")
 
     @classmethod
@@ -236,7 +238,7 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],

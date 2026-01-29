@@ -3,10 +3,9 @@ import uuid
 from typing import Any, Optional, cast
 
 import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError, StatementError
+from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
@@ -738,8 +737,7 @@ class ModelServingRepository:
                     user_data = current_user()
                     if user_data is None:
                         raise GenericForbidden("User context not available.")
-                    user_role = UserRole(user_data.role)
-                    match user_role:
+                    match user_data.role:
                         case UserRole.SUPERADMIN:
                             pass
                         case UserRole.ADMIN:
@@ -750,8 +748,9 @@ class ModelServingRepository:
                             user_id = user_data.user_id
                             if endpoint_row.session_owner != user_id:
                                 raise EndpointNotFound
-                except NoResultFound:
-                    raise EndpointNotFound
+                except NoResultFound as e:
+                    raise EndpointNotFound from e
+
                 if endpoint_row.lifecycle_stage in (
                     EndpointLifecycle.DESTROYING,
                     EndpointLifecycle.DESTROYED,

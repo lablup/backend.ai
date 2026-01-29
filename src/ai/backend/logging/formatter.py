@@ -7,17 +7,20 @@ import traceback
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
 
-_SysExcInfoType: TypeAlias = (
+type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
 
 
-def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
+def format_exception(
+    self: logging.Formatter,
+    ei: Sequence[str] | _SysExcInfoType,
+) -> str:
     match ei:
         case (str(), *_):
             # Already foramtted from the source process for ease of serialization
@@ -31,12 +34,12 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
 
 
 class SerializedExceptionFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
 
 class ConsoleFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
@@ -49,7 +52,7 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class CustomJsonFormatter(JsonFormatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def add_fields(

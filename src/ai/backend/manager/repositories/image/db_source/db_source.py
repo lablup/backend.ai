@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from typing import Optional, cast
@@ -16,6 +18,7 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
     ImageDataWithDetails,
+    ImageListResult,
     ImageStatus,
     RescanImagesResult,
 )
@@ -36,6 +39,7 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -146,8 +150,8 @@ class ImageDBSource:
                     ],
                     filter_by_statuses=status_filter,
                 )
-        except UnknownImageReference:
-            raise ImageNotFound
+        except UnknownImageReference as e:
+            raise ImageNotFound from e
         return image_row.to_detailed_dataclass()
 
     async def query_image_details_by_id(
@@ -161,8 +165,8 @@ class ImageDBSource:
                 row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
                 )
-            except UnknownImageReference:
-                raise ImageNotFound()
+            except UnknownImageReference as e:
+                raise ImageNotFound() from e
             return row.to_detailed_dataclass()
 
     async def query_all_images(
@@ -228,10 +232,10 @@ class ImageDBSource:
                 row_id = image_row.id
                 alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
             return row_id, alias_data
-        except ValueError:
-            raise AliasImageActionValueError
+        except ValueError as e:
+            raise AliasImageActionValueError from e
         except DBAPIError as e:
-            raise AliasImageActionDBError(str(e))
+            raise AliasImageActionDBError(str(e)) from e
 
     async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
@@ -291,8 +295,8 @@ class ImageDBSource:
                 if result is None:
                     raise ImageNotFound(f"Image not found (id:{updater.pk_value})")
                 return result.row.to_dataclass()
-        except (ValueError, DBAPIError):
-            raise ModifyImageActionValueError
+        except (ValueError, DBAPIError) as e:
+            raise ModifyImageActionValueError from e
 
     async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str
@@ -320,4 +324,20 @@ class ImageDBSource:
                 await session.delete(image_row)
             return data
         except DBAPIError as e:
-            raise PurgeImageActionByIdObjectDBError(str(e))
+            raise PurgeImageActionByIdObjectDBError(str(e)) from e
+
+    async def search_images(self, querier: BatchQuerier) -> ImageListResult:
+        """
+        Search images using a batch querier with conditions, pagination, and ordering.
+        Returns ImageListResult with items and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageRow.to_dataclass() for row in result.rows]
+            return ImageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

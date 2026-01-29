@@ -110,7 +110,7 @@ class StorageProxyHTTPClient:
                     error_detail=ErrorDetail.CONTENT_TYPE_MISMATCH,
                 ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
-            )
+            ) from e
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain

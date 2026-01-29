@@ -23,8 +23,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Optional,
+    Self,
     TextIO,
-    TypeAlias,
     cast,
 )
 
@@ -40,7 +40,7 @@ from ai.backend.agent.errors.resources import (
     InvalidResourceConfigError,
     ResourceOverAllocatedError,
 )
-from ai.backend.agent.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -79,7 +79,7 @@ if TYPE_CHECKING:
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 
-DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
+type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
@@ -203,7 +203,7 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> KernelResourceSpec:
+    def read_from_string(cls, text: str) -> Self:
         kvpairs = {}
         for line in text.split("\n"):
             if "=" not in line:
@@ -251,12 +251,12 @@ class KernelResourceSpec:
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> KernelResourceSpec:
+    def read_from_file(cls, file: TextIOWrapper) -> Self:
         text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> KernelResourceSpec:
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> Self:
         text = "\n".join(await file.readlines())  # type: ignore
         return cls.read_from_string(text)
 
@@ -518,8 +518,8 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return []
 
 
-ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
-SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
+type ComputersMap = Mapping[DeviceName, ComputerContext]
+type SlotsMap = Mapping[SlotName, Decimal]
 
 
 class ResourceAllocator(aobject):
@@ -827,7 +827,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
-        def accel_lt_intrinsic(item):
+        def accel_lt_intrinsic(item: tuple[str, type[AbstractComputePlugin]]) -> int:
             # push back "intrinsic" plugins (if exists)
             if item[0] in ("cpu", "mem"):
                 return 0
@@ -852,22 +852,25 @@ class Mount:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
-    def from_str(cls, s):
-        source, target, perm = s.split(":")
-        source = Path(source)
+    def from_str(cls, s: str) -> Self:
+        source_str, target_str, perm_str = s.split(":")
+        source_path = Path(source_str)
         type = MountTypes.BIND
-        if not source.is_absolute():
-            if len(source.parts) == 1:
-                source = str(source)
+        source: Optional[Path]
+        if not source_path.is_absolute():
+            if len(source_path.parts) == 1:
+                source = Path(source_str)
                 type = MountTypes.VOLUME
             else:
                 raise ValueError(
-                    "Mount source must be an absolute path if it is not a volume name.", source
+                    "Mount source must be an absolute path if it is not a volume name.", source_path
                 )
-        target = Path(target)
+        else:
+            source = source_path
+        target = Path(target_str)
         if not target.is_absolute():
             raise ValueError("Mount target must be an absolute path.", target)
-        perm = MountPermission(perm)
+        perm = MountPermission(perm_str)
         return cls(type, source, target, perm, None)
 
 

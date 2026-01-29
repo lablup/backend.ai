@@ -5,19 +5,21 @@ from datetime import UTC, datetime
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
     ModelDeploymentStatus,
+    ReadinessStatus,
 )
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    ActivenessStatus,
     ClusterConfigData,
     DeploymentInfo,
     ExtraVFolderMountData,
-    LivenessStatus,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
@@ -25,13 +27,14 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReadinessStatus,
     ReplicaStateData,
     ResourceConfigData,
     RouteInfo,
 )
+from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -326,7 +329,12 @@ class DeploymentService:
                 ),
             ),
         )
-        creator: Creator[EndpointRow] = Creator(spec=creator_spec)
+        creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
+            spec=creator_spec,
+            scope_type=ScopeType.USER,
+            scope_id=str(metadata.created_user),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
 
         # Create endpoint via repository
         deployment_info = await self._deployment_repository.create_endpoint(
@@ -595,8 +603,6 @@ class DeploymentService:
         Raises:
             RouteNotFound: If the route does not exist
         """
-        from ai.backend.manager.errors.service import RoutingNotFound
-
         route = await self._deployment_controller.update_route_traffic_status(
             route_id=action.route_id,
             traffic_status=action.traffic_status,

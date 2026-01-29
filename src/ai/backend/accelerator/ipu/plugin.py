@@ -20,7 +20,6 @@ from ai.backend.agent.resources import (
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
-    StatContext,
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
@@ -28,6 +27,7 @@ from ai.backend.agent.stats import (
     MetricTypes,
     NodeMeasurement,
     ProcessMeasurement,
+    StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common import config
@@ -96,7 +96,7 @@ class IPUPlugin(AbstractComputePlugin):
         self.ipu_config = _config_iv.check(raw_cfg)
         log.info("Read IPU device configs from {}", cfg_src_path)
 
-        def _read_json():
+        def _read_json() -> dict[str, Any]:
             with open(self.ipu_config["ipuof-config-path"]) as fr:
                 return json.loads(fr.read())
 
@@ -173,7 +173,8 @@ class IPUPlugin(AbstractComputePlugin):
             if len(ipv4_subnet) > 1:
                 raise DockerNetworkError(f"Multiple IPv4 configs on network {network_identifier}")
             ip_network = ipaddress.ip_network(ipv4_subnet[0])
-            assert isinstance(ip_network, ipaddress.IPv4Network)
+            if not isinstance(ip_network, ipaddress.IPv4Network):
+                raise RuntimeError(f"Expected IPv4Network but got {type(ip_network).__name__}")
             self.subnet_network_map[ip_network] = network_identifier
 
     def get_docker_network(self, device: IPUDevice) -> str:
@@ -355,7 +356,7 @@ class IPUPlugin(AbstractComputePlugin):
             source_path / "ipuof.conf.d" / Path(self.ipu_config["ipuof-config-path"]).name
         )
 
-        def _write():
+        def _write() -> None:
             generated_ipuof_config_path.parent.mkdir(parents=True)
             with open(generated_ipuof_config_path, "w") as fw:
                 fw.write(json.dumps(generated_ipuof_config))

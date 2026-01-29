@@ -374,7 +374,7 @@ class User(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, email: str):
+    async def delete(cls, email: str) -> dict:
         """
         Inactivates an existing user.
         """
@@ -396,7 +396,7 @@ class User(BaseFunction):
         email: str,
         purge_shared_vfolders: bool = False,
         delegate_endpoint_ownership: bool = False,
-    ):
+    ) -> dict:
         """
         Deletes an existing user.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -26,7 +26,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class RBACEntityCreator(Generic[TRow]):
+class RBACEntityCreator[TRow: Base]:
     """Creator for a single scope-scoped entity.
 
     Attributes:
@@ -43,13 +43,13 @@ class RBACEntityCreator(Generic[TRow]):
 
 
 @dataclass
-class RBACEntityCreatorResult(Generic[TRow]):
+class RBACEntityCreatorResult[TRow: Base]:
     """Result of executing a single entity creation."""
 
     row: TRow
 
 
-async def execute_rbac_entity_creator(
+async def execute_rbac_entity_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACEntityCreator[TRow],
 ) -> RBACEntityCreatorResult[TRow]:
@@ -107,7 +107,7 @@ async def execute_rbac_entity_creator(
 
 
 @dataclass
-class RBACBulkEntityCreator(Generic[TRow]):
+class RBACBulkEntityCreator[TRow: Base]:
     """Bulk creator for multiple scope-scoped entities.
 
     Attributes:
@@ -124,13 +124,13 @@ class RBACBulkEntityCreator(Generic[TRow]):
 
 
 @dataclass
-class RBACBulkEntityCreatorResult(Generic[TRow]):
+class RBACBulkEntityCreatorResult[TRow: Base]:
     """Result of executing a bulk entity creation."""
 
     rows: list[TRow]
 
 
-async def execute_rbac_bulk_entity_creator(
+async def execute_rbac_bulk_entity_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACBulkEntityCreator[TRow],
 ) -> RBACBulkEntityCreatorResult[TRow]:

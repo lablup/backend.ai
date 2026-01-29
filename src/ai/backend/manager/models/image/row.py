@@ -13,7 +13,6 @@ from typing import (
     Any,
     Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
@@ -89,7 +88,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask.bgtask import ProgressReporter
+    from ai.backend.common.bgtask.reporter import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -305,13 +304,13 @@ type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
-def _get_image_endpoint_join_condition():
+def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return ImageRow.id == foreign(EndpointRow.image)
 
 
-def _get_container_registry_join_condition():
+def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
@@ -393,36 +392,36 @@ class ImageRow(Base):
 
     def __init__(
         self,
-        name,
-        project,
-        architecture,
-        registry_id,
-        is_local=False,
-        registry=None,
-        image=None,
-        tag=None,
-        config_digest=None,
-        size_bytes=None,
-        type=None,
-        accelerators=None,
-        labels=None,
-        resources=None,
-        status=ImageStatus.ALIVE,
+        name: str,
+        project: str | None,
+        architecture: str,
+        registry_id: UUID,
+        is_local: bool = False,
+        registry: str | None = None,
+        image: str | None = None,
+        tag: str | None = None,
+        config_digest: str | None = None,
+        size_bytes: int | None = None,
+        type: ImageType | None = None,
+        accelerators: str | None = None,
+        labels: dict[str, Any] | None = None,
+        resources: dict[str, Any] | None = None,
+        status: ImageStatus = ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
-        self.registry = registry
+        self.registry = registry  # type: ignore[assignment]
         self.registry_id = registry_id
-        self.image = image
+        self.image = image  # type: ignore[assignment]
         self.tag = tag
         self.architecture = architecture
         self.is_local = is_local
-        self.config_digest = config_digest
-        self.size_bytes = size_bytes
-        self.type = type
+        self.config_digest = config_digest  # type: ignore[assignment]
+        self.size_bytes = size_bytes  # type: ignore[assignment]
+        self.type = type  # type: ignore[assignment]
         self.accelerators = accelerators
-        self.labels = labels
-        self._resources = resources
+        self.labels = labels  # type: ignore[assignment]
+        self._resources = resources  # type: ignore[assignment]
         self.status = status
 
     @property
@@ -564,7 +563,7 @@ class ImageRow(Base):
             type=image_data.type,
             accelerators=image_data.accelerators,
             labels=image_data.labels.label_data,
-            resources=image_data.resources.resources_data,
+            resources={str(k): v for k, v in image_data.resources.resources_data.items()},
             status=image_data.status,
         )
         image_row.id = image_data.id
@@ -818,7 +817,7 @@ class ImageRow(Base):
 
         return min_slot
 
-    def _parse_row(self):
+    def _parse_row(self) -> dict[str, Any]:
         res_limits = []
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
@@ -833,11 +832,11 @@ class ImageRow(Base):
                 "max": max_value,
             })
 
-        accels = self.accelerators
-        if accels is None:
-            accels = []
+        accels_str = self.accelerators
+        if accels_str is None:
+            accels: list[str] = []
         else:
-            accels = accels.split(",")
+            accels = accels_str.split(",")
 
         return {
             "canonical_ref": self.name,
@@ -866,7 +865,7 @@ class ImageRow(Base):
         self,
         slot_type: str,
         value_range: tuple[Optional[Decimal], Optional[Decimal]],
-    ):
+    ) -> None:
         resources = self._resources
         if resources.get(slot_type) is None:
             resources[slot_type] = {}
@@ -1045,9 +1044,7 @@ class ImageAliasRow(Base):
         return ImageAliasData(id=self.id, alias=self.alias or "")
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])
@@ -1436,7 +1433,7 @@ class ImagePermissionContextBuilder(
     ) -> ImagePermissionContext:
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def global_registry_condition(project_ids: list[Any]):
+        def global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(
@@ -1453,7 +1450,7 @@ class ImagePermissionContextBuilder(
         )
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def non_global_registry_condition(project_ids: list[Any]):
+        def non_global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
                 AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )

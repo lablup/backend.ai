@@ -8,8 +8,8 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.sokovan.data import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
-from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):

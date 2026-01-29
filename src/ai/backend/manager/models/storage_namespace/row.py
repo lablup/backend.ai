@@ -22,7 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("StorageNamespaceRow",)
 
 
-def _get_storage_namespace_join_cond():
+def _get_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id

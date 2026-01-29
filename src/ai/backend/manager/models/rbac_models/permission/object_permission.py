@@ -27,13 +27,13 @@ if TYPE_CHECKING:
     from .permission_group import PermissionGroupRow
 
 
-def _get_role_join_condition():
+def _get_role_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-def _get_scope_association_join_condition():
+def _get_scope_association_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.association_scopes_entities import (
         AssociationScopesEntitiesRow,
     )
@@ -44,7 +44,7 @@ def _get_scope_association_join_condition():
     )
 
 
-def _get_permission_group_join_condition():
+def _get_permission_group_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.permission.permission_group import (
         PermissionGroupRow,
     )

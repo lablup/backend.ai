@@ -28,13 +28,14 @@ from ai.backend.manager.data.domain.types import (
     UserInfo,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
-    ClientContext,
     ScopeType,
     SystemScope,
 )
+from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import get_scaling_groups
 from ai.backend.manager.models.user import UserRole
@@ -106,7 +107,7 @@ class DomainPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(node: Any, _variables: dict | None = None) -> DomainPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return DomainPermission(node.value)
         return None
@@ -169,7 +170,9 @@ class DomainNode(graphene.ObjectType):
             created_at=obj.created_at,
             modified_at=obj.modified_at,
             total_resource_slots=obj.total_resource_slots,
-            allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
+            allowed_vfolder_hosts=(
+                obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
+            ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
@@ -189,7 +192,9 @@ class DomainNode(graphene.ObjectType):
             created_at=obj.created_at,
             modified_at=obj.modified_at,
             total_resource_slots=obj.total_resource_slots,
-            allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
+            allowed_vfolder_hosts=(
+                obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
+            ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
@@ -322,7 +327,7 @@ class DomainNode(graphene.ObjectType):
                 )
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> DomainNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> DomainNode:
         domain_node = await DomainNode.get_node(info, self.id)
         if domain_node is None:
             raise DomainNotFound(f"Domain not found: {self.id}")
@@ -372,7 +377,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
     def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
-        def value_or_none(value):
+        def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
@@ -637,7 +642,7 @@ class DomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
-        def value_or_none(value):
+        def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         return CreateDomainAction(
@@ -716,7 +721,7 @@ class CreateDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: DomainInput,
@@ -752,7 +757,7 @@ class ModifyDomain(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: ModifyDomainInput,
@@ -788,7 +793,7 @@ class DeleteDomain(graphene.Mutation):
     msg = graphene.String()
 
     @classmethod
-    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
@@ -819,7 +824,7 @@ class PurgeDomain(graphene.Mutation):
     msg = graphene.String()
 
     @classmethod
-    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(

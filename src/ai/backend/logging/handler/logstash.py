@@ -100,9 +100,11 @@ class LogstashHandler(logging.Handler):
             ("tags", list(tags)),
         ])
         if self._protocol.startswith("zmq"):
-            assert isinstance(self._sock, zmq.Socket)
+            if not isinstance(self._sock, zmq.Socket):
+                raise RuntimeError(f"Expected ZMQ socket for protocol {self._protocol}")
             self._sock.send_json(log)
         else:
             # TODO: reconnect if disconnected
-            assert isinstance(self._sock, socket.socket)
+            if not isinstance(self._sock, socket.socket):
+                raise RuntimeError(f"Expected socket.socket for protocol {self._protocol}")
             self._sock.sendall(json.dumps(log).encode("utf-8"))

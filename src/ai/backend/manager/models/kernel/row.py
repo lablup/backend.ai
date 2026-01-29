@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -179,7 +179,7 @@ async def get_user_email(
     return user_email.replace("@", "_")
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
@@ -283,8 +283,8 @@ async def handle_kernel_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     kernel_id: KernelId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]
@@ -349,13 +349,13 @@ async def handle_kernel_exception(
 
 
 # Defined for avoiding circular import
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition():
+def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
     from ai.backend.manager.models.image import ImageRow
 
     return sa.and_(
@@ -708,7 +708,7 @@ class KernelRow(Base):
     ) -> KernelRow:
         from ai.backend.manager.models.agent import AgentStatus
 
-        async def _query():
+        async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:
                 query = (
                     sa.select(KernelRow)
@@ -726,7 +726,7 @@ class KernelRow(Base):
                         k
                         for k in result
                         if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row.status == AgentStatus.ALIVE)
+                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
                     ]
                 if not cand:
                     raise SessionNotFound

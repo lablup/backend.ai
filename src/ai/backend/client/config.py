@@ -48,11 +48,11 @@ def parse_api_version(value: str) -> tuple[int, str]:
 T = TypeVar("T")
 
 
-def default_clean(v: T | Any) -> T:
+def default_clean[T](v: T | Any) -> T:
     return cast(T, v)
 
 
-def get_env(
+def get_env[T](
     key: str,
     default: str | Mapping | Undefined = _undefined,
     *,
@@ -127,8 +127,8 @@ def _clean_address_map(v: str | Mapping) -> Mapping:
             k, _, v = assignment.partition("=")
             if k == "" or v == "":
                 raise ValueError
-        except ValueError:
-            raise ValueError(f"{v} is not a valid mapping expression")
+        except ValueError as e:
+            raise ValueError(f"{v} is not a valid mapping expression") from e
         else:
             override_map[k] = v
     return override_map
@@ -212,8 +212,6 @@ class APIConfig:
         read_timeout: Optional[float] = None,
         announcement_handler: Optional[Callable[[str], None]] = None,
     ) -> None:
-        from . import get_user_agent
-
         self._endpoints = (
             _clean_urls(endpoint)
             if endpoint
@@ -242,7 +240,11 @@ class APIConfig:
             )
         )
         self._version = version if version is not None else default_clean(self.DEFAULTS["version"])
-        self._user_agent = user_agent if user_agent is not None else get_user_agent()
+        if user_agent is None:
+            from ai.backend.client import get_user_agent
+
+            user_agent = get_user_agent()
+        self._user_agent = user_agent
         # Note: Running a web server with session BACKEND_ENDPOINT_TYPE is not an intended scenario;
         # The normal scenario is to run with "api" as the endpoint type.
         if self._endpoint_type == "api":
@@ -296,12 +298,12 @@ class APIConfig:
         """All configured endpoint URLs."""
         return self._endpoints
 
-    def rotate_endpoints(self):
+    def rotate_endpoints(self) -> None:
         if len(self._endpoints) > 1:
             item = self._endpoints.pop(0)
             self._endpoints.append(item)
 
-    def load_balance_endpoints(self):
+    def load_balance_endpoints(self) -> None:
         pass
 
     @property

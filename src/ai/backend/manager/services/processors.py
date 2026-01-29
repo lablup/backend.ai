@@ -66,7 +66,6 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 )
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
-    ModelServingServiceProtocol,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import (
@@ -162,7 +161,7 @@ class Services:
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
-    model_serving: ModelServingServiceProtocol
+    model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
     notification: NotificationService

@@ -37,8 +37,9 @@ from ai.backend.manager.models.agent import (
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
@@ -288,10 +289,10 @@ class AgentNode(graphene.ObjectType):
                 cnt_query = cnt_query.where(cond)
             else:
 
-                async def all_permissions(row):
+                async def all_permissions(row: AgentRow) -> frozenset[AgentPermission]:
                     return ADMIN_PERMISSIONS
 
-                permission_getter = all_permissions
+                permission_getter = all_permissions  # type: ignore[assignment]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
@@ -798,7 +799,7 @@ class AgentSummary(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
-        query = sa.select(AgentRow)
+        query = sa.select(AgentRow.id)
 
         if raw_status is not None:
             query = query.where(AgentRow.status == AgentStatus[raw_status])
@@ -814,31 +815,21 @@ class AgentSummary(graphene.ObjectType):
                 AgentRow.scaling_group.asc(),
                 AgentRow.id.asc(),
             )
-        query = (
-            query.select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
-            .options(contains_eager(AgentRow.kernels))
-            .limit(limit)
-            .offset(offset)
-        )
+
+        query = query.limit(limit).offset(offset)
+
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
         )
+
         agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             result = await db_session.scalars(query)
-            rows = result.unique().all()
-            for row in rows:
-                agent_ids.append(AgentId(row.id))
+            for agent_id in result:
+                agent_ids.append(AgentId(agent_id))
+
+        if not agent_ids:
+            return []
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
@@ -877,7 +868,7 @@ class ModifyAgent(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyAgentInput,
@@ -915,7 +906,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:

@@ -11,7 +11,7 @@ from .pretty import print_error, print_info, print_warn
 
 
 @main.group(aliases=["sesstpl"])
-def session_template():
+def session_template() -> None:
     """Set of session template operations"""
 
 
@@ -52,7 +52,9 @@ def session_template():
     metavar="ACCESS_KEY",
     help="Set the owner of the target session explicitly.",
 )
-def create(template_path, domain, group, owner_access_key):
+def create(
+    template_path: str | None, domain: str | None, group: str | None, owner_access_key: str | None
+) -> None:
     """
     Store task template to Backend.AI Manager and return template ID.
     Template can be used when creating new session.
@@ -94,7 +96,7 @@ def create(template_path, domain, group, owner_access_key):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def get(template_id, template_format, owner_access_key):
+def get(template_id: str, template_format: str, owner_access_key: str | None) -> None:
     """
     Print task template associated with given template ID
     """
@@ -115,7 +117,7 @@ def get(template_id, template_format, owner_access_key):
     is_flag=True,
     help="List all virtual folders (superadmin privilege is required).",
 )
-def list(list_all):
+def list(list_all: bool) -> None:
     """
     List all available task templates by user.
     """
@@ -160,7 +162,7 @@ def list(list_all):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def update(template_id, template_path, owner_access_key):
+def update(template_id: str, template_path: str | None, owner_access_key: str | None) -> None:
     """
     Update task template stored in Backend.AI Manager.
     """
@@ -175,7 +177,7 @@ def update(template_id, template_path, owner_access_key):
     with Session() as session:
         try:
             template = session.SessionTemplate(template_id, owner_access_key=owner_access_key)
-            template.put(body)
+            _ = template.put(body)
             print_info(f"Task template {template.template_id} updated")
         except Exception as e:
             print_error(e)
@@ -198,7 +200,7 @@ def update(template_id, template_path, owner_access_key):
     metavar="ACCESS_KEY",
     help="Specify the owner of the target session explicitly.",
 )
-def delete(template_id, force, owner_access_key):
+def delete(template_id: str, force: bool, owner_access_key: str | None) -> None:
     """
     Delete task template from Backend.AI Manager.
     """
@@ -211,7 +213,7 @@ def delete(template_id, force, owner_access_key):
                 print_info("Aborting.")
                 exit()
         try:
-            template.delete()
+            _ = template.delete()
             print_info(f"Task template {template.template_id} deleted")
         except Exception as e:
             print_error(e)

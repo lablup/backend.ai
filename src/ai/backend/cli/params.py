@@ -1,10 +1,9 @@
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import (
     Any,
-    Generic,
     Optional,
     Protocol,
     TypeVar,
@@ -163,7 +162,7 @@ class JSONParamType(click.ParamType):
             self.fail(f"cannot parse {value!r} as JSON", param, ctx)
 
 
-def drange(start: Decimal, stop: Decimal, num: int):
+def drange(start: Decimal, stop: Decimal, num: int) -> Iterator[Decimal]:
     """
     A simplified version of numpy.linspace with default options
     """
@@ -192,7 +191,8 @@ class RangeExprOptionType(click.ParamType):
         ctx: Optional[click.Context],
     ) -> Any:
         key, value = value.split("=", maxsplit=1)
-        assert self._rx_range_key.match(key), "The key must be a valid slug string."
+        if not self._rx_range_key.match(key):
+            self.fail("The key must be a valid slug string.", param, ctx)
         try:
             if value.startswith("case:"):
                 return key, value[5:].split(",")
@@ -217,25 +217,31 @@ class SingleValueConstructorType(Protocol):
 TScalar = TypeVar("TScalar", bound=SingleValueConstructorType | click.ParamType)
 
 
-class CommaSeparatedListType(click.ParamType, Generic[TScalar]):
+class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamType](
+    click.ParamType
+):
     name = "List Expression"
 
     def __init__(self, type_: Optional[type[TScalar]] = None) -> None:
         super().__init__()
         self.type_ = type_ if type_ is not None else str
 
-    def convert(self, arg, param, ctx):
+    def convert(
+        self, arg: str | int, param: Optional[click.Parameter], ctx: Optional[click.Context]
+    ) -> int | list[Any]:
         try:
             match arg:
                 case int():
                     return arg
                 case str():
-                    return [self.type_(elem) for elem in arg.split(",")]
+                    return [self.type_(elem) for elem in arg.split(",")]  # type: ignore[call-arg]
+                case _:
+                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)  # type: ignore[call-arg]
         except ValueError as e:
-            self.fail(repr(e), param, ctx)
+            self.fail(repr(e), param, ctx)  # type: ignore[call-arg]
 
 
-class OptionalType(click.ParamType, Generic[TScalar]):
+class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.ParamType):
     name = "Optional Type Wrapper"
 
     def __init__(self, type_: type[TScalar] | type[click.ParamType] | click.ParamType) -> None:

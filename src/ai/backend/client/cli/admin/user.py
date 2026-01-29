@@ -132,7 +132,15 @@ def info(ctx: CLIContext, email: str) -> None:
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext,
+    status: str | None,
+    group: str | None,
+    filter_: str | None,
+    order: str | None,
+    offset: int,
+    limit: int | None,
+) -> None:
     """
     List users.
     (admin privilege required)
@@ -282,7 +290,7 @@ def add(
     container_main_gid: int | None,
     container_gids: Iterable[int] | None,
     groups: Iterable[str],
-):
+) -> None:
     """
     Create a new user. As the user must belong to a domain,
     you should provide DOMAIN_NAME explicitly.
@@ -309,7 +317,7 @@ def add(
                         # Either domain_name or group_ref may be invalid.
                         raise ValueError(
                             f"Cannot find the group {group_ref!r} in the domain {domain_name!r}"
-                        )
+                        ) from None
                     group_ids.append(data[0]["id"])
             data = session.User.create(
                 domain_name,
@@ -517,7 +525,7 @@ def update(
     unset_container_main_gid: bool,
     container_gids: Iterable[int] | Undefined,
     unset_container_gids: bool,
-):
+) -> None:
     """
     Update an existing user.
 
@@ -585,7 +593,7 @@ def update(
 @user.command()
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
-def delete(ctx: CLIContext, email):
+def delete(ctx: CLIContext, email: str) -> None:
     """
     Inactivate an existing user.
 
@@ -640,7 +648,9 @@ def delete(ctx: CLIContext, email):
         "and delegate the ownership to the requested admin."
     ),
 )
-def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership):
+def purge(
+    ctx: CLIContext, email: str, purge_shared_vfolders: bool, delegate_endpoint_ownership: bool
+) -> None:
     """
     Delete an existing user. This action cannot be undone.
 

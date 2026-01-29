@@ -10,6 +10,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
+from textual.events import Mount
 from textual.validation import ValidationResult, Validator
 from textual.widget import Widget
 from textual.widgets import (
@@ -144,6 +145,7 @@ class InputDialog(Static):
 
     _value: str | None
     _can_focus_list: list[Widget]
+    _focus_save: Widget | None
 
     def __init__(
         self,
@@ -175,7 +177,7 @@ class InputDialog(Static):
             if self._allow_cancel:
                 yield Button("Cancel", id="button-cancel")
 
-    def on_mount(self, _) -> None:
+    def on_mount(self, _: Mount) -> None:
         self._override_focus()
         self.query_one(Input).focus()
 
@@ -201,7 +203,7 @@ class InputDialog(Static):
         self._value = None
         self._concluded.set()
 
-    def _override_focus(self):
+    def _override_focus(self) -> None:
         self._focus_save = self.app.focused
         for widget in self.app.screen.focus_chain:
             self._can_focus_list.append(widget)
@@ -210,7 +212,7 @@ class InputDialog(Static):
         for button in self.query(Button):
             button.can_focus = True
 
-    def _restore_focus(self):
+    def _restore_focus(self) -> None:
         while len(self._can_focus_list) > 0:
             self._can_focus_list.pop().can_focus = True
         if self._focus_save is not None:

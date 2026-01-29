@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -10,10 +11,13 @@ from ai.backend.common.health_checker import (
     DATABASE,
     MANAGER,
     AllServicesHealth,
+    ComponentHealthStatus,
+    ComponentId,
     HealthCheckerAlreadyRegistered,
     HealthCheckerNotFound,
     HealthProbe,
     ServiceGroup,
+    ServiceHealth,
     ServiceHealthChecker,
 )
 
@@ -85,11 +89,6 @@ async def test_probe_register_multiple_checkers(
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test registering multiple health checkers."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate mock checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -216,11 +215,6 @@ async def test_probe_check_all_mixed_results(
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test check_all() with a mix of healthy and unhealthy checkers."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 
@@ -276,11 +270,6 @@ async def test_probe_check_all_continues_on_exception(
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that check_all() continues checking even if some checkers fail."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 
@@ -408,8 +397,6 @@ async def test_probe_periodic_check(
     await health_probe.stop()
 
     # Verify that check_service was called multiple times
-    from unittest.mock import AsyncMock
-
     mock = mock_healthy_checker.check_service  # type: ignore[attr-defined]
     assert isinstance(mock, AsyncMock)
     assert mock.call_count >= 2
@@ -421,11 +408,6 @@ async def test_probe_dynamic_registration_during_loop(
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that checkers can be registered/unregistered while the loop is running."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -481,11 +463,6 @@ async def test_probe_get_connectivity_status_all_healthy(
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_connectivity_status() when all components are healthy."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -529,11 +506,6 @@ async def test_probe_get_connectivity_status_some_unhealthy(
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_connectivity_status() when some components are unhealthy."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 

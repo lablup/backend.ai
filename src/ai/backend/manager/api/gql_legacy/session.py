@@ -38,6 +38,7 @@ from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -95,7 +96,6 @@ from .gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .user import UserNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
@@ -183,7 +183,7 @@ class SessionPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(node: Any, _variables: dict | None = None) -> ComputeSessionPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
         return None
@@ -339,7 +339,7 @@ class ComputeSessionNode(graphene.ObjectType):
         *,
         permissions: Optional[Iterable[ComputeSessionPermission]] = None,
     ) -> Self:
-        status_history = row.status_history or {}
+        status_history: dict[str, Any] = dict(row.status_history) if row.status_history else {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         result = cls(
             # identity
@@ -451,7 +451,7 @@ class ComputeSessionNode(graphene.ObjectType):
         return result
 
     async def __resolve_reference(
-        self, info: graphene.ResolveInfo, **kwargs
+        self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> Optional[ComputeSessionNode]:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
@@ -815,8 +815,8 @@ def _validate_priority_input(priority: int) -> None:
 def _validate_name_input(name: str) -> None:
     try:
         tx.SessionName().check(name)
-    except t.DataError:
-        raise ValueError(f"Not allowed session name (n:{name})")
+    except t.DataError as e:
+        raise ValueError(f"Not allowed session name (n:{name})") from e
 
 
 class ModifyComputeSession(graphene.relay.ClientIDMutation):
@@ -840,7 +840,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        **input,
+        **input: Any,
     ) -> ModifyComputeSession:
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
@@ -897,7 +897,7 @@ class CheckAndTransitStatus(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         input: CheckAndTransitStatusInput,
     ) -> CheckAndTransitStatus:

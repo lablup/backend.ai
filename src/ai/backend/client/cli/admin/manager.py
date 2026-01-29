@@ -15,12 +15,12 @@ from . import admin
 
 
 @admin.group()
-def manager():
+def manager() -> None:
     """Set of manager control operations."""
 
 
 @manager.command()
-def status():
+def status() -> None:
     """Show the manager's current status."""
     from ai.backend.client.cli.session.lifecycle import Session
 
@@ -49,7 +49,7 @@ def status():
     is_flag=True,
     help="Kill all running sessions immediately and freeze the manager.",
 )
-def freeze(wait, force_kill):
+def freeze(wait: bool, force_kill: bool) -> None:
     """Freeze manager."""
     from ai.backend.client.cli.session.lifecycle import Session
 
@@ -76,7 +76,7 @@ def freeze(wait, force_kill):
             if force_kill:
                 print_wait("Killing all sessions...")
 
-            session.Manager.freeze(force_kill=force_kill)
+            _ = session.Manager.freeze(force_kill=force_kill)
 
             if force_kill:
                 print_done("All sessions are killed.")
@@ -88,13 +88,13 @@ def freeze(wait, force_kill):
 
 
 @manager.command()
-def unfreeze():
+def unfreeze() -> None:
     """Unfreeze manager."""
     from ai.backend.client.cli.session.lifecycle import Session
 
     try:
         with Session() as session:
-            session.Manager.unfreeze()
+            _ = session.Manager.unfreeze()
             print("Manager is successfully unfrozen.")
     except Exception as e:
         print_error(e)
@@ -102,12 +102,12 @@ def unfreeze():
 
 
 @admin.group()
-def announcement():
+def announcement() -> None:
     """Global announcement related commands"""
 
 
 @announcement.command()
-def get():
+def get() -> None:
     """Get current announcement."""
     from ai.backend.client.cli.session.lifecycle import Session
 
@@ -126,7 +126,7 @@ def get():
 
 @announcement.command()
 @click.option("-m", "--message", default=None, type=click.STRING)
-def update(message):
+def update(message: str | None) -> None:
     """
     Post new announcement.
 
@@ -143,7 +143,7 @@ def update(message):
             if message is None:
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            session.Manager.update_announcement(enabled=True, message=message)
+            _ = session.Manager.update_announcement(enabled=True, message=message)
         print_done("Posted new announcement.")
     except Exception as e:
         print_error(e)
@@ -151,7 +151,7 @@ def update(message):
 
 
 @announcement.command()
-def delete():
+def delete() -> None:
     """Delete current announcement."""
     from ai.backend.client.cli.session.lifecycle import Session
 
@@ -160,7 +160,7 @@ def delete():
         sys.exit(ExitCode.FAILURE)
     try:
         with Session() as session:
-            session.Manager.update_announcement(enabled=False)
+            _ = session.Manager.update_announcement(enabled=False)
         print_done("Deleted announcement.")
     except Exception as e:
         print_error(e)
@@ -168,7 +168,7 @@ def delete():
 
 
 @announcement.command()
-def dismiss():
+def dismiss() -> None:
     """Do not show the same announcement again."""
     if not ask_yn():
         print_info("Cancelled.")
@@ -190,7 +190,7 @@ def dismiss():
 
 
 @manager.group()
-def scheduler():
+def scheduler() -> None:
     """
     The scheduler operation command group.
     """
@@ -199,7 +199,7 @@ def scheduler():
 
 @scheduler.command()
 @click.argument("agent_ids", nargs=-1)
-def include_agents(agent_ids):
+def include_agents(agent_ids: tuple[str, ...]) -> None:
     """
     Include agents in scheduling, meaning that the given agents
     will be considered to be ready for creating new session containers.
@@ -208,7 +208,7 @@ def include_agents(agent_ids):
 
     try:
         with Session() as session:
-            session.Manager.scheduler_op("include-agents", agent_ids)
+            _ = session.Manager.scheduler_op("include-agents", agent_ids)
         print_done("The given agents now accepts new sessions.")
     except Exception as e:
         print_error(e)
@@ -217,7 +217,7 @@ def include_agents(agent_ids):
 
 @scheduler.command()
 @click.argument("agent_ids", nargs=-1)
-def exclude_agents(agent_ids):
+def exclude_agents(agent_ids: tuple[str, ...]) -> None:
     """
     Exclude agents from scheduling, meaning that the given agents
     will no longer start new sessions unless they are "included" again,
@@ -227,7 +227,7 @@ def exclude_agents(agent_ids):
 
     try:
         with Session() as session:
-            session.Manager.scheduler_op("exclude-agents", agent_ids)
+            _ = session.Manager.scheduler_op("exclude-agents", agent_ids)
         print_done("The given agents will no longer start new sessions.")
     except Exception as e:
         print_error(e)

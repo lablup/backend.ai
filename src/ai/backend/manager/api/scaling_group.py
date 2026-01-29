@@ -52,7 +52,9 @@ async def query_wsproxy_status(
             result = await resp.json()
         except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
             log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
-            raise InternalServerError("Got invalid response from wsproxy when querying status")
+            raise InternalServerError(
+                "Got invalid response from wsproxy when querying status"
+            ) from e
         return result
 
 

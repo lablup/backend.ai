@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import uuid
-from collections.abc import MutableMapping
+from collections.abc import Iterable, MutableMapping
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
@@ -34,7 +34,7 @@ from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:

@@ -18,8 +18,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingSessionData,
+)
+from ai.backend.manager.sokovan.data import (
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
 )
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -33,15 +39,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
-from ai.backend.manager.sokovan.scheduler.results import (
-    ScheduledSessionData,
-    ScheduleResult,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 if TYPE_CHECKING:
     pass

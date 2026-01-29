@@ -14,6 +14,7 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.data.notification.types import EmailSpec, NotificationRuleType, WebhookSpec
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
@@ -307,8 +308,6 @@ class NotificationAPIHandler:
         path: PathParam[RuleTypePathParam],
     ) -> APIResponse:
         """Get JSON schema for a notification rule type's message format."""
-        from ai.backend.common.data.notification import NotifiableMessage
-
         me = current_user()
         if me is None or not me.is_superadmin:
             raise web.HTTPForbidden(

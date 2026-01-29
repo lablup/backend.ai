@@ -4,7 +4,7 @@ import json
 
 class GraphcoreAPI:
     @classmethod
-    async def get_monitor_info(cls):
+    async def get_monitor_info(cls) -> dict:
         proc = await asyncio.subprocess.create_subprocess_exec(
             "/usr/bin/env",
             *["gc-monitor", "-j"],
@@ -15,7 +15,7 @@ class GraphcoreAPI:
         return json.loads(out.decode("utf-8"))
 
     @classmethod
-    async def get_poplar_version(cls):
+    async def get_poplar_version(cls) -> str:
         proc = await asyncio.subprocess.create_subprocess_exec(
             "/usr/bin/env",
             *["gc-monitor", "version"],

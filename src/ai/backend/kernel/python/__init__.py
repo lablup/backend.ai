@@ -3,12 +3,17 @@ import logging
 import os
 import shutil
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import janus
 
 from ai.backend.kernel import BaseRunner
 from ai.backend.kernel.base import promote_path
+
+if TYPE_CHECKING:
+    from janus import _AsyncQueueProxy
 
 log = logging.getLogger()
 
@@ -26,16 +31,16 @@ class Runner(BaseRunner):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.input_queue = None
-        self.output_queue = None
+        self.input_queue: janus.Queue[tuple[str, str]] | None = None
+        self.output_queue: janus.Queue[bytes] | None = None
 
-    async def init_with_loop(self):
-        self.input_queue = janus.Queue()
-        self.output_queue = janus.Queue()
+    async def init_with_loop(self) -> None:
+        self.input_queue = janus.Queue[tuple[str, str]]()
+        self.output_queue = janus.Queue[bytes]()
 
         # We have interactive input functionality for query mode!
-        self._user_input_queue = janus.Queue()
-        self.user_input_queue = self._user_input_queue.async_q
+        self._user_input_queue: janus.Queue[str] = janus.Queue[str]()
+        self.user_input_queue: _AsyncQueueProxy[str] = self._user_input_queue.async_q
 
         # Get USER_SITE for runtime python.
         cmd = [self.runtime_path, *DEFAULT_PYFLAGS, "-c", "import site; print(site.USER_SITE)"]
@@ -52,9 +57,9 @@ class Runner(BaseRunner):
         # Add support for interactive input in batch mode by copying
         # sitecustomize.py to USER_SITE of runtime python.
         sitecustomize_path = Path(os.path.dirname(__file__)) / "sitecustomize.py"
-        user_site = Path(user_site)
-        user_site.mkdir(parents=True, exist_ok=True)
-        shutil.copy(str(sitecustomize_path), str(user_site / "sitecustomize.py"))
+        user_site_path = Path(user_site)
+        user_site_path.mkdir(parents=True, exist_ok=True)
+        shutil.copy(str(sitecustomize_path), str(user_site_path / "sitecustomize.py"))
 
     async def build_heuristic(self) -> int:
         if Path("setup.py").is_file():
@@ -83,7 +88,13 @@ class Runner(BaseRunner):
         log.error('cannot find the main script ("main.py").')
         return 127
 
-    async def start_service(self, service_info):
+    async def start_service(
+        self, service_info: Mapping[str, Any]
+    ) -> (
+        tuple[list[str] | None, dict[str, str]]
+        | tuple[list[str] | None, dict[str, str], str]
+        | None
+    ):
         if service_info["name"] in ["jupyter", "jupyterlab"]:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", suffix=".py", delete=False
@@ -98,7 +109,7 @@ class Runner(BaseRunner):
             if jupyter_service_type == "jupyter":
                 jupyter_service_type = "notebook"
             return [
-                self.runtime_path,
+                str(self.runtime_path),
                 "-m",
                 jupyter_service_type,
                 "--no-browser",
@@ -107,20 +118,21 @@ class Runner(BaseRunner):
             ], {}
         if service_info["name"] == "ipython":
             return [
-                self.runtime_path,
+                str(self.runtime_path),
                 "-m",
                 "IPython",
             ], {}
         if service_info["name"] == "digits":
             return [
-                self.runtime_path,
+                str(self.runtime_path),
                 "-m",
                 "digits",
             ], {}
         if service_info["name"] == "tensorboard":
             Path("/home/work/logs").mkdir(parents=True, exist_ok=True)
+            port_str = str(service_info["port"])
             return [
-                self.runtime_path,
+                str(self.runtime_path),
                 "-m",
                 "tensorboard.main",
                 "--logdir",
@@ -128,14 +140,14 @@ class Runner(BaseRunner):
                 "--host",
                 "0.0.0.0",
                 "--port",
-                str(service_info["port"]),
+                port_str,
                 "--debugger_port",
                 "6064",  # used by in-container TensorFlow
             ], {}
         if service_info["name"] == "spectravis":
             return (
                 [
-                    self.runtime_path,
+                    str(self.runtime_path),
                     "-m",
                     "http.server",
                     "8000",
@@ -144,11 +156,12 @@ class Runner(BaseRunner):
                 "/home/work/spectravis",
             )
         if service_info["name"] == "sftp":
+            port_str = str(service_info["port"])
             return [
-                self.runtime_path,
+                str(self.runtime_path),
                 "-m",
                 "sftpserver",
                 "--port",
-                str(service_info["port"]),
+                port_str,
             ], {}
-        return None, None
+        return None

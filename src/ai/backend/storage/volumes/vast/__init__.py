@@ -52,7 +52,7 @@ class VASTQuotaModel(BaseQuotaModel):
     async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VASTQuotaID | None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _read():
+        def _read() -> VASTQuotaID | None:
             try:
                 with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
                     return VASTQuotaID(f.read())
@@ -66,7 +66,7 @@ class VASTQuotaModel(BaseQuotaModel):
     ) -> None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _write():
+        def _write() -> None:
             qs_path.mkdir(parents=True, exist_ok=True)
             with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "w") as f:
                 f.write(str(vast_quota_id))
@@ -92,12 +92,12 @@ class VASTQuotaModel(BaseQuotaModel):
                 soft_limit=config.limit_bytes,
                 hard_limit=config.limit_bytes,
             )
-        except VASTInvalidParameterError:
-            raise InvalidQuotaConfig
+        except VASTInvalidParameterError as e:
+            raise InvalidQuotaConfig from e
         except VASTUnknownError as e:
             raise ExternalStorageServiceError(
                 f"VAST API unknown error during quota modification: {e}"
-            )
+            ) from e
 
     async def create_quota_scope(
         self,
@@ -128,7 +128,9 @@ class VASTQuotaModel(BaseQuotaModel):
                         "Got invalid parameter error but no quota exists with given quota name"
                         f" ({quota_name}). Raise error (orig:{e!s})"
                     )
-                    raise InvalidQuotaConfig(f"No existing quota found with name {quota_name}")
+                    raise InvalidQuotaConfig(
+                        f"No existing quota found with name {quota_name}"
+                    ) from e
                 await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
                 await self.api_client.modify_quota(
                     existing_quota.id,
@@ -139,7 +141,7 @@ class VASTQuotaModel(BaseQuotaModel):
             except VASTUnknownError as e:
                 raise ExternalStorageServiceError(
                     f"VAST API unknown error during quota creation: {e}"
-                )
+                ) from e
             return quota
 
         try:
@@ -197,8 +199,8 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         try:
             await self.api_client.remove_quota(vast_quota_id)
-        except VASTNotFoundError:
-            raise QuotaScopeNotFoundError
+        except VASTNotFoundError as e:
+            raise QuotaScopeNotFoundError from e
         await self._rm_vast_quota_id(quota_scope_id)
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:

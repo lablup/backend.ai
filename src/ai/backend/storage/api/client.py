@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
-from collections.abc import Mapping, MutableMapping
+from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -36,7 +36,7 @@ from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
-from ai.backend.storage.errors import InvalidAPIParameters
+from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import CheckParamSource, check_params
 
@@ -162,7 +162,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             file_path.resolve().relative_to(vfpath)
             if not file_path.exists():
                 raise FileNotFoundError
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError) as e:
             raise web.HTTPNotFound(
                 body=dump_json_str(
                     {
@@ -171,7 +171,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     },
                 ),
                 content_type="application/problem+json",
-            )
+            ) from e
         if not file_path.is_file():
             if params["archive"]:
                 # Download directory as an archive when archive param is set.
@@ -224,17 +224,19 @@ async def download_directory_as_archive(
     Serve a directory as a zip archive on the fly.
     """
 
-    def _iter2aiter(iter):
+    def _iter2aiter(iter: Iterator[Any]) -> AsyncGenerator[Any, None]:
         """Iterable to async iterable"""
 
-        def _consume(loop, iter, q):
+        def _consume(
+            loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
+        ) -> None:
             for item in iter:
                 q.put(item)
             q.put(SENTINEL)
 
-        async def _aiter():
+        async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
-            q = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
+            q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
                 fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
@@ -345,6 +347,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
             upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+
+            # TUS protocol requires Upload-Offset validation before appending data
+            upload_offset_header = request.headers.get("Upload-Offset")
+            if upload_offset_header is None:
+                raise InvalidAPIParameters(
+                    "Missing required Upload-Offset header for TUS PATCH request"
+                )
+
+            try:
+                client_offset = int(upload_offset_header)
+            except ValueError as e:
+                raise InvalidAPIParameters(
+                    f"Invalid Upload-Offset header value: {upload_offset_header}"
+                ) from e
+
+            actual_offset = int(headers["Upload-Offset"])
+            if client_offset != actual_offset:
+                raise UploadOffsetMismatchError(
+                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                )
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,

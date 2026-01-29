@@ -1,21 +1,18 @@
 import enum
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from typing import (
-    TypeAlias,
-)
 
 import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-WebRequestHandler: TypeAlias = Callable[
+type WebRequestHandler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware
 
-CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
-AppCreator: TypeAlias = Callable[
+type CORSOptions = Mapping[str, aiohttp_cors.ResourceOptions]
+type AppCreator = Callable[
     [CORSOptions],
     tuple[web.Application, Iterable[WebMiddleware]],
 ]

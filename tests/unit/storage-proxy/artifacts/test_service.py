@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from aiohttp import ClientError, ClientResponseError
 from aioresponses import aioresponses
+from huggingface_hub.hf_api import RepoFile
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -18,7 +20,7 @@ from ai.backend.common.data.storage.registries.types import (
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
-from ai.backend.storage.client.huggingface import HuggingFaceClient
+from ai.backend.storage.client.huggingface import HuggingFaceClient, HuggingFaceScanner
 from ai.backend.storage.client.manager import ManagerHTTPClientPool
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
@@ -26,7 +28,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
-from ai.backend.storage.data.storage.types import StorageTarget
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
@@ -38,7 +40,6 @@ from ai.backend.storage.errors import (
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
-    HuggingFaceScanner,
 )
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirDownloadStep,
@@ -46,7 +47,6 @@ from ai.backend.storage.services.artifacts.reservoir import (
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
@@ -429,8 +429,6 @@ class TestHuggingFaceDownloadStep:
         mock_list_repo_files.return_value = ["config.json"]
 
         # Mock the RepoFile object properly
-        from huggingface_hub.hf_api import RepoFile
-
         mock_repo_file = MagicMock(spec=RepoFile)
         mock_repo_file.path = "config.json"
         mock_repo_file.size = 285
@@ -887,8 +885,6 @@ class TestReservoirDownloadStep:
             )
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
@@ -913,8 +909,6 @@ class TestReservoirDownloadStep:
             mock_list_keys.return_value = ([], {}, 0)
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(

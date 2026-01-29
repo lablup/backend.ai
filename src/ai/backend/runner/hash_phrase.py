@@ -1,21 +1,24 @@
 # Based on https://github.com/fpgaminer/hash-phrase/blob/master/hash-phrase.py
 # but modified to exclude external pbkdf2 implementation
+from __future__ import annotations
+
 import binascii
 import hashlib
 import json
 import math
 import random
 import sys
+from collections.abc import Callable
 
 
-def pbkdf2_hex(data, salt, iterations, keylen, hashfunc="sha1"):
+def pbkdf2_hex(data: str, salt: str, iterations: int, keylen: int, hashfunc: str = "sha1") -> str:
     dk = hashlib.pbkdf2_hmac(
         hashfunc, bytes(data, "utf-8"), bytes(salt, "utf-8"), iterations, dklen=keylen
     )
     return binascii.hexlify(dk).decode("utf-8")
 
 
-def load_dictionary(dictionary_file=None):
+def load_dictionary(dictionary_file: str | None = None) -> list:
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
@@ -23,19 +26,19 @@ def load_dictionary(dictionary_file=None):
         return json.load(f)
 
 
-def default_hasher(data):
+def default_hasher(data: str) -> str:
     return pbkdf2_hex(data, "", iterations=50000, keylen=32, hashfunc="sha256")
 
 
 def hash_phrase(
-    data,
-    minimum_entropy=90,
-    dictionary=None,
-    hashfunc=default_hasher,
-    use_numbers=True,
-    separator="",
-    capitalize=True,
-):
+    data: str,
+    minimum_entropy: int = 90,
+    dictionary: list | None = None,
+    hashfunc: Callable[[str], str] = default_hasher,
+    use_numbers: bool = True,
+    separator: str = "",
+    capitalize: bool = True,
+) -> str:
     if dictionary is None:
         dictionary = load_dictionary()
 
@@ -44,9 +47,9 @@ def hash_phrase(
     num_words = math.ceil(minimum_entropy / entropy_per_word)
 
     # Hash the data and convert to a big integer (converts as Big Endian)
-    hash = hashfunc(data)
-    available_entropy = len(hash) * 4
-    hash = int(hash, 16)
+    hash_str = hashfunc(data)
+    available_entropy = len(hash_str) * 4
+    hash_int = int(hash_str, 16)
 
     # Check entropy
     if num_words * entropy_per_word > available_entropy:
@@ -62,8 +65,8 @@ def hash_phrase(
         word_idx_to_replace = -1
 
     for i in range(num_words):
-        remainder = int(hash % dict_len)
-        hash = hash / dict_len
+        remainder = int(hash_int % dict_len)
+        hash_int = hash_int // dict_len
         if i == word_idx_to_replace:
             phrase.append(str(remainder))
         else:

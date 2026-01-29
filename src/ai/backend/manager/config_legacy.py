@@ -14,7 +14,6 @@ from typing import (
     Any,
     Final,
     Optional,
-    TypeAlias,
 )
 
 import click
@@ -38,7 +37,7 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
-NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
+type NestedStrKeyedDict = "dict[str, Any | NestedStrKeyedDict]"
 
 _default_pyroscope_config: dict[str, Any] = {
     "enabled": False,
@@ -464,6 +463,6 @@ def load(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return LocalConfig(cfg)

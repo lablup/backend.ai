@@ -6,19 +6,22 @@ Tests the service layer with mocked repository operations.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointAutoScalingRuleListResult,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -27,6 +30,37 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 
 class TestAutoScalingServiceSearch:
     """Test cases for AutoScalingService search functionality"""
+
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, user_data: UserData) -> Iterator[None]:
+        with with_user(user_data):
+            yield
+
+    @pytest.fixture
+    def mock_repositories(self) -> MagicMock:
+        mock = MagicMock(spec=ModelServingRepositories)
+        mock.repository = MagicMock(spec=ModelServingRepository)
+        return mock
+
+    @pytest.fixture
+    def auto_scaling_service(
+        self,
+        mock_repositories: MagicMock,
+    ) -> AutoScalingService:
+        return AutoScalingService(
+            repository=mock_repositories.repository,
+        )
 
     @pytest.fixture
     def sample_auto_scaling_rule_data(self) -> EndpointAutoScalingRuleData:
@@ -44,18 +78,6 @@ class TestAutoScalingServiceSearch:
             created_at=datetime.now(UTC),
             last_triggered_at=datetime.now(UTC),
             endpoint=uuid.uuid4(),
-        )
-
-    @pytest.fixture
-    def user_data(self) -> UserData:
-        """Create sample user data"""
-        return UserData(
-            user_id=uuid.uuid4(),
-            is_authorized=True,
-            is_admin=False,
-            is_superadmin=False,
-            role=UserRole.USER.value,
-            domain_name="default",
         )
 
     async def test_search_auto_scaling_rules(

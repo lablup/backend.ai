@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, TypeAlias
+from typing import TYPE_CHECKING, Any, Optional
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -190,7 +190,7 @@ class ContainerLifecycleEvent:
             f"reason:{self.reason!r})"
         )
 
-    def set_done_future_result(self, result: Any):
+    def set_done_future_result(self, result: Any) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_result(result)
@@ -198,7 +198,7 @@ class ContainerLifecycleEvent:
                 # The future is already done, ignore the error
                 pass
 
-    def set_done_future_exception(self, exception: Exception):
+    def set_done_future_exception(self, exception: Exception) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_exception(exception)
@@ -235,4 +235,4 @@ class KernelOwnershipData:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware

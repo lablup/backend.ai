@@ -1,11 +1,12 @@
 import asyncio
 import logging
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -19,7 +20,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
-    ArtifactRegistryType,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
@@ -138,7 +138,7 @@ class ArtifactService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
-    async def _get_storage_client(self, storage_name: str):
+    async def _get_storage_client(self, storage_name: str) -> Any:
         """Get storage client by trying object_storage first, then vfs_storage as fallback"""
         try:
             storage = await self._object_storage_repository.get_by_name(storage_name)

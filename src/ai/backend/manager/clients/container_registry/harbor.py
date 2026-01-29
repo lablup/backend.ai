@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Any, override
+from dataclasses import dataclass
+from typing import Any, TypedDict, override
 
 import aiohttp
 import yarl
@@ -14,14 +15,24 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.service.container_registry.harbor import (
-        HarborAuthArgs,
-        HarborProjectInfo,
-        HarborProjectQuotaInfo,
-    )
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class HarborProjectInfo:
+    url: str
+    project: str
+    ssl_verify: bool
+
+
+class HarborAuthArgs(TypedDict):
+    username: str
+    password: str
+
+
+class HarborProjectQuotaInfo(TypedDict):
+    previous_quota: int
+    quota_id: int
 
 
 def _get_harbor_auth_args(auth_args: HarborAuthArgs) -> dict[str, Any]:
@@ -73,8 +84,6 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
         project_info: HarborProjectInfo,
         rqst_args: dict[str, Any],
     ) -> HarborProjectQuotaInfo:
-        from ai.backend.manager.service.container_registry.harbor import HarborProjectQuotaInfo
-
         harbor_project_id = await self._get_harbor_project_id(sess, project_info, rqst_args)
         get_quota_id_api = (yarl.URL(project_info.url) / "api" / "v2.0" / "quotas").with_query({
             "reference": "project",
@@ -118,7 +127,7 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota, quota_id = quota_info["previous_quota"], quota_info["quota_id"]
 
-            if previous_quota > 0:
+            if previous_quota != -1:
                 raise GenericBadRequest("Quota limit already exists!")
 
             put_quota_api = yarl.URL(project_info.url) / "api" / "v2.0" / "quotas" / str(quota_id)

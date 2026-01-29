@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -19,10 +20,13 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentPolicyUpdaterSpec,
@@ -36,6 +40,7 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -109,10 +114,19 @@ class DeploymentController:
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
+        image_id = await self._deployment_repository.get_image_id(model_revision.image_identifier)
 
-        return await self._deployment_repository.create_endpoint_legacy(
-            draft.to_creator(model_revision)
+        spec = LegacyEndpointCreatorSpec.from_deployment_creator(
+            creator=draft.to_creator(model_revision),
+            image_id=image_id,
         )
+        creator = RBACEntityCreator(
+            spec=spec,
+            scope_type=ScopeType.USER,
+            scope_id=str(draft.metadata.created_user),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+        return await self._deployment_repository.create_endpoint_legacy(creator)
 
     async def update_deployment(
         self,
@@ -284,9 +298,6 @@ class DeploymentController:
         Returns:
             Updated RouteInfo if found, None otherwise
         """
-        from ai.backend.manager.models.routing import RoutingRow
-        from ai.backend.manager.types import OptionalState
-
         spec = RouteUpdaterSpec(
             traffic_status=OptionalState.update(traffic_status),
         )

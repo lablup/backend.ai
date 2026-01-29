@@ -9,20 +9,22 @@ from .types import HostPortPair
 def port_no(s: str) -> int:
     try:
         port = int(s)
-        assert port > 0
-        assert port < 65536
-    except (ValueError, AssertionError):
+        if port <= 0:
+            raise ValueError("Port must be greater than 0")
+        if port >= 65536:
+            raise ValueError("Port must be less than 65536")
+    except (ValueError, AssertionError) as e:
         msg = f"{s!r} is not a valid port number."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from e
     return port
 
 
 def port_range(s: str) -> tuple[int, int]:
     try:
         port_range = tuple(map(int, s.split("-")))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
         msg = f"{s!r} should be a hyphen-separated pair of integers."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from e
     if len(port_range) != 2:
         msg = f"{s!r} should have exactly two integers."
         raise argparse.ArgumentTypeError(msg)
@@ -41,20 +43,22 @@ def port_range(s: str) -> tuple[int, int]:
 def positive_int(s: str) -> int:
     try:
         val = int(s)
-        assert val > 0
-    except (ValueError, AssertionError):
+        if val <= 0:
+            raise ValueError("Value must be positive")
+    except (ValueError, AssertionError) as e:
         msg = f"{s!r} is not a positive integer."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from e
     return val
 
 
 def non_negative_int(s: str) -> int:
     try:
         val = int(s)
-        assert val >= 0
-    except (ValueError, AssertionError):
+        if val < 0:
+            raise ValueError("Value must be non-negative")
+    except (ValueError, AssertionError) as e:
         msg = f"{s!r} is not a non-negative integer."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from e
     return val
 
 
@@ -74,20 +78,22 @@ def host_port_pair(s: str) -> tuple[ipaddress._BaseAddress, int]:
             host = host
         try:
             port = int(pieces[1])
-            assert port > 0
-            assert port < 65536
-        except (ValueError, AssertionError):
+            if port <= 0:
+                raise ValueError("Port must be greater than 0")
+            if port >= 65536:
+                raise ValueError("Port must be less than 65536")
+        except (ValueError, AssertionError) as e:
             msg = f"{pieces[1]!r} is not a valid port number."
-            raise argparse.ArgumentTypeError(msg)
+            raise argparse.ArgumentTypeError(msg) from e
     return HostPortPair(host, port)
 
 
 def ipaddr(s: str) -> ipaddress._BaseAddress:
     try:
         ip = ipaddress.ip_address(s.strip("[]"))
-    except ValueError:
+    except ValueError as e:
         msg = f"{s!r} is not a valid IP address."
-        raise argparse.ArgumentTypeError(msg)
+        raise argparse.ArgumentTypeError(msg) from e
     return ip
 
 

@@ -24,9 +24,10 @@ async def list_devices() -> list[LPUDevice]:
                 x for x in (ddp / "drm").iterdir() if x.name.startswith("renderD")
             ],
         )
-        assert len(renderD_files) == 1, (
-            f'no renderD file found under {display_driver_path.as_posix()}/"drm"!'
-        )
+        if len(renderD_files) != 1:
+            raise RuntimeError(
+                f'no renderD file found under {display_driver_path.as_posix()}/"drm"!'
+            )
         renderD_filename = renderD_files[0].name
         devices.append(
             LPUDevice(

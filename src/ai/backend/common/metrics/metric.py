@@ -725,7 +725,7 @@ class CommonMetricRegistry:
         self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance

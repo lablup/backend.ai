@@ -35,10 +35,9 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
-
-from .query import QueryCondition, QueryOrder
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

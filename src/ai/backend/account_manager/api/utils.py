@@ -4,8 +4,6 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Generic,
-    TypeAlias,
     TypeVar,
 )
 
@@ -18,9 +16,9 @@ from ai.backend.account_manager.exceptions import AuthorizationFailed, InvalidAP
 from ai.backend.logging import BraceStyleAdapter
 
 
-def auth_required(handler):
+def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request, *args, **kwargs):
+    async def wrapped(request: web.Request, *args, **kwargs) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -30,15 +28,15 @@ def auth_required(handler):
     return wrapped
 
 
-def set_handler_attr(func, key, value):
+def set_handler_attr(func: Callable, key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    func._backend_attrs = attrs
+    func._backend_attrs = attrs  # type: ignore[attr-defined]
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -78,7 +76,7 @@ class RequestData(BaseModel):
 
 
 @dataclass
-class ResponseModel(Generic[TBaseModel]):
+class ResponseModel[TBaseModel: BaseModel]:
     data: TBaseModel
     headers: dict[str, Any] = field(default_factory=dict)
     status: int = 200
@@ -90,15 +88,15 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-THandlerFuncWithoutParam: TypeAlias = Callable[
+type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
     [web.Request], Awaitable[ResponseModel | TAnyResponse]
 ]
-THandlerFuncWithParam: TypeAlias = Callable[
+type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
     [web.Request, TParamModel], Awaitable[ResponseModel | TAnyResponse]
 ]
 
 
-def ensure_stream_response_type(
+def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
     response: ResponseModel | TAnyResponse,
 ) -> web.StreamResponse:
     json_body: Any
@@ -118,7 +116,7 @@ def ensure_stream_response_type(
 
 def pydantic_api_response_handler(
     handler: THandlerFuncWithoutParam,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -139,11 +137,11 @@ def pydantic_api_response_handler(
     return wrapped
 
 
-def pydantic_api_handler(
+def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-    is_deprecated=False,
+    is_deprecated: bool = False,
 ) -> Callable[[THandlerFuncWithParam], Handler]:
     def wrap(
         handler: THandlerFuncWithParam,
@@ -173,10 +171,10 @@ def pydantic_api_handler(
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

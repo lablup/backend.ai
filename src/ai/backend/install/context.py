@@ -32,6 +32,7 @@ from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
 from .dev import (
@@ -54,7 +55,6 @@ from .types import (
     DistInfo,
     FrontendMode,
     HalfstackConfig,
-    HostPortPair,
     ImageSource,
     InstallInfo,
     InstallType,
@@ -125,7 +125,7 @@ class Context(metaclass=ABCMeta):
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
 
-    def generate_passphrase(self, len=16) -> str:
+    def generate_passphrase(self, len: int = 16) -> str:
         return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
@@ -240,7 +240,8 @@ class Context(metaclass=ABCMeta):
         }
         creds: dict[str, str] | None = None
         if halfstack.etcd_user is not None:
-            assert halfstack.etcd_password is not None
+            if halfstack.etcd_password is None:
+                raise ValueError("etcd_password must be set when etcd_user is provided")
             creds = {
                 "user": halfstack.etcd_user,
                 "password": halfstack.etcd_password,
@@ -261,13 +262,69 @@ class Context(metaclass=ABCMeta):
         async with self.etcd_ctx() as etcd:
             return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
+    async def _ensure_rover_installed(self) -> str:
+        rover_bin = Path.home() / ".rover" / "bin" / "rover"
+
+        if rover_bin.exists():
+            self.log_header("Rover CLI is already installed.")
+            return str(rover_bin)
+
+        if shutil.which("rover"):
+            self.log_header("Rover CLI found in PATH.")
+            return "rover"
+
+        self.log_header("Installing Rover CLI...")
+        install_proc = await asyncio.create_subprocess_shell(
+            "curl -sSL https://rover.apollo.dev/nix/latest | sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await install_proc.communicate()
+        if install_proc.returncode != 0:
+            raise RuntimeError(f"Failed to install Rover CLI:\n{stderr.decode()}")
+
+        if not rover_bin.exists():
+            raise RuntimeError("Rover CLI installation completed but binary not found.")
+
+        bashrc_path = Path.home() / ".bashrc"
+        rover_path_export = 'export PATH="$HOME/.rover/bin:$PATH"'
+        license_export = "export APOLLO_ELV2_LICENSE=accept"
+
+        bashrc_content = ""
+        if bashrc_path.exists():
+            bashrc_content = bashrc_path.read_text()
+
+        lines_to_add = []
+        if rover_path_export not in bashrc_content:
+            lines_to_add.append(rover_path_export)
+        if license_export not in bashrc_content:
+            lines_to_add.append(license_export)
+
+        if lines_to_add:
+            bashrc_addition = "\n# Added by Backend.AI installer for Rover CLI\n"
+            bashrc_addition += "\n".join(lines_to_add) + "\n"
+            with open(bashrc_path, "a") as f:
+                f.write(bashrc_addition)
+            self.log_header("Added Rover PATH and license to ~/.bashrc")
+
+        self.log_header("Rover CLI installed successfully.")
+        return str(rover_bin)
+
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
 
         self.log_header("Generating supergraph.graphql via rover CLI...")
 
+        rover_path = await self._ensure_rover_installed()
+
+        # Accept ELv2 license for supergraph compose.
+        # Although we add this to ~/.bashrc during installation, it won't take effect
+        # in the current session, so we must pass it explicitly to the subprocess.
+        env = os.environ.copy()
+        env["APOLLO_ELV2_LICENSE"] = "accept"
+
         compose_cmd = [
-            "rover",
+            rover_path,
             "supergraph",
             "compose",
             "--config",
@@ -279,6 +336,7 @@ class Context(metaclass=ABCMeta):
             *compose_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
@@ -315,7 +373,8 @@ class Context(metaclass=ABCMeta):
         (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
-        assert self.install_info.halfstack_config.redis_addr
+        if not self.install_info.halfstack_config.redis_addr:
+            raise RuntimeError("redis_addr must be configured")
         self.sed_in_place_multi(
             dst_compose_path,
             [
@@ -455,7 +514,8 @@ class Context(metaclass=ABCMeta):
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
-            assert halfstack.redis_sentinel_addrs
+            if not halfstack.redis_sentinel_addrs:
+                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
             data["redis"] = {
                 "sentinel": ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -470,7 +530,8 @@ class Context(metaclass=ABCMeta):
             if halfstack.redis_password:
                 data["redis"]["password"] = halfstack.redis_password
         else:
-            assert halfstack.redis_addr
+            if not halfstack.redis_addr:
+                raise RuntimeError("redis_addr must be configured")
             data["redis"] = {
                 "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
                 "helper": {
@@ -606,7 +667,8 @@ class Context(metaclass=ABCMeta):
         fqdn_prefix = self.install_variable.fqdn_prefix
         storage_public_address = self.install_variable.storage_public_address
         public_facing_address = self.install_variable.public_facing_address
-        assert halfstack.redis_addr is not None
+        if halfstack.redis_addr is None:
+            raise RuntimeError("redis_addr must be configured")
 
         # use FQDN if provided, otherwise use public_facing_address
         if fqdn_prefix is not None:
@@ -634,7 +696,8 @@ class Context(metaclass=ABCMeta):
             helper_table["socket_connect_timeout"] = 2.0
             helper_table["reconnect_poll_timeout"] = 0.3
             if halfstack.ha_setup:
-                assert halfstack.redis_sentinel_addrs
+                if not halfstack.redis_sentinel_addrs:
+                    raise ValueError("Redis sentinel addresses must be configured for HA setup")
                 redis_table = tomlkit.table()
                 redis_table["sentinel"] = ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -644,7 +707,8 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             else:
-                assert halfstack.redis_addr
+                if not halfstack.redis_addr:
+                    raise RuntimeError("redis_addr must be configured")
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"

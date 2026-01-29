@@ -16,6 +16,7 @@ from ai.backend.common.data.permission.types import OperationType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
+    FieldType,
     RoleSource,
     ScopeType,
 )
@@ -24,6 +25,7 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
@@ -98,6 +100,7 @@ ENTITY_PURGER_TABLES = [
     PermissionRow,
     ObjectPermissionRow,
     AssociationScopesEntitiesRow,
+    EntityFieldRow,
 ]
 
 
@@ -1064,6 +1067,200 @@ class TestRBACEntityPurgerMultipleScopes:
                 sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
             )
             assert assoc_count == 0
+
+
+class TestRBACEntityPurgerEntityFieldCleanup:
+    """Tests for EntityFieldRow cleanup during entity purging."""
+
+    @dataclass
+    class EntityWithFieldsContext:
+        """Context with entity and its field mappings."""
+
+        entity_uuid: UUID
+        user_id: str
+        field_ids: list[str]
+
+    @dataclass
+    class TwoEntitiesWithFieldsContext:
+        """Context with two entities having field mappings."""
+
+        entity_uuid1: UUID
+        entity_uuid2: UUID
+        user_id: str
+        entity1_field_ids: list[str]
+        entity2_field_ids: list[str]
+
+    @pytest.fixture
+    async def entity_with_fields(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> AsyncGenerator[EntityWithFieldsContext, None]:
+        """Create entity with multiple EntityFieldRow mappings."""
+        user_id = str(uuid.uuid4())
+        entity_uuid = uuid.uuid4()
+        field_ids = [str(uuid.uuid4()) for _ in range(3)]
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            entity_row = RBACEntityPurgerTestRow(
+                id=entity_uuid,
+                name="entity-with-fields",
+                owner_scope_type=ScopeType.USER.value,
+                owner_scope_id=user_id,
+            )
+            db_sess.add(entity_row)
+
+            assoc_row = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=str(entity_uuid),
+            )
+            db_sess.add(assoc_row)
+
+            # Create EntityFieldRows for this entity
+            for field_id in field_ids:
+                entity_field = EntityFieldRow(
+                    entity_type=EntityType.VFOLDER.value,
+                    entity_id=str(entity_uuid),
+                    field_type=FieldType.KERNEL.value,
+                    field_id=field_id,
+                )
+                db_sess.add(entity_field)
+            await db_sess.flush()
+
+        yield self.EntityWithFieldsContext(
+            entity_uuid=entity_uuid,
+            user_id=user_id,
+            field_ids=field_ids,
+        )
+
+    @pytest.fixture
+    async def two_entities_with_fields(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> AsyncGenerator[TwoEntitiesWithFieldsContext, None]:
+        """Create two entities each with EntityFieldRow mappings."""
+        user_id = str(uuid.uuid4())
+        entity_uuid1 = uuid.uuid4()
+        entity_uuid2 = uuid.uuid4()
+        entity1_field_ids = [str(uuid.uuid4()) for _ in range(2)]
+        entity2_field_ids = [str(uuid.uuid4()) for _ in range(2)]
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            for entity_uuid, name in [
+                (entity_uuid1, "entity-1"),
+                (entity_uuid2, "entity-2"),
+            ]:
+                entity_row = RBACEntityPurgerTestRow(
+                    id=entity_uuid,
+                    name=name,
+                    owner_scope_type=ScopeType.USER.value,
+                    owner_scope_id=user_id,
+                )
+                db_sess.add(entity_row)
+
+                assoc_row = AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.USER,
+                    scope_id=user_id,
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(entity_uuid),
+                )
+                db_sess.add(assoc_row)
+
+            # Create EntityFieldRows for entity1
+            for field_id in entity1_field_ids:
+                entity_field = EntityFieldRow(
+                    entity_type=EntityType.VFOLDER.value,
+                    entity_id=str(entity_uuid1),
+                    field_type=FieldType.KERNEL.value,
+                    field_id=field_id,
+                )
+                db_sess.add(entity_field)
+
+            # Create EntityFieldRows for entity2
+            for field_id in entity2_field_ids:
+                entity_field = EntityFieldRow(
+                    entity_type=EntityType.VFOLDER.value,
+                    entity_id=str(entity_uuid2),
+                    field_type=FieldType.KERNEL.value,
+                    field_id=field_id,
+                )
+                db_sess.add(entity_field)
+            await db_sess.flush()
+
+        yield self.TwoEntitiesWithFieldsContext(
+            entity_uuid1=entity_uuid1,
+            entity_uuid2=entity_uuid2,
+            user_id=user_id,
+            entity1_field_ids=entity1_field_ids,
+            entity2_field_ids=entity2_field_ids,
+        )
+
+    async def test_purger_deletes_entity_fields(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        entity_with_fields: EntityWithFieldsContext,
+    ) -> None:
+        """Test that purger deletes all EntityFieldRows for the entity."""
+        ctx = entity_with_fields
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            # Verify initial state
+            entity_field_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert entity_field_count == 3
+
+            # Execute purge
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
+            purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
+                row_class=RBACEntityPurgerTestRow,
+                pk_value=ctx.entity_uuid,
+                spec=spec,
+            )
+            await execute_rbac_entity_purger(db_sess, purger)
+
+            # Verify all EntityFieldRows deleted
+            remaining_entity_fields = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert remaining_entity_fields == 0
+
+    async def test_purger_preserves_other_entity_fields(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        two_entities_with_fields: TwoEntitiesWithFieldsContext,
+    ) -> None:
+        """Test that purger preserves EntityFieldRows for other entities."""
+        ctx = two_entities_with_fields
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            # Verify initial state
+            entity_field_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert entity_field_count == 4  # 2 + 2
+
+            # Delete only entity1
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
+            purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
+                row_class=RBACEntityPurgerTestRow,
+                pk_value=ctx.entity_uuid1,
+                spec=spec,
+            )
+            await execute_rbac_entity_purger(db_sess, purger)
+
+            # Verify only entity1's fields deleted
+            remaining_entity_fields = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityFieldRow)
+            )
+            assert remaining_entity_fields == 2
+
+            # Verify entity2's fields preserved
+            remaining_fields = (await db_sess.scalars(sa.select(EntityFieldRow))).all()
+            assert all(f.entity_id == str(ctx.entity_uuid2) for f in remaining_fields)
 
 
 class TestRBACEntityPurgerPermissionRowPreservation:

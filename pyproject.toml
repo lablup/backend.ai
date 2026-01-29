@@ -82,6 +82,7 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
+extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
 select = [
     "E",      # pycodestyle errors: PEP8 style violations
     "W",      # pycodestyle warnings: PEP8 style warnings
@@ -106,8 +107,10 @@ select = [
     "RET",    # flake8-return: enforces consistent return statement usage
     "T20",    # flake8-print: detects print statements (should use logging)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
+    "PLC0415", # pylint-convention: import-outside-toplevel - enforce imports at module level
     "ANN",    # flake8-annotations: enforces type annotations
     "DTZ",    # flake8-datetimez: enforces timezone-aware datetime usage
+    "S101",   # flake8-bandit: detects use of assert in production code
 ]
 ignore = [
     "E203",   # whitespace before ':' - conflicts with Black formatter
@@ -160,32 +163,16 @@ ignore = [
     "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
     "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
     "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
-    # B904 - raise-without-from-inside-except: 361 violations, no auto-fix, defer for gradual migration
-    "B904",
     "B911",  # batched-without-explicit-strict - Python 3.13+ feature
     # UP (pyupgrade) - defer large-scale changes for gradual adoption
-    "UP030",  # format-literals - implicit positional references in format (42 violations, defer)
-    "UP031",  # printf-string-formatting - percent format to f-string (11 violations, defer)
-    "UP040",  # non-pep695-type-alias - TypeAlias -> type statement (77 violations, Python 3.12+ syntax)
     "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
     "UP045",  # non-pep604-annotation-optional - Optional[X] -> X | None (5392 violations, defer)
-    "UP046",  # non-pep695-generic-class - Python 3.12+ generic syntax (93 violations, defer)
-    "UP047",  # non-pep695-generic-function - Python 3.12+ type parameter syntax (24 violations, defer)
     # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
     "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
     "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
-    # RET (return) - stylistic rules that may reduce readability
-    "RET502",  # implicit-return-value - mixed implicit/explicit return (stylistic preference)
-    "RET507",  # superfluous-else-continue - else after continue (can improve readability)
-    "RET508",  # superfluous-else-break - else after break (can improve readability)
     # ANN (annotations) - defer for gradual migration, mypy handles type checking
-    "ANN001",  # missing-type-function-argument - 1336 violations, defer for gradual migration
     "ANN002",  # missing-type-args - *args type annotation, low practical value
     "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
-    "ANN201",  # missing-return-type-undocumented-public-function - 597 violations, defer for gradual migration
-    "ANN202",  # missing-return-type-private-function - 258 violations, defer for gradual migration
-    "ANN205",  # missing-return-type-static-method - 21 violations, defer for gradual migration
-    "ANN206",  # missing-return-type-class-method - 119 violations, defer for gradual migration
     "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs
 ]
 
@@ -200,20 +187,32 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
 "src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
+# UP040 (type alias) exceptions - cannot use `type` statement when used as callable or base class
+"src/ai/backend/storage/volumes/netapp/netappclient.py" = ["UP040"]  # StorageID/VolumeID/QTreeID used as callables
+"src/ai/backend/manager/api/utils.py" = ["UP040"]  # LegacyBaseRequestModel used as base class
+"src/ai/backend/common/types.py" = ["UP040"]  # VolumeID used as callable
 # T20 (print statements) exceptions:
-# - CLI modules are allowed to use print for user-facing output
-"src/ai/backend/cli/**/*.py" = ["T20"]
-"src/ai/backend/*/cli/**/*.py" = ["T20"]
-"src/ai/backend/*/*/cli/**/*.py" = ["T20"]
-"src/ai/backend/client/cli/**/*.py" = ["T20"]
-"src/ai/backend/plugin/cli.py" = ["T20"]
-# - Client output module is designed for console printing
-"src/ai/backend/client/output/*.py" = ["T20"]
+# PLC0415 (import-outside-toplevel) exceptions for CLI lazy loading:
+# - CLI modules are allowed to use print for user-facing output and lazy imports for startup performance
+"src/ai/backend/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/*/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/*/*/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/client/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/plugin/cli.py" = ["T20", "PLC0415"]
+# - Client output module is designed for console printing and uses lazy imports for optional dependencies
+"src/ai/backend/client/output/*.py" = ["T20", "PLC0415"]
+# - Client modules use lazy imports for optional dependencies and circular import resolution
+"src/ai/backend/client/config.py" = ["PLC0415"]
+"src/ai/backend/client/session.py" = ["PLC0415"]
+"src/ai/backend/client/utils.py" = ["PLC0415"]
 # - Client func vfolder has progress printing
 "src/ai/backend/client/func/vfolder.py" = ["T20"]
 # - Alembic migrations may print progress and have standard signatures
-"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN"]
-"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN"]
+"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
+"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
+# - Model modules may have circular dependencies between Row classes
+"src/ai/backend/*/models/**/*.py" = ["PLC0415"]
+"src/ai/backend/*/*/models/**/*.py" = ["PLC0415"]
 # - Config files print debug info to stderr
 "src/ai/backend/*/config.py" = ["T20"]
 "src/ai/backend/*/*/config.py" = ["T20"]
@@ -222,8 +221,8 @@ split-on-trailing-comma = true
 # - Server files print debug config info
 "src/ai/backend/*/server.py" = ["T20"]
 "src/ai/backend/*/*/server.py" = ["T20"]
-# - Installer prints progress info
-"src/ai/backend/install/**/*.py" = ["T20"]
+# - Installer prints progress info and uses lazy imports for rich dependencies
+"src/ai/backend/install/**/*.py" = ["T20", "PLC0415"]
 # - Runner scripts for containers
 "src/ai/backend/runner/**/*.py" = ["T20"]
 # - Kernel vendor scripts
@@ -233,6 +232,10 @@ split-on-trailing-comma = true
 # - Watcher modules
 "src/ai/backend/*/watcher/**/*.py" = ["T20"]
 "src/ai/backend/storage/watcher.py" = ["T20"]
+# - Common modules may have circular dependencies during refactoring
+"src/ai/backend/common/**/*.py" = ["PLC0415"]
+# - Agent modules may have circular dependencies between submodules
+"src/ai/backend/agent/**/*.py" = ["PLC0415"]
 # - Common utilities with debug functions
 "src/ai/backend/common/utils.py" = ["T20"]
 "src/ai/backend/common/configs/sample_generator.py" = ["T20"]
@@ -242,13 +245,21 @@ split-on-trailing-comma = true
 "src/ai/backend/storage/migration.py" = ["T20"]
 # - Logging handler (prints to stderr by design)
 "src/ai/backend/logging/handler/**/*.py" = ["T20"]
+# - Logging modules use lazy imports for optional driver dependencies (logstash, graylog, otel)
+"src/ai/backend/logging/logger.py" = ["PLC0415"]
+"src/ai/backend/logging/utils.py" = ["PLC0415"]
 # - Test files may use print for debugging and have flexible type annotations
-"tests/**/*.py" = ["T20", "ANN"]
-"src/ai/backend/test/**/*.py" = ["T20", "ANN"]
+"tests/**/*.py" = ["T20", "ANN", "S101"]
+"src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101"]
 # - Type stub files have their own conventions
 "stubs/**/*.pyi" = ["ANN"]
 # - Vec2D class intentionally overrides tuple operators with incompatible return types for vector math
 "src/ai/backend/kernel/python/drawing/turtle.py" = ["ANN204"]
+# - GraphQL resolvers may have circular dependencies with error/types modules
+"src/ai/backend/*/api/gql/**/*.py" = ["PLC0415"]
+"src/ai/backend/*/api/gql_legacy/**/*.py" = ["PLC0415"]
+# - Container registry factory uses lazy imports to avoid circular dependencies with models
+"src/ai/backend/manager/container_registry/factory.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
@@ -262,11 +273,38 @@ preview = true
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 ignore_missing_imports = true
 follow_untyped_imports = false
+implicit_reexport = false
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
+
+# Disable errors in client CLI, web server, and tests
+# Client SDK will be rewritten, so defer all type fixes
+# "None not callable" errors occur because mypy doesn't understand the APIFunctionMeta metaclass magic
+# that wraps async API functions to work in both sync (Session) and async (AsyncSession) contexts
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.client.cli.*",
+    "ai.backend.client.session",
+    "ai.backend.client.helper",
+    "ai.backend.client.func.resource",
+    "ai.backend.web.server",
+    "ai.backend.test.*",
+    "tests.unit.client.*",
+]
+disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
+
+# Ignore errors in vendor code, accelerators, and build tools
+# These are external/generated code or low-priority plugins
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.kernel.vendor.*",
+    "ai.backend.accelerator.*",
+    "tools.build-macros",
+]
+ignore_errors = true
 
 [tool.pyright]
 pythonVersion = "3.13"
@@ -285,6 +323,7 @@ exclude = [
 venvPath = "dist/export/python/virtualenvs/python-default"
 venv = "3.13.7"
 typeCheckingMode = "standard"
+reportMatchNotExhaustive = "error"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

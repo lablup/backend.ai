@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from dateutil.tz import tzutc
 
 from ai.backend.common.types import (
     AccessKey,
@@ -16,12 +18,13 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
-from ai.backend.manager.sokovan.scheduler.results import (
-    SessionExecutionResult,
-    SessionTransitionInfo,
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import (
+    SessionStatus,
+    StatusTransitions,
+    TransitionStatus,
 )
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
@@ -29,6 +32,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
+)
+from ai.backend.manager.sokovan.scheduler.results import (
+    SessionExecutionResult,
+    SessionTransitionInfo,
 )
 
 
@@ -423,10 +430,6 @@ def user_specific_minimal_workload(test_user_id: uuid.UUID) -> SessionWorkload:
 @pytest.fixture
 def batch_session_past_start_time() -> SessionWorkload:
     """Batch session with start time in the past."""
-    from datetime import datetime, timedelta
-
-    from dateutil.tz import tzutc
-
     past_time = datetime.now(tzutc()) - timedelta(hours=1)
     return SessionWorkload(
         session_id=SessionId(uuid4()),
@@ -450,10 +453,6 @@ def batch_session_past_start_time() -> SessionWorkload:
 @pytest.fixture
 def batch_session_future_start_time() -> SessionWorkload:
     """Batch session with start time in the future."""
-    from datetime import datetime, timedelta
-
-    from dateutil.tz import tzutc
-
     future_time = datetime.now(tzutc()) + timedelta(hours=1)
     return SessionWorkload(
         session_id=SessionId(uuid4()),
@@ -482,8 +481,6 @@ def batch_session_future_start_time() -> SessionWorkload:
 @pytest.fixture
 def session_transition_info_pending() -> SessionTransitionInfo:
     """SessionTransitionInfo for PENDING session."""
-    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
-
     return SessionTransitionInfo(
         session_id=SessionId(uuid4()),
         from_status=SessionStatus.PENDING,
@@ -496,8 +493,6 @@ def session_transition_info_pending() -> SessionTransitionInfo:
 @pytest.fixture
 def session_transition_info_preparing() -> SessionTransitionInfo:
     """SessionTransitionInfo for PREPARING session."""
-    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
-
     return SessionTransitionInfo(
         session_id=SessionId(uuid4()),
         from_status=SessionStatus.PREPARING,
@@ -510,8 +505,6 @@ def session_transition_info_preparing() -> SessionTransitionInfo:
 @pytest.fixture
 def failure_sessions_for_classification() -> list[SessionTransitionInfo]:
     """Multiple failure sessions for classification tests."""
-    from ai.backend.manager.sokovan.scheduler.results import SessionTransitionInfo
-
     return [
         SessionTransitionInfo(
             session_id=SessionId(uuid4()),
@@ -540,11 +533,6 @@ def failure_sessions_for_classification() -> list[SessionTransitionInfo]:
 @pytest.fixture
 def session_execution_result_success() -> SessionExecutionResult:
     """SessionExecutionResult with successful sessions."""
-    from ai.backend.manager.sokovan.scheduler.results import (
-        SessionExecutionResult,
-        SessionTransitionInfo,
-    )
-
     return SessionExecutionResult(
         successes=[
             SessionTransitionInfo(
@@ -563,11 +551,6 @@ def session_execution_result_success() -> SessionExecutionResult:
 @pytest.fixture
 def session_execution_result_with_failures() -> SessionExecutionResult:
     """SessionExecutionResult with failures."""
-    from ai.backend.manager.sokovan.scheduler.results import (
-        SessionExecutionResult,
-        SessionTransitionInfo,
-    )
-
     return SessionExecutionResult(
         successes=[
             SessionTransitionInfo(
@@ -594,11 +577,6 @@ def session_execution_result_with_failures() -> SessionExecutionResult:
 @pytest.fixture
 def session_execution_result_with_skipped() -> SessionExecutionResult:
     """SessionExecutionResult with skipped sessions."""
-    from ai.backend.manager.sokovan.scheduler.results import (
-        SessionExecutionResult,
-        SessionTransitionInfo,
-    )
-
     return SessionExecutionResult(
         successes=[],
         failures=[],
@@ -617,8 +595,6 @@ def session_execution_result_with_skipped() -> SessionExecutionResult:
 @pytest.fixture
 def session_execution_result_empty() -> SessionExecutionResult:
     """Empty SessionExecutionResult."""
-    from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
-
     return SessionExecutionResult(
         successes=[],
         failures=[],
@@ -629,9 +605,6 @@ def session_execution_result_empty() -> SessionExecutionResult:
 @pytest.fixture
 def status_transitions_with_all_outcomes() -> StatusTransitions:
     """StatusTransitions with all outcome types defined."""
-    from ai.backend.manager.data.kernel.types import KernelStatus
-    from ai.backend.manager.data.session.types import StatusTransitions, TransitionStatus
-
     return StatusTransitions(
         success=TransitionStatus(session=SessionStatus.SCHEDULED, kernel=KernelStatus.SCHEDULED),
         need_retry=TransitionStatus(session=SessionStatus.PENDING, kernel=KernelStatus.PENDING),
@@ -643,9 +616,6 @@ def status_transitions_with_all_outcomes() -> StatusTransitions:
 @pytest.fixture
 def status_transitions_success_only() -> StatusTransitions:
     """StatusTransitions with only success outcome."""
-    from ai.backend.manager.data.kernel.types import KernelStatus
-    from ai.backend.manager.data.session.types import StatusTransitions, TransitionStatus
-
     return StatusTransitions(
         success=TransitionStatus(session=SessionStatus.SCHEDULED, kernel=KernelStatus.SCHEDULED),
         need_retry=None,

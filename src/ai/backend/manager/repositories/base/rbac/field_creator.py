@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, FieldType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
@@ -24,7 +24,7 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 @dataclass
-class RBACFieldCreator(Generic[TRow]):
+class RBACFieldCreator[TRow: Base]:
     """Creator for a single field-scoped entity.
 
     Attributes:
@@ -37,17 +37,17 @@ class RBACFieldCreator(Generic[TRow]):
     spec: CreatorSpec[TRow]
     entity_type: EntityType
     entity_id: str
-    field_type: EntityType
+    field_type: FieldType
 
 
 @dataclass
-class RBACFieldCreatorResult(Generic[TRow]):
+class RBACFieldCreatorResult[TRow: Base]:
     """Result of executing a single field creation."""
 
     row: TRow
 
 
-async def execute_rbac_field_creator(
+async def execute_rbac_field_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACFieldCreator[TRow],
 ) -> RBACFieldCreatorResult[TRow]:
@@ -105,7 +105,7 @@ async def execute_rbac_field_creator(
 
 
 @dataclass
-class RBACBulkFieldCreator(Generic[TRow]):
+class RBACBulkFieldCreator[TRow: Base]:
     """Bulk creator for multiple field-scoped entities.
 
     Attributes:
@@ -118,17 +118,17 @@ class RBACBulkFieldCreator(Generic[TRow]):
     specs: Sequence[CreatorSpec[TRow]]
     entity_type: EntityType
     entity_id: str
-    field_type: EntityType
+    field_type: FieldType
 
 
 @dataclass
-class RBACBulkFieldCreatorResult(Generic[TRow]):
+class RBACBulkFieldCreatorResult[TRow: Base]:
     """Result of executing a bulk field creation."""
 
     rows: list[TRow]
 
 
-async def execute_rbac_bulk_field_creator(
+async def execute_rbac_bulk_field_creator[TRow: Base](
     db_sess: SASession,
     creator: RBACBulkFieldCreator[TRow],
 ) -> RBACBulkFieldCreatorResult[TRow]:

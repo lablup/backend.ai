@@ -10,7 +10,7 @@ from .pretty import print_error, print_info, print_warn
 
 
 @click.group()
-def dotfile():
+def dotfile() -> None:
     """Provides dotfile operations."""
 
 
@@ -47,7 +47,14 @@ def dotfile():
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def create(path, permission, dotfile_path, owner_access_key, domain, group):
+def create(
+    path: str,
+    permission: str | None,
+    dotfile_path: str | None,
+    owner_access_key: str | None,
+    domain: str | None,
+    group: str | None,
+) -> None:
     """
     Store dotfile to Backend.AI Manager.
     Dotfiles will be automatically loaded when creating kernels.
@@ -102,7 +109,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def get(path, owner_access_key, domain, group):
+def get(path: str, owner_access_key: str | None, domain: str | None, group: str | None) -> None:
     """
     Print dotfile content.
     """
@@ -139,7 +146,7 @@ def get(path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def list(owner_access_key, domain, group):
+def list(owner_access_key: str | None, domain: str | None, group: str | None) -> None:
     """
     List available user/domain/group dotfiles.
     """
@@ -203,7 +210,14 @@ def list(owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def update(path, permission, dotfile_path, owner_access_key, domain, group):
+def update(
+    path: str,
+    permission: str | None,
+    dotfile_path: str | None,
+    owner_access_key: str | None,
+    domain: str | None,
+    group: str | None,
+) -> None:
     """
     Update dotfile stored in Backend.AI Manager.
     """
@@ -222,7 +236,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
             dotfile_ = session.Dotfile(
                 path, owner_access_key=owner_access_key, domain=domain, group=group
             )
-            dotfile_.update(body, permission)
+            _ = dotfile_.update(body, permission)
             print_info(f"Dotfile {dotfile_.path} updated")
         except Exception as e:
             print_error(e)
@@ -252,7 +266,9 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
         "(If group name is provided, domain name must be specified with option -d)"
     ),
 )
-def delete(path, force, owner_access_key, domain, group):
+def delete(
+    path: str, force: bool, owner_access_key: str | None, domain: str | None, group: str | None
+) -> None:
     """
     Delete dotfile from Backend.AI Manager.
     """
@@ -267,7 +283,7 @@ def delete(path, force, owner_access_key, domain, group):
                 print_info("Aborting.")
                 exit()
         try:
-            dotfile_.delete()
+            _ = dotfile_.delete()
             print_info(f"Dotfile {dotfile_.path} deleted")
         except Exception as e:
             print_error(e)

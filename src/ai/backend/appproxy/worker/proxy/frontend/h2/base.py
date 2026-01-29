@@ -1,18 +1,17 @@
 import asyncio
 import logging
 from asyncio import subprocess
-from typing import Generic
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
-from ai.backend.appproxy.worker.types import Circuit, TCircuitKey
+from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class H2Frontend(Generic[TCircuitKey], BaseFrontend[H2Backend, TCircuitKey]):
+class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
     api_port_pool: set[int]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -27,7 +26,9 @@ class H2Frontend(Generic[TCircuitKey], BaseFrontend[H2Backend, TCircuitKey]):
         # We can't measure activeness of HTTP/2 circuits
         return []
 
-    async def _log_monitor_task(self, stream: asyncio.StreamReader, log_header_postfix="") -> None:
+    async def _log_monitor_task(
+        self, stream: asyncio.StreamReader, log_header_postfix: str = ""
+    ) -> None:
         while True:
             line = await stream.readline()
             if len(line) == 0:

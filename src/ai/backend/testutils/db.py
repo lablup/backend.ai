@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Protocol, TypeAlias
+from typing import Any, Protocol
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -15,10 +15,10 @@ class HasTable(Protocol):
 
 
 # Type alias for items that can be passed to with_tables
-TableOrORM: TypeAlias = Table | type[HasTable]
+type TableOrORM = Table | type[HasTable]
 
 
-def _create_tables_sync(conn, tables: list[Table]) -> None:
+def _create_tables_sync(conn: Any, tables: list[Table]) -> None:
     """
     Sync function to create tables using MetaData.create_all().
 

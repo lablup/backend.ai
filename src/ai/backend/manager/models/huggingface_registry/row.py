@@ -24,13 +24,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("HuggingFaceRegistryRow",)
 
 
-def _get_registry_artifact_join_condition():
+def _get_registry_artifact_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact import ArtifactRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
-def _get_registry_meta_join_condition():
+def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)

@@ -2,7 +2,7 @@ import logging
 from typing import Any, Optional
 
 import sqlalchemy as sa
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -193,7 +193,7 @@ class ModelServingEventHandler:
                 ],
             }
 
-            async def _update():
+            async def _update() -> None:
                 async with self._db.begin_session() as db_sess:
                     query = (
                         sa.update(RoutingRow)

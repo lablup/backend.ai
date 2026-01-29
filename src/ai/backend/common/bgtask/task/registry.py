@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Generic, Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
 from ai.backend.common.exception import (
@@ -11,8 +11,6 @@ from .base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
-    TManifest,
-    TResult,
 )
 
 
@@ -40,7 +38,10 @@ class _TaskExecutor(ABC):
         raise NotImplementedError("Subclasses must implement this method")
 
 
-class _TaskDefinition(_TaskExecutor, Generic[TManifest, TResult]):
+class _TaskDefinition[
+    TManifest: BaseBackgroundTaskManifest,
+    TResult: Optional[BaseBackgroundTaskResult],
+](_TaskExecutor):
     _handler: BaseBackgroundTaskHandler[TManifest, TResult]
     _task_name: BgtaskNameBase
 
@@ -80,8 +81,8 @@ class BackgroundTaskHandlerRegistry:
         """Get BgtaskNameBase instance from string name."""
         try:
             definition = self._executor_registry[name]
-        except KeyError:
-            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.")
+        except KeyError as e:
+            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.") from e
         return definition.task_name()
 
     async def revive_task(
@@ -89,8 +90,8 @@ class BackgroundTaskHandlerRegistry:
     ) -> Optional[BaseBackgroundTaskResult]:
         try:
             definition = self._executor_registry[name]
-        except KeyError:
-            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.")
+        except KeyError as e:
+            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.") from e
         return await definition.revive_task(manifest_dict)
 
     async def execute_new_task(
@@ -98,6 +99,6 @@ class BackgroundTaskHandlerRegistry:
     ) -> Optional[BaseBackgroundTaskResult]:
         try:
             definition = self._executor_registry[name.value]
-        except KeyError:
-            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.")
+        except KeyError as e:
+            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.") from e
         return await definition.execute_new_task(manifest)

@@ -55,11 +55,11 @@ class KubernetesHostPathVolume(KubernetesAbstractVolume):
 class ConfigMap(AbstractAPIObject):
     items: dict[str, str] = {}
 
-    def __init__(self, kernel_id, name: str) -> None:
+    def __init__(self, kernel_id: Any, name: str) -> None:
         self.name = name
         self.labels = {"backend.ai/kernel-id": kernel_id}
 
-    def put(self, key: str, value: str):
+    def put(self, key: str, value: str) -> None:
         self.items[key] = value
 
     def to_dict(self) -> dict:
@@ -76,7 +76,7 @@ class ConfigMap(AbstractAPIObject):
 
 class Service(AbstractAPIObject):
     def __init__(
-        self, kernel_id: str, name: str, container_port: list, service_type="NodePort"
+        self, kernel_id: str, name: str, container_port: list[Any], service_type: str = "NodePort"
     ) -> None:
         self.name = name
         self.deployment_name = f"kernel-{kernel_id}"
@@ -108,7 +108,7 @@ class Service(AbstractAPIObject):
 
 
 class NFSPersistentVolume(AbstractAPIObject):
-    def __init__(self, server, name, capacity, path="/") -> None:
+    def __init__(self, server: str, name: str, capacity: str, path: str = "/") -> None:
         self.server = server
         self.path = path
         self.name = name
@@ -116,7 +116,7 @@ class NFSPersistentVolume(AbstractAPIObject):
         self.labels: dict[str, str] = {}
         self.options: list[str] = []
 
-    def label(self, k, v):
+    def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:
@@ -142,14 +142,14 @@ class NFSPersistentVolume(AbstractAPIObject):
 
 
 class HostPathPersistentVolume(AbstractAPIObject):
-    def __init__(self, path, name, capacity) -> None:
+    def __init__(self, path: str, name: str, capacity: str) -> None:
         self.path = path
         self.name = name
         self.capacity = capacity
         self.labels: dict[str, str] = {}
         self.options: list[str] = []
 
-    def label(self, k, v):
+    def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:
@@ -174,13 +174,13 @@ class HostPathPersistentVolume(AbstractAPIObject):
 
 
 class PersistentVolumeClaim(AbstractAPIObject):
-    def __init__(self, name, pv_name, capacity) -> None:
+    def __init__(self, name: str, pv_name: str, capacity: str) -> None:
         self.name = name
         self.pv_name = pv_name
         self.capacity = capacity
         self.labels: dict[str, str] = {}
 
-    def label(self, k, v):
+    def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
     def to_dict(self) -> dict:

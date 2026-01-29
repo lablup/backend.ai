@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import ssl
 import time
 import urllib.parse
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
@@ -29,7 +31,7 @@ class WekaQuota:
     used_bytes: Optional[int]
 
     @classmethod
-    def from_json(cls, quota_id: str, data: Any):
+    def from_json(cls, quota_id: str, data: Any) -> WekaQuota:
         return WekaQuota(
             quota_id,
             data["inode_id"],
@@ -39,7 +41,7 @@ class WekaQuota:
             data["used_bytes"],
         )
 
-    def to_json(self):
+    def to_json(self) -> dict[str, int | str | None]:
         return {
             "quota_id": self.quota_id,
             "inode_id": self.inode_id,
@@ -68,7 +70,8 @@ class WekaFs:
     ssd_budget: int
     total_budget: int
 
-    def from_json(data: Any):
+    @classmethod
+    def from_json(cls, data: Any) -> WekaFs:
         return WekaFs(
             data["id"],
             data["name"],
@@ -88,14 +91,14 @@ class WekaFs:
         )
 
 
-def error_handler(inner):
-    async def outer(*args, **kwargs):
+def error_handler(inner: Callable[..., Awaitable[Any]]) -> Any:
+    async def outer(*args, **kwargs) -> Any:
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise WekaInvalidBodyError
-        except web.HTTPNotFound:
-            raise WekaNotFoundError
+        except web.HTTPBadRequest as e:
+            raise WekaInvalidBodyError from e
+        except web.HTTPNotFound as e:
+            raise WekaNotFoundError from e
 
     return outer
 
@@ -206,8 +209,8 @@ class WekaAPIClient:
                     ssl=self.ssl_context,
                 )
 
-            except web.HTTPUnauthorized:
-                raise WekaUnauthorizedError
+            except web.HTTPUnauthorized as e:
+                raise WekaUnauthorizedError from e
 
     @error_handler
     async def list_fs(self) -> Iterable[WekaFs]:

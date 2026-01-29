@@ -7,7 +7,7 @@ import json
 import logging
 import socket
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Optional, cast
 
@@ -17,19 +17,14 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from aiotools import aclosing
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events.event_types.schedule.anycast import (
-    DoCheckPrecondEvent,
-    DoScaleEvent,
-    DoScheduleEvent,
-    DoStartSessionEvent,
-)
-from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
+from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive, QueueSentinel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
-from ai.backend.manager.api import ManagerStatus, SchedulerEvent
+from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest, ServerFrozen, ServiceUnavailable
@@ -62,10 +57,12 @@ class SchedulerOps(enum.Enum):
     EXCLUDE_AGENTS = "exclude-agents"
 
 
-def server_status_required(allowed_status: frozenset[ManagerStatus]):
-    def decorator(handler):
+def server_status_required(
+    allowed_status: frozenset[ManagerStatus],
+) -> Callable[[Handler], Handler]:
+    def decorator(handler: Handler) -> Handler:
         @functools.wraps(handler)
-        async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
+        async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
             if status not in allowed_status:
@@ -88,7 +85,7 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if (
             info.operation.operation == "mutation"
@@ -104,6 +101,8 @@ async def detect_status_update(root_ctx: RootContext) -> None:
             root_ctx.config_provider.legacy_etcd_config_loader.watch_manager_status()
         ) as agen:
             async for ev in agen:
+                if isinstance(ev, QueueSentinel):
+                    continue
                 if ev.event == "put":
                     root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status.cache_clear()
                     updated_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
@@ -192,10 +191,10 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
     try:
         status = params["status"]
         force_kill = params["force_kill"]
-    except json.JSONDecodeError:
-        raise InvalidAPIParameters(extra_msg="No request body!")
+    except json.JSONDecodeError as e:
+        raise InvalidAPIParameters(extra_msg="No request body!") from e
     except (AssertionError, ValueError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     if force_kill:
         # It supposed to kill all running sessions and kernels
@@ -256,7 +255,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
         raise InvalidAPIParameters(
             f"Input validation failed for args with {params['op']}",
             extra_data=e.as_dict(),
-        )
+        ) from e
     if params["op"] in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
         schedulable = params["op"] == SchedulerOps.INCLUDE_AGENTS
         async with root_ctx.db.begin() as conn:
@@ -264,46 +263,21 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
             result = await conn.execute(query)
             if result.rowcount < len(args):
                 raise InstanceNotFound()
-        if schedulable:
-            # trigger scheduler
-            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
     else:
         raise GenericBadRequest("Unknown scheduler operation")
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @superadmin_required
-@check_api_params(
-    t.Dict({
-        t.Key("event"): tx.Enum(SchedulerEvent),
-    })
-)
-async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    match params["event"]:
-        case SchedulerEvent.SCHEDULE:
-            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
-        case SchedulerEvent.CHECK_PRECOND:
-            await root_ctx.event_producer.anycast_event(DoCheckPrecondEvent())
-        case SchedulerEvent.START_SESSION:
-            await root_ctx.event_producer.anycast_event(DoStartSessionEvent())
-        case SchedulerEvent.SCALE_SERVICES:
-            await root_ctx.event_producer.anycast_event(DoScaleEvent())
-    return web.Response(status=HTTPStatus.NO_CONTENT)
+async def scheduler_trigger(request: web.Request) -> web.Response:
+    # Legacy scheduler events are no longer supported with Sokovan scheduler
+    raise InvalidAPIParameters("Legacy scheduler trigger API is no longer supported")
 
 
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    manager_id = root_ctx.config_provider.config.manager.id
-
-    scheduler_status = {}
-    for event in SchedulerEvent:
-        scheduler_status[event.value] = await root_ctx.valkey_live.get_scheduler_metadata(
-            f"manager.{manager_id}.{event.value}"
-        )
-
-    return web.json_response(scheduler_status)
+    # Legacy scheduler status check is no longer supported with Sokovan scheduler
+    raise InvalidAPIParameters("Legacy scheduler healthcheck API is no longer supported")
 
 
 class SQLAlchemyConnectionMetric(PromMetric):

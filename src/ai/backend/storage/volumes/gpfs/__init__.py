@@ -8,7 +8,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
@@ -16,14 +16,13 @@ from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
-    QuotaConfig,
-    QuotaUsage,
 )
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
+from .types import GPFSSystemHealthState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -196,7 +195,7 @@ class GPFSVolume(BaseVolume):
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
         invalid_status = ["FAILED", "DEGRADED", "ERROR"]
-        health_status = "HEALTHY"
+        health_status: str | GPFSSystemHealthState = "HEALTHY"
 
         for node in nodes:
             if health_status == "ERROR":
@@ -255,8 +254,8 @@ class GPFSVolume(BaseVolume):
         try:
             metrics = await self.api_client.get_metric(query)
             latest_metric = metrics["performanceData"]["rows"][-1]["values"]
-        except (KeyError, IndexError):
-            raise GPFSNoMetricError
+        except (KeyError, IndexError) as e:
+            raise GPFSNoMetricError from e
         return FSPerfMetric(
             iops_read=latest_metric[0] or 0,
             iops_write=latest_metric[1] or 0,

@@ -17,7 +17,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelWorkload, SessionWorkload
+from ai.backend.manager.sokovan.data import KernelWorkload, SessionWorkload
 
 
 @dataclass

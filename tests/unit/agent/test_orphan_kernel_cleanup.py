@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.agent.observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
 from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.valkey_client.valkey_schedule import KernelStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
@@ -24,7 +25,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
 if TYPE_CHECKING:
-    from ai.backend.agent.observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
+    pass
 
 
 @dataclass
@@ -91,8 +92,6 @@ class TestOrphanKernelCleanupObserver:
         mock_valkey_client: AsyncMock,
     ) -> OrphanKernelCleanupObserver:
         """Create observer with mocked dependencies."""
-        from ai.backend.agent.observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
-
         return OrphanKernelCleanupObserver(mock_agent, mock_valkey_client)
 
     @pytest.fixture

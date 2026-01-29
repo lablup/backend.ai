@@ -29,6 +29,7 @@ import trafaret as t
 from aiodocker.docker import DockerContainer
 
 from ai.backend.common import identity
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
@@ -37,7 +38,6 @@ from ai.backend.common.cgroup import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
-from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

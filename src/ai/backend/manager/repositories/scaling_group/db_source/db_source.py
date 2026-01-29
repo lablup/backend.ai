@@ -76,9 +76,9 @@ class ScalingGroupDBSource:
         async with self._db.begin_session() as session:
             try:
                 result = await execute_creator(session, creator)
-            except sa.exc.IntegrityError:
+            except sa.exc.IntegrityError as e:
                 spec = cast(ScalingGroupCreatorSpec, creator.spec)
-                raise ScalingGroupConflict(f"Duplicate scaling group name: {spec.name}")
+                raise ScalingGroupConflict(f"Duplicate scaling group name: {spec.name}") from e
             return result.row.to_dataclass()
 
     async def search_scaling_groups(

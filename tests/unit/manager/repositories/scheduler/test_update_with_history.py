@@ -12,6 +12,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -23,7 +24,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
-from ai.backend.manager.data.user.types import UserRole, UserStatus
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow

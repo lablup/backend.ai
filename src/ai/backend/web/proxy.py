@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import random
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Final, Optional, cast
 
 import aiohttp
@@ -150,7 +150,10 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 
 @web.middleware
-async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+async def decrypt_payload(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
     config: WebServerUnifiedConfig = request.app["config"]
     try:
         request_headers = extra_config_headers.check(request.headers)
@@ -566,7 +569,7 @@ async def web_plugin_handler(
 async def websocket_handler(
     request: web.Request,
     *,
-    is_anonymous=False,
+    is_anonymous: bool = False,
     api_endpoint: Optional[str] = None,
     jwt_token: Optional[str] = None,
 ) -> web.StreamResponse:

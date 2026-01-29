@@ -48,7 +48,6 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ResourceSpecDraft,
 )
-from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
     MountOption,
@@ -70,13 +69,6 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.clear_error import ClearErrorAction
-from ai.backend.manager.services.model_serving.actions.create_model_service import (
-    CreateModelServiceAction,
-    CreateModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.actions.delete_model_service import (
-    DeleteModelServiceAction,
-)
 from ai.backend.manager.services.model_serving.actions.delete_route import DeleteRouteAction
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
@@ -474,46 +466,6 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
     )
     config: ServiceConfigModel
 
-    def to_create_action(
-        self,
-        validation_result: ValidationResult,
-        request_user_id: uuid.UUID,
-        sudo_session_enabled: bool,
-    ) -> CreateModelServiceAction:
-        return CreateModelServiceAction(
-            request_user_id=request_user_id,
-            creator=ModelServiceCreator(
-                service_name=self.service_name,
-                replicas=self.replicas,
-                image=self.image,
-                runtime_variant=self.runtime_variant,
-                architecture=self.architecture,
-                group_name=self.group_name,
-                domain_name=self.domain_name,
-                cluster_size=self.cluster_size,
-                cluster_mode=ClusterMode(self.cluster_mode),
-                tag=self.tag,
-                startup_command=self.startup_command,
-                bootstrap_script=self.bootstrap_script,
-                callback_url=self.callback_url,
-                open_to_public=self.open_to_public,
-                config=self.config.to_dataclass(),
-                sudo_session_enabled=sudo_session_enabled,
-                model_service_prepare_ctx=ModelServicePrepareCtx(
-                    model_id=validation_result.model_id,
-                    model_definition_path=validation_result.model_definition_path,
-                    requester_access_key=validation_result.requester_access_key,
-                    owner_access_key=validation_result.owner_access_key,
-                    owner_uuid=validation_result.owner_uuid,
-                    owner_role=validation_result.owner_role,
-                    group_id=validation_result.group_id,
-                    resource_policy=validation_result.resource_policy,
-                    scaling_group=validation_result.scaling_group,
-                    extra_mounts=validation_result.extra_mounts,
-                ),
-            ),
-        )
-
     def to_start_action(
         self,
         validation_result: ValidationResult,
@@ -731,50 +683,35 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     root_ctx: RootContext = request.app["_root.context"]
 
     validation_result = await _validate(request, params)
-    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
-    if (
-        root_ctx.config_provider.config.manager.use_sokovan
-        and root_ctx.processors.deployment is not None
-    ):
-        # Create deployment using the new deployment controller
-        deployment_action = CreateLegacyDeploymentAction(
-            draft=DeploymentCreationDraft(
-                metadata=DeploymentMetadata(
-                    name=params.service_name,
-                    domain=params.domain_name,
-                    project=validation_result.group_id,
-                    resource_group=validation_result.scaling_group,
-                    created_user=request["user"]["uuid"],
-                    session_owner=validation_result.owner_uuid,
-                    created_at=None,  # Will be set by controller
-                    revision_history_limit=10,
-                    tag=params.tag,
-                ),
-                replica_spec=ReplicaSpec(
-                    replica_count=params.replicas,
-                ),
-                draft_model_revision=params.to_model_revision(validation_result),
-                network=DeploymentNetworkSpec(
-                    open_to_public=params.open_to_public,
-                ),
-            )
+    # Create deployment using the deployment controller
+    deployment_action = CreateLegacyDeploymentAction(
+        draft=DeploymentCreationDraft(
+            metadata=DeploymentMetadata(
+                name=params.service_name,
+                domain=params.domain_name,
+                project=validation_result.group_id,
+                resource_group=validation_result.scaling_group,
+                created_user=request["user"]["uuid"],
+                session_owner=validation_result.owner_uuid,
+                created_at=None,  # Will be set by controller
+                revision_history_limit=10,
+                tag=params.tag,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=params.replicas,
+            ),
+            draft_model_revision=params.to_model_revision(validation_result),
+            network=DeploymentNetworkSpec(
+                open_to_public=params.open_to_public,
+            ),
         )
-        deployment_result: CreateLegacyDeploymentActionResult = (
-            await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
-                deployment_action
-            )
+    )
+    deployment_result: CreateLegacyDeploymentActionResult = (
+        await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
+            deployment_action
         )
-        return ServeInfoModel.from_deployment_info(deployment_result.data)
-    # Fall back to model_serving
-    action = params.to_create_action(
-        validation_result=validation_result,
-        request_user_id=request["user"]["uuid"],
-        sudo_session_enabled=request["user"]["sudo_session_enabled"],
     )
-    result: CreateModelServiceActionResult = (
-        await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
-    )
-    return ServeInfoModel.from_dto(result.data)
+    return ServeInfoModel.from_deployment_info(deployment_result.data)
 
 
 class TryStartResponseModel(LegacyBaseResponseModel):
@@ -815,27 +752,14 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         "SERVE.DELETE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
-    if (
-        root_ctx.config_provider.config.manager.use_sokovan
-        and root_ctx.processors.deployment is not None
-    ):
-        # Use deployment destroy action
-        deployment_action = DestroyDeploymentAction(
-            endpoint_id=service_id,
-        )
-        deployment_result: DestroyDeploymentActionResult = (
-            await root_ctx.processors.deployment.destroy_deployment.wait_for_complete(
-                deployment_action
-            )
-        )
-        return SuccessResponseModel(success=deployment_result.success)
-    # Fall back to model_serving
-    action = DeleteModelServiceAction(
-        service_id=service_id,
+    # Use deployment destroy action
+    deployment_action = DestroyDeploymentAction(
+        endpoint_id=service_id,
     )
-    result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
-    return SuccessResponseModel(success=result.success)
+    deployment_result: DestroyDeploymentActionResult = (
+        await root_ctx.processors.deployment.destroy_deployment.wait_for_complete(deployment_action)
+    )
+    return SuccessResponseModel(success=deployment_result.success)
 
 
 @auth_required

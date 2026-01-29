@@ -10,7 +10,6 @@ from collections import defaultdict
 from collections.abc import Callable, Coroutine, Sequence
 from typing import (
     Any,
-    Generic,
     Optional,
     Protocol,
     TypedDict,
@@ -76,7 +75,7 @@ class EventHandlerType(enum.Enum):
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
-class EventHandler(Generic[TContext, TEvent]):
+class EventHandler[TContext, TEvent: "AbstractEvent"]:
     event_cls: type[TEvent]
     name: str
     context: TContext
@@ -101,7 +100,7 @@ class CoalescingState:
     last_handle: asyncio.TimerHandle | None = None
     fut_sync: asyncio.Future | None = None
 
-    def proceed(self):
+    def proceed(self) -> None:
         if self.fut_sync is not None and not self.fut_sync.done():
             self.fut_sync.set_result(None)
 
@@ -111,11 +110,13 @@ class CoalescingState:
         loop = asyncio.get_running_loop()
         if self.fut_sync is None:
             self.fut_sync = loop.create_future()
-        assert self.fut_sync is not None
+        if self.fut_sync is None:
+            raise RuntimeError("Failed to create future for rate control")
         self.last_added = loop.time()
         self.batch_size += 1
         if self.batch_size >= opts["max_batch_size"]:
-            assert self.last_handle is not None
+            if self.last_handle is None:
+                raise RuntimeError("Timer handle is not initialized")
             self.last_handle.cancel()
             self.fut_sync.cancel()
             self.last_handle = None

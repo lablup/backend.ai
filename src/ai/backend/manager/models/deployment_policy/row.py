@@ -47,7 +47,7 @@ class BlueGreenSpec(BaseModel):
     promote_delay_seconds: int = 0
 
 
-def _get_endpoint_join_condition():
+def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id

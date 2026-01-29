@@ -6,7 +6,8 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import HostPortPair
 
 
 class TestEtcdHealthChecker:
@@ -19,8 +20,6 @@ class TestEtcdHealthChecker:
         test_ns: str,
     ) -> AsyncGenerator[AsyncEtcd, None]:
         """Create an AsyncEtcd client connected to the test container."""
-        from ai.backend.common.types import HostPortPair
-
         container_id, etcd_addr = etcd_container
 
         scope_prefix_map = {
@@ -64,8 +63,6 @@ class TestEtcdHealthChecker:
     async def test_connection_error(self) -> None:
         """Test health check failure with unreachable etcd server."""
         # Create client pointing to non-existent server
-        from ai.backend.common.types import HostPortPair
-
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }

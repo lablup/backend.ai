@@ -199,7 +199,7 @@ class VASTAPIClient:
         if get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
-            return
+            return None
         if get_exp_dt(self._auth_token["refresh_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens
@@ -209,8 +209,8 @@ class VASTAPIClient:
     def _parse_token(self, data: Mapping[str, Any]) -> None:
         try:
             self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
-        except KeyError:
-            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})")
+        except KeyError as e:
+            raise VASTAPIError(f"Cannot parse token with given data (d:{data!s})") from e
 
     async def _refresh(self) -> None:
         if self._auth_token is None:

@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
@@ -29,7 +29,7 @@ from ai.backend.manager.models.user import UserRole, users
 
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:
@@ -151,8 +151,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except json.JSONDecodeError:
             try:
                 body = yaml.safe_load(params["payload"])
-            except (yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed payload")
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
         template_data = check_cluster_template(body)
         template_id = uuid.uuid4().hex
         resp = {
@@ -333,9 +333,10 @@ async def put(request: web.Request, params: Any) -> web.Response:
         try:
             body = load_json(params["payload"])
         except json.JSONDecodeError:
-            body = yaml.safe_load(params["payload"])
-        except (yaml.YAMLError, yaml.MarkedYAMLError):
-            raise InvalidAPIParameters("Malformed payload")
+            try:
+                body = yaml.safe_load(params["payload"])
+            except (yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed payload") from e
         template_data = check_cluster_template(body)
         update_query = (
             sa.update(session_templates)

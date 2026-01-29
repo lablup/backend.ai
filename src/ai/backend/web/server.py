@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging.config
@@ -24,6 +26,7 @@ import aiotools
 import click
 import jinja2
 import tomli
+import uvloop
 from aiohttp import web
 from setproctitle import setproctitle
 
@@ -176,14 +179,14 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     # SECURITY: only allow reading files under static_path
     try:
         file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
+    except (ValueError, FileNotFoundError) as e:
         raise web.HTTPNotFound(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-not-found",
                 "title": "Not Found",
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     # Fallback to index.html to support the URL routing for single-page application.
@@ -341,10 +344,10 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
-    async def _get_login_history():
+    async def _get_login_history() -> dict[str, float | int]:
         login_history_bytes = await valkey_client.get_login_history(creds["username"])
         if not login_history_bytes:
-            login_history = {
+            login_history: dict[str, float | int] = {
                 "last_login_attempt": 0,
                 "login_fail_count": 0,
             }
@@ -356,7 +359,7 @@ async def login_handler(request: web.Request) -> web.Response:
             login_history["login_fail_count"] = 0
         return login_history
 
-    async def _set_login_history(last_login_attempt, login_fail_count):
+    async def _set_login_history(last_login_attempt: float, login_fail_count: float | int) -> None:
         """
         Set login history per email (not in browser session).
         """
@@ -872,7 +875,7 @@ async def webapp_ctx(
         raise ValueError("Unrecognized service.mode", config.service.mode)
     cors.add(app.router.add_route("GET", "/{path:.*$}", fallback_handler))
 
-    async def on_prepare(request, response):
+    async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
         # Remove "Server" header for a security reason.
         response.headers.popall("Server", None)
 
@@ -1031,8 +1034,6 @@ def main(
                 log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

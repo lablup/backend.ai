@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar, override
+from typing import Optional, TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -11,7 +11,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 TSpec = TypeVar("TSpec")
 
 
-class SpecGenerator(ABC, Generic[TSpec]):
+class SpecGenerator[TSpec](ABC):
     """
     Base class for all specs in the stage.
 
@@ -30,7 +30,7 @@ class SpecGenerator(ABC, Generic[TSpec]):
 TResource = TypeVar("TResource")
 
 
-class Provisioner(ABC, Generic[TSpec, TResource]):
+class Provisioner[TSpec, TResource](ABC):
     """
     Base class for all provisioners in the stage.
     """
@@ -58,7 +58,7 @@ class Provisioner(ABC, Generic[TSpec, TResource]):
         raise NotImplementedError
 
 
-class Stage(ABC, Generic[TSpec, TResource]):
+class Stage[TSpec, TResource](ABC):
     @abstractmethod
     async def setup(self, spec_generator: SpecGenerator[TSpec]) -> None:
         """

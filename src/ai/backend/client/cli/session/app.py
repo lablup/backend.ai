@@ -3,7 +3,7 @@ import json
 import shlex
 import sys
 from collections.abc import MutableMapping, Sequence
-from typing import Optional
+from typing import Any, Optional
 
 import aiohttp
 import click
@@ -65,11 +65,11 @@ class WSProxy:
                         if msg.type == aiohttp.WSMsgType.ERROR:
                             await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.CLOSE:
+                        if msg.type == aiohttp.WSMsgType.CLOSE:
                             if msg.data != aiohttp.WSCloseCode.OK:
                                 await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.BINARY:
+                        if msg.type == aiohttp.WSMsgType.BINARY:
                             self.writer.write(msg.data)
                             await self.writer.drain()
                 except ConnectionResetError:
@@ -191,7 +191,8 @@ class ProxyRunnerContext:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session is not initialized")
         p = WSProxy(
             self.api_session,
             self.session_name,
@@ -254,9 +255,11 @@ class ProxyRunnerContext:
             print_info("Shutting down....")
             self.local_server.close()
             await self.local_server.wait_closed()
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session was not properly initialized")
         await self.api_session.__aexit__(*exc_info)
-        assert self.api_session.closed
+        if not self.api_session.closed:
+            raise RuntimeError("Failed to close API session")
         if self.local_server is not None:
             print_info(f'The local proxy to "{self.app_name}" has terminated.')
         self.local_server = None
@@ -288,7 +291,7 @@ class ProxyRunnerContext:
     metavar='"ENVNAME=envvalue"',
     help="Add additional environment variable when starting service.",
 )
-def app(session_name, app, bind, arg, env):
+def app(session_name: str, app: str, bind: str, arg: tuple[str, ...], env: tuple[str, ...]) -> None:
     """
     Run a local proxy to a service provided by Backend.AI compute sessions.
 
@@ -326,7 +329,7 @@ def app(session_name, app, bind, arg, env):
 @click.argument("session_name", type=str, metavar="NAME", nargs=1)
 @click.argument("app_name", type=str, metavar="APP", nargs=-1)
 @click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
-def apps(session_name, app_name, list_names):
+def apps(session_name: str, app_name: tuple[str, ...], list_names: bool) -> None:
     """
     List available additional arguments and environment variables when starting service.
 
@@ -336,16 +339,16 @@ def apps(session_name, app_name, list_names):
          If none provided, this will print all available services.
     """
 
-    async def print_arguments():
-        apps = []
+    async def print_arguments() -> None:
+        apps: list[dict[str, Any]] = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x["name"] in app_name))
+                apps = list(filter(lambda x: x["name"] in app_name, apps))
         if list_names:
             print_info(
-                "This session provides the following app services: {0}".format(
+                "This session provides the following app services: {}".format(
                     ", ".join(list(map(lambda x: x["name"], apps)))
                 )
             )
@@ -355,14 +358,14 @@ def apps(session_name, app_name, list_names):
             has_envs = "allowed_envs" in service.keys()
 
             if has_arguments or has_envs:
-                print_info("Information for service {0}:".format(service["name"]))
+                print_info("Information for service {}:".format(service["name"]))
                 if has_arguments:
-                    print("\tAvailable arguments: {0}".format(service["allowed_arguments"]))
+                    print("\tAvailable arguments: {}".format(service["allowed_arguments"]))
                 if has_envs:
-                    print("\tAvailable environment variables: {0}".format(service["allowed_envs"]))
+                    print("\tAvailable environment variables: {}".format(service["allowed_envs"]))
             else:
                 print_info(
-                    "Service {0} does not have customizable arguments.".format(service["name"])
+                    "Service {} does not have customizable arguments.".format(service["name"])
                 )
 
     try:

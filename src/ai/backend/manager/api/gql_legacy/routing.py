@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Optional, Self
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -41,7 +41,7 @@ class Routing(graphene.ObjectType):
     _endpoint_row: EndpointRow
 
     @classmethod
-    def from_dto(cls, dto) -> Optional[Self]:  # type: ignore
+    def from_dto(cls, dto: Any) -> Optional[Self]:
         if dto is None:
             return None
         return cls(
@@ -57,7 +57,7 @@ class Routing(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: RoutingRow,
         endpoint: Optional[EndpointRow] = None,
     ) -> Routing:
@@ -76,7 +76,7 @@ class Routing(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: Optional[uuid.UUID] = None,
         project: Optional[uuid.UUID] = None,
@@ -94,12 +94,12 @@ class Routing(graphene.ObjectType):
             query = query.filter(RoutingRow.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -134,12 +134,14 @@ class Routing(graphene.ObjectType):
             query = parser.append_ordering(query, order)
         """
         async with ctx.db.begin_readonly_session() as session:
-            return [await cls.from_row(ctx, row) async for row in (await session.stream(query))]
+            return [
+                await cls.from_row(ctx, row) async for row in (await session.stream_scalars(query))
+            ]
 
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext
+        ctx: GraphQueryContext,
         endpoint_id: uuid.UUID,
         *,
         project: Optional[uuid.UUID] = None,
@@ -159,7 +161,7 @@ class Routing(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         routing_id: uuid.UUID,
         project: Optional[uuid.UUID] = None,
@@ -171,8 +173,8 @@ class Routing(graphene.ObjectType):
                 row = await RoutingRow.get(
                     session, routing_id, project=project, domain=domain_name, user_uuid=user_uuid
                 )
-        except NoResultFound:
-            raise RoutingNotFound
+        except NoResultFound as e:
+            raise RoutingNotFound from e
         return await Routing.from_row(ctx, row)
 
     async def resolve_error(self, info: graphene.ResolveInfo) -> Any:

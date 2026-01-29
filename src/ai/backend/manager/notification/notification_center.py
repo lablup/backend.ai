@@ -7,7 +7,7 @@ from datetime import datetime
 
 import jinja2
 
-from ai.backend.common.clients.http_client import ClientPool
+from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
 from ai.backend.common.data.notification import (
     NotifiableMessage,
     NotificationChannelType,
@@ -43,8 +43,6 @@ class NotificationCenter:
 
     def __init__(self) -> None:
         """Initialize the notification center with HTTP client pool and template environment."""
-        from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
-
         self._http_client_pool = ClientPool(
             factory=tcp_client_session_factory,
             cleanup_interval_seconds=600,

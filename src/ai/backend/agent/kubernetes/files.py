@@ -17,11 +17,11 @@ if s3_access_key == "dummy-access-key":
     log.info("Automatic ~/.output file S3 uploads is disabled.")
 
 
-def relpath(path, base):
+def relpath(path: str | Path, base: str | Path) -> Path:
     return Path(path).resolve().relative_to(Path(base).resolve())
 
 
-def scandir(root: Path, allowed_max_size: int):
+def scandir(root: Path, allowed_max_size: int) -> dict[Path, float]:
     """
     Scans a directory recursively and returns a dictionary of all files and
     their last modified time.
@@ -52,7 +52,7 @@ def scandir(root: Path, allowed_max_size: int):
     return file_stats
 
 
-def diff_file_stats(fs1, fs2):
+def diff_file_stats(fs1: dict[Path, float], fs2: dict[Path, float]) -> set[Path]:
     k2 = set(fs2.keys())
     k1 = set(fs1.keys())
     new_files = k2 - k1

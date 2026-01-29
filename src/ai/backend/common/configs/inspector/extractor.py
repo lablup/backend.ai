@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
@@ -223,8 +224,6 @@ class ConfigInspector:
         Returns:
             True if the type is nullable (allows None), False otherwise.
         """
-        import types
-
         if annotation is None:
             return True
 
@@ -307,8 +306,6 @@ class ConfigInspector:
 
     def _unwrap_optional(self, annotation: type) -> type:
         """Unwrap Optional[T] to get T."""
-        import types
-
         # Handle Python 3.10+ UnionType (X | None syntax)
         if isinstance(annotation, types.UnionType):
             args = annotation.__args__

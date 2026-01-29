@@ -146,7 +146,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         await asyncio.sleep(delay)
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         return
 
     @override
@@ -166,7 +166,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         return []
 
     @override
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path()
 
     @override
@@ -177,7 +177,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
-    ):
+    ) -> Mount:
         return Mount(MountTypes.BIND, Path(), Path())
 
     @override
@@ -185,7 +185,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
@@ -208,8 +208,8 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts,
-        preopen_ports,
+        resource_opts: Optional[Mapping[str, Any]],
+        preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config.container.bind_host
@@ -264,7 +264,7 @@ class DummyAgent(
         opts: Mapping[str, Any],
         api_version: int,
         flush_timeout: float,
-    ):
+    ) -> dict[str, Any]:
         return {"status": "not-implemented"}
 
     @override
