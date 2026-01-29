@@ -43,19 +43,15 @@ from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.get_image_by_id import (
-    GetImageByIdAction,
-    GetImageByIdActionResult,
-)
-from ai.backend.manager.services.image.actions.get_image_by_identifier import (
-    GetImageByIdentifierAction,
-    GetImageByIdentifierActionResult,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images import (
+    GetImageByIdAction,
+    GetImageByIdActionResult,
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
     GetImagesByIdsAction,
