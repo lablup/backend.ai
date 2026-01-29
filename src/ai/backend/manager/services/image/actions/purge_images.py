@@ -79,7 +79,6 @@ class PurgeImagesActionResult(BaseActionResult):
 
 @dataclass
 class PurgeImageByIdAction(ImageAction):
-    user_id: uuid.UUID
     image_id: uuid.UUID
 
     @override

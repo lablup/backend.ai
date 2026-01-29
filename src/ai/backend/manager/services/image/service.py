@@ -200,9 +200,11 @@ class ImageService:
             ImageAlias(action.reference),
         ]
         # Regular users need ownership validation
-        if action.client_role != UserRole.SUPERADMIN:
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        if not is_superadmin and user is not None:
             image_data = await self._image_repository.resolve_image(identifiers)
-            await self._validate_image_ownership(image_data.id, action.user_id)
+            await self._validate_image_ownership(image_data.id, user.user_id)
         data = await self._image_repository.soft_delete_image(identifiers)
         return ForgetImageActionResult(image=data)
 
@@ -212,8 +214,8 @@ class ImageService:
         # Regular users need ownership validation
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        if not is_superadmin:
-            await self._validate_image_ownership(action.image_id, action.user_id)
+        if not is_superadmin and user is not None:
+            await self._validate_image_ownership(action.image_id, user.user_id)
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
 
@@ -260,8 +262,8 @@ class ImageService:
         # Regular users need ownership validation
         user = current_user()
         is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        if not is_superadmin:
-            await self._validate_image_ownership(action.image_id, action.user_id)
+        if not is_superadmin and user is not None:
+            await self._validate_image_ownership(action.image_id, user.user_id)
         image_data = await self._image_repository.delete_image_with_aliases(action.image_id)
         return PurgeImageByIdActionResult(image=image_data)
 
@@ -269,8 +271,10 @@ class ImageService:
         self, action: UntagImageFromRegistryAction
     ) -> UntagImageFromRegistryActionResult:
         # Regular users need ownership validation
-        if action.client_role != UserRole.SUPERADMIN:
-            await self._validate_image_ownership(action.image_id, action.user_id)
+        user = current_user()
+        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
+        if not is_superadmin and user is not None:
+            await self._validate_image_ownership(action.image_id, user.user_id)
         image_data = await self._image_repository.untag_image_from_registry(action.image_id)
         return UntagImageFromRegistryActionResult(image=image_data)
 
