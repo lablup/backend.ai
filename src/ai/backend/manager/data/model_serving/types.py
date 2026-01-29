@@ -31,6 +31,7 @@ __all__ = [
     "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
     "EndpointAutoScalingRuleListResult",
+    "EndpointAutoScalingRuleData",
     "EndpointData",
     "EndpointLifecycle",
     "EndpointTokenData",
