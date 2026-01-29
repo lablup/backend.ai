@@ -76,14 +76,12 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
 )
 from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
-from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
-from ai.backend.manager.services.image.actions.get_image_by_identifier import (
-    GetImageByIdentifierAction,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
 from ai.backend.manager.services.image.actions.get_images import (
+    GetImageByIdAction,
+    GetImageByIdentifierAction,
     GetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
