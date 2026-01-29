@@ -329,8 +329,7 @@ class ImageDBSource:
                 image_row = await self._get_image_by_id(session, image_id)
                 image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
                 image_row.aliases.append(image_alias)
-                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
-            return alias_data
+                return ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
         except ValueError as e:
             raise AliasImageActionValueError from e
         except DBAPIError as e:
