@@ -87,27 +87,3 @@ class GetImagesByCanonicalsActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return None
-
-
-@dataclass
-class GetImagesByIdsAction(ImageAction):
-    image_ids: list[UUID]
-    image_status: list[ImageStatus] | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    @classmethod
-    def operation_type(cls) -> str:
-        return "get_by_ids"
-
-
-@dataclass
-class GetImagesByIdsActionResult(BaseActionResult):
-    images: list[ImageWithAgentInstallStatus]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
