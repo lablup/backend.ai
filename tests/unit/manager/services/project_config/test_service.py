@@ -1,4 +1,10 @@
-"""Tests for ProjectConfigService functionality."""
+"""Tests for ProjectConfigService functionality.
+
+As there is an ongoing migration of renaming group to project,
+there are some occurrences where "group" is being used as "project"
+(e.g., GroupDotfile).
+It will be fixed in the future; for now understand them as the same concept.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +16,6 @@ import pytest
 
 from ai.backend.common.contexts.user import UserData, with_user
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -41,7 +46,7 @@ def service(mock_repo: AsyncMock) -> ProjectConfigService:
 
 
 @pytest.fixture
-def group_id() -> uuid.UUID:
+def project_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
@@ -56,8 +61,8 @@ def user_id() -> uuid.UUID:
 
 
 @pytest.fixture
-def resolved_project(group_id: uuid.UUID, domain_name: str) -> ResolvedProject:
-    return ResolvedProject(id=group_id, domain_name=domain_name)
+def resolved_project(project_id: uuid.UUID, domain_name: str) -> ResolvedProject:
+    return ResolvedProject(id=project_id, domain_name=domain_name)
 
 
 @pytest.fixture
@@ -81,14 +86,14 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="# test bashrc",
@@ -97,7 +102,7 @@ class TestCreateDotfile:
 
         result = await service.create_dotfile(action)
 
-        assert result.group_id == group_id
+        assert result.project_id == project_id
         mock_repo.add_dotfile.assert_called_once()
 
     @pytest.mark.asyncio
@@ -105,14 +110,14 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".ssh/authorized_keys",
             data="# test",
@@ -127,17 +132,17 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="# test",
@@ -152,15 +157,15 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed("Dotfile creation limit reached")
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="# test",
@@ -175,15 +180,15 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileAlreadyExists
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="# new",
@@ -198,17 +203,17 @@ class TestCreateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
         action = CreateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="x" * 70000,
@@ -225,12 +230,12 @@ class TestListDotfiles:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         expected_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"},
             {"path": ".zshrc", "perm": "644", "data": "# zsh"},
@@ -238,28 +243,28 @@ class TestListDotfiles:
         mock_repo.get_dotfiles.return_value = ProjectDotfilesResult(
             dotfiles=expected_dotfiles, leftover_space=64000
         )
-        action = ListDotfilesAction(group_id_or_name=group_id, domain_name=domain_name)
+        action = ListDotfilesAction(project_id_or_name=project_id, domain_name=domain_name)
 
         result = await service.list_dotfiles(action)
 
         assert result.dotfiles == expected_dotfiles
-        mock_repo.get_dotfiles.assert_called_once_with(group_id)
+        mock_repo.get_dotfiles.assert_called_once_with(project_id)
 
     @pytest.mark.asyncio
     async def test_list_dotfiles_empty(
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.get_dotfiles.return_value = ProjectDotfilesResult(
             dotfiles=[], leftover_space=64000
         )
-        action = ListDotfilesAction(group_id_or_name=group_id, domain_name=domain_name)
+        action = ListDotfilesAction(project_id_or_name=project_id, domain_name=domain_name)
 
         result = await service.list_dotfiles(action)
 
@@ -272,12 +277,12 @@ class TestGetDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         existing_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"},
             {"path": ".zshrc", "perm": "644", "data": "# zsh"},
@@ -286,7 +291,7 @@ class TestGetDotfile:
             dotfiles=existing_dotfiles, leftover_space=64000
         )
         action = GetDotfileAction(
-            group_id_or_name=group_id, domain_name=domain_name, path=".bashrc"
+            project_id_or_name=project_id, domain_name=domain_name, path=".bashrc"
         )
 
         result = await service.get_dotfile(action)
@@ -299,19 +304,21 @@ class TestGetDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         existing_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"}
         ]
         mock_repo.get_dotfiles.return_value = ProjectDotfilesResult(
             dotfiles=existing_dotfiles, leftover_space=64000
         )
-        action = GetDotfileAction(group_id_or_name=group_id, domain_name=domain_name, path=".zshrc")
+        action = GetDotfileAction(
+            project_id_or_name=project_id, domain_name=domain_name, path=".zshrc"
+        )
 
         with pytest.raises(DotfileNotFound):
             await service.get_dotfile(action)
@@ -323,14 +330,14 @@ class TestUpdateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         action = UpdateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="# new",
@@ -339,7 +346,7 @@ class TestUpdateDotfile:
 
         result = await service.update_dotfile(action)
 
-        assert result.group_id == group_id
+        assert result.project_id == project_id
         mock_repo.modify_dotfile.assert_called_once()
 
     @pytest.mark.asyncio
@@ -347,15 +354,15 @@ class TestUpdateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.modify_dotfile.side_effect = DotfileNotFound
         action = UpdateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".zshrc",
             data="# new",
@@ -370,17 +377,17 @@ class TestUpdateDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.modify_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
         action = UpdateDotfileAction(
-            group_id_or_name=group_id,
+            project_id_or_name=project_id,
             domain_name=domain_name,
             path=".bashrc",
             data="x" * 70000,
@@ -397,14 +404,14 @@ class TestDeleteDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         action = DeleteDotfileAction(
-            group_id_or_name=group_id, domain_name=domain_name, path=".bashrc"
+            project_id_or_name=project_id, domain_name=domain_name, path=".bashrc"
         )
 
         result = await service.delete_dotfile(action)
@@ -417,35 +424,35 @@ class TestDeleteDotfile:
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
+        mock_repo.resolve_project.return_value = resolved_project
         mock_repo.remove_dotfile.side_effect = DotfileNotFound
         action = DeleteDotfileAction(
-            group_id_or_name=group_id, domain_name=domain_name, path=".zshrc"
+            project_id_or_name=project_id, domain_name=domain_name, path=".zshrc"
         )
 
         with pytest.raises(DotfileNotFound):
             await service.delete_dotfile(action)
 
     @pytest.mark.asyncio
-    async def test_delete_dotfile_group_not_found(
+    async def test_delete_dotfile_project_not_found(
         self,
         service: ProjectConfigService,
         mock_repo: AsyncMock,
-        group_id: uuid.UUID,
+        project_id: uuid.UUID,
         domain_name: str,
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_group.return_value = resolved_project
-        mock_repo.remove_dotfile.side_effect = ProjectNotFound
+        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.remove_dotfile.side_effect = DotfileNotFound
         action = DeleteDotfileAction(
-            group_id_or_name=group_id, domain_name=domain_name, path=".bashrc"
+            project_id_or_name=project_id, domain_name=domain_name, path=".bashrc"
         )
 
-        with pytest.raises(ProjectNotFound):
+        with pytest.raises(DotfileNotFound):
             await service.delete_dotfile(action)
