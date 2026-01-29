@@ -55,8 +55,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
-    GetImagesByIdsAction,
-    GetImagesByIdsActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -403,20 +401,6 @@ class ImageService:
             image_id=image_id,
             image_alias=image_alias,
         )
-
-    async def get_images_by_ids(self, action: GetImagesByIdsAction) -> GetImagesByIdsActionResult:
-        """
-        Retrieves multiple images by their IDs.
-        """
-        user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
-        images_with_agent_install_status = await self._image_repository.get_images_by_ids(
-            action.image_ids,
-            status_filter=action.image_status,
-            hide_agents=hide_agents,
-        )
-        return GetImagesByIdsActionResult(images=images_with_agent_install_status)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         """
