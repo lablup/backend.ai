@@ -2687,6 +2687,13 @@ class AgentRegistry:
                             await self.event_producer.anycast_event(
                                 KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                             )
+                        case KernelStatus.TERMINATED | KernelStatus.CANCELLED:
+                            log.debug(
+                                "skip destroying kernel already in terminal state (k:{}, status:{})",
+                                kernel.id,
+                                kernel.status,
+                            )
+                            continue
                         case _:
 
                             async def _update() -> None:
