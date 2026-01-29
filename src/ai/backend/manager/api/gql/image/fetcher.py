@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
+from ai.backend.manager.services.image.actions.get_images import GetImageByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
 from .types import (
