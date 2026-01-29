@@ -74,10 +74,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_images_by_id import (
-    RescanImagesByIdAction,
-    RescanImagesByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
@@ -360,9 +356,6 @@ class ImageService:
         )
 
     async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
-        """
-        Deprecated. Use rescan_images_by_id instead.
-        """
         image_canonical = action.canonical
         architecture = action.architecture
 
@@ -426,15 +419,6 @@ class ImageService:
         """
         image_data = await self._image_repository.clear_image_resource_limits_by_id(action.image_id)
         return ClearImageCustomResourceLimitByIdActionResult(image_data=image_data)
-
-    async def rescan_images_by_id(
-        self, action: RescanImagesByIdAction
-    ) -> RescanImagesByIdActionResult:
-        """
-        Rescans images by their IDs.
-        """
-        result = await self._image_repository.scan_images_by_ids(action.image_ids)
-        return RescanImagesByIdActionResult(images=result.images, errors=result.errors)
 
     async def set_image_resource_limit_by_id(
         self, action: SetImageResourceLimitByIdAction

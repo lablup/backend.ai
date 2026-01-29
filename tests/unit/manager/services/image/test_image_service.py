@@ -27,7 +27,6 @@ from ai.backend.manager.data.image.types import (
     ImageLabelsData,
     ImageListResult,
     ImageResourcesData,
-    RescanImagesResult,
     ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
@@ -62,7 +61,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesKeyData,
 )
-from ai.backend.manager.services.image.actions.rescan_images_by_id import RescanImagesByIdAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.actions.set_image_resource_limit_by_id import (
     SetImageResourceLimitByIdAction,
@@ -1054,51 +1052,6 @@ class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):
 
         with pytest.raises(ImageNotFound):
             await processors.clear_image_custom_resource_limit_by_id.wait_for_complete(action)
-
-
-class TestRescanImagesById(ImageServiceBaseFixtures):
-    """Tests for ImageService.rescan_images_by_id"""
-
-    async def test_rescan_images_by_id_success(
-        self,
-        processors: ImageProcessors,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Rescan images by ID should return scanned images."""
-        mock_image_repository.scan_images_by_ids = AsyncMock(
-            return_value=RescanImagesResult(images=[image_data], errors=[])
-        )
-
-        action = RescanImagesByIdAction(image_ids=[image_data.id])
-
-        result = await processors.rescan_images_by_id.wait_for_complete(action)
-
-        assert len(result.images) == 1
-        assert result.images[0] == image_data
-        assert len(result.errors) == 0
-        mock_image_repository.scan_images_by_ids.assert_called_once_with([image_data.id])
-
-    async def test_rescan_images_by_id_with_errors(
-        self,
-        processors: ImageProcessors,
-        mock_image_repository: MagicMock,
-        image_data: ImageData,
-    ) -> None:
-        """Rescan images by ID should collect errors."""
-        mock_image_repository.scan_images_by_ids = AsyncMock(
-            return_value=RescanImagesResult(
-                images=[image_data], errors=["Registry not found for image test"]
-            )
-        )
-
-        action = RescanImagesByIdAction(image_ids=[image_data.id, uuid.uuid4()])
-
-        result = await processors.rescan_images_by_id.wait_for_complete(action)
-
-        assert len(result.images) == 1
-        assert len(result.errors) == 1
-        assert "Registry not found" in result.errors[0]
 
 
 class TestSetImageResourceLimitById(ImageServiceBaseFixtures):
