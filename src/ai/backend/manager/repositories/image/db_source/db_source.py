@@ -320,9 +320,7 @@ class ImageDBSource:
             image_row._resources = {}
             return image_row.to_dataclass()
 
-    async def insert_image_alias_by_id(
-        self, image_id: UUID, alias: str
-    ) -> tuple[UUID, ImageAliasData]:
+    async def insert_image_alias_by_id(self, image_id: UUID, alias: str) -> ImageAliasData:
         """
         Creates an image alias directly using image ID.
         """
@@ -332,7 +330,7 @@ class ImageDBSource:
                 image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
                 image_row.aliases.append(image_alias)
                 alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
-            return image_id, alias_data
+            return alias_data
         except ValueError as e:
             raise AliasImageActionValueError from e
         except DBAPIError as e:

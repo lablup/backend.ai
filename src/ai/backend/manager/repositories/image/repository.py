@@ -275,9 +275,7 @@ class ImageRepository:
         return await self._db_source.clear_image_resource_limits(image_canonical, architecture)
 
     @image_repository_resilience.apply()
-    async def add_image_alias_by_id(
-        self, image_id: UUID, alias: str
-    ) -> tuple[UUID, ImageAliasData]:
+    async def add_image_alias_by_id(self, image_id: UUID, alias: str) -> ImageAliasData:
         """
         Creates an image alias directly using image ID.
         """
