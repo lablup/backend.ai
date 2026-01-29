@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Final, Optional, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 
 import graphene
 
@@ -96,13 +96,13 @@ class ServiceConfigNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         services: list[str],
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         tasks = [asyncio.create_task(ServiceConfigNode.load(info, svc)) for svc in services]
 

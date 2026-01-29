@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -57,10 +56,8 @@ class DomainFairShareOrderField(StrEnum):
 class DomainFairShareFilter(BaseRequestModel):
     """Filter for domain fair share queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class DomainFairShareOrder(BaseRequestModel):
@@ -81,11 +78,9 @@ class ProjectFairShareOrderField(StrEnum):
 class ProjectFairShareFilter(BaseRequestModel):
     """Filter for project fair share queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    project_id: Optional[UUIDFilter] = Field(default=None, description="Filter by project ID")
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class ProjectFairShareOrder(BaseRequestModel):
@@ -106,12 +101,10 @@ class UserFairShareOrderField(StrEnum):
 class UserFairShareFilter(BaseRequestModel):
     """Filter for user fair share queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    user_uuid: Optional[UUIDFilter] = Field(default=None, description="Filter by user UUID")
-    project_id: Optional[UUIDFilter] = Field(default=None, description="Filter by project ID")
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    user_uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class UserFairShareOrder(BaseRequestModel):
@@ -131,10 +124,8 @@ class DomainUsageBucketOrderField(StrEnum):
 class DomainUsageBucketFilter(BaseRequestModel):
     """Filter for domain usage bucket queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class DomainUsageBucketOrder(BaseRequestModel):
@@ -154,11 +145,9 @@ class ProjectUsageBucketOrderField(StrEnum):
 class ProjectUsageBucketFilter(BaseRequestModel):
     """Filter for project usage bucket queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    project_id: Optional[UUIDFilter] = Field(default=None, description="Filter by project ID")
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class ProjectUsageBucketOrder(BaseRequestModel):
@@ -178,12 +167,10 @@ class UserUsageBucketOrderField(StrEnum):
 class UserUsageBucketFilter(BaseRequestModel):
     """Filter for user usage bucket queries."""
 
-    resource_group: Optional[StringFilter] = Field(
-        default=None, description="Filter by scaling group"
-    )
-    user_uuid: Optional[UUIDFilter] = Field(default=None, description="Filter by user UUID")
-    project_id: Optional[UUIDFilter] = Field(default=None, description="Filter by project ID")
-    domain_name: Optional[StringFilter] = Field(default=None, description="Filter by domain name")
+    resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
+    user_uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID")
+    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
+    domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
 
 
 class UserUsageBucketOrder(BaseRequestModel):

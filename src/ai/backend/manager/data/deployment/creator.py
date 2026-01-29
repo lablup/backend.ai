@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -23,7 +22,7 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 @dataclass
 class VFolderMountsCreator:
     model_vfolder_id: UUID
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
     model_mount_destination: str = "/models"
     extra_mounts: list[MountInfo] = field(default_factory=list)
 
@@ -48,7 +47,7 @@ class DeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionSpec
-    policy: Optional[DeploymentPolicyConfig] = None
+    policy: DeploymentPolicyConfig | None = None
 
     # Accessor properties for backward compatibility
     @property
@@ -130,4 +129,4 @@ class NewDeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionCreator
-    policy: Optional[DeploymentPolicyConfig] = None
+    policy: DeploymentPolicyConfig | None = None

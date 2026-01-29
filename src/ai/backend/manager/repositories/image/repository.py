@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -90,7 +89,7 @@ class ImageRepository:
     async def get_images_by_canonicals(
         self,
         image_canonicals: list[str],
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
         requested_by_superadmin: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
         images_data = await self._db_source.query_images_by_canonicals(
@@ -122,7 +121,7 @@ class ImageRepository:
     async def get_image_by_identifier(
         self,
         identifier: ImageIdentifier,
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
         requested_by_superadmin: bool = False,
     ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_identifier(
@@ -146,7 +145,7 @@ class ImageRepository:
         self,
         image_id: UUID,
         load_aliases: bool = False,
-        status_filter: Optional[list[ImageStatus]] = None,
+        status_filter: list[ImageStatus] | None = None,
         requested_by_superadmin: bool = False,
     ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
@@ -177,7 +176,7 @@ class ImageRepository:
 
     @image_repository_resilience.apply()
     async def get_all_images(
-        self, status_filter: Optional[list[ImageStatus]] = None
+        self, status_filter: list[ImageStatus] | None = None
     ) -> Mapping[ImageID, ImageWithAgentInstallStatus]:
         """
         Retrieves all images from the database, optionally filtered by status.

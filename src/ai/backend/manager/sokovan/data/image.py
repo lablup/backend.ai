@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
@@ -22,14 +21,14 @@ class ImageConfigData:
 
     canonical: str
     architecture: str
-    project: Optional[str]
+    project: str | None
     is_local: bool
     digest: str
     labels: dict[str, str]
     registry_name: str
     registry_url: str
-    registry_username: Optional[str]
-    registry_password: Optional[str]
+    registry_username: str | None
+    registry_password: str | None
 
     def to_image_config(self, auto_pull: AutoPullBehavior) -> ImageConfig:
         """

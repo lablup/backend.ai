@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import (
     AliasChoices,
@@ -117,7 +117,7 @@ class ServiceConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl_cert", "ssl-cert"),
@@ -136,7 +136,7 @@ class ServiceConfig(BaseConfigSchema):
         ),
     ]
     ssl_privkey: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl_privkey", "ssl-privkey"),
@@ -170,7 +170,7 @@ class ServiceConfig(BaseConfigSchema):
         ),
     ]
     force_endpoint_protocol: Annotated[
-        Optional[ForceEndpointProtocol],
+        ForceEndpointProtocol | None,
         Field(
             default=None,
             validation_alias=AliasChoices("force_endpoint_protocol", "force-endpoint-protocol"),
@@ -362,7 +362,7 @@ class ServiceConfig(BaseConfigSchema):
         ),
     ]
     single_sign_on_vendors: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(
             default=None,
             validation_alias=AliasChoices("single_sign_on_vendors", "single-sign-on-vendors"),
@@ -674,7 +674,7 @@ class CSPConfig(BaseConfigSchema):
     """
 
     default_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("default_src", "default-src"),
@@ -690,7 +690,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     connect_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("connect_src", "connect-src"),
@@ -706,7 +706,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     img_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("img_src", "img-src"),
@@ -722,7 +722,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     media_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("media_src", "media-src"),
@@ -738,7 +738,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     font_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("font_src", "font-src"),
@@ -753,7 +753,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     script_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("script_src", "script-src"),
@@ -769,7 +769,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     style_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("style_src", "style-src"),
@@ -785,7 +785,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     frame_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("frame_src", "frame-src"),
@@ -801,7 +801,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     object_src: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("object_src", "object-src"),
@@ -817,7 +817,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     frame_ancestors: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("frame_ancestors", "frame-ancestors"),
@@ -833,7 +833,7 @@ class CSPConfig(BaseConfigSchema):
         ),
     ]
     form_action: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("form_action", "form-action"),
@@ -890,7 +890,7 @@ class SecurityConfig(BaseConfigSchema):
         ),
     ]
     csp: Annotated[
-        Optional[CSPConfig],
+        CSPConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1212,7 +1212,7 @@ class EnvironmentsConfig(BaseConfigSchema):
     """
 
     allowlist: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1249,7 +1249,7 @@ class PluginConfig(BaseConfigSchema):
     """
 
     page: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1281,7 +1281,7 @@ class PipelineConfig(BaseConfigSchema):
         ),
     ]
     frontend_endpoint: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("frontend_endpoint", "frontend-endpoint"),
@@ -1306,7 +1306,7 @@ class UIConfig(BaseConfigSchema):
     """
 
     default_environment: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("default_environment", "default-environment"),
@@ -1323,7 +1323,7 @@ class UIConfig(BaseConfigSchema):
         ),
     ]
     default_import_environment: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices(
@@ -1342,7 +1342,7 @@ class UIConfig(BaseConfigSchema):
         ),
     ]
     menu_blocklist: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(
             default=None,
             validation_alias=AliasChoices("menu_blocklist", "menu-blocklist"),
@@ -1358,7 +1358,7 @@ class UIConfig(BaseConfigSchema):
         ),
     ]
     menu_inactivelist: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(
             default=None,
             validation_alias=AliasChoices("menu_inactivelist", "menu-inactivelist"),
@@ -1613,7 +1613,7 @@ class SessionConfig(BaseConfigSchema):
         ),
     ]
     login_session_extension_sec: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             validation_alias=AliasChoices(

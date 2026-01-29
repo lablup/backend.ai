@@ -26,7 +26,6 @@ from collections.abc import (
 from types import TracebackType
 from typing import (
     Any,
-    Optional,
     ParamSpec,
     Self,
     TypeVar,
@@ -118,7 +117,7 @@ def _slash(v: str) -> str:
 P = ParamSpec("P")
 R = TypeVar("R")
 
-type GetPrefixValue = "Mapping[str, GetPrefixValue | Optional[str]]"
+type GetPrefixValue = "Mapping[str, GetPrefixValue | str | None]"
 type NestedStrKeyedMapping = "Mapping[str, str | NestedStrKeyedMapping]"
 type NestedStrKeyedDict = "dict[str, str | NestedStrKeyedDict]"
 
@@ -136,7 +135,7 @@ class AbstractKVStore(ABC):
         val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -147,7 +146,7 @@ class AbstractKVStore(ABC):
         dict_obj: NestedStrKeyedMapping,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -157,7 +156,7 @@ class AbstractKVStore(ABC):
         flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -167,8 +166,8 @@ class AbstractKVStore(ABC):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ) -> Optional[str]:
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> str | None:
         pass
 
     @abstractmethod
@@ -177,7 +176,7 @@ class AbstractKVStore(ABC):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> GetPrefixValue:
         pass
 
@@ -189,7 +188,7 @@ class AbstractKVStore(ABC):
         new_val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
         pass
 
@@ -199,7 +198,7 @@ class AbstractKVStore(ABC):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -209,7 +208,7 @@ class AbstractKVStore(ABC):
         keys: Iterable[str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -219,7 +218,7 @@ class AbstractKVStore(ABC):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         pass
 
@@ -229,11 +228,11 @@ class AbstractKVStore(ABC):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         pass
 
@@ -243,18 +242,18 @@ class AbstractKVStore(ABC):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         pass
 
 
 class AsyncEtcd(AbstractKVStore):
     etcd: EtcdClient
-    _connect_options: Optional[ConnectOptions]
+    _connect_options: ConnectOptions | None
 
     def __init__(
         self,
@@ -262,7 +261,7 @@ class AsyncEtcd(AbstractKVStore):
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
-        credentials: Optional[dict[str, str]] = None,
+        credentials: dict[str, str] | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:
@@ -360,7 +359,7 @@ class AsyncEtcd(AbstractKVStore):
 
     def _merge_scope_prefix_map(
         self,
-        override: Optional[Mapping[ConfigScopes, str]] = None,
+        override: Mapping[ConfigScopes, str] | None = None,
     ) -> Mapping[ConfigScopes, str]:
         """
         This stub ensures immutable usage of the ChainMap because ChainMap does *not*
@@ -375,7 +374,7 @@ class AsyncEtcd(AbstractKVStore):
         val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         """
         Put a single key-value pair to the etcd.
@@ -399,7 +398,7 @@ class AsyncEtcd(AbstractKVStore):
         dict_obj: NestedStrKeyedMapping,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         """
         Put a nested dict object under the given key prefix.
@@ -444,7 +443,7 @@ class AsyncEtcd(AbstractKVStore):
         flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         """
         Put a flattened key-value pairs into the etcd.
@@ -475,8 +474,8 @@ class AsyncEtcd(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ) -> Optional[str]:
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> str | None:
         """
         Get a single key from the etcd.
         Returns ``None`` if the key does not exist.
@@ -521,7 +520,7 @@ class AsyncEtcd(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> GetPrefixValue:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
@@ -607,7 +606,7 @@ class AsyncEtcd(AbstractKVStore):
         new_val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -635,7 +634,7 @@ class AsyncEtcd(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -647,7 +646,7 @@ class AsyncEtcd(AbstractKVStore):
         keys: Iterable[str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         async with self.etcd.connect() as communicator:
@@ -665,7 +664,7 @@ class AsyncEtcd(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
@@ -677,8 +676,8 @@ class AsyncEtcd(AbstractKVStore):
         iterator_factory: Callable[[EtcdCommunicator], Watch],
         scope_prefix_len: int,
         once: bool,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         try:
             async with self.etcd.connect() as communicator:
@@ -706,11 +705,11 @@ class AsyncEtcd(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
@@ -746,11 +745,11 @@ class AsyncEtcd(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))

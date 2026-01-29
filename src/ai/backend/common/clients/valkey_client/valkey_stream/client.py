@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Self, cast
+from typing import Any, Self, cast
 
 from glide import (
     Batch,
@@ -91,7 +91,7 @@ class ValkeyStreamClient:
         *,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> Self:
         """
         Create a ValkeyStreamClient instance.
@@ -156,7 +156,7 @@ class ValkeyStreamClient:
         consumer_name: str,
         count: int = 1,
         block_ms: int = 0,
-    ) -> Optional[list[StreamMessage]]:
+    ) -> list[StreamMessage] | None:
         """
         Read messages from a consumer group.
 
@@ -266,7 +266,7 @@ class ValkeyStreamClient:
         start_id: str,
         min_idle_timeout: int,
         count: int = _DEFAULT_AUTOCLAIM_COUNT,
-    ) -> Optional[AutoClaimMessage]:
+    ) -> AutoClaimMessage | None:
         """
         Auto claim messages from a stream for a consumer group.
 
@@ -345,7 +345,7 @@ class ValkeyStreamClient:
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> Mapping[str, str] | None:
         """
         Fetch a cached broadcast message by its ID.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -53,7 +53,7 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.TERMINATING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering - termination applies to any kernel state."""
         return None
 
@@ -80,7 +80,7 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for operations targeting TERMINATING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 

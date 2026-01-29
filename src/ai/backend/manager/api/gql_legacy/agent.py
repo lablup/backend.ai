@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
 )
 
@@ -151,7 +150,7 @@ class AgentNode(graphene.ObjectType):
     )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Optional[Self]:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
         condition = [QueryConditions.by_ids([AgentId(raw_agent_id)])]
@@ -200,7 +199,7 @@ class AgentNode(graphene.ObjectType):
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
-    ) -> Optional[Mapping[str, HardwareMetadata]]:
+    ) -> Mapping[str, HardwareMetadata] | None:
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
@@ -236,13 +235,13 @@ class AgentNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope: ScopeType,
         permission: AgentPermission,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -394,7 +393,7 @@ class Agent(graphene.ObjectType):
         )
 
     async def resolve_compute_containers(
-        self, info: graphene.ResolveInfo, *, status: Optional[str] = None
+        self, info: graphene.ResolveInfo, *, status: str | None = None
     ) -> list[ComputeContainer]:
         ctx: GraphQueryContext = info.context
         _status = KernelStatus[status] if status is not None else None
@@ -423,7 +422,7 @@ class Agent(graphene.ObjectType):
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
-    ) -> Optional[Mapping[str, HardwareMetadata]]:
+    ) -> Mapping[str, HardwareMetadata] | None:
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
@@ -476,9 +475,9 @@ class Agent(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        scaling_group: Optional[str] = None,
-        raw_status: Optional[str | AgentStatus] = None,
-        filter: Optional[str] = None,
+        scaling_group: str | None = None,
+        raw_status: str | AgentStatus | None = None,
+        filter: str | None = None,
     ) -> int:
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -503,10 +502,10 @@ class Agent(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        scaling_group: Optional[str] = None,
-        raw_status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        scaling_group: str | None = None,
+        raw_status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[Agent]:
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -545,8 +544,8 @@ class Agent(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        scaling_group: Optional[str] = None,
-        raw_status: Optional[str] = None,
+        scaling_group: str | None = None,
+        raw_status: str | None = None,
     ) -> Sequence[Agent]:
         conditions = []
         if scaling_group is not None:
@@ -563,7 +562,7 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        raw_status: Optional[str] = None,
+        raw_status: str | None = None,
     ) -> Sequence[Agent | None]:
         condition = [QueryConditions.by_ids(agent_ids)]
         order = [QueryOrders.id(ascending=True)]
@@ -727,10 +726,10 @@ class AgentSummary(graphene.ObjectType):
         agent_ids: Sequence[AgentId],
         *,
         access_key: AccessKey,
-        domain_name: Optional[str] = None,
-        raw_status: Optional[str] = None,
-        scaling_group: Optional[str] = None,
-    ) -> Sequence[Optional[Self]]:
+        domain_name: str | None = None,
+        raw_status: str | None = None,
+        scaling_group: str | None = None,
+    ) -> Sequence[Self | None]:
         query = (
             sa.select(AgentRow)
             .select_from(
@@ -768,8 +767,8 @@ class AgentSummary(graphene.ObjectType):
         access_key: str,
         domain_name: str | None = None,
         scaling_group: str | None = None,
-        raw_status: Optional[str] = None,
-        filter: Optional[str] = None,
+        raw_status: str | None = None,
+        filter: str | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from(AgentRow)
         query = await _append_sgroup_from_clause(
@@ -795,9 +794,9 @@ class AgentSummary(graphene.ObjectType):
         access_key: str,
         domain_name: str | None = None,
         scaling_group: str | None = None,
-        raw_status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        raw_status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[Self]:
         query = sa.select(AgentRow.id)
 

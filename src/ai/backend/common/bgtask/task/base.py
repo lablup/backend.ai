@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -36,7 +35,7 @@ class BaseBackgroundTaskResult(BaseModel):
 
 class BaseBackgroundTaskHandler[
     TManifest: BaseBackgroundTaskManifest,
-    TResult: Optional[BaseBackgroundTaskResult],
+    TResult: BaseBackgroundTaskResult | None,
 ](ABC):
     @classmethod
     @abstractmethod

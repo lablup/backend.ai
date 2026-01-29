@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +15,7 @@ class VerifierResult(BaseModel):
     scan_time: float  # Time taken to complete verification in seconds
     scanned_count: int
     metadata: dict[str, str]  # Additional metadata from verifier
-    error: Optional[str] = None  # For when verifier fails with exception
+    error: str | None = None  # For when verifier fails with exception
 
 
 class VerificationStepResult(BaseModel):
@@ -82,7 +81,7 @@ class FileDownloadProgressData(BaseModel):
     last_updated: float = Field(
         description="Last update timestamp (Unix time)",
     )
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None,
         description=(
             "Error message if download failed. "
@@ -97,7 +96,7 @@ class DownloadProgressData(BaseModel):
     Download progress data including artifact-level and all file-level information.
     """
 
-    artifact_progress: Optional[ArtifactDownloadTrackingData] = Field(
+    artifact_progress: ArtifactDownloadTrackingData | None = Field(
         description="Artifact-level download progress, None if not found",
     )
     file_progress: list[FileDownloadProgressData] = Field(
@@ -111,7 +110,7 @@ class ArtifactRevisionDownloadProgress(BaseModel):
     Used for both local and remote download progress.
     """
 
-    progress: Optional[DownloadProgressData] = Field(
+    progress: DownloadProgressData | None = Field(
         description=(
             "Download progress data. "
             "Present when status is PULLING (actively downloading). "
@@ -139,7 +138,7 @@ class CombinedDownloadProgress(BaseModel):
     local: ArtifactRevisionDownloadProgress = Field(
         description="Local download progress and status",
     )
-    remote: Optional[ArtifactRevisionDownloadProgress] = Field(
+    remote: ArtifactRevisionDownloadProgress | None = Field(
         default=None,
         description="Remote download progress and status. None if not RESERVOIR type, required object if RESERVOIR type",
     )

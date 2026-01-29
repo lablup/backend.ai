@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.client.request import Request
 
@@ -75,7 +75,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_announcement(cls, enabled: bool = True, message: Optional[str] = None) -> None:
+    async def update_announcement(cls, enabled: bool = True, message: str | None = None) -> None:
         """
         Update (create / delete) announcement.
 

@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Optional, Self
+from typing import Self
 
 import pytest
 from aiohttp import web
@@ -55,8 +55,8 @@ class TestUserRequestModel(BaseRequestModel):
 
 class TestSearchParamsModel(BaseRequestModel):
     keyword: str
-    category: Optional[str] = Field(default="all")
-    limit: Optional[int] = Field(default=10)
+    category: str | None = Field(default="all")
+    limit: int | None = Field(default=10)
 
 
 class TestCombinedResponseModel(BaseResponseModel):
@@ -181,12 +181,12 @@ async def test_body_parameter(aiohttp_client):
 
 class TestSearchQueryModel(BaseRequestModel):
     search: str
-    page: Optional[int] = Field(default=1)
+    page: int | None = Field(default=1)
 
 
 class TestSearchQueryResponse(BaseResponseModel):
     search: str
-    page: Optional[int] = Field(default=1)
+    page: int | None = Field(default=1)
 
 
 class TestSearchQueryHandler:
@@ -455,12 +455,12 @@ async def test_invalid_body(aiohttp_client):
 
 class TestProductSearchModel(BaseRequestModel):
     search: str
-    page: Optional[int] = Field(default=1)
+    page: int | None = Field(default=1)
 
 
 class TestProductSearchResponse(BaseResponseModel):
     search: str
-    page: Optional[int] = Field(default=1)
+    page: int | None = Field(default=1)
 
 
 class TestProductSearchHandler:

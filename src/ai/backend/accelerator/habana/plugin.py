@@ -6,7 +6,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -78,7 +77,7 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
 
     gaudi_config: Mapping[str, Any]
 
-    _all_devices: Optional[list[TDevice]]
+    _all_devices: list[TDevice] | None
 
     _driver_version: str
 

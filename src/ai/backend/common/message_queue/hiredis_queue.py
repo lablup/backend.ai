@@ -3,7 +3,6 @@ import hashlib
 import logging
 import socket
 from collections.abc import AsyncGenerator, Mapping
-from typing import Optional
 
 import hiredis
 from aiotools.server import process_index
@@ -114,7 +113,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 ],
             ])
 
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         if self._closed:
             raise RuntimeError("Queue is closed")
         async with RedisConnection(self._target, db=self._db) as client:
@@ -365,7 +364,7 @@ class HiRedisQueue(AbstractMessageQueue):
             log.error("Error while creating group: {}", internal_e)
 
 
-def _generate_consumer_id(node_id: Optional[str]) -> str:
+def _generate_consumer_id(node_id: str | None) -> str:
     h = hashlib.sha1(usedforsecurity=False)
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()

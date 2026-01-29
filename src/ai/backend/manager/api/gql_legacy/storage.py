@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import graphene
@@ -84,7 +84,7 @@ class StorageVolume(graphene.ObjectType):
     async def load_count(
         cls,
         ctx: GraphQueryContext,
-        filter: Optional[str] = None,
+        filter: str | None = None,
     ) -> int:
         volumes = [*await ctx.storage_manager.get_all_volumes()]
         return len(volumes)
@@ -95,8 +95,8 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         limit: int,
         offset: int,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[StorageVolume]:
         # For consistency we add filter/order params here, but it's actually noop.
         if filter is not None or order is not None:

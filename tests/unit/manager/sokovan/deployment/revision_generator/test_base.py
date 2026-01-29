@@ -3,7 +3,7 @@ Tests for BaseRevisionGenerator implementation.
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -33,10 +33,10 @@ from ai.backend.manager.sokovan.deployment.revision_generator.custom import Cust
 class _RequestSpec:
     """API request specification."""
 
-    image: Optional[str]
-    architecture: Optional[str]
-    resource_slots: Optional[dict[str, Any]]
-    environ: Optional[dict[str, str]]
+    image: str | None
+    architecture: str | None
+    resource_slots: dict[str, Any] | None
+    environ: dict[str, str] | None
 
 
 @dataclass
@@ -46,7 +46,7 @@ class _ExpectedResult:
     image: str
     architecture: str
     resource_slots: dict[str, Any]
-    environ: Optional[dict[str, str]]
+    environ: dict[str, str] | None
 
 
 @dataclass
@@ -259,10 +259,10 @@ class _MergeRevisionTestCase:
     """Test case for merge_revision."""
 
     id: str
-    service_definition: Optional[ModelServiceDefinition]
+    service_definition: ModelServiceDefinition | None
     request: _RequestSpec
     expected: _ExpectedResult
-    default_architecture: Optional[str] = None
+    default_architecture: str | None = None
 
 
 class TestMergeRevision:
@@ -530,7 +530,7 @@ class _CompletePipelineTestCase:
     runtime_variant: str
     request: _RequestSpec
     expected: _ExpectedResult
-    default_architecture: Optional[str] = None
+    default_architecture: str | None = None
 
 
 class TestCompleteOverridePipeline:

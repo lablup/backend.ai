@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -29,14 +28,14 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
 @strawberry.field(description="Added in 25.16.0")
 async def replicas(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ReplicaFilter] = None,
-    order_by: Optional[list[ReplicaOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ReplicaFilter | None = None,
+    order_by: list[ReplicaOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ModelReplicaConnection:
     """List replicas with optional filtering and pagination."""
     return await fetch_replicas(
@@ -53,7 +52,7 @@ async def replicas(
 
 
 @strawberry.field(description="Added in 25.16.0")
-async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
+async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
     processor = info.context.processors.deployment

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.repositories.audit_log import AuditLogConditions
@@ -14,7 +13,7 @@ from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 async def load_audit_logs_by_ids(
     processor: AuditLogProcessors,
     audit_log_ids: Sequence[uuid.UUID],
-) -> list[Optional[AuditLogData]]:
+) -> list[AuditLogData | None]:
     """Batch load audit logs by their IDs.
 
     Args:

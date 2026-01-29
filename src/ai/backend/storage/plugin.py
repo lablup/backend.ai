@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
@@ -44,8 +44,8 @@ class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> Iterator[tuple[str, type[AbstractStoragePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
         yield from scanned_plugins
@@ -58,8 +58,8 @@ class StorageArtifactVerifierPluginContext(BasePluginContext[AbstractArtifactVer
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> Iterator[tuple[str, type[AbstractArtifactVerifierPlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
         yield from scanned_plugins

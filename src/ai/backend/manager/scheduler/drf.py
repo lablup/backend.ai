@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Optional, override
+from typing import Any, override
 
 import trafaret as t
 
@@ -46,7 +46,7 @@ class DRFScheduler(AbstractScheduler):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         self.total_capacity = total_capacity
 
         # Calculate the initial dominant shares of all users.

@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -229,7 +228,7 @@ class VirtualFolderNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         row: VFolderRow,
         *,
-        permissions: Optional[Iterable[VFolderRBACPermission]] = None,
+        permissions: Iterable[VFolderRBACPermission] | None = None,
     ) -> Self:
         result = cls(
             id=row.id,
@@ -281,9 +280,9 @@ class VirtualFolderNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: str,
-        scope_id: Optional[ScopeType] = None,
+        scope_id: ScopeType | None = None,
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(VFolderRow).options(
@@ -304,7 +303,7 @@ class VirtualFolderNode(graphene.ObjectType):
             query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
-                vfolder_row = cast(Optional[VFolderRow], vfolder_row)
+                vfolder_row = cast(VFolderRow | None, vfolder_row)
         if vfolder_row is None:
             return None
         return cls.from_row(
@@ -601,9 +600,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(
-        cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow
-    ) -> Optional[Self]:
+    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
@@ -840,7 +837,7 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Optional[Self]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Self | None:
         match row:
             case None:
                 return None
@@ -987,10 +984,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.group import groups
         from ai.backend.manager.models.user import users
@@ -1019,11 +1016,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[VirtualFolder]:
         from ai.backend.manager.models.group import groups
         from ai.backend.manager.models.user import users
@@ -1064,11 +1061,11 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         ids: list[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-    ) -> Sequence[Optional[VirtualFolder]]:
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[VirtualFolder | None]:
         query = (
             sa.select(VFolderRow)
             .where(VFolderRow.id.in_(ids))
@@ -1100,8 +1097,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from ai.backend.manager.models.user import users
 
@@ -1132,10 +1129,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.user import users
 
@@ -1170,11 +1167,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.user import users
 
@@ -1217,10 +1214,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
@@ -1251,11 +1248,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
@@ -1315,7 +1312,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
     user_email = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolderPermissionGQL]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> VirtualFolderPermissionGQL | None:
         if row is None:
             return None
         return cls(
@@ -1347,8 +1344,8 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.user import users
 
@@ -1372,9 +1369,9 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolderPermissionGQL]:
         from ai.backend.manager.models.user import users
 
@@ -1441,7 +1438,7 @@ class QuotaScope(graphene.ObjectType):
     def resolve_id(self, info: graphene.ResolveInfo) -> str:
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
-    async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_details(self, info: graphene.ResolveInfo) -> int | None:
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
             self.storage_host_name

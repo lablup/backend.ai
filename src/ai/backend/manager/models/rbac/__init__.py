@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self, TypeVar, cast
+from typing import Any, Self, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -688,12 +688,12 @@ T_PropertyReturn = TypeVar("T_PropertyReturn")
 def required_permission[PermissionType: BasePermission](
     permission: PermissionType,
 ) -> Callable[
-    [Callable[[T_RBACModel], T_PropertyReturn]], Callable[[T_RBACModel], Optional[T_PropertyReturn]]
+    [Callable[[T_RBACModel], T_PropertyReturn]], Callable[[T_RBACModel], T_PropertyReturn | None]
 ]:
     def wrapper(
         property_func: Callable[[T_RBACModel], T_PropertyReturn],
-    ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:
-        def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
+    ) -> Callable[[T_RBACModel], T_PropertyReturn | None]:
+        def wrapped(self: T_RBACModel) -> T_PropertyReturn | None:
             if permission in self.permissions:
                 return property_func(self)
             return None

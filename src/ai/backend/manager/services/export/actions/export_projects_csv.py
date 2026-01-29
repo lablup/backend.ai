@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
@@ -29,7 +29,7 @@ class ExportProjectsCSVAction(ExportAction):
         return "export_projects_csv"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return "projects"
 
 
@@ -46,5 +46,5 @@ class ExportProjectsCSVActionResult(BaseActionResult):
     filename: str  # Generated or provided filename
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return "projects"

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.actions.action import BaseActionResult
@@ -14,10 +14,10 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 class GetImagesByCanonicalsAction(ImageAction):
     image_canonicals: list[str]
     user_role: UserRole
-    image_status: Optional[list[ImageStatus]]
+    image_status: list[ImageStatus] | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -32,5 +32,5 @@ class GetImagesByCanonicalsActionResult(BaseActionResult):
     images_with_agent_install_status: list[ImageWithAgentInstallStatus]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

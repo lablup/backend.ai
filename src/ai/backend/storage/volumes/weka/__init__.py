@@ -5,7 +5,7 @@ import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles.os
 
@@ -53,8 +53,8 @@ class WekaQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
@@ -73,7 +73,7 @@ class WekaQuotaModel(BaseQuotaModel):
             qs_relpath, inode_id, soft_limit=config.limit_bytes, hard_limit=config.limit_bytes
         )
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
@@ -128,8 +128,8 @@ class WekaVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
@@ -12,7 +12,7 @@ class ClearImageCustomResourceLimitAction(ImageAction):
     architecture: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -26,5 +26,5 @@ class ClearImageCustomResourceLimitActionResult(BaseActionResult):
     image_data: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_data.id)

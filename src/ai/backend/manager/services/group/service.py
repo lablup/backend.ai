@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
@@ -99,7 +98,7 @@ class GroupService:
         self,
         start_date: datetime,
         end_date: datetime,
-        project_ids: Optional[Sequence[UUID]] = None,
+        project_ids: Sequence[UUID] | None = None,
     ) -> dict[UUID, ProjectResourceUsage]:
         kernels = await self._group_repository.fetch_project_resource_usage(
             start_date, end_date, project_ids=project_ids

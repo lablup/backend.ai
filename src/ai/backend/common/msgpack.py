@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import PosixPath, PurePosixPath
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import msgpack as _msgpack
 import temporenc
@@ -87,7 +87,7 @@ _DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
 
 
 class _Deserializer:
-    def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None) -> None:
+    def __init__(self, mapping: Mapping[int, ExtFunc] | None = None) -> None:
         self._ext_hook: dict[int, ExtFunc] = {}
         mapping = mapping or {}
         self._ext_hook = {**mapping}
@@ -129,9 +129,7 @@ def packb(data: Any, **kwargs) -> bytes:
     return ret
 
 
-def unpackb(
-    packed: bytes, ext_hook_mapping: Optional[Mapping[int, ExtFunc]] = None, **kwargs
-) -> Any:
+def unpackb(packed: bytes, ext_hook_mapping: Mapping[int, ExtFunc] | None = None, **kwargs) -> Any:
     opts = {**DEFAULT_UNPACK_OPTS, **kwargs}
     if ext_hook_mapping is not None:
         opts["ext_hook"] = _Deserializer(ext_hook_mapping).ext_hook

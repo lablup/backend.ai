@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -109,7 +109,7 @@ class SchedulerRepository:
         self._config_provider = config_provider
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(self, scaling_group: str) -> Optional[SchedulingData]:
+    async def get_scheduling_data(self, scaling_group: str) -> SchedulingData | None:
         """
         Get scheduling data from database.
         Returns None if no pending sessions exist.
@@ -204,7 +204,7 @@ class SchedulerRepository:
         """
         return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-    async def _get_max_container_count(self) -> Optional[int]:
+    async def _get_max_container_count(self) -> int | None:
         """
         Get max container count from configuration.
         """
@@ -351,7 +351,7 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
-        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, image_ref: str | None = None
     ) -> int:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -365,7 +365,7 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_prepared_for_image(
-        self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, image_ref: str | None = None
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -382,7 +382,7 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def cancel_kernels_for_failed_image(
-        self, agent_id: AgentId, image: str, error_msg: str, image_ref: Optional[str] = None
+        self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
     ) -> set[SessionId]:
         """
         Cancel kernels for an image that failed to be available on an agent.
@@ -443,7 +443,7 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def update_kernel_status_terminated(
-        self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
+        self, kernel_id: UUID, reason: str, exit_code: int | None = None
     ) -> bool:
         """Update kernel status to TERMINATED."""
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
@@ -543,9 +543,7 @@ class SchedulerRepository:
         await self._db_source.mark_session_cancelled(session_id, error_info, reason)
 
     @scheduler_repository_resilience.apply()
-    async def get_container_info_for_kernels(
-        self, session_id: SessionId
-    ) -> dict[UUID, Optional[str]]:
+    async def get_container_info_for_kernels(self, session_id: SessionId) -> dict[UUID, str | None]:
         """
         Get container IDs for kernels in a session.
         """
@@ -619,7 +617,7 @@ class SchedulerRepository:
     async def update_session_network_id(
         self,
         session_id: SessionId,
-        network_id: Optional[str],
+        network_id: str | None,
     ) -> None:
         """
         Update the network ID associated with a session.
@@ -668,7 +666,7 @@ class SchedulerRepository:
         self,
         scaling_group: str,
         session_statuses: list[SessionStatus],
-        kernel_statuses: Optional[list[KernelStatus]],
+        kernel_statuses: list[KernelStatus] | None,
     ) -> list[SessionWithKernels]:
         """Get sessions for handler execution based on status filters.
 

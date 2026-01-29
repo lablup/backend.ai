@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import sys
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 import click
@@ -87,8 +86,8 @@ def domain_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def domain_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -173,7 +172,7 @@ def domain_set_weight_cmd(
     ctx: CLIContext,
     resource_group: str,
     domain_name: str,
-    weight: Optional[str],
+    weight: str | None,
     as_json: bool,
 ) -> None:
     """Set domain fair share weight."""
@@ -279,9 +278,9 @@ def project_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def project_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    project_id: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    project_id: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -376,7 +375,7 @@ def project_set_weight_cmd(
     resource_group: str,
     project_id: str,
     domain_name: str,
-    weight: Optional[str],
+    weight: str | None,
     as_json: bool,
 ) -> None:
     """Set project fair share weight."""
@@ -487,10 +486,10 @@ def user_get_cmd(
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def user_list_cmd(
     ctx: CLIContext,
-    resource_group: Optional[str],
-    user_uuid: Optional[str],
-    project_id: Optional[str],
-    domain_name: Optional[str],
+    resource_group: str | None,
+    user_uuid: str | None,
+    project_id: str | None,
+    domain_name: str | None,
     limit: int,
     offset: int,
     order_by: str,
@@ -589,7 +588,7 @@ def user_set_weight_cmd(
     project_id: str,
     user_uuid: str,
     domain_name: str,
-    weight: Optional[str],
+    weight: str | None,
     as_json: bool,
 ) -> None:
     """Set user fair share weight."""
@@ -668,10 +667,10 @@ def resource_group() -> None:
 def resource_group_update_spec_cmd(
     ctx: CLIContext,
     name: str,
-    half_life_days: Optional[int],
-    lookback_days: Optional[int],
-    decay_unit_days: Optional[int],
-    default_weight: Optional[str],
+    half_life_days: int | None,
+    lookback_days: int | None,
+    decay_unit_days: int | None,
+    default_weight: str | None,
     resource_weights: tuple[str, ...],
     as_json: bool,
 ) -> None:

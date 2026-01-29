@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -40,15 +39,15 @@ def get_user_usage_bucket_pagination_spec() -> PaginationSpec:
 
 async def fetch_user_usage_buckets(
     info: Info[StrawberryGQLContext],
-    filter: Optional[UserUsageBucketFilter] = None,
-    order_by: Optional[list[UserUsageBucketOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: UserUsageBucketFilter | None = None,
+    order_by: list[UserUsageBucketOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> UserUsageBucketConnection:
     """Fetch user usage buckets with optional filtering, ordering, and pagination.
 

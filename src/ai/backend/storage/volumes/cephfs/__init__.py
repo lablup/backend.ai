@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles.os
 
@@ -28,15 +28,15 @@ class CephDirQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None

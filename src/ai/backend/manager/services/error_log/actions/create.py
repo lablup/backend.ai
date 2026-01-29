@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.error_log.types import ErrorLogData
@@ -25,7 +25,7 @@ class CreateErrorLogAction(ErrorLogAction):
         return "create"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -36,5 +36,5 @@ class CreateErrorLogActionResult(BaseActionResult):
     error_log_data: ErrorLogData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.error_log_data.id)

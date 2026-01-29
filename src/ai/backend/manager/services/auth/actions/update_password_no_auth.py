@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, override
+from typing import override
 
 from aiohttp import web
 
@@ -18,7 +18,7 @@ class UpdatePasswordNoAuthAction(AuthAction):
     new_password: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -42,5 +42,5 @@ class UpdatePasswordNoAuthActionResult(BaseActionResult):
     password_changed_at: datetime
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_id)

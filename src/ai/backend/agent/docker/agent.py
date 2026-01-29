@@ -23,7 +23,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Optional,
     cast,
     override,
 )
@@ -297,8 +296,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     port_pool: set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
-    gwbridge_subnet: Optional[str]
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
+    gwbridge_subnet: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -316,8 +315,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
-        gwbridge_subnet: Optional[str] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
+        gwbridge_subnet: str | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -361,7 +360,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         loop = current_loop()
         if self.restarting:
             resource_spec = await loop.run_in_executor(
@@ -392,9 +391,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
-    def _chown_paths_if_root(
-        self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]
-    ) -> None:
+    def _chown_paths_if_root(self, paths: Iterable[Path], uid: int | None, gid: int | None) -> None:
         if os.geteuid() == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
@@ -480,7 +477,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
 
-                def chown_scratch(uid: Optional[int], gid: Optional[int]) -> None:
+                def chown_scratch(uid: int | None, gid: int | None) -> None:
                     paths = [
                         self.work_dir,
                         self.work_dir / ".jupyter",
@@ -660,7 +657,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src: str | Path,
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(
             type,
@@ -736,7 +733,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.write_text(sshkey["private_key"])
                 pub_key_path.write_text(sshkey["public_key"])
 
-                def chown_keyfile(uid: Optional[int], gid: Optional[int]) -> None:
+                def chown_keyfile(uid: int | None, gid: int | None) -> None:
                     self._chown_paths_if_root([priv_key_path, pub_key_path], uid, gid)
 
                 do_override = False
@@ -904,7 +901,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     (self.work_dir / "id_container").write_bytes(privkey)
                     (self.work_dir / "id_container").chmod(0o600)
 
-                    def chown_idfile(uid: Optional[int], gid: Optional[int]) -> None:
+                    def chown_idfile(uid: int | None, gid: int | None) -> None:
                         paths = [
                             ssh_dir,
                             ssh_dir / "authorized_keys",
@@ -1015,7 +1012,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         kernel_obj: AbstractKernel,
         cmdargs: list[str],
-        resource_opts: Optional[Mapping[str, Any]],
+        resource_opts: Mapping[str, Any] | None,
         preopen_ports: list[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
@@ -1206,7 +1203,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
-            container: Optional[DockerContainer] = None
+            container: DockerContainer | None = None
             try:
                 container = await docker.containers.create(
                     config=container_config, name=kernel_name
@@ -1283,7 +1280,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: Optional[ContainerNetworkInfo] = None
+            container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
@@ -1326,7 +1323,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if not ports:
                         raise ContainerCreationError(
                             container_id=cid,
@@ -1378,7 +1375,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
     docker_ptask_group: aiotools.PersistentTaskGroup
-    gwbridge_subnet: Optional[str]
+    gwbridge_subnet: str | None
     checked_invalid_images: set[str]
 
     network_plugin_ctx: NetworkPluginContext
@@ -1391,7 +1388,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
@@ -1577,7 +1574,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return self.docker_info["CgroupVersion"]
 
     @override
-    async def extract_image_command(self, image: str) -> Optional[str]:
+    async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1830,7 +1827,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout_seconds: Optional[float] | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1861,7 +1858,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout_seconds: Optional[float],
+        timeout_seconds: float | None,
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1941,7 +1938,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> DockerKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
@@ -1999,7 +1996,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
     ) -> None:
         if container_id is None:
             return
@@ -2028,7 +2025,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         loop = current_loop()

@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -170,11 +170,11 @@ class LifecycleEvent(enum.IntEnum):
 class ContainerLifecycleEvent:
     kernel_id: KernelId
     session_id: SessionId
-    container_id: Optional[ContainerId]
+    container_id: ContainerId | None
     event: LifecycleEvent
     reason: KernelLifecycleEventReason
-    done_future: Optional[asyncio.Future] = None
-    exit_code: Optional[int] = None
+    done_future: asyncio.Future | None = None
+    exit_code: int | None = None
     suppress_events: bool = False
 
     def __str__(self) -> str:
@@ -212,11 +212,11 @@ class KernelOwnershipData:
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
-    owner_user_id: Optional[uuid.UUID] = None
-    owner_project_id: Optional[uuid.UUID] = None
+    owner_user_id: uuid.UUID | None = None
+    owner_project_id: uuid.UUID | None = None
 
     def __post_init__(self) -> None:
-        def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
+        def to_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
             if value is None:
                 return None
             if isinstance(value, uuid.UUID):
@@ -227,11 +227,11 @@ class KernelOwnershipData:
         self.owner_project_id = to_uuid(self.owner_project_id)
 
     @property
-    def owner_user_id_to_str(self) -> Optional[str]:
+    def owner_user_id_to_str(self) -> str | None:
         return str(self.owner_user_id) if self.owner_user_id is not None else None
 
     @property
-    def owner_project_id_to_str(self) -> Optional[str]:
+    def owner_project_id_to_str(self) -> str | None:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 

@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import (
     Concatenate,
     Final,
-    Optional,
     ParamSpec,
     Self,
 )
@@ -227,7 +226,7 @@ class ParallelBgtask(BackgroundTaskMeta):
 
 
 def _exception_to_task_result[**P](
-    func: Callable[P, Awaitable[Optional[BaseBackgroundTaskResult]]],
+    func: Callable[P, Awaitable[BaseBackgroundTaskResult | None]],
 ) -> Callable[P, Awaitable[TaskResult]]:
     """
     Decorator that converts exceptions raised during background task execution
@@ -277,9 +276,9 @@ class BackgroundTaskManager:
         *,
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
-        tags: Optional[Iterable[str]] = None,
-        bgtask_observer: Optional[BackgroundTaskObserver] = None,
-        task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
+        tags: Iterable[str] | None = None,
+        bgtask_observer: BackgroundTaskObserver | None = None,
+        task_registry: BackgroundTaskHandlerRegistry | None = None,
     ) -> None:
         self._event_producer = event_producer
         self._ongoing_tasks = {}
@@ -306,7 +305,7 @@ class BackgroundTaskManager:
     async def start(
         self,
         func: BackgroundTask,
-        name: Optional[str] = None,
+        name: str | None = None,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -374,14 +373,14 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
-        task_name: Optional[str],
+        task_name: str | None,
         **kwargs,
     ) -> BaseBgtaskDoneEvent:
         self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
         start_time = time.perf_counter()
         task_name = task_name or func.__name__
         status = BgtaskStatus.STARTED
-        error_code: Optional[ErrorCode] = None
+        error_code: ErrorCode | None = None
         msg = "no message"
         try:
             bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
@@ -428,7 +427,7 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
-        task_name: Optional[str],
+        task_name: str | None,
         **kwargs,
     ) -> None:
         try:
@@ -482,13 +481,13 @@ class BackgroundTaskManager:
         self,
         task_name: BgtaskNameBase,
         manifest: BaseBackgroundTaskManifest,
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         return await self._task_registry.execute_new_task(task_name, manifest)
 
     @_exception_to_task_result
     async def _try_to_revive_task(
         self, task_name: BgtaskNameBase, task_info: TaskInfo
-    ) -> Optional[BaseBackgroundTaskResult]:
+    ) -> BaseBackgroundTaskResult | None:
         return await self._task_registry.revive_task(task_name.value, task_info.body)
 
     async def _execute_new_task(
@@ -615,7 +614,7 @@ class BackgroundTaskManager:
                 task_key = subkey_info.key
                 async_task = asyncio.create_task(self._revive_task(task_name, task_info, task_key))
                 async_tasks.append(async_task)
-        task: Optional[BackgroundTaskMeta] = None
+        task: BackgroundTaskMeta | None = None
         match task_info.task_type:
             case TaskType.SINGLE:
                 if len(async_tasks) != 1:

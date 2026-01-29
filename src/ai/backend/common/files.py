@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import janus
 
@@ -22,8 +22,8 @@ class AsyncFileWriter:
         self,
         target_filename: str | Path,
         access_mode: str,
-        encode: Optional[Callable[[str], bytes]] = None,
-        max_chunks: Optional[int] = None,
+        encode: Callable[[str], bytes] | None = None,
+        max_chunks: int | None = None,
     ) -> None:
         if max_chunks is None:
             max_chunks = 0

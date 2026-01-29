@@ -7,7 +7,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -75,7 +74,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     atom_config: Any
 
     _rbln_stat_path: str
-    _all_devices: Optional[list[TATOMDevice]]
+    _all_devices: list[TATOMDevice] | None
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None

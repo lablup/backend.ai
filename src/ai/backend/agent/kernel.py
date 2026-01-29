@@ -23,7 +23,6 @@ from typing import (
     Any,
     Literal,
     NotRequired,
-    Optional,
     TypedDict,
     cast,
     overload,
@@ -158,17 +157,17 @@ class ExecTimeout(RunEvent):
 @dataclass
 class ResultRecord:
     msg_type: ResultType
-    data: Optional[str] = None
+    data: str | None = None
 
 
 class NextResult(TypedDict):
-    runId: Optional[str]
+    runId: str | None
     status: ResultType
-    exitCode: Optional[int]
-    options: Optional[Mapping[str, Any]]
+    exitCode: int | None
+    options: Mapping[str, Any] | None
     # v1
-    stdout: NotRequired[Optional[str]]
-    stderr: NotRequired[Optional[str]]
+    stdout: NotRequired[str | None]
+    stderr: NotRequired[str | None]
     media: NotRequired[Sequence[Any]]
     html: NotRequired[Sequence[Any]]
     # v2
@@ -183,14 +182,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     agent_id: AgentId
     network_id: str
-    container_id: Optional[str]
+    container_id: str | None
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: list[ServicePort]
     data: dict[Any, Any]
     last_used: float
-    termination_reason: Optional[KernelLifecycleEventReason]
-    clean_event: Optional[asyncio.Future]
+    termination_reason: KernelLifecycleEventReason | None
+    clean_event: asyncio.Future | None
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
@@ -198,7 +197,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     _tasks: set[asyncio.Task]
 
-    runner: Optional[AbstractCodeRunner]
+    runner: AbstractCodeRunner | None
 
     def __init__(
         self,
@@ -422,7 +421,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def execute(
         self,
-        run_id: Optional[str],
+        run_id: str | None,
         mode: Literal["batch", "query", "input", "continue"],
         text: str,
         *,
@@ -655,14 +654,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     session_id: SessionId
     started_at: float
-    finished_at: Optional[float]
+    finished_at: float | None
     exec_timeout: float
     max_record_size: int
     client_features: frozenset[str]
 
     event_producer: EventProducer
 
-    _sockets: Optional[SocketPair]
+    _sockets: SocketPair | None
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
@@ -670,13 +669,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     _is_socket_invalid: bool
-    output_queue: Optional[asyncio.Queue[ResultRecord]]
-    current_run_id: Optional[str]
+    output_queue: asyncio.Queue[ResultRecord] | None
+    current_run_id: str | None
     pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
-    read_task: Optional[asyncio.Task]
-    status_task: Optional[asyncio.Task]
-    watchdog_task: Optional[asyncio.Task]
+    read_task: asyncio.Task | None
+    status_task: asyncio.Task | None
+    watchdog_task: asyncio.Task | None
 
     _closed: bool
 
@@ -687,7 +686,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: Optional[frozenset[str]] = None,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
@@ -812,7 +811,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.watchdog_task = loop.create_task(self.watchdog())
 
     async def _close_tasks(self) -> None:
-        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+        concurrent_safe_tasks: tuple[asyncio.Task | None, ...] = (
             self.status_task,
             self.read_task,
             self.watchdog_task,
@@ -1148,7 +1147,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("unexpected error")
             raise
 
-    async def attach_output_queue(self, run_id: Optional[str]) -> None:
+    async def attach_output_queue(self, run_id: str | None) -> None:
         # Context: per API request
         if run_id is None:
             run_id = secrets.token_hex(16)

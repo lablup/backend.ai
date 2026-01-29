@@ -2,7 +2,7 @@
 
 import uuid
 from decimal import Decimal
-from typing import Optional, cast
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -39,10 +39,10 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
 
 
 def create_session_workload(
-    session_id: Optional[SessionId] = None,
+    session_id: SessionId | None = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    kernels: Optional[list[KernelWorkload]] = None,
-    designated_agent_ids: Optional[list[AgentId]] = None,
+    kernels: list[KernelWorkload] | None = None,
+    designated_agent_ids: list[AgentId] | None = None,
     **kwargs,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing."""
@@ -83,7 +83,7 @@ def create_session_workload(
 
 
 def create_kernel_workload(
-    kernel_id: Optional[uuid.UUID] = None,
+    kernel_id: uuid.UUID | None = None,
     cpu: Decimal = Decimal("1"),
     mem: Decimal = Decimal("1024"),
     architecture: str = "x86_64",
@@ -148,7 +148,7 @@ class TestProvisionerAllocation:
             resource_req: ResourceRequirements,
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId],
+            designated_agent: AgentId | None,
         ) -> AgentInfo:
             try:
                 # Capture the state of agents at each call
@@ -203,7 +203,7 @@ class TestProvisionerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId] = None,
+            designated_agent: AgentId | None = None,
         ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
@@ -488,7 +488,7 @@ class TestProvisionerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent_ids: Optional[list[AgentId]],
+            designated_agent_ids: list[AgentId] | None,
         ) -> list[AgentSelection]:
             resource_requirements = criteria.get_resource_requirements()
             selections = []

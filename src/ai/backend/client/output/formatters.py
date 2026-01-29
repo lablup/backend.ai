@@ -5,7 +5,7 @@ import json
 import textwrap
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from typing import Any, Optional
+from typing import Any
 
 import humanize
 
@@ -14,7 +14,7 @@ from ai.backend.common.types import MetricValue
 from .types import AbstractOutputFormatter, FieldSpec
 
 
-def format_stats(raw_stats: Optional[str], indent: str = "") -> str:
+def format_stats(raw_stats: str | None, indent: str = "") -> str:
     if raw_stats is None:
         return "(unavailable)"
     stats = json.loads(raw_stats)

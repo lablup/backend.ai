@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Optional, TypeVar, final
+from typing import TypeVar, final
 
 T = TypeVar("T")
 
@@ -61,7 +61,7 @@ class BaseTestContext[T]:
     It is designed to be subclassed for specific test contexts.
     """
 
-    _ctxvar: Optional[ContextVar[Optional[T]]] = None
+    _ctxvar: ContextVar[T | None] | None = None
     _used: MutableMapping[ContextName, "BaseTestContext"] = {}
 
     def __init_subclass__(cls):

@@ -4,7 +4,7 @@ import logging
 from collections.abc import AsyncIterator, Iterable
 from http import HTTPStatus
 from pathlib import Path
-from typing import Optional, cast, override
+from typing import cast, override
 
 import aiohttp_cors
 from aiohttp import ClientResponse, web
@@ -58,7 +58,7 @@ class VFSDirectoryDownloadProxyStreamReader(StreamReader):
         self._filepath = filepath
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/x-tar"
 
     @override

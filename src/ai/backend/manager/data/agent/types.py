@@ -4,7 +4,7 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
@@ -22,7 +22,7 @@ class AgentStatus(enum.Enum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
+    def _missing_(cls, value: Any) -> AgentStatus | None:
         if isinstance(value, int):
             for member in cls:
                 if member.value == value:
@@ -51,15 +51,15 @@ class AgentStatus(enum.Enum):
 @dataclass
 class AgentDataForHeartbeatUpdate:
     status: AgentStatus
-    status_changed: Optional[datetime]
+    status_changed: datetime | None
     scaling_group: str
     available_slots: ResourceSlot
     addr: str
-    public_host: Optional[str]
+    public_host: str | None
     version: str
     architecture: str
     compute_plugins: Mapping[str, Any]
-    public_key: Optional[PublicKey]
+    public_key: PublicKey | None
     auto_terminate_abusing_kernel: bool
 
 
@@ -67,7 +67,7 @@ class AgentDataForHeartbeatUpdate:
 class AgentData:
     id: AgentId
     status: AgentStatus
-    status_changed: Optional[datetime]
+    status_changed: datetime | None
     region: str
     scaling_group: str
     schedulable: bool
@@ -75,13 +75,13 @@ class AgentData:
     cached_occupied_slots: ResourceSlot
     actual_occupied_slots: ResourceSlot
     addr: str
-    public_host: Optional[str]
+    public_host: str | None
     first_contact: datetime | None
-    lost_at: Optional[datetime]
+    lost_at: datetime | None
     version: str
     architecture: str
     compute_plugins: Mapping[str, Any]
-    public_key: Optional[PublicKey]
+    public_key: PublicKey | None
     auto_terminate_abusing_kernel: bool
 
 
@@ -89,7 +89,7 @@ class AgentData:
 class AgentMetadata:
     id: AgentId
     status: AgentStatus
-    region: Optional[str]
+    region: str | None
     scaling_group: str
     architecture: str
     version: str
@@ -100,7 +100,7 @@ class AgentMetadata:
 class AgentNetworkInfo:
     addr: str
     public_host: str
-    public_key: Optional[PublicKey]
+    public_key: PublicKey | None
 
 
 @dataclass
@@ -115,7 +115,7 @@ class AgentHeartbeatUpsert:
     metadata: AgentMetadata
     network_info: AgentNetworkInfo
     resource_info: AgentResourceInfo
-    lost_at: Optional[datetime]
+    lost_at: datetime | None
     heartbeat_received: datetime
 
     @property
@@ -192,7 +192,7 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_data: Optional[AgentDataForHeartbeatUpdate], upsert_data: AgentHeartbeatUpsert
+        cls, existing_data: AgentDataForHeartbeatUpdate | None, upsert_data: AgentHeartbeatUpsert
     ) -> Self:
         if existing_data is None:
             return cls(

@@ -5,7 +5,7 @@ import re
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
@@ -47,7 +47,7 @@ __all__: Sequence[str] = (
 class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
-    project: Optional[str]
+    project: str | None
 
 
 # TODO: Refactor this using inheritance
@@ -58,7 +58,7 @@ class ContainerRegistryValidator:
 
     _url: str
     _type: ContainerRegistryType
-    _project: Optional[str]
+    _project: str | None
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
@@ -164,12 +164,12 @@ class ContainerRegistryRow(Base):
         url: str,
         registry_name: str,
         type: ContainerRegistryType,
-        project: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        ssl_verify: Optional[bool] = None,
-        is_global: Optional[bool] = None,
-        extra: Optional[dict] = None,
+        project: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        ssl_verify: bool | None = None,
+        is_global: bool | None = None,
+        extra: dict | None = None,
     ) -> None:
         self.id = id
         self.url = url

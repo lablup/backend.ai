@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.types import EndpointData
@@ -15,7 +15,7 @@ class ModifyEndpointAction(ModelServiceAction):
     updater: Updater[EndpointRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,8 +27,8 @@ class ModifyEndpointAction(ModelServiceAction):
 @dataclass
 class ModifyEndpointActionResult(BaseActionResult):
     success: bool
-    data: Optional[EndpointData]
+    data: EndpointData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data is not None else None

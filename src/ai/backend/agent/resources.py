@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     TextIO,
     cast,
@@ -307,8 +306,8 @@ class AbstractComputeDevice:
     hw_location: str  # either PCI bus ID or arbitrary string
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
-    _device_name: Optional[DeviceName]
-    numa_node: Optional[int]  # NUMA node ID (None if not applicable)
+    _device_name: DeviceName | None
+    numa_node: int | None  # NUMA node ID (None if not applicable)
 
     def __init__(
         self,
@@ -316,8 +315,8 @@ class AbstractComputeDevice:
         hw_location: str,
         memory_size: int,
         processing_units: int,
-        numa_node: Optional[int] = None,
-        device_name: Optional[DeviceName] = None,
+        numa_node: int | None = None,
+        device_name: DeviceName | None = None,
     ) -> None:
         self.device_id = device_id
         self.hw_location = hw_location
@@ -822,8 +821,8 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
@@ -843,10 +842,10 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
 @attrs.define(auto_attribs=True, slots=True)
 class Mount:
     type: MountTypes
-    source: Optional[Path]
+    source: Path | None
     target: Path
     permission: MountPermission = MountPermission.READ_ONLY
-    opts: Optional[Mapping[str, Any]] = None
+    opts: Mapping[str, Any] | None = None
 
     def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
@@ -856,7 +855,7 @@ class Mount:
         source_str, target_str, perm_str = s.split(":")
         source_path = Path(source_str)
         type = MountTypes.BIND
-        source: Optional[Path]
+        source: Path | None
         if not source_path.is_absolute():
             if len(source_path.parts) == 1:
                 source = Path(source_str)

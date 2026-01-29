@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.types import AgentId, ImageCanonical
@@ -13,7 +13,7 @@ class RemoveAgentFromImagesAction(AgentAction):
     scanned_images: dict[ImageCanonical, ScannedImage]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)
 
     @override
@@ -27,5 +27,5 @@ class RemoveAgentFromImagesActionResult(BaseActionResult):
     agent_id: AgentId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)

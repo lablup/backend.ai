@@ -4,7 +4,7 @@ import enum
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final, Optional, Protocol
+from typing import Any, Final, Protocol
 
 import attrs
 
@@ -86,9 +86,9 @@ FIRST_COMPLETED: Final = HookReturnTiming.FIRST_COMPLETED
 @attrs.define(auto_attribs=True, slots=True)
 class HookResult:
     status: HookResults
-    src_plugin: Optional[str | Sequence[str]] = None
-    reason: Optional[str] = None
-    result: Optional[Any] = None
+    src_plugin: str | Sequence[str] | None = None
+    reason: str | None = None
+    result: Any | None = None
 
 
 class HookPluginContext(BasePluginContext[HookPlugin]):
@@ -101,7 +101,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     def _get_handlers(
         self,
         event_name: str,
-        order: Optional[Sequence[str]] = None,
+        order: Sequence[str] | None = None,
     ) -> Sequence[tuple[str, HookHandler]]:
         handlers = []
         for plugin_name, plugin_instance in self.plugins.items():
@@ -124,7 +124,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         *,
         return_when: HookReturnTiming = ALL_COMPLETED,
         success_if_no_hook: bool = True,
-        order: Optional[Sequence[str]] = None,
+        order: Sequence[str] | None = None,
     ) -> HookResult:
         """
         Invoke the handlers that matches with the given ``event_name``.

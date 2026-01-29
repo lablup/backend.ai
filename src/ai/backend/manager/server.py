@@ -30,7 +30,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Optional,
     cast,
 )
 
@@ -515,8 +514,8 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 async def config_provider_ctx(
     root_ctx: RootContext,
     log_level: LogLevel,
-    config_path: Optional[Path] = None,
-    extra_config: Optional[Mapping[str, Any]] = None,
+    config_path: Path | None = None,
+    extra_config: Mapping[str, Any] | None = None,
 ) -> AsyncIterator[ManagerConfigProvider]:
     loaders: list[AbstractConfigLoader] = []
 
@@ -546,7 +545,7 @@ async def config_provider_ctx(
     unified_config_loader = LoaderChain(loaders, base_config=extra_config)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
-    config_provider: Optional[ManagerConfigProvider] = None
+    config_provider: ManagerConfigProvider | None = None
     config_provider = await ManagerConfigProvider.create(
         unified_config_loader,
         etcd_watcher,
@@ -1436,9 +1435,9 @@ def build_root_app(
     pidx: int,
     bootstrap_config: BootstrapConfig,
     *,
-    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
-    subapp_pkgs: Optional[Sequence[str]] = None,
-    scheduler_opts: Optional[Mapping[str, Any]] = None,
+    cleanup_contexts: Sequence[CleanupContext] | None = None,
+    subapp_pkgs: Sequence[str] | None = None,
+    scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:

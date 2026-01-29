@@ -10,7 +10,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, Any, Literal, Optional, cast
+from typing import IO, Any, Literal, cast
 from uuid import UUID
 
 import click
@@ -62,7 +62,7 @@ def session() -> None:
     """Set of compute session operations"""
 
 
-def _create_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _create_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("image")
     @click.option(
         "-o",
@@ -142,38 +142,38 @@ def _create_cmd(docs: Optional[str] = None) -> Callable[..., None]:
     def create(
         # base args
         image: str,
-        name: Optional[str],  # click_start_option
-        owner: Optional[str],
+        name: str | None,  # click_start_option
+        owner: str | None,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        starts_at: Optional[str],  # click_start_option
-        startup_command: Optional[str],
-        timeout: Optional[str],
+        starts_at: str | None,  # click_start_option
+        startup_command: str | None,
+        timeout: str | None,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[UUID],
-        priority: Optional[int],  # click_start_option
+        priority: int | None,  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        bootstrap_script: Optional[IO],
-        tag: Optional[str],  # click_start_option
+        bootstrap_script: IO | None,
+        tag: str | None,  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: Optional[str],  # click_start_option
+        scaling_group: str | None,  # click_start_option
         resources: Sequence[str],  # click_start_option
         cluster_size: int,  # click_start_option
         cluster_mode: ClusterMode,
         resource_opts: Sequence[str],  # click_start_option
-        preopen: Optional[str],
-        assign_agent: Optional[str],
+        preopen: str | None,
+        assign_agent: str | None,
         # resource grouping
-        domain: Optional[str],  # click_start_option
-        group: Optional[str],  # click_start_option
-        network: Optional[str],  # click_start_option
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -314,7 +314,7 @@ main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
-def _create_from_template_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("template_id")
     @click_start_option()
     @click.option(
@@ -434,12 +434,12 @@ def _create_from_template_cmd(docs: Optional[str] = None) -> Callable[..., None]
     def create_from_template(
         # base args
         template_id: str,
-        name: Optional[str],  # click_start_option
+        name: str | None,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        priority: Optional[int],  # click_start_option
-        starts_at: Optional[str],  # click_start_option
+        priority: int | None,  # click_start_option
+        starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         timeout: str | Undefined,
@@ -447,11 +447,11 @@ def _create_from_template_cmd(docs: Optional[str] = None) -> Callable[..., None]
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[UUID],
-        callback_url: Optional[str],  # click_start_option
+        callback_url: str | None,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: Optional[str],  # click_start_option
+        tag: str | None,  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,
@@ -465,7 +465,7 @@ def _create_from_template_cmd(docs: Optional[str] = None) -> Callable[..., None]
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
-        network: Optional[str],  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -601,7 +601,7 @@ main.command(aliases=["start-from-template"])(
 session.command()(_create_from_template_cmd())
 
 
-def _destroy_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_names", metavar="SESSID", nargs=-1)
     @click.option(
         "-f",
@@ -683,7 +683,7 @@ main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destro
 session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
-def _restart_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _restart_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     @click.option(
         "-o",
@@ -847,7 +847,7 @@ def ls(session_id: str, path: str) -> None:
     default=None,
     help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
 )
-def logs(session_id: str, kernel: Optional[str]) -> None:
+def logs(session_id: str, kernel: str | None) -> None:
     """
     Shows the full console log of a compute session.
 
@@ -1071,7 +1071,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -1132,7 +1132,7 @@ session.command(
 )(_ssh_cmd())
 
 
-def _scp_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
     @click.argument("dst", type=str, metavar="DST")
@@ -1224,7 +1224,7 @@ session.command(
 )(_scp_cmd())
 
 
-def _events_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _events_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
@@ -1255,7 +1255,7 @@ def _events_cmd(docs: Optional[str] = None) -> Callable[..., None]:
         owner_access_key: str | None,
         scope: str,
         quiet: bool,
-        wait: Optional[str] = None,
+        wait: str | None = None,
     ) -> None:
         """
         Monitor the lifecycle events of a compute session.
@@ -1350,7 +1350,7 @@ def _fetch_session_names() -> tuple[str]:
     return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
-def _watch_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _watch_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME", nargs=-1)
     @click.option(
         "-o",

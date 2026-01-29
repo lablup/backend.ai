@@ -4,7 +4,7 @@ import enum
 import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from typing import Any, NotRequired, Optional, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 import aiohttp
 
@@ -27,7 +27,7 @@ class OneFSClient:
     user: str
     password: str
     api_version: str
-    system_name: Optional[str]
+    system_name: str | None
     _session: aiohttp.ClientSession
 
     def __init__(
@@ -37,7 +37,7 @@ class OneFSClient:
         password: str,
         *,
         api_version: str = "12",
-        system_name: Optional[str] = "nfs",
+        system_name: str | None = "nfs",
     ) -> None:
         self.endpoint = endpoint
         self.user = user

@@ -1,7 +1,7 @@
 import shutil
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import click
 from tabulate import tabulate
@@ -21,8 +21,8 @@ def tabulate_items(
     items: Iterator[_Item],
     fields: Sequence[FieldSpec],
     *,
-    page_size: Optional[int] = None,
-    item_formatter: Optional[Callable[[_Item], None]] = None,
+    page_size: int | None = None,
+    item_formatter: Callable[[_Item], None] | None = None,
     tablefmt: Literal["simple", "plain", "github"] = "simple",
 ) -> Iterator[str]:
     is_first = True
@@ -79,7 +79,7 @@ def tabulate_items(
 
 def echo_via_pager(
     text_generator: Iterator[str],
-    break_callback: Optional[Callable[[], None]] = None,
+    break_callback: Callable[[], None] | None = None,
 ) -> None:
     """
     A variant of ``click.echo_via_pager()`` which implements our own simplified pagination.

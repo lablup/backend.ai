@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import textwrap
 from collections.abc import Iterable, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import group_fields
@@ -53,8 +53,8 @@ class Group(BaseFunction):
         cls,
         name: str,
         *,
-        fields: Optional[Iterable[FieldSpec | str]] = None,
-        domain_name: Optional[str] = None,
+        fields: Iterable[FieldSpec | str] | None = None,
+        domain_name: str | None = None,
     ) -> Sequence[dict]:
         """
         Find the group(s) by its name.
@@ -138,9 +138,9 @@ class Group(BaseFunction):
         *,
         description: str = "",
         is_active: bool = True,
-        total_resource_slots: Optional[str] = None,
-        allowed_vfolder_hosts: Optional[str] = None,
-        integration_id: Optional[str] = None,
+        total_resource_slots: str | None = None,
+        allowed_vfolder_hosts: str | None = None,
+        integration_id: str | None = None,
         _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -184,8 +184,8 @@ class Group(BaseFunction):
         name: str | Undefined = undefined,
         description: str | Undefined = undefined,
         is_active: bool | Undefined = undefined,
-        total_resource_slots: Optional[str] | Undefined = undefined,
-        allowed_vfolder_hosts: Optional[str] | Undefined = undefined,
+        total_resource_slots: str | None | Undefined = undefined,
+        allowed_vfolder_hosts: str | None | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
@@ -254,7 +254,7 @@ class Group(BaseFunction):
         cls,
         gid: str,
         user_uuids: Iterable[str],
-        _fields: Optional[Iterable[FieldSpec | str]] = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Add users to a group.
@@ -283,7 +283,7 @@ class Group(BaseFunction):
         cls,
         gid: str,
         user_uuids: Iterable[str],
-        _fields: Optional[Iterable[FieldSpec | str]] = None,
+        _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Remove users from a group.

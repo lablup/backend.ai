@@ -4,7 +4,6 @@ import enum
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -84,10 +83,10 @@ class AuditLogRow(Base):
         description: str,
         created_at: datetime,
         status: OperationStatus,
-        entity_id: Optional[str | uuid.UUID] = None,
-        request_id: Optional[str] = None,
-        triggered_by: Optional[str] = None,
-        duration: Optional[timedelta] = None,
+        entity_id: str | uuid.UUID | None = None,
+        request_id: str | None = None,
+        triggered_by: str | None = None,
+        duration: timedelta | None = None,
     ) -> None:
         self.entity_type = entity_type
         self.operation = operation

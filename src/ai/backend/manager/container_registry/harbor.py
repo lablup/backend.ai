@@ -4,7 +4,7 @@ import copy
 import logging
 import urllib.parse
 from collections.abc import AsyncIterator, Mapping
-from typing import Any, Optional, cast, override
+from typing import Any, cast, override
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -47,7 +47,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                 self.credentials["username"],
                 self.credentials["password"],
             )
-        project_list_url: Optional[yarl.URL]
+        project_list_url: yarl.URL | None
         project_list_url = (api_url / "projects").with_query(
             {"page_size": "30"},
         )
@@ -68,7 +68,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
         if not project_ids:
             log.warning("There is no given project.")
             return
-        repo_list_url: Optional[yarl.URL]
+        repo_list_url: yarl.URL | None
         for project_id in project_ids:
             repo_list_url = (api_url / "repositories").with_query(
                 {"project_id": project_id, "page_size": "30"},
@@ -205,7 +205,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.credentials["password"],
             )
 
-        repo_list_url: Optional[yarl.URL]
+        repo_list_url: yarl.URL | None
         repo_list_url = (
             api_url / "projects" / self.registry_info.project / "repositories"
         ).with_query(
@@ -254,7 +254,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
 
         try:
             async with aiotools.TaskGroup() as tg:
-                artifact_url: Optional[yarl.URL] = (
+                artifact_url: yarl.URL | None = (
                     api_url / "projects" / project / "repositories" / repository / "artifacts"
                 ).with_query(
                     {"page_size": "30"},
@@ -264,7 +264,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         resp.raise_for_status()
                         body = await resp.json()
                         for image_info in body:
-                            skip_reason: Optional[str] = None
+                            skip_reason: str | None = None
                             tag = image_info["digest"]
                             try:
                                 if not image_info["tags"] or len(image_info["tags"]) == 0:

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
@@ -15,7 +15,7 @@ class ForgetImageByIdAction(ImageAction):
     image_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
 
     @override
@@ -29,5 +29,5 @@ class ForgetImageByIdActionResult(BaseActionResult):
     image: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image.id)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -170,8 +170,8 @@ class SchedulingFailure:
     session_id: SessionId
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
     failed_phases: list[SchedulingPredicate] = field(default_factory=list)
-    last_try: Optional[datetime] = None
-    msg: Optional[str] = None
+    last_try: datetime | None = None
+    msg: str | None = None
 
     def to_status_data(self, current_retries: int) -> dict:
         """Convert failure to status data dictionary for storage."""

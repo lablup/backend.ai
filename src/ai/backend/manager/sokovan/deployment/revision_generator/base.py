@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.types import RuntimeVariant
@@ -32,8 +32,8 @@ class BaseRevisionGenerator(RevisionGenerator):
         self,
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
-        default_architecture: Optional[str] = None,
+        model_definition_path: str | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Generate revision with common override logic and variant-specific validation.
@@ -52,9 +52,9 @@ class BaseRevisionGenerator(RevisionGenerator):
     async def load_service_definition(
         self,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
+        model_definition_path: str | None,
         runtime_variant: str,
-    ) -> Optional[ModelServiceDefinition]:
+    ) -> ModelServiceDefinition | None:
         """
         Load service definition from vfolder with field-level override.
 
@@ -135,8 +135,8 @@ class BaseRevisionGenerator(RevisionGenerator):
     def merge_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: Optional[ModelServiceDefinition],
-        default_architecture: Optional[str] = None,
+        service_definition: ModelServiceDefinition | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Merge requested revision with service definition.
@@ -159,7 +159,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         self,
         draft_revision: ModelRevisionSpecDraft,
         service_definition: ModelServiceDefinition,
-        default_architecture: Optional[str] = None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Merge service definition and API request with field-level override.

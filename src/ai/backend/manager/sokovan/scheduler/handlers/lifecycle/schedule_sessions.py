@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -56,7 +56,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         return [SessionStatus.PENDING]
 
     @classmethod
-    def target_kernel_statuses(cls) -> Optional[list[KernelStatus]]:
+    def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for scheduling."""
         return None
 
@@ -86,7 +86,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for operations targeting PENDING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_PENDING
 

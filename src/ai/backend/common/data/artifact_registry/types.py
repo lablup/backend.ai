@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from typing import Any, Optional, Self
+from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
@@ -54,7 +54,7 @@ class HuggingFaceRegistryStatefulData(_CommonArtifactRegistryStatefulData):
             "used for model and dataset downloads"
         ),
     )
-    token: Optional[str] = Field(
+    token: str | None = Field(
         default=None,
         description="Optional authentication token for accessing private HuggingFace repositories and datasets",
     )

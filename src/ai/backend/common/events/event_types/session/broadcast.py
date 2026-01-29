@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.types import (
@@ -24,11 +24,11 @@ class BaseSessionEvent(AbstractBroadcastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.session_id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -79,7 +79,7 @@ class SessionCreationEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -127,7 +127,7 @@ class SessionTerminationEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -168,7 +168,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -211,7 +211,7 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.session_id)
 
     @override
@@ -239,10 +239,10 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
         return "scheduling"
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
     @override
-    def cache_domain(cls) -> Optional[EventCacheDomain]:
+    def cache_domain(cls) -> EventCacheDomain | None:
         return EventCacheDomain.SESSION_SCHEDULER

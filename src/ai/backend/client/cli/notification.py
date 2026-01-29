@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import IO, Optional
+from typing import IO
 from uuid import UUID
 
 import click
@@ -212,11 +212,11 @@ def create_channel_cmd(
 def update_channel_cmd(
     ctx: CLIContext,
     channel_id: str,
-    name: Optional[str],
+    name: str | None,
     channel_type: str | None,
     spec: str | None,
-    description: Optional[str],
-    enabled: Optional[bool],
+    description: str | None,
+    enabled: bool | None,
 ) -> None:
     """
     Update a notification channel.
@@ -328,8 +328,8 @@ def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 def validate_channel_cmd(
     ctx: CLIContext,
     channel_id: str,
-    data: Optional[str],
-    data_file: Optional[IO],
+    data: str | None,
+    data_file: IO | None,
 ) -> None:
     """
     Validate a notification channel by sending a test webhook.
@@ -510,9 +510,9 @@ def create_rule_cmd(
     name: str,
     rule_type: str,
     channel_id: str,
-    template: Optional[str],
-    template_file: Optional[IO],
-    description: Optional[str],
+    template: str | None,
+    template_file: IO | None,
+    description: str | None,
     disabled: bool,
 ) -> None:
     """
@@ -574,11 +574,11 @@ def create_rule_cmd(
 def update_rule_cmd(
     ctx: CLIContext,
     rule_id: str,
-    name: Optional[str],
-    description: Optional[str],
-    message_template: Optional[str],
-    template_file: Optional[IO],
-    enabled: Optional[bool],
+    name: str | None,
+    description: str | None,
+    message_template: str | None,
+    template_file: IO | None,
+    enabled: bool | None,
 ) -> None:
     """
     Update a notification rule.
@@ -656,7 +656,7 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     help="Path to JSON file with test data (use '-' for stdin)",
 )
 def validate_rule_cmd(
-    ctx: CLIContext, rule_id: str, data: Optional[str], data_file: Optional[IO]
+    ctx: CLIContext, rule_id: str, data: str | None, data_file: IO | None
 ) -> None:
     """
     Validate a notification rule by rendering its template with test data.

@@ -8,7 +8,7 @@ import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Optional, Self, cast
+from typing import Self, cast
 
 from glide import (
     Batch,
@@ -393,7 +393,7 @@ class ValkeyBgtaskClient:
                 log.debug("Task TTL insufficient (id: {})", task_id)
                 return True
 
-    async def _fetch_total_info(self, task_id: TaskID) -> Optional[TaskTotalInfo]:
+    async def _fetch_total_info(self, task_id: TaskID) -> TaskTotalInfo | None:
         """
         Fetch complete task information including task metadata and all subtask metadata.
         Returns None if metadata is missing or corrupted.
@@ -443,7 +443,7 @@ class ValkeyBgtaskClient:
 
     async def _fetch_unmanaged_task(
         self, task_id: TaskID, task_set_key: TaskSetKey
-    ) -> Optional[TaskTotalInfo]:
+    ) -> TaskTotalInfo | None:
         """
         Check if task TTL is below threshold and fetch complete task info if needed.
         If fetching fails (metadata missing or corrupted), unregister the task.

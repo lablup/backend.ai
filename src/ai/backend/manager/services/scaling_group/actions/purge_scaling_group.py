@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -22,7 +22,7 @@ class PurgeScalingGroupAction(ScalingGroupAction):
         return "purge"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.purger.pk_value)
 
 
@@ -33,5 +33,5 @@ class PurgeScalingGroupActionResult(BaseActionResult):
     data: ScalingGroupData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.data.name

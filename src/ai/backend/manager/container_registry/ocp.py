@@ -1,7 +1,7 @@
 import logging
 from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import Optional, cast, override
+from typing import cast, override
 
 import aiohttp
 import yarl
@@ -33,7 +33,7 @@ class OpenShiftPlatformContainerRegistry(BaseContainerRegistry):
             self.credentials,
             "registry:catalog:*",
         )
-        catalog_url: Optional[yarl.URL]
+        catalog_url: yarl.URL | None
         catalog_url = (self.registry_url / "v2/_catalog").with_query(
             {"n": "30"},
         )

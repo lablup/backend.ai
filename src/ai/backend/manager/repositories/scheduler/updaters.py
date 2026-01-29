@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.utils import sql_json_merge
@@ -21,7 +21,7 @@ class SessionStatusBatchUpdaterSpec(BatchUpdaterSpec[SessionRow]):
 
     to_status: SessionStatus
     status_changed_at: datetime
-    reason: Optional[str] = None
+    reason: str | None = None
 
     @property
     @override

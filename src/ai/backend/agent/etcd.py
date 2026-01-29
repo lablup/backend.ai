@@ -1,6 +1,6 @@
 from collections import ChainMap
 from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping
-from typing import Optional, cast, override
+from typing import cast, override
 
 from etcd_client import CondVar
 
@@ -42,7 +42,7 @@ class AgentEtcdClientView(AbstractKVStore):
 
     def _augment_scope_prefix_map(
         self,
-        override: Optional[Mapping[ConfigScopes, str]],
+        override: Mapping[ConfigScopes, str] | None,
     ) -> Mapping[ConfigScopes, str]:
         """
         This stub ensures immutable usage of the ChainMap because ChainMap does *not*
@@ -63,7 +63,7 @@ class AgentEtcdClientView(AbstractKVStore):
         val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put(key, val, scope=scope, scope_prefix_map=scope_prefix_map)
@@ -75,7 +75,7 @@ class AgentEtcdClientView(AbstractKVStore):
         dict_obj: NestedStrKeyedMapping,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put_prefix(key, dict_obj, scope=scope, scope_prefix_map=scope_prefix_map)
@@ -86,7 +86,7 @@ class AgentEtcdClientView(AbstractKVStore):
         flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.put_dict(
@@ -99,8 +99,8 @@ class AgentEtcdClientView(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-    ) -> Optional[str]:
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> str | None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         return await self._etcd.get(key, scope=scope, scope_prefix_map=scope_prefix_map)
 
@@ -110,7 +110,7 @@ class AgentEtcdClientView(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> GetPrefixValue:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         return await self._etcd.get_prefix(
@@ -127,7 +127,7 @@ class AgentEtcdClientView(AbstractKVStore):
         new_val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> bool:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         return await self._etcd.replace(
@@ -144,7 +144,7 @@ class AgentEtcdClientView(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete(key, scope=scope, scope_prefix_map=scope_prefix_map)
@@ -155,7 +155,7 @@ class AgentEtcdClientView(AbstractKVStore):
         keys: Iterable[str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete_multi(keys, scope=scope, scope_prefix_map=scope_prefix_map)
@@ -166,7 +166,7 @@ class AgentEtcdClientView(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         await self._etcd.delete_prefix(key_prefix, scope=scope, scope_prefix_map=scope_prefix_map)
@@ -177,11 +177,11 @@ class AgentEtcdClientView(AbstractKVStore):
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         watch_result = self._etcd.watch(
@@ -202,11 +202,11 @@ class AgentEtcdClientView(AbstractKVStore):
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
         once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
+        ready_event: CondVar | None = None,
+        cleanup_event: CondVar | None = None,
+        wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
         watch_prefix_result = self._etcd.watch_prefix(

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
@@ -14,7 +14,7 @@ class RegisterNamespaceAction(StorageNamespaceAction):
     creator: Creator[StorageNamespaceRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,5 +29,5 @@ class RegisterNamespaceActionResult(BaseActionResult):
     result: StorageNamespaceData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.storage_id)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -38,15 +37,15 @@ def get_project_fair_share_pagination_spec() -> PaginationSpec:
 
 async def fetch_project_fair_shares(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ProjectFairShareFilter] = None,
-    order_by: Optional[list[ProjectFairShareOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    base_conditions: Optional[list[QueryCondition]] = None,
+    filter: ProjectFairShareFilter | None = None,
+    order_by: list[ProjectFairShareOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
 ) -> ProjectFairShareConnection:
     """Fetch project fair shares with optional filtering, ordering, and pagination.
 

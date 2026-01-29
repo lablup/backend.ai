@@ -4,7 +4,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Never, Optional, Self, override
+from typing import Never, Self, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
@@ -31,7 +31,7 @@ class BaseBgtaskEvent(AbstractBroadcastEvent, ABC):
         return EventDomain.BGTASK
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.task_id)
 
     @abstractmethod
@@ -43,7 +43,7 @@ class BaseBgtaskEvent(AbstractBroadcastEvent, ABC):
 class BgtaskUpdatedEvent(BaseBgtaskEvent):
     current_progress: float
     total_progress: float
-    message: Optional[str] = None
+    message: str | None = None
 
     def serialize(self) -> tuple:
         return (
@@ -72,7 +72,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
         return BgtaskStatus.UPDATED
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return UserBgtaskUpdatedEvent(
             task_id=str(self.task_id),
             message=str(self.message),
@@ -87,7 +87,7 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
     Arguments for events that are triggered when the Bgtask is completed.
     """
 
-    message: Optional[str] = None
+    message: str | None = None
 
     @override
     def serialize(self) -> tuple:
@@ -121,7 +121,7 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
         return BgtaskStatus.DONE
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return UserBgtaskDoneEvent(
             task_id=str(self.task_id),
             message=str(self.message),
@@ -136,7 +136,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     """
 
     task_status: BgtaskStatus
-    message: Optional[str] = None
+    message: str | None = None
     current: str = "0"
     total: str = "0"
 
@@ -159,7 +159,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
         return self.task_status
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         match self.task_status:
             case BgtaskStatus.DONE:
                 return UserBgtaskDoneEvent(
@@ -198,7 +198,7 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
         return BgtaskStatus.CANCELLED
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return UserBgtaskCancelledEvent(
             task_id=str(self.task_id),
             message=str(self.message),
@@ -217,7 +217,7 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
         return BgtaskStatus.FAILED
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return UserBgtaskFailedEvent(
             task_id=str(self.task_id),
             message=str(self.message),
@@ -256,7 +256,7 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
         return BgtaskStatus.DONE
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         # TODO: When client side is ready, we can change this to `UserBgtaskPartialSuccessEvent`
         return UserBgtaskDoneEvent(
             task_id=str(self.task_id),

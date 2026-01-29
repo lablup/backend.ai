@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -50,14 +49,14 @@ from ai.backend.manager.services.deployment.actions.revision_operations.activate
 @strawberry.field(description="Added in 25.16.0")
 async def revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ModelRevisionFilter] = None,
-    order_by: Optional[list[ModelRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ModelRevisionFilter | None = None,
+    order_by: list[ModelRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ModelRevisionConnection:
     """List revisions with optional filtering and pagination."""
     return await fetch_revisions(

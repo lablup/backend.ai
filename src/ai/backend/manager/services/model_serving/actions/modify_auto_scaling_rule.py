@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -15,7 +15,7 @@ class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
     updater: Updater[EndpointAutoScalingRuleRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,8 +27,8 @@ class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
 @dataclass
 class ModifyEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
-    data: Optional[EndpointAutoScalingRuleData]
+    data: EndpointAutoScalingRuleData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data is not None else None

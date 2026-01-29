@@ -5,7 +5,7 @@ import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Final, Optional, ParamSpec, TypeVar
+from typing import Final, ParamSpec, TypeVar
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -110,7 +110,7 @@ class RetryPolicy(Policy):
         Automatically retries all exceptions except non-retryable ones.
         Non-retryable exceptions propagate immediately without retry.
         """
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
 
         for attempt in range(1, self._max_retries + 1):
             try:

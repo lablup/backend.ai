@@ -10,7 +10,6 @@ from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 # Import ValkeyStatClient with TYPE_CHECKING to avoid circular imports
 from typing import (
     Any,
-    Optional,
     cast,
 )
 
@@ -81,9 +80,9 @@ async def execute(
     redis_obj: RedisConnectionInfo,
     func: Callable[[Redis | Any], Awaitable[Any]],
     *,
-    service_name: Optional[str] = None,
-    encoding: Optional[str] = None,
-    command_timeout: Optional[float] = None,
+    service_name: str | None = None,
+    encoding: str | None = None,
+    command_timeout: float | None = None,
 ) -> Any:
     """
     Executes a function that issues Redis commands or returns a pipeline/transaction of commands,
@@ -384,7 +383,7 @@ async def create_valkey_client(
     *,
     name: str,
     db: int = 0,
-    pubsub_channels: Optional[set[str]] = None,
+    pubsub_channels: set[str] | None = None,
 ) -> GlideClient:
     addresses: list[NodeAddress] = []
     if valkey_target.addr:
@@ -396,12 +395,12 @@ async def create_valkey_client(
             host, port = addr_to_hostport_pair(address)
             addresses.append(NodeAddress(host=str(host), port=int(port)))
 
-    credentials: Optional[ServerCredentials] = None
+    credentials: ServerCredentials | None = None
     if valkey_target.password:
         credentials = ServerCredentials(
             password=valkey_target.password,
         )
-    pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
+    pubsub_subscriptions: GlideClientConfiguration.PubSubSubscriptions | None = None
     if pubsub_channels is not None:
         pubsub_subscriptions = GlideClientConfiguration.PubSubSubscriptions(
             channels_and_patterns={

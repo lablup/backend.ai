@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     TypedDict,
     cast,
@@ -368,7 +367,7 @@ def by_id(project_id: uuid.UUID) -> QueryCondition:
 class ProjectModel(RBACModel[ProjectPermission]):
     id: uuid.UUID
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool | None
     created_at: datetime | None
     modified_at: datetime | None
@@ -455,7 +454,7 @@ async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: str | uuid.UUID,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     match value:
         case uuid.UUID():
             cond = groups.c.id == value
@@ -717,8 +716,8 @@ class ProjectPermissionContextBuilder(
 async def get_projects(
     target_scope: ScopeType,
     requested_permission: ProjectPermission,
-    project_id: Optional[uuid.UUID] = None,
-    project_name: Optional[str] = None,
+    project_id: uuid.UUID | None = None,
+    project_name: str | None = None,
     *,
     ctx: ClientContext,
     db_conn: SAConnection,
@@ -745,7 +744,7 @@ async def get_permission_ctx(
     ctx: ClientContext,
     requested_permission: ProjectPermission,
     target_scope: ScopeType,
-    container_registry_scope: Optional[ContainerRegistryScope] = None,
+    container_registry_scope: ContainerRegistryScope | None = None,
 ) -> ProjectPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ProjectPermissionContextBuilder(db_session)

@@ -12,7 +12,7 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp import web
 
@@ -27,12 +27,12 @@ class BackendError(web.HTTPError):
     error_title: str = "General Backend API Error."
 
     content_type: str
-    extra_msg: Optional[str]
+    extra_msg: str | None
 
     body_dict: dict[str, Any]
 
     def __init__(
-        self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs
+        self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
@@ -95,7 +95,7 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         self,
         *,
         extra_msg: str | None = None,
-        extra_data: Optional[Any] = None,
+        extra_data: Any | None = None,
         object_name: str | None = None,
         **kwargs,
     ) -> None:

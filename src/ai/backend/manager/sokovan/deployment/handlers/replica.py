@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
@@ -37,7 +36,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return "check-replica-deployments"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for checking replicas."""
         return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
@@ -47,12 +46,12 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.READY]
 
     @classmethod
-    def next_status(cls) -> Optional[EndpointLifecycle]:
+    def next_status(cls) -> EndpointLifecycle | None:
         """Get the next deployment status after this handler's operation."""
         return EndpointLifecycle.SCALING
 
     @classmethod
-    def failure_status(cls) -> Optional[EndpointLifecycle]:
+    def failure_status(cls) -> EndpointLifecycle | None:
         return None
 
     @classmethod

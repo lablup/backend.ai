@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import socket
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import glide
 from pydantic import (
@@ -65,11 +65,11 @@ class SQLAlchemyConnectionInfo(BaseModel):
 
 class RedisObjectConnectionInfo(BaseModel):
     name: str
-    num_connections: Optional[int] = Field(
+    num_connections: int | None = Field(
         description="The number of connections in Redis Client's connection pool."
     )
     max_connections: int
-    err_msg: Optional[str] = Field(
+    err_msg: str | None = Field(
         description="Error message occurred when fetch connection info from Redis client objects.",
         default=None,
     )

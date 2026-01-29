@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -76,6 +76,6 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         return to_update
 
     @property
-    def group_ids_value(self) -> Optional[list[str]]:
+    def group_ids_value(self) -> list[str] | None:
         """Helper property for group_ids access."""
         return self.group_ids.optional_value()

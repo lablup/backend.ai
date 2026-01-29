@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any, Optional, Self, TypeVar, override
+from typing import Any, Self, TypeVar, override
 
 T = TypeVar("T")
 
@@ -15,7 +15,7 @@ class AbstractAgentResp(ABC):
 @dataclass
 class PurgeImageResp(AbstractAgentResp):
     image: str
-    error: Optional[str] = None
+    error: str | None = None
 
     @override
     def as_dict(self) -> dict:
@@ -56,7 +56,7 @@ class DropKernelRegistryResp(AbstractAgentResp):
 @dataclass
 class CodeCompletionResult:
     status: str
-    error: Optional[str]
+    error: str | None
     suggestions: list[str]
 
     @classmethod
@@ -78,7 +78,7 @@ class CodeCompletionResult:
         )
 
     @classmethod
-    def failure(cls, error_msg: Optional[str] = None) -> Self:
+    def failure(cls, error_msg: str | None = None) -> Self:
         return cls(status="failed", error=error_msg, suggestions=[])
 
     def as_dict(self) -> dict:

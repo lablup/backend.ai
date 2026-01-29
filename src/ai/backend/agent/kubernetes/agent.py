@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     override,
 )
 
@@ -170,7 +169,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         loop = current_loop()
         if self.restarting:
             await kube_config.load_kube_config()
@@ -436,7 +435,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         src: str | Path,
         target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -738,9 +737,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         async def rollup(
-            functions: list[tuple[Optional[functools.partial], Optional[functools.partial]]],
+            functions: list[tuple[functools.partial | None, functools.partial | None]],
         ) -> None:
-            rollback_functions: list[Optional[functools.partial]] = []
+            rollback_functions: list[functools.partial | None] = []
 
             for rollup_function, future_rollback_function in functions:
                 try:
@@ -754,7 +753,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     log.exception("Error while rollup: {}", e)
                     raise
 
-        arguments: list[tuple[Optional[functools.partial], Optional[functools.partial]]] = []
+        arguments: list[tuple[functools.partial | None, functools.partial | None]] = []
 
         try:
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(
@@ -850,7 +849,7 @@ class KubernetesAgent(
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
@@ -1126,7 +1125,7 @@ class KubernetesAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> KubernetesKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
@@ -1144,9 +1143,7 @@ class KubernetesAgent(
         )
 
     @override
-    async def destroy_kernel(
-        self, kernel_id: KernelId, container_id: Optional[ContainerId]
-    ) -> None:
+    async def destroy_kernel(self, kernel_id: KernelId, container_id: ContainerId | None) -> None:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
@@ -1172,7 +1169,7 @@ class KubernetesAgent(
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         loop = current_loop()
@@ -1223,7 +1220,7 @@ class KubernetesAgent(
         )
 
 
-async def get_kernel_id_from_deployment(pod: Any) -> Optional[KernelId]:
+async def get_kernel_id_from_deployment(pod: Any) -> KernelId | None:
     # TODO: create function which extracts kernel id from pod object
     if (kernel_id := pod.get("metadata", {}).get("name")) is not None:
         return KernelId(uuid.UUID(kernel_id))

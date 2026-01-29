@@ -2,7 +2,6 @@ import uuid
 from dataclasses import dataclass
 from typing import (
     NewType,
-    Optional,
 )
 
 from ai.backend.common.types import (
@@ -28,9 +27,9 @@ ALL_METRIC_VALUE_TYPES = {CURRENT_METRIC_KEY, CAPACITY_METRIC_KEY, PCT_METRIC_KE
 class FlattenedKernelMetric:
     agent_id: AgentId
     kernel_id: KernelId
-    session_id: Optional[SessionId]
-    owner_user_id: Optional[uuid.UUID]
-    project_id: Optional[uuid.UUID]
+    session_id: SessionId | None
+    owner_user_id: uuid.UUID | None
+    project_id: uuid.UUID | None
     key: MetricKey
     value_pairs: list[MetricValueFieldPair]
 

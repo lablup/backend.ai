@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -9,11 +9,11 @@ from ai.backend.manager.services.resource_preset.actions.base import ResourcePre
 
 @dataclass
 class DeleteResourcePresetAction(ResourcePresetAction):
-    id: Optional[uuid.UUID]
-    name: Optional[str]
+    id: uuid.UUID | None
+    name: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.id) if self.id else None
 
     @override
@@ -27,7 +27,7 @@ class DeleteResourcePresetActionResult(BaseActionResult):
     resource_preset: ResourcePresetData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.resource_preset.id)
 
 

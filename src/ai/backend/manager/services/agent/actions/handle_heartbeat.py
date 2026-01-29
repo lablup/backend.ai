@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId
@@ -13,7 +13,7 @@ class HandleHeartbeatAction(AgentAction):
     agent_info: AgentInfo
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)
 
     @override
@@ -27,5 +27,5 @@ class HandleHeartbeatActionResult(BaseActionResult):
     agent_id: AgentId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.agent_id)

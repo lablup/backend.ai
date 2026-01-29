@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -37,7 +37,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         fs: str,
         gpfs_owner: str,
         *,
-        fileset_prefix: Optional[str] = None,
+        fileset_prefix: str | None = None,
     ) -> None:
         super().__init__(mount_path)
         self.api_client = api_client
@@ -51,8 +51,8 @@ class GPFSQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
@@ -71,7 +71,7 @@ class GPFSQuotaModel(BaseQuotaModel):
             config.limit_bytes,
         )
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
@@ -146,8 +146,8 @@ class GPFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,

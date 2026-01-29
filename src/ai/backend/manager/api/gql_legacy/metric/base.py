@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional, Self
+from typing import TYPE_CHECKING, Self
 
 import graphene
 
@@ -54,12 +54,12 @@ class ContainerUtilizationMetric(graphene.ObjectType):
         description="The average value of the metric in given time range. null if no data."
     )
 
-    async def resolve_max_value(self, info: graphene.ResolveInfo) -> Optional[str]:
+    async def resolve_max_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:
             return None
         return max(self.values, key=lambda x: Decimal(x.value)).value
 
-    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> Optional[str]:
+    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:
             return None
         avg_val = sum(Decimal(x.value) for x in self.values) / len(self.values)

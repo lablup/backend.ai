@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -21,7 +21,7 @@ class SearchHuggingFaceRegistriesAction(ArtifactRegistryAction):
         return "search_huggingface_registries"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -35,5 +35,5 @@ class SearchHuggingFaceRegistriesActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

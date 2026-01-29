@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, TypeVar, override
+from typing import TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -90,7 +90,7 @@ class ProvisionStage(Stage[TSpec, TResource]):
     """
 
     _provisioner: Provisioner
-    _resource: Optional[TResource]
+    _resource: TResource | None
     _setup_completed: asyncio.Event
 
     def __init__(self, provisioner: Provisioner) -> None:

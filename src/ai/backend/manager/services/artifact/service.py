@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
@@ -504,7 +504,7 @@ class ArtifactService:
         return RestoreArtifactsActionResult(artifacts=restored_artifacts)
 
     async def _resolve_artifact_registry_meta(
-        self, _artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: ArtifactType | None, registry_id_or_none: uuid.UUID | None
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             # TODO: Handle `artifact_type` for other types

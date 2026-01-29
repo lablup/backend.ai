@@ -4,7 +4,7 @@ import datetime
 import decimal
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from uuid import UUID
 
 import graphene
@@ -363,7 +363,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
 
     def to_action(self, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
         def convert_to_decimal(
-            value: Optional[str] | UndefinedType,
+            value: str | None | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
@@ -662,7 +662,7 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
-        creator = cast(Optional[UserRow], row.created_user_row)
+        creator = cast(UserRow | None, row.created_user_row)
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
@@ -705,7 +705,7 @@ class Endpoint(graphene.ObjectType):
         )
 
     @classmethod
-    def from_dto(cls, ctx: GraphQueryContext, dto: Optional[EndpointData]) -> Optional[Self]:
+    def from_dto(cls, ctx: GraphQueryContext, dto: EndpointData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -752,9 +752,9 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         project: UUID | None = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from(
             sa.join(
@@ -785,11 +785,11 @@ class Endpoint(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        project: Optional[UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        project: UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -833,9 +833,9 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        project: Optional[UUID] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        project: UUID | None = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
@@ -855,8 +855,8 @@ class Endpoint(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         endpoint_id: UUID,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
         project: UUID | None = None,
     ) -> Self:
         """
@@ -947,7 +947,7 @@ class Endpoint(graphene.ObjectType):
 
         return errors
 
-    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "EndpointStatistics.by_endpoint"
@@ -1028,7 +1028,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
             return ImageRef(graphene_image_input.name, registry, architecture)
 
         def convert_runtime_variant(
-            value: Optional[str] | UndefinedType,
+            value: str | None | UndefinedType,
         ) -> RuntimeVariant | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
@@ -1166,10 +1166,10 @@ class EndpointToken(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        endpoint_id: Optional[UUID] = None,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        endpoint_id: UUID | None = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from(EndpointTokenRow)
         if endpoint_id is not None:
@@ -1191,12 +1191,12 @@ class EndpointToken(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        endpoint_id: Optional[UUID] = None,
+        endpoint_id: UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
@@ -1230,9 +1230,9 @@ class EndpointToken(graphene.ObjectType):
         ctx: GraphQueryContext,
         endpoint_id: UUID,
         *,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointTokenRow.list(
@@ -1250,9 +1250,9 @@ class EndpointToken(graphene.ObjectType):
         ctx: GraphQueryContext,
         token: str,
         *,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Self:
         try:
             async with ctx.db.begin_readonly_session() as session:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, final
+from typing import final
 
 from ai.backend.manager.api.gql.base import decode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -27,12 +27,12 @@ DEFAULT_PAGINATION_LIMIT = 10
 class PaginationOptions:
     """GraphQL pagination arguments."""
 
-    first: Optional[int] = None
-    after: Optional[str] = None
-    last: Optional[int] = None
-    before: Optional[str] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 @dataclass(frozen=True)
@@ -132,9 +132,9 @@ class BaseGQLAdapter:
         self,
         pagination_options: PaginationOptions,
         pagination_spec: PaginationSpec,
-        filter: Optional[GQLFilter] = None,
-        order_by: Optional[Sequence[GQLOrderBy]] = None,
-        base_conditions: Optional[Sequence[QueryCondition]] = None,
+        filter: GQLFilter | None = None,
+        order_by: Sequence[GQLOrderBy] | None = None,
+        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> BatchQuerier:
         """Build BatchQuerier from GraphQL arguments with domain configuration.
 

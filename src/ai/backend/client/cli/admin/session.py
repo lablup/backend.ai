@@ -4,7 +4,7 @@ import builtins
 import sys
 import uuid
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -30,7 +30,7 @@ def session() -> None:
     """
 
 
-def _list_cmd(name: str = "list", docs: Optional[str] = None) -> Callable[..., None]:
+def _list_cmd(name: str = "list", docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.option(
         "-s",
@@ -235,7 +235,7 @@ user_session.command()(_list_cmd(docs='Alias of "admin session list"'))
 session.command()(_list_cmd())
 
 
-def _info_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _info_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.argument("session_id", metavar="SESSID")
     def info(ctx: CLIContext, session_id: str) -> None:

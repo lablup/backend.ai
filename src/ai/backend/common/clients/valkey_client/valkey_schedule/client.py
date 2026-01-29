@@ -1,7 +1,7 @@
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, cast
+from typing import Self, cast
 from uuid import UUID
 
 from glide import Batch, ExpirySet, ExpiryType
@@ -309,7 +309,7 @@ class ValkeyScheduleClient:
         return [SessionId(UUID(sid)) for sid in raw_session_ids]
 
     @valkey_schedule_resilience.apply()
-    async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[Optional[int]]:
+    async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[int | None]:
         """
         Get the positions of multiple sessions in their pending queue.
         """
@@ -323,7 +323,7 @@ class ValkeyScheduleClient:
         if batch_result is None:
             return [None for _ in session_ids]
 
-        result: list[Optional[int]] = []
+        result: list[int | None] = []
         for pos in batch_result:
             if pos is None:
                 result.append(None)
@@ -399,7 +399,7 @@ class ValkeyScheduleClient:
         return False
 
     @valkey_schedule_resilience.apply()
-    async def get_route_health_status(self, route_id: str) -> Optional[HealthStatus]:
+    async def get_route_health_status(self, route_id: str) -> HealthStatus | None:
         """
         Get health status for a route from Redis.
 
@@ -504,7 +504,7 @@ class ValkeyScheduleClient:
     @valkey_schedule_resilience.apply()
     async def check_route_health_status(
         self, route_ids: list[str]
-    ) -> Mapping[str, Optional[HealthStatus]]:
+    ) -> Mapping[str, HealthStatus | None]:
         """
         Check health status for multiple routes and update last_check timestamp.
         This is used by the manager to track when it last checked each route.
@@ -530,7 +530,7 @@ class ValkeyScheduleClient:
             return dict.fromkeys(route_ids)
 
         # Process results - every 3rd result is the hgetall response
-        health_statuses: dict[str, Optional[HealthStatus]] = {}
+        health_statuses: dict[str, HealthStatus | None] = {}
         for i, route_id in enumerate(route_ids):
             # Results are in groups of 3: hset result, expire result, hgetall result
             hgetall_result = results[i * 3 + 2] if len(results) > i * 3 + 2 else None

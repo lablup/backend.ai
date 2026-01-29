@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import graphene
@@ -107,8 +107,8 @@ class ResourcePreset(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[ResourcePreset]:
         query = sa.select(ResourcePresetRow)
         if filter is not None:
@@ -205,7 +205,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
-    def to_updater(self, id: Optional[UUID], name: Optional[str]) -> Updater[ResourcePresetRow]:
+    def to_updater(self, id: UUID | None, name: str | None) -> Updater[ResourcePresetRow]:
         resource_slots = (
             ResourceSlot.from_json(self.resource_slots) if self.resource_slots else Undefined
         )
@@ -280,8 +280,8 @@ class ModifyResourcePreset(graphene.Mutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        id: Optional[UUID],
-        name: Optional[str],
+        id: UUID | None,
+        name: str | None,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
         from ai.backend.manager.services.resource_preset.actions.modify_preset import (
@@ -318,8 +318,8 @@ class DeleteResourcePreset(graphene.Mutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        id: Optional[UUID],
-        name: Optional[str],
+        id: UUID | None,
+        name: str | None,
     ) -> DeleteResourcePreset:
         from ai.backend.manager.services.resource_preset.actions.delete_preset import (
             DeleteResourcePresetAction,

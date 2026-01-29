@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -13,7 +13,7 @@ class CreateObjectStorageAction(ObjectStorageAction):
     creator: Creator[ObjectStorageRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,5 +27,5 @@ class CreateObjectStorageActionResult(BaseActionResult):
     result: ObjectStorageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

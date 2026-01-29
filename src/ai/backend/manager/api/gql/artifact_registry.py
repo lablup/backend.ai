@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from strawberry import ID, Info
 
@@ -45,12 +43,12 @@ class ArtifactRegistry:
 @strawberry.field(description="Added in 25.14.0")
 async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
-) -> Optional[ArtifactRegistry]:
+) -> ArtifactRegistry | None:
     artifact_registry_cfg = info.context.config_provider.config.artifact_registry
     if artifact_registry_cfg is None:
         raise ServerMisconfiguredError("Artifact registry configuration is missing.")
 
-    registry_name: Optional[str] = None
+    registry_name: str | None = None
     match artifact_type:
         case ArtifactType.MODEL:
             registry_name = artifact_registry_cfg.model_registry

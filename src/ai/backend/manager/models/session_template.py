@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
 import trafaret as t
@@ -146,8 +146,8 @@ async def query_accessible_session_templates(
     user_uuid: uuid.UUID,
     template_type: TemplateType,
     *,
-    user_role: Optional[UserRole] = None,
-    domain_name: Optional[str] = None,
+    user_role: UserRole | None = None,
+    domain_name: str | None = None,
     allowed_types: Iterable[str] = ["user"],
     extra_conds: Any = None,
 ) -> list[Mapping[str, Any]]:

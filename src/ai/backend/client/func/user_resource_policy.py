@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.client.output.fields import user_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
@@ -30,9 +29,9 @@ class UserResourcePolicy(BaseFunction):
     Provides interactions with user resource policy.
     """
 
-    _name: Optional[str]
+    _name: str | None
 
-    def __init__(self, name: Optional[str]) -> None:
+    def __init__(self, name: str | None) -> None:
         super().__init__()
         self._name = name
 
@@ -89,10 +88,10 @@ class UserResourcePolicy(BaseFunction):
         cls,
         name: str,
         *,
-        max_vfolder_count: Optional[int] = None,
-        max_quota_scope_size: Optional[int] = None,
-        max_session_count_per_model_session: Optional[int] = None,
-        max_customized_image_count: Optional[int] = None,
+        max_vfolder_count: int | None = None,
+        max_quota_scope_size: int | None = None,
+        max_session_count_per_model_session: int | None = None,
+        max_customized_image_count: int | None = None,
     ) -> dict:
         """
         Update an existing user resource policy with the given options.

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.common.stage.types import (
@@ -12,7 +12,7 @@ from ai.backend.common.stage.types import (
 @dataclass
 class CmdArgSpec:
     runtime_type: str
-    runtime_path: Optional[str]
+    runtime_path: str | None
     sandbox_type: ContainerSandboxType
     jail_args: list[str]
     debug_kernel_runner: bool

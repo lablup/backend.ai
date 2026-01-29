@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from aiohttp import MultipartReader
 
@@ -17,7 +17,7 @@ class UploadFilesAction(SessionAction):
     reader: MultipartReader
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -33,5 +33,5 @@ class UploadFilesActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

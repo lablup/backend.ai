@@ -26,7 +26,6 @@ from typing import (
     Literal,
     NewType,
     NotRequired,
-    Optional,
     Self,
     TypeAlias,
     TypedDict,
@@ -459,7 +458,7 @@ class SlotTypes(enum.StrEnum):
 
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
-    status_info: Optional[str]
+    status_info: str | None
     metadata: dict[str, str]
 
 
@@ -515,7 +514,7 @@ class ClusterMode(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: object) -> Optional[ClusterMode]:
+    def _missing_(cls, value: object) -> ClusterMode | None:
         if not isinstance(value, str):
             raise TypeError("value must be a string")
         # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
@@ -533,8 +532,8 @@ class CommitStatus(enum.StrEnum):
 
 
 class ItemResult(TypedDict):
-    msg: Optional[str]
-    item: Optional[str]
+    msg: str | None
+    item: str | None
 
 
 class ResultSet(TypedDict):
@@ -549,7 +548,7 @@ class AbuseReportValue(enum.StrEnum):
 
 class AbuseReport(TypedDict):
     kernel: str
-    abuse_report: Optional[str]
+    abuse_report: str | None
 
 
 class MovingStatValue(TypedDict):
@@ -559,14 +558,14 @@ class MovingStatValue(TypedDict):
     avg: str
     diff: str
     rate: str
-    version: Optional[int]  # for legacy client compatibility
+    version: int | None  # for legacy client compatibility
 
 
 MetricValue = TypedDict(
     "MetricValue",
     {
         "current": str,
-        "capacity": Optional[str],
+        "capacity": str | None,
         "pct": str,
         "unit_hint": str,
         "stats.min": str,
@@ -575,7 +574,7 @@ MetricValue = TypedDict(
         "stats.avg": str,
         "stats.diff": str,
         "stats.rate": str,
-        "stats.version": Optional[int],
+        "stats.version": int | None,
     },
 )
 
@@ -628,7 +627,7 @@ class MountPoint(BaseModel):
 
 
 class MountExpression:
-    def __init__(self, expression: str, *, escape_map: Optional[Mapping[str, str]] = None) -> None:
+    def __init__(self, expression: str, *, escape_map: Mapping[str, str] | None = None) -> None:
         self.expression = expression
         self.escape_map = {
             "\\,": ",",
@@ -1084,7 +1083,7 @@ class ResourceSlot(UserDict[str, Decimal]):
     def from_user_input(
         cls,
         obj: Mapping[str, Any],
-        slot_types: Optional[Mapping[SlotName, SlotTypes]],
+        slot_types: Mapping[SlotName, SlotTypes] | None,
     ) -> ResourceSlot:
         pruned_obj = {k: v for k, v in obj.items() if v != 0}
 
@@ -1374,16 +1373,16 @@ class QuotaScopeType(enum.StrEnum):
 class ImageRegistry(TypedDict):
     name: str
     url: str
-    username: Optional[str]
-    password: Optional[str]
+    username: str | None
+    password: str | None
 
 
 class ImageConfig(TypedDict):
     canonical: str
-    project: Optional[str]
+    project: str | None
     architecture: str
     digest: str
-    repo_digest: Optional[str]
+    repo_digest: str | None
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
@@ -1394,7 +1393,7 @@ class ServicePort(TypedDict):
     name: str
     protocol: ServicePortProtocols
     container_ports: Sequence[int]
-    host_ports: Sequence[Optional[int]]
+    host_ports: Sequence[int | None]
     is_inference: bool
 
 
@@ -1407,7 +1406,7 @@ class ClusterInfo(TypedDict):
     replicas: Mapping[str, int]  # per-role kernel counts
     network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
 
 
 class ClusterSSHKeyPair(TypedDict):
@@ -1444,7 +1443,7 @@ class KernelContainerId:
     """
 
     kernel_id: KernelId
-    container_id: Optional[ContainerId]
+    container_id: ContainerId | None
 
     @property
     def human_readable_container_id(self) -> str:
@@ -1456,7 +1455,7 @@ class KernelContainerId:
             str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
         )
 
-    def serialize(self) -> tuple[str, Optional[str]]:
+    def serialize(self) -> tuple[str, str | None]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1466,7 +1465,7 @@ class KernelContainerId:
         )
 
     @classmethod
-    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
+    def deserialize(cls, data: tuple[str, str | None]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
@@ -1532,7 +1531,7 @@ class KernelCreationConfig(TypedDict):
     kernel_id: str  # the kernel's ID
     session_id: str  # the session's ID
     owner_user_id: str  # the owner user's ID
-    owner_project_id: Optional[str]  # the owner project's ID (for project-owned sessions)
+    owner_project_id: str | None  # the owner project's ID (for project-owned sessions)
     network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
@@ -1541,8 +1540,8 @@ class KernelCreationConfig(TypedDict):
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
     local_rank: int  # the kernel's local rank in the cluster
-    uid: Optional[int]
-    main_gid: Optional[int]
+    uid: int | None
+    main_gid: int | None
     supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
     resource_opts: Mapping[str, Any]  # json form of resource options
@@ -1550,14 +1549,14 @@ class KernelCreationConfig(TypedDict):
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]
     idle_timeout: int
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
-    internal_data: Optional[Mapping[str, Any]]
+    bootstrap_script: str | None
+    startup_command: str | None
+    internal_data: Mapping[str, Any] | None
     preopen_ports: list[int]
     allocated_host_ports: list[int]
     scaling_group: str
     agent_addr: str
-    endpoint_id: Optional[str]
+    endpoint_id: str | None
 
 
 class SessionEnqueueingConfig(TypedDict):
@@ -1573,9 +1572,9 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: Optional[str]
-    uid: Optional[int]
-    main_gid: Optional[int]
+    startup_command: str | None
+    uid: int | None
+    main_gid: int | None
     supplementary_gids: list[int]
 
 
@@ -1601,11 +1600,11 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
 
 @dataclass
 class ValkeyTarget:
-    addr: Optional[str] = None
-    sentinel: Optional[list[str]] = None
-    service_name: Optional[str] = None
-    password: Optional[str] = None
-    request_timeout: Optional[int] = None
+    addr: str | None = None
+    sentinel: list[str] | None = None
+    service_name: str | None = None
+    password: str | None = None
+    request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -1624,11 +1623,11 @@ class ValkeyTarget:
 
 @dataclass
 class RedisTarget:
-    addr: Optional[HostPortPair] = None
-    sentinel: Optional[str | list[HostPortPair]] = None
-    service_name: Optional[str] = None
-    password: Optional[str] = None
-    redis_helper_config: Optional[RedisHelperConfig] = None
+    addr: HostPortPair | None = None
+    sentinel: str | list[HostPortPair] | None = None
+    service_name: str | None = None
+    password: str | None = None
+    redis_helper_config: RedisHelperConfig | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -1657,7 +1656,7 @@ class RedisTarget:
 
     def to_valkey_target(self) -> ValkeyTarget:
         addr = str(self.addr) if self.addr else None
-        sentinel_addrs: Optional[list[str]] = None
+        sentinel_addrs: list[str] | None = None
         if self.sentinel:
             sentinel_addrs = None
             if isinstance(self.sentinel, list):
@@ -1682,17 +1681,17 @@ class RedisTarget:
 @dataclass
 class ValkeyProfileTarget:
     _base_target: ValkeyTarget
-    _override_targets: Optional[Mapping[str, ValkeyTarget]]
+    _override_targets: Mapping[str, ValkeyTarget] | None
 
     def __init__(
         self,
         *,
-        addr: Optional[str] = None,
-        sentinel: Optional[list[str]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        request_timeout: Optional[int] = None,
-        override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
+        addr: str | None = None,
+        sentinel: list[str] | None = None,
+        service_name: str | None = None,
+        password: str | None = None,
+        request_timeout: int | None = None,
+        override_targets: Mapping[str, ValkeyTarget] | None = None,
     ) -> None:
         self._base_target = ValkeyTarget(
             addr=addr,
@@ -1713,17 +1712,17 @@ class ValkeyProfileTarget:
 @dataclass
 class RedisProfileTarget:
     _base_target: RedisTarget
-    _override_targets: Optional[Mapping[str, RedisTarget]]
+    _override_targets: Mapping[str, RedisTarget] | None
 
     def __init__(
         self,
         *,
-        addr: Optional[HostPortPair] = None,
-        sentinel: Optional[str | list[HostPortPair]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_targets: Optional[Mapping[str, RedisTarget]] = None,
+        addr: HostPortPair | None = None,
+        sentinel: str | list[HostPortPair] | None = None,
+        service_name: str | None = None,
+        password: str | None = None,
+        redis_helper_config: RedisHelperConfig | None = None,
+        override_targets: Mapping[str, RedisTarget] | None = None,
         use_tls: bool = False,
         tls_skip_verify: bool = False,
     ) -> None:
@@ -1806,11 +1805,11 @@ class RedisHelperConfig(TypedDict, total=False):
 class RedisConnectionInfo:
     client: Redis
     name: str  # connection pool name
-    service_name: Optional[str]
-    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    service_name: str | None
+    sentinel: redis.asyncio.sentinel.Sentinel | None
     redis_helper_config: RedisHelperConfig
 
-    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+    async def close(self, close_connection_pool: bool | None = None) -> None:
         await self.client.close(close_connection_pool)
 
 
@@ -1968,7 +1967,7 @@ ResultType = TypeVar("ResultType")
 
 @dataclass
 class DispatchResult[ResultType]:
-    result: Optional[ResultType] = None
+    result: ResultType | None = None
     errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
@@ -2001,8 +2000,8 @@ class DispatchResult[ResultType]:
 
 class PurgeImageResult(TypedDict):
     image: str
-    result: Optional[list[Any]]
-    error: Optional[str]
+    result: list[Any] | None
+    error: str | None
 
 
 class ServiceDiscoveryType(enum.StrEnum):
@@ -2027,5 +2026,5 @@ class StreamReader(ABC):
         raise GenericNotImplementedError
 
     @abstractmethod
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         raise GenericNotImplementedError

@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Any, Optional
+from typing import Any
 
 import async_timeout
 from cryptography.hazmat.backends import default_backend
@@ -436,9 +436,9 @@ class SessionLauncher:
         :param session: Session data containing network type and configuration
         :return: NetworkSetup with network config and SSH port mapping
         """
-        network_name: Optional[str] = None
+        network_name: str | None = None
         network_config: dict[str, Any] = {}
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
 
         network_type = session.network_type or NetworkType.VOLATILE
 

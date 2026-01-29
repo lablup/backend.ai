@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -34,7 +33,7 @@ class ProvisioningRouteHandler(RouteHandler):
         return "provision-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for provisioning routes."""
         return LockID.LOCKID_DEPLOYMENT_PROVISIONING_ROUTES
 
@@ -44,17 +43,17 @@ class ProvisioningRouteHandler(RouteHandler):
         return [RouteStatus.PROVISIONING]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Get the next route status after this handler's operation."""
         return RouteStatus.DEGRADED
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Get the failure route status if applicable."""
         return RouteStatus.FAILED_TO_START
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
 

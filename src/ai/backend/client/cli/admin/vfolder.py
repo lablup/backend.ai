@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
-from typing import Optional
 
 import click
 import humanize
@@ -24,7 +23,7 @@ def vfolder() -> None:
     """
 
 
-def _list_cmd(docs: Optional[str] = None) -> Callable[..., None]:
+def _list_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.option(
         "-g",

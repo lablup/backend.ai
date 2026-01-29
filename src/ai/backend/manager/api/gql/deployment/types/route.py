@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Optional, override
+from typing import TYPE_CHECKING, Annotated, override
 from uuid import UUID
 
 import strawberry
@@ -57,8 +57,8 @@ RouteTrafficStatusGQL = strawberry.enum(
 class Route(Node):
     id: NodeID
     _deployment_id: strawberry.Private[UUID]
-    _session_id: strawberry.Private[Optional[UUID]]
-    _revision_id: strawberry.Private[Optional[UUID]]
+    _session_id: strawberry.Private[UUID | None]
+    _revision_id: strawberry.Private[UUID | None]
     status: RouteStatusGQL = strawberry.field(
         description="The current status of the route indicating its health state.",
     )
@@ -68,10 +68,10 @@ class Route(Node):
     traffic_ratio: float = strawberry.field(
         description="The traffic ratio for load balancing.",
     )
-    created_at: Optional[datetime] = strawberry.field(
+    created_at: datetime | None = strawberry.field(
         description="The timestamp when the route was created.",
     )
-    error_data: Optional[JSON] = strawberry.field(
+    error_data: JSON | None = strawberry.field(
         description="Error data if the route is in a failed state.",
     )
 
@@ -92,7 +92,7 @@ class Route(Node):
     @strawberry.field(
         description="The session associated with the route. Can be null if the route is still provisioning."
     )
-    async def session(self, info: Info[StrawberryGQLContext]) -> Optional[ID]:
+    async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
         if self._session_id is None:
             return None
@@ -156,8 +156,8 @@ class RouteOrderField(StrEnum):
 
 @strawberry.input(description="Added in 25.19.0. Filter for routes.")
 class RouteFilter(GQLFilter):
-    status: Optional[list[RouteStatusGQL]] = None
-    traffic_status: Optional[list[RouteTrafficStatusGQL]] = None
+    status: list[RouteStatusGQL] | None = None
+    traffic_status: list[RouteTrafficStatusGQL] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:

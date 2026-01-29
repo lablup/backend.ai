@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
@@ -99,7 +99,7 @@ class ModelServingRepository:
         self._db = db
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_by_id(self, endpoint_id: uuid.UUID) -> Optional[EndpointData]:
+    async def get_endpoint_by_id(self, endpoint_id: uuid.UUID) -> EndpointData | None:
         """
         Get endpoint by ID.
         Returns None if endpoint doesn't exist.
@@ -148,7 +148,7 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def get_endpoint_by_name_validated(
         self, name: str, user_id: uuid.UUID
-    ) -> Optional[EndpointData]:
+    ) -> EndpointData | None:
         """
         Get endpoint by name with ownership validation.
         Returns None if endpoint doesn't exist or user doesn't own it.
@@ -161,7 +161,7 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def list_endpoints_by_owner_validated(
-        self, session_owner_id: uuid.UUID, name: Optional[str] = None
+        self, session_owner_id: uuid.UUID, name: str | None = None
     ) -> list[EndpointData]:
         """
         List endpoints owned by a specific user with optional name filter.
@@ -226,7 +226,7 @@ class ModelServingRepository:
         self,
         endpoint_id: uuid.UUID,
         lifecycle_stage: EndpointLifecycle,
-        replicas: Optional[int] = None,
+        replicas: int | None = None,
     ) -> bool:
         """
         Update endpoint lifecycle stage.
@@ -281,7 +281,7 @@ class ModelServingRepository:
         self,
         route_id: uuid.UUID,
         service_id: uuid.UUID,
-    ) -> Optional[RoutingData]:
+    ) -> RoutingData | None:
         """
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
@@ -300,7 +300,7 @@ class ModelServingRepository:
         route_id: uuid.UUID,
         service_id: uuid.UUID,
         traffic_ratio: float,
-    ) -> Optional[EndpointData]:
+    ) -> EndpointData | None:
         """
         Update route traffic ratio.
         Returns updated endpoint data if successful, None if not found.
@@ -353,7 +353,7 @@ class ModelServingRepository:
     async def create_endpoint_token(
         self,
         creator: Creator[EndpointTokenRow],
-    ) -> Optional[EndpointTokenData]:
+    ) -> EndpointTokenData | None:
         """
         Create endpoint token.
         Returns token data if created, None if endpoint not found.
@@ -368,7 +368,7 @@ class ModelServingRepository:
             return result.row.to_dataclass()
 
     @model_serving_repository_resilience.apply()
-    async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
+    async def get_scaling_group_info(self, scaling_group_name: str) -> ScalingGroupData | None:
         """
         Get scaling group information (wsproxy details).
         """
@@ -388,14 +388,14 @@ class ModelServingRepository:
             )
 
     @model_serving_repository_resilience.apply()
-    async def get_user_by_id(self, user_id: uuid.UUID) -> Optional[UserData]:
+    async def get_user_by_id(self, user_id: uuid.UUID) -> UserData | None:
         """
         Get user information by ID.
         """
         async with self._db.begin_readonly_session() as session:
             query = sa.select(UserRow).where(UserRow.uuid == user_id)
             result = await session.execute(query)
-            user_row: Optional[UserRow] = result.scalar()
+            user_row: UserRow | None = result.scalar()
             if not user_row:
                 return None
 
@@ -409,7 +409,7 @@ class ModelServingRepository:
         load_image: bool = False,
         load_session_owner: bool = False,
         load_model: bool = False,
-    ) -> Optional[EndpointRow]:
+    ) -> EndpointRow | None:
         """
         Private method to get endpoint by ID using an existing session.
         """
@@ -427,7 +427,7 @@ class ModelServingRepository:
 
     async def _get_endpoint_by_name(
         self, session: SASession, name: str, user_id: uuid.UUID
-    ) -> Optional[EndpointRow]:
+    ) -> EndpointRow | None:
         """
         Private method to get endpoint by name and owner using an existing session.
         """
@@ -444,7 +444,7 @@ class ModelServingRepository:
         route_id: uuid.UUID,
         load_endpoint: bool = False,
         load_session: bool = False,
-    ) -> Optional[RoutingRow]:
+    ) -> RoutingRow | None:
         """
         Private method to get route by ID using an existing session.
         """
@@ -487,7 +487,7 @@ class ModelServingRepository:
                 return owner.uuid == user_id
 
     @model_serving_repository_resilience.apply()
-    async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderRow]:
+    async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> VFolderRow | None:
         """
         Get VFolder by ID.
         """
@@ -495,7 +495,7 @@ class ModelServingRepository:
             return await VFolderRow.get(session, vfolder_id)
 
     @model_serving_repository_resilience.apply()
-    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Optional[Any]:
+    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
         """
         Get user with their main access key.
         """
@@ -507,7 +507,7 @@ class ModelServingRepository:
             return result.fetchone()
 
     @model_serving_repository_resilience.apply()
-    async def get_keypair_resource_policy(self, policy_name: str) -> Optional[Any]:
+    async def get_keypair_resource_policy(self, policy_name: str) -> Any | None:
         """
         Get keypair resource policy by name.
         """
@@ -521,9 +521,7 @@ class ModelServingRepository:
             return result.first()
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_for_appproxy_update(
-        self, service_id: uuid.UUID
-    ) -> Optional[EndpointRow]:
+    async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
         """
         Get endpoint with routes loaded for AppProxy updates.
         """
@@ -531,7 +529,7 @@ class ModelServingRepository:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
 
     @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> Optional[RoutingRow]:
+    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
         """
         Get route with endpoint and session data loaded.
         """
@@ -567,7 +565,7 @@ class ModelServingRepository:
     async def get_auto_scaling_rule_by_id(
         self,
         rule_id: uuid.UUID,
-    ) -> Optional[EndpointAutoScalingRuleData]:
+    ) -> EndpointAutoScalingRuleData | None:
         """
         Get auto scaling rule by ID.
         Returns None if rule doesn't exist.
@@ -592,9 +590,9 @@ class ModelServingRepository:
         comparator: AutoScalingMetricComparator,
         step_size: int,
         cooldown_seconds: int,
-        min_replicas: Optional[int] = None,
-        max_replicas: Optional[int] = None,
-    ) -> Optional[EndpointAutoScalingRuleData]:
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
+    ) -> EndpointAutoScalingRuleData | None:
         """
         Create auto scaling rule.
         Returns the created rule if successful, None if endpoint not found or inactive.
@@ -624,7 +622,7 @@ class ModelServingRepository:
     async def update_auto_scaling_rule(
         self,
         updater: Updater[EndpointAutoScalingRuleRow],
-    ) -> Optional[EndpointAutoScalingRuleData]:
+    ) -> EndpointAutoScalingRuleData | None:
         """
         Update auto scaling rule.
         Returns the updated rule if successful, None if not found or endpoint inactive.
@@ -673,7 +671,7 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def resolve_group_id(
         self, domain_name: str, group_name_or_id: str | uuid.UUID
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """
         Resolve group name or ID to group ID.
         """
@@ -686,7 +684,7 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def get_session_by_id(
         self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
-    ) -> Optional[SessionRow]:
+    ) -> SessionRow | None:
         """
         Get session by ID with specified kernel loading strategy.
         """

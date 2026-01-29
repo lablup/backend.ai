@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Optional
+from typing import Final
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -100,7 +100,7 @@ class SchedulerTaskSpec:
     """Specification for a scheduler's periodic task."""
 
     schedule_type: ScheduleType
-    short_interval: Optional[float] = None  # None means no short-cycle task
+    short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
@@ -1513,7 +1513,7 @@ class ScheduleCoordinator:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """Update kernel status from PREPARING to PULLING for the specified image on an agent."""
         await self._kernel_state_engine.update_kernels_to_pulling_for_image(
@@ -1524,7 +1524,7 @@ class ScheduleCoordinator:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """Update kernel status to PREPARED for the specified image on an agent."""
         result = await self._kernel_state_engine.update_kernels_to_prepared_for_image(
@@ -1547,7 +1547,7 @@ class ScheduleCoordinator:
         agent_id: AgentId,
         image: str,
         error_msg: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """Cancel kernels for an image that failed to be available on an agent."""
         await self._kernel_state_engine.cancel_kernels_for_failed_image(

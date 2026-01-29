@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncGenerator, Iterable
-from typing import Optional, Self, override
+from typing import Self, override
 
 import glide
 
@@ -28,7 +28,7 @@ class RedisSubscriber(AbstractSubscriber):
     _subscribe_queue: asyncio.Queue[BroadcastMessage]
     _channels: set[str]
     _closed: bool
-    _loop_task: Optional[asyncio.Task]
+    _loop_task: asyncio.Task | None
 
     def __init__(self, client: ValkeyStreamClient, channels: Iterable[str]) -> None:
         """

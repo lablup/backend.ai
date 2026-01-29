@@ -6,7 +6,7 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -61,7 +61,7 @@ class NotificationChannelDTO(BaseModel):
 
     id: UUID = Field(description="Channel ID")
     name: str = Field(description="Channel name")
-    description: Optional[str] = Field(default=None, description="Channel description")
+    description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
     spec: WebhookSpecResponse | EmailSpecResponse = Field(description="Channel configuration")
     enabled: bool = Field(description="Whether the channel is enabled")
@@ -75,7 +75,7 @@ class NotificationRuleDTO(BaseModel):
 
     id: UUID = Field(description="Rule ID")
     name: str = Field(description="Rule name")
-    description: Optional[str] = Field(default=None, description="Rule description")
+    description: str | None = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
     channel: NotificationChannelDTO = Field(description="Associated channel")
     message_template: str = Field(description="Jinja2 template for notification message")
@@ -114,7 +114,7 @@ class PaginationInfo(BaseModel):
 
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
+    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class ListNotificationChannelsResponse(BaseResponseModel):

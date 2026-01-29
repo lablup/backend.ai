@@ -1,4 +1,3 @@
-from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -100,7 +99,7 @@ async def query_userinfo(
     keypair_resource_policy: dict | None,
     requesting_domain: str,
     requesting_group: str | UUID,
-    query_on_behalf_of: Optional[AccessKey] = None,
+    query_on_behalf_of: AccessKey | None = None,
 ) -> tuple[UUID, UUID, dict]:
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
         await check_if_requester_is_eligible_to_act_as_target_access_key(
@@ -225,7 +224,7 @@ async def query_userinfo_from_session(
     keypair_resource_policy: dict | None,
     requesting_domain: str,
     requesting_group: str | UUID,
-    query_on_behalf_of: Optional[AccessKey] = None,
+    query_on_behalf_of: AccessKey | None = None,
 ) -> tuple[UUID, UUID, dict]:
     """Version of query_userinfo that accepts SASession instead of SAConnection."""
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:

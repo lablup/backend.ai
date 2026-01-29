@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import aiohttp_cors
 import aiotools
@@ -197,9 +197,7 @@ class RouteInfoModel(BaseFieldModel):
             " relationship with the inference session."
         )
     )
-    session_id: Optional[uuid.UUID] = Field(
-        description="Unique ID referencing the inference session."
-    )
+    session_id: uuid.UUID | None = Field(description="Unique ID referencing the inference session.")
     traffic_ratio: NonNegativeFloat
 
 
@@ -343,7 +341,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default_factory=dict,
     )
 
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
@@ -352,7 +350,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: Optional[dict[str, str | int]] = Field(
+    resources: dict[str, str | int] | None = Field(
         examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
@@ -382,7 +380,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
 @dataclass
 class ValidationResult:
     model_id: uuid.UUID
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
@@ -405,7 +403,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
     )
-    image: Optional[str] = Field(
+    image: str | None = Field(
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
         alias="lang",
@@ -415,7 +413,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="Type of the inference runtime the image will try to load.",
         default=RuntimeVariant.CUSTOM,
     )
-    architecture: Optional[str] = Field(
+    architecture: str | None = Field(
         description="Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
         alias="arch",
         default=None,

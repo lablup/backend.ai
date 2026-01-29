@@ -2,7 +2,6 @@ import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from typing import Optional
 
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventPropagator
@@ -22,7 +21,7 @@ class WithCachePropagator(EventPropagator):
 
     _id: uuid.UUID
     _event_fetcher: EventFetcher
-    _queue: asyncio.Queue[Optional[AbstractEvent]]
+    _queue: asyncio.Queue[AbstractEvent | None]
     _closed: bool = False
 
     def __init__(self, event_fetcher: EventFetcher) -> None:
@@ -37,7 +36,7 @@ class WithCachePropagator(EventPropagator):
         """
         return self._id
 
-    async def _fetch_cached_event_safe(self, cache_id: str) -> Optional[AbstractEvent]:
+    async def _fetch_cached_event_safe(self, cache_id: str) -> AbstractEvent | None:
         """
         Safely fetch cached event, handling any errors that may occur.
         Returns None if fetching fails or no cached event exists.

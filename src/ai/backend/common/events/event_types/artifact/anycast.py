@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -62,11 +62,11 @@ class ModelVerifyingEvent(BaseArtifactEvent):
         )
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -77,8 +77,8 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     registry_type: ArtifactRegistryType
     registry_name: str
     success: bool
-    digest: Optional[str]
-    verification_result: Optional[VerificationStepResult]
+    digest: str | None
+    verification_result: VerificationStepResult | None
 
     @classmethod
     @override
@@ -117,11 +117,11 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         )
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -158,9 +158,9 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
         )
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

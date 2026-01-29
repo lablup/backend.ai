@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.data.image.types import ScannedImage
@@ -37,11 +37,11 @@ class BaseAgentLifecycleEvent(BaseAgentEvent):
         return cls(value[0])
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -64,19 +64,19 @@ class AgentTerminatedEvent(BaseAgentLifecycleEvent):
 @dataclass
 class AgentOperationEvent(BaseAgentEvent):
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
 @dataclass
 class AgentErrorEvent(AgentOperationEvent):
     message: str
-    traceback: Optional[str] = None
-    user: Optional[Any] = None
+    traceback: str | None = None
+    user: Any | None = None
     context_env: Mapping[str, Any] = field(default_factory=dict)
     severity: LogLevel = LogLevel.ERROR
 

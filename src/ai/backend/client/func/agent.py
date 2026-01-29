@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
@@ -57,13 +56,13 @@ class Agent(BaseFunction):
     async def paginated_list(
         cls,
         status: str = "ALIVE",
-        scaling_group: Optional[str] = None,
+        scaling_group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> PaginatedResult:
         """
         Lists the keypairs.

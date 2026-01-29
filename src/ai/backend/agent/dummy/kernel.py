@@ -4,7 +4,7 @@ import asyncio
 import os
 from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping, Sequence
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ai.backend.agent.resources import KernelResourceSpec
@@ -197,7 +197,7 @@ class DummyCodeRunner(AbstractCodeRunner):
         repl_in_port: int,
         repl_out_port: int,
         exec_timeout: float = 0,
-        client_features: Optional[frozenset[str]] = None,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,
@@ -238,7 +238,7 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         repl_in_port: int,
         repl_out_port: int,
         exec_timeout: float = 0,
-        client_features: Optional[frozenset[str]] = None,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         self.zctx = None
         self.input_sock = None

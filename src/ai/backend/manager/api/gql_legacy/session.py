@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -286,7 +285,7 @@ class ComputeSessionNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: str,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
         async with graphene_ctx.db.begin_readonly_session() as db_session:
@@ -317,7 +316,7 @@ class ComputeSessionNode(graphene.ObjectType):
             stmt = option(stmt)
         return stmt
 
-    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> int | None:
         if self.status != SessionStatus.PENDING:
             return None
         graph_ctx: GraphQueryContext = info.context
@@ -328,7 +327,7 @@ class ComputeSessionNode(graphene.ObjectType):
 
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
-    ) -> list[Optional[int]]:
+    ) -> list[int | None]:
         return await ctx.valkey_schedule.get_queue_positions(session_ids)
 
     @classmethod
@@ -337,7 +336,7 @@ class ComputeSessionNode(graphene.ObjectType):
         ctx: GraphQueryContext,
         row: SessionRow,
         *,
-        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+        permissions: Iterable[ComputeSessionPermission] | None = None,
     ) -> Self:
         status_history: dict[str, Any] = dict(row.status_history) if row.status_history else {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
@@ -393,7 +392,7 @@ class ComputeSessionNode(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_data: SessionData,
         *,
-        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+        permissions: Iterable[ComputeSessionPermission] | None = None,
     ) -> Self:
         status_history = session_data.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
@@ -452,7 +451,7 @@ class ComputeSessionNode(graphene.ObjectType):
 
     async def __resolve_reference(
         self, info: graphene.ResolveInfo, **kwargs: Any
-    ) -> Optional[ComputeSessionNode]:
+    ) -> ComputeSessionNode | None:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
         resolved_id = resolve_global_id(self.id)
@@ -656,7 +655,7 @@ class ComputeSessionNode(graphene.ObjectType):
         id: ResolvedGlobalID,
         scope_id: ScopeType,
         permission: ComputeSessionPermission,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
@@ -684,13 +683,13 @@ class ComputeSessionNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ComputeSessionPermission,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -765,10 +764,10 @@ class TotalResourceSlot(graphene.ObjectType):
     async def get_data(
         cls,
         ctx: GraphQueryContext,
-        statuses: Optional[Iterable[str]] = None,
-        raw_filter: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        resource_group_name: Optional[str] = None,
+        statuses: Iterable[str] | None = None,
+        raw_filter: str | None = None,
+        domain_name: str | None = None,
+        resource_group_name: str | None = None,
     ) -> Self:
         if statuses is not None:
             status_list = [SessionStatus[s] for s in statuses]
@@ -1081,7 +1080,7 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_inference_metrics(
         self, info: graphene.ResolveInfo
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
@@ -1122,7 +1121,7 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
-    ) -> Iterable[Optional[Mapping[str, Any]]]:
+    ) -> Iterable[Mapping[str, Any] | None]:
         containers = self.containers
         if containers is None:
             containers = await self.resolve_containers(info)
@@ -1202,11 +1201,11 @@ class ComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: str | None = None,
+        status: str | None = None,
+        filter: str | None = None,
     ) -> int:
         status_list: list[SessionStatus] | None = None
         if isinstance(status, str):
@@ -1242,12 +1241,12 @@ class ComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: str | None = None,
+        status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         status_list: list[SessionStatus] | None = None
         if isinstance(status, str):
@@ -1298,8 +1297,8 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[str] = None,
+        domain_name: str | None = None,
+        access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid

@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -64,7 +64,7 @@ type WhereClauseType = sa.sql.expression.ColumnElement[bool]
 
 class QueryFilterTransformer(Transformer):
     def __init__(
-        self, sa_table: sa.Table | sa.sql.Join | type, fieldspec: Optional[FieldSpecType] = None
+        self, sa_table: sa.Table | sa.sql.Join | type, fieldspec: FieldSpecType | None = None
     ) -> None:
         super().__init__()
         self._sa_table = sa_table
@@ -216,7 +216,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: Optional[FieldSpecType] = None) -> None:
+    def __init__(self, fieldspec: FieldSpecType | None = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 

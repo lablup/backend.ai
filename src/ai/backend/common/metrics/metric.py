@@ -1,7 +1,7 @@
 import asyncio
 import enum
 import os
-from typing import Optional, Self
+from typing import Self
 
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
@@ -10,7 +10,7 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 
 
 class APIMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -35,7 +35,7 @@ class APIMetricObserver:
         return cls._instance
 
     def _inc_request_total(
-        self, *, method: str, endpoint: str, error_code: Optional[ErrorCode], status_code: int
+        self, *, method: str, endpoint: str, error_code: ErrorCode | None, status_code: int
     ) -> None:
         self._request_count.labels(
             method=method,
@@ -51,7 +51,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -69,7 +69,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -86,7 +86,7 @@ class APIMetricObserver:
 
 
 class GraphQLMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -135,7 +135,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
     ) -> None:
         self._request_count.labels(
@@ -156,7 +156,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -178,7 +178,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -202,7 +202,7 @@ class GraphQLMetricObserver:
 
 
 class EventMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _event_count: Counter
     _event_failure_count: Counter
@@ -273,7 +273,7 @@ class EventMetricObserver:
 
 
 class BgTaskMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _bgtask_count: Gauge
     _bgtask_done_count: Counter
@@ -307,7 +307,7 @@ class BgTaskMetricObserver:
         self._bgtask_count.labels(task_name=task_name).inc()
 
     def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+        self, *, task_name: str, status: str, duration: float, error_code: ErrorCode | None
     ) -> None:
         self._bgtask_count.labels(task_name=task_name).dec()
         self._bgtask_processing_time.labels(
@@ -327,7 +327,7 @@ class BgTaskMetricObserver:
 
 
 class ActionMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _action_count: Counter
     _action_duration_sec: Histogram
@@ -372,7 +372,7 @@ class ActionMetricObserver:
         operation_type: str,
         status: str,
         duration: float,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
     ) -> None:
         self._action_count.labels(
             entity_type=entity_type,
@@ -479,7 +479,7 @@ ClientType = DomainType
 
 
 class LayerMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
@@ -554,7 +554,7 @@ class LayerMetricObserver:
         layer: LayerType,
         operation: str,
         duration: float,
-        exception: Optional[BaseException] = None,
+        exception: BaseException | None = None,
     ) -> None:
         success = exception is None
         self._layer_operation_triggered_count.labels(
@@ -588,7 +588,7 @@ class LayerMetricObserver:
 
 
 class SystemMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _async_task_count: Gauge
     _cpu_usage_percent: Gauge
@@ -628,7 +628,7 @@ class SystemMetricObserver:
 
 
 class SweeperMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _session_sweep_count: Counter
     _kernel_sweep_count: Counter
@@ -659,7 +659,7 @@ class SweeperMetricObserver:
 
 
 class EventPropagatorMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _propagator_count: Gauge
     _propagator_alias_count: Gauge
@@ -705,7 +705,7 @@ class EventPropagatorMetricObserver:
 
 
 class CommonMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     gql: GraphQLMetricObserver
@@ -736,7 +736,7 @@ class CommonMetricRegistry:
 
 
 class StageObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _stage_count: Counter
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -23,7 +23,7 @@ class ModifyScalingGroupAction(ScalingGroupAction):
         return "modify"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
 
@@ -34,5 +34,5 @@ class ModifyScalingGroupActionResult(BaseActionResult):
     scaling_group: ScalingGroupData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.scaling_group.name

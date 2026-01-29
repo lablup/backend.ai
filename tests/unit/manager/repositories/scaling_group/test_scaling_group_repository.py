@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -114,13 +114,13 @@ class TestScalingGroupRepositoryDB:
         name: str,
         driver: str = "static",
         scheduler: str = "fifo",
-        description: Optional[str] = None,
+        description: str | None = None,
         is_active: bool = True,
         is_public: bool = True,
-        wsproxy_addr: Optional[str] = None,
-        wsproxy_api_token: Optional[str] = None,
-        driver_opts: Optional[dict[str, Any]] = None,
-        scheduler_opts: Optional[ScalingGroupOpts] = None,
+        wsproxy_addr: str | None = None,
+        wsproxy_api_token: str | None = None,
+        driver_opts: dict[str, Any] | None = None,
+        scheduler_opts: ScalingGroupOpts | None = None,
         use_host_network: bool = False,
     ) -> Creator[ScalingGroupRow]:
         """Create a ScalingGroupCreatorSpec with the given parameters."""

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
@@ -89,7 +89,7 @@ class UserResourcePolicyDBSource:
                 .from_statement(delete_stmt)
                 .execution_options(populate_existing=True)
             )
-            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query_stms)
+            row: UserResourcePolicyRow | None = await db_sess.scalar(query_stms)
             if row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."

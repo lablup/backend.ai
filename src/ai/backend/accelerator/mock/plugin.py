@@ -14,7 +14,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
     cast,
 )
 
@@ -135,7 +134,7 @@ class MockPlugin(AbstractComputePlugin):
     reserved_memory: int = 64 * (2**20)  # 64 MiB (only for fractional)
     quantum_size: Decimal = Decimal("0.1")
 
-    _all_devices: Optional[Sequence[MockDevice]] = None
+    _all_devices: Sequence[MockDevice] | None = None
     _mode: AllocationModes = AllocationModes.DISCRETE
     _unit_mem: int = 2 * (2**30)  # 2 GiB
     _unit_proc: int = 8  # number of SMPs
@@ -143,7 +142,7 @@ class MockPlugin(AbstractComputePlugin):
     nvdocker_version: tuple[int, ...] = (0, 0, 0)
     docker_version: tuple[int, ...] = (0, 0, 0)
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         # Read the mockup device config.
         raw_cfg, cfg_src_path = config.read_from_file(None, "mock-accelerator")
         self.mock_config = _mock_config_iv.check(raw_cfg)

@@ -6,7 +6,7 @@ import json
 import logging
 import random
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Final, Optional, cast
+from typing import Final, cast
 
 import aiohttp
 from aiohttp import web
@@ -62,7 +62,7 @@ class WebSocketProxy:
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
     upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
-    upstream_buffer_task: Optional[asyncio.Task]
+    upstream_buffer_task: asyncio.Task | None
 
     def __init__(
         self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
@@ -185,7 +185,7 @@ async def web_handler(
     frontend_rqst: web.Request,
     *,
     is_anonymous: bool = False,
-    api_endpoint: Optional[str] = None,
+    api_endpoint: str | None = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
@@ -330,7 +330,7 @@ async def web_handler_with_jwt(
         Streamed response from the backend API
     """
     # Select random endpoint if multiple endpoints are provided
-    api_endpoint: Optional[str] = None
+    api_endpoint: str | None = None
     if api_endpoints:
         api_endpoint = random.choice(api_endpoints)
 
@@ -570,8 +570,8 @@ async def websocket_handler(
     request: web.Request,
     *,
     is_anonymous: bool = False,
-    api_endpoint: Optional[str] = None,
-    jwt_token: Optional[str] = None,
+    api_endpoint: str | None = None,
+    jwt_token: str | None = None,
 ) -> web.StreamResponse:
     if api_endpoint:
         if api_endpoint.startswith("http://"):

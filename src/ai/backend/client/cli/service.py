@@ -1,7 +1,7 @@
 import json
 import sys
 from collections.abc import Sequence
-from typing import Literal, Optional
+from typing import Literal
 from uuid import UUID
 
 import click
@@ -72,10 +72,10 @@ def service() -> None:
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(
     ctx: CLIContext,
-    filter_: Optional[str],
-    order: Optional[str],
+    filter_: str | None,
+    order: str | None,
     offset: int,
-    limit: Optional[int],
+    limit: int | None,
 ) -> None:
     """
     List the service endpoints.
@@ -285,24 +285,24 @@ def create(
     model_name_or_id: str,
     initial_session_count: int,
     *,
-    name: Optional[str],
-    model_version: Optional[str],
-    model_mount_destination: Optional[str],
+    name: str | None,
+    model_version: str | None,
+    model_mount_destination: str | None,
     env: Sequence[str],
     mount: Sequence[str],
-    startup_command: Optional[str],
+    startup_command: str | None,
     resources: Sequence[str],
     resource_opts: Sequence[str],
     cluster_size: int,
     cluster_mode: Literal["single-node", "multi-node"],
-    domain: Optional[str],
-    project: Optional[str],
-    bootstrap_script: Optional[str],
-    tag: Optional[str],
-    architecture: Optional[str],
-    scaling_group: Optional[str],
-    owner: Optional[str],
-    model_definition_path: Optional[str],
+    domain: str | None,
+    project: str | None,
+    bootstrap_script: str | None,
+    tag: str | None,
+    architecture: str | None,
+    scaling_group: str | None,
+    owner: str | None,
+    model_definition_path: str | None,
     public: bool,
     runtime_variant: RuntimeVariant,
 ) -> None:
@@ -481,22 +481,22 @@ def try_start(
     image: str,
     model_name_or_id: str,
     *,
-    name: Optional[str],
+    name: str | None,
     model_version: int,
-    model_mount_destination: Optional[str],
+    model_mount_destination: str | None,
     env: Sequence[str],
-    startup_command: Optional[str],
+    startup_command: str | None,
     resources: Sequence[str],
     resource_opts: Sequence[str],
     cluster_size: int,
     cluster_mode: ClusterMode,
-    domain: Optional[str],
-    project: Optional[str],
-    bootstrap_script: Optional[str],
-    tag: Optional[str],
-    architecture: Optional[str],
-    scaling_group: Optional[str],
-    owner: Optional[str],
+    domain: str | None,
+    project: str | None,
+    bootstrap_script: str | None,
+    tag: str | None,
+    architecture: str | None,
+    scaling_group: str | None,
+    owner: str | None,
     public: bool,
 ) -> None:
     """

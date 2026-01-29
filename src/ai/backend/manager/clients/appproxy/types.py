@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.config import ModelHealthCheck
@@ -26,7 +24,7 @@ class EndpointTagsModel(BaseModel):
 
     id: str
     runtime_variant: str
-    existing_url: Optional[str] = None
+    existing_url: str | None = None
 
 
 class TagsModel(BaseModel):
@@ -50,6 +48,6 @@ class CreateEndpointRequestBody(BaseModel):
     open_to_public: bool = Field(
         default=False, description="Whether the endpoint is publicly accessible"
     )
-    health_check: Optional[ModelHealthCheck] = Field(
+    health_check: ModelHealthCheck | None = Field(
         default=None, description="Health check configuration"
     )

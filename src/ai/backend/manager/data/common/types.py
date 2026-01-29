@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -8,18 +7,18 @@ from sqlalchemy.sql.elements import ColumnElement
 class StringFilterData:
     """Data class that corresponds 1:1 with StringFilter for API requests."""
 
-    contains: Optional[str] = None
-    starts_with: Optional[str] = None
-    ends_with: Optional[str] = None
-    equals: Optional[str] = None
-    not_equals: Optional[str] = None
-    i_contains: Optional[str] = None
-    i_starts_with: Optional[str] = None
-    i_ends_with: Optional[str] = None
-    i_equals: Optional[str] = None
-    i_not_equals: Optional[str] = None
+    contains: str | None = None
+    starts_with: str | None = None
+    ends_with: str | None = None
+    equals: str | None = None
+    not_equals: str | None = None
+    i_contains: str | None = None
+    i_starts_with: str | None = None
+    i_ends_with: str | None = None
+    i_equals: str | None = None
+    i_not_equals: str | None = None
 
-    def apply_to_column(self, column: ColumnElement[str]) -> Optional[ColumnElement[bool]]:
+    def apply_to_column(self, column: ColumnElement[str]) -> ColumnElement[bool] | None:
         """Apply this string filter to a SQLAlchemy column and return the condition.
 
         Args:
@@ -56,14 +55,14 @@ class StringFilterData:
 class IntFilterData:
     """Data class that corresponds 1:1 with IntFilter for API requests."""
 
-    equals: Optional[int] = None
-    not_equals: Optional[int] = None
-    greater_than: Optional[int] = None
-    greater_than_or_equal: Optional[int] = None
-    less_than: Optional[int] = None
-    less_than_or_equal: Optional[int] = None
+    equals: int | None = None
+    not_equals: int | None = None
+    greater_than: int | None = None
+    greater_than_or_equal: int | None = None
+    less_than: int | None = None
+    less_than_or_equal: int | None = None
 
-    def apply_to_column(self, column: ColumnElement[int]) -> Optional[ColumnElement[bool]]:
+    def apply_to_column(self, column: ColumnElement[int]) -> ColumnElement[bool] | None:
         """Apply this int filter to a SQLAlchemy column and return the condition.
 
         Args:

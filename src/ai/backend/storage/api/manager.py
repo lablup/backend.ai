@@ -17,7 +17,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NotRequired,
-    Optional,
     TypedDict,
     cast,
 )
@@ -398,7 +397,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        mode: Optional[int]
+        mode: int | None
         options: dict[str, Any] | None  # deprecated
 
     async with cast(

@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -34,7 +33,7 @@ class TerminatingRouteHandler(RouteHandler):
         return "terminate-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for terminating routes."""
         return None
 
@@ -44,18 +43,18 @@ class TerminatingRouteHandler(RouteHandler):
         return [RouteStatus.TERMINATING]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Get the next route status after this handler's operation."""
         return RouteStatus.TERMINATED
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Get the failure route status if applicable."""
         # Even if termination fails, we still mark as terminated
         return None
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
 

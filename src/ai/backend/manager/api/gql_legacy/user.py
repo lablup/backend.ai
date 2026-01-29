@@ -5,7 +5,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -411,13 +410,13 @@ class UserNode(graphene.ObjectType):
     async def resolve_project_nodes(
         self,
         info: graphene.ResolveInfo,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
         from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 
@@ -479,7 +478,7 @@ class UserGroup(graphene.ObjectType):
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[Self]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Self | None:
         if row is None:
             return None
         return cls(
@@ -624,11 +623,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        limit: int | None = None,
     ) -> Sequence[User]:
         """
         Load user's information. Group names associated with the user are also returned.
@@ -699,11 +698,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
     ) -> int:
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
@@ -738,12 +737,12 @@ class User(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[User]:
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
@@ -794,12 +793,12 @@ class User(graphene.ObjectType):
     async def batch_load_by_email(
         cls,
         ctx: GraphQueryContext,
-        emails: Optional[Sequence[str]] = None,
+        emails: Sequence[str] | None = None,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-    ) -> Sequence[Optional[User]]:
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+    ) -> Sequence[User | None]:
         if not emails:
             return []
         query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
@@ -824,12 +823,12 @@ class User(graphene.ObjectType):
     async def batch_load_by_uuid(
         cls,
         ctx: GraphQueryContext,
-        user_ids: Optional[Sequence[UUID]] = None,
+        user_ids: Sequence[UUID] | None = None,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-    ) -> Sequence[Optional[User]]:
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+    ) -> Sequence[User | None]:
         if not user_ids:
             return []
         query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
@@ -890,7 +889,7 @@ class UserInput(graphene.InputObjectType):
     # When modifying, set the field to "None" to skip setting the value.
 
     def to_action(self, email: str, graph_ctx: GraphQueryContext) -> CreateUserAction:
-        def value_or_none(value: Any) -> Optional[Any]:
+        def value_or_none(value: Any) -> Any | None:
             return value if value is not Undefined else None
 
         auth_config = graph_ctx.config_provider.config.auth

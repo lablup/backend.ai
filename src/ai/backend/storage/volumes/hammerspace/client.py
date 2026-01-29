@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 from pydantic_core._pydantic_core import ValidationError
@@ -159,7 +159,7 @@ class HammerspaceAPIClient:
     async def get_share(
         self,
         params: GetShareParams,
-    ) -> Optional[Share]:
+    ) -> Share | None:
         session = await self._create_login_session()
         data = await self._get_shares(session, params)
         for raw_share in data:
@@ -176,7 +176,7 @@ class HammerspaceAPIClient:
         params: GetShareParams,
         retry: int,
         wait_sec: int,
-    ) -> Optional[Share]:
+    ) -> Share | None:
         session = await self._create_login_session()
         while retry > 0:
             data = await self._get_shares(session, params)
@@ -191,7 +191,7 @@ class HammerspaceAPIClient:
             await asyncio.sleep(wait_sec)  # wait for a moment and try again
         return None
 
-    async def get_objective(self, id: uuid.UUID) -> Optional[Objective]:
+    async def get_objective(self, id: uuid.UUID) -> Objective | None:
         session = await self._create_login_session()
         query = {"spec": f"uoid.uuid=eq={id}"}
         async with session.get(self._connection_info.address / "objectives", params=query) as resp:

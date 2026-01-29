@@ -3,7 +3,7 @@ from __future__ import annotations
 import urllib
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextvars import ContextVar
-from typing import Any, Optional, override
+from typing import Any, override
 
 import aiotools
 import yarl
@@ -32,7 +32,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     _etcd: AsyncEtcd
     _config_prefix: str = "config"
 
-    def __init__(self, etcd: AsyncEtcd, config_prefix: Optional[str] = None) -> None:
+    def __init__(self, etcd: AsyncEtcd, config_prefix: str | None = None) -> None:
         super().__init__()
         self._etcd = etcd
         if config_prefix:
@@ -68,7 +68,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
                     )
         return flattened_dict
 
-    async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
+    async def get_raw(self, key: str, allow_null: bool = True) -> str | None:
         value = await self._etcd.get(key)
         if not allow_null and value is None:
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
@@ -154,7 +154,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     # TODO: refactor using contextvars in Python 3.7 so that the result is cached
     #       in a per-request basis.
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-    async def get_allowed_origins(self) -> Optional[str]:
+    async def get_allowed_origins(self) -> str | None:
         return await self._etcd.get("config/api/allow-origins")
 
 

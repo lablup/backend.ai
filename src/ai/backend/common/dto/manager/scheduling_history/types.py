@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -42,17 +41,15 @@ class SessionHistoryOrderField(StrEnum):
 class SessionHistoryFilter(BaseRequestModel):
     """Filter for session scheduling history."""
 
-    session_id: Optional[UUIDFilter] = Field(default=None, description="Filter by session ID")
-    phase: Optional[StringFilter] = Field(default=None, description="Filter by phase (contains)")
-    from_status: Optional[list[str]] = Field(default=None, description="Filter by from_status")
-    to_status: Optional[list[str]] = Field(default=None, description="Filter by to_status")
-    result: Optional[list[SchedulingResultType]] = Field(
+    session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
+    phase: StringFilter | None = Field(default=None, description="Filter by phase (contains)")
+    from_status: list[str] | None = Field(default=None, description="Filter by from_status")
+    to_status: list[str] | None = Field(default=None, description="Filter by to_status")
+    result: list[SchedulingResultType] | None = Field(
         default=None, description="Filter by result (SUCCESS, FAILURE, STALE)"
     )
-    error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(
-        default=None, description="Filter by message (contains)"
-    )
+    error_code: StringFilter | None = Field(default=None, description="Filter by error code")
+    message: StringFilter | None = Field(default=None, description="Filter by message (contains)")
 
 
 class SessionHistoryOrder(BaseRequestModel):
@@ -70,17 +67,13 @@ class DeploymentHistoryOrderField(StrEnum):
 class DeploymentHistoryFilter(BaseRequestModel):
     """Filter for deployment history."""
 
-    deployment_id: Optional[UUIDFilter] = Field(default=None, description="Filter by deployment ID")
-    phase: Optional[StringFilter] = Field(default=None, description="Filter by phase (contains)")
-    from_status: Optional[list[str]] = Field(default=None, description="Filter by from_status")
-    to_status: Optional[list[str]] = Field(default=None, description="Filter by to_status")
-    result: Optional[list[SchedulingResultType]] = Field(
-        default=None, description="Filter by result"
-    )
-    error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(
-        default=None, description="Filter by message (contains)"
-    )
+    deployment_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
+    phase: StringFilter | None = Field(default=None, description="Filter by phase (contains)")
+    from_status: list[str] | None = Field(default=None, description="Filter by from_status")
+    to_status: list[str] | None = Field(default=None, description="Filter by to_status")
+    result: list[SchedulingResultType] | None = Field(default=None, description="Filter by result")
+    error_code: StringFilter | None = Field(default=None, description="Filter by error code")
+    message: StringFilter | None = Field(default=None, description="Filter by message (contains)")
 
 
 class DeploymentHistoryOrder(BaseRequestModel):
@@ -98,18 +91,14 @@ class RouteHistoryOrderField(StrEnum):
 class RouteHistoryFilter(BaseRequestModel):
     """Filter for route history."""
 
-    route_id: Optional[UUIDFilter] = Field(default=None, description="Filter by route ID")
-    deployment_id: Optional[UUIDFilter] = Field(default=None, description="Filter by deployment ID")
-    phase: Optional[StringFilter] = Field(default=None, description="Filter by phase (contains)")
-    from_status: Optional[list[str]] = Field(default=None, description="Filter by from_status")
-    to_status: Optional[list[str]] = Field(default=None, description="Filter by to_status")
-    result: Optional[list[SchedulingResultType]] = Field(
-        default=None, description="Filter by result"
-    )
-    error_code: Optional[StringFilter] = Field(default=None, description="Filter by error code")
-    message: Optional[StringFilter] = Field(
-        default=None, description="Filter by message (contains)"
-    )
+    route_id: UUIDFilter | None = Field(default=None, description="Filter by route ID")
+    deployment_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
+    phase: StringFilter | None = Field(default=None, description="Filter by phase (contains)")
+    from_status: list[str] | None = Field(default=None, description="Filter by from_status")
+    to_status: list[str] | None = Field(default=None, description="Filter by to_status")
+    result: list[SchedulingResultType] | None = Field(default=None, description="Filter by result")
+    error_code: StringFilter | None = Field(default=None, description="Filter by error code")
+    message: StringFilter | None = Field(default=None, description="Filter by message (contains)")
 
 
 class RouteHistoryOrder(BaseRequestModel):

@@ -10,7 +10,6 @@ from collections import defaultdict
 from collections.abc import Callable, Coroutine, Sequence
 from typing import (
     Any,
-    Optional,
     Protocol,
     TypedDict,
     TypeVar,
@@ -81,7 +80,7 @@ class EventHandler[TContext, TEvent: "AbstractEvent"]:
     context: TContext
     callback: EventCallback[TContext, TEvent]
     handler_type: _EventHandlerType
-    coalescing_opts: Optional[CoalescingOptions]
+    coalescing_opts: CoalescingOptions | None
     coalescing_state: CoalescingState
     args_matcher: Callable[[tuple], bool] | None
     event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
@@ -213,10 +212,10 @@ class EventDispatcherGroup(ABC):
         event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
@@ -226,11 +225,11 @@ class EventDispatcherGroup(ABC):
         event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        override_event_name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        override_event_name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
@@ -269,10 +268,10 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
@@ -291,11 +290,11 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        override_event_name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        override_event_name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
@@ -331,8 +330,8 @@ class EventDispatcher(EventDispatcherGroup):
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
-    _consumer_loop_task: Optional[asyncio.Task]
-    _subscriber_loop_task: Optional[asyncio.Task]
+    _consumer_loop_task: asyncio.Task | None
+    _subscriber_loop_task: asyncio.Task | None
     _consumer_taskgroup: PersistentTaskGroup
     _subscriber_taskgroup: PersistentTaskGroup
 
@@ -378,7 +377,7 @@ class EventDispatcher(EventDispatcherGroup):
             await self._consumer_taskgroup.shutdown()
             await self._subscriber_taskgroup.shutdown()
 
-            def cancel_task(task: Optional[asyncio.Task]) -> None:
+            def cancel_task(task: asyncio.Task | None) -> None:
                 if task is not None and not task.done():
                     task.cancel()
                     cancelled_tasks.append(task)
@@ -407,10 +406,10 @@ class EventDispatcher(EventDispatcherGroup):
         event_cls: type[TConsumedEvent],
         context: TContext,
         callback: EventCallback[TContext, TConsumedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TConsumedEvent]:
@@ -454,11 +453,11 @@ class EventDispatcher(EventDispatcherGroup):
         event_cls: type[TSubscirbedEvent],
         context: TContext,
         callback: EventCallback[TContext, TSubscirbedEvent],
-        coalescing_opts: Optional[CoalescingOptions] = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: Optional[str] = None,
-        override_event_name: Optional[str] = None,
-        args_matcher: Optional[Callable[[tuple], bool]] = None,
+        name: str | None = None,
+        override_event_name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TSubscirbedEvent]:
@@ -492,7 +491,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         handler: EventHandler[TContext, TEvent],
         *,
-        override_event_name: Optional[str] = None,
+        override_event_name: str | None = None,
     ) -> None:
         override_event_name = override_event_name or handler.event_cls.event_name()
         self._subscribers[override_event_name].discard(
@@ -505,7 +504,7 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
-        metadata: Optional[MessageMetadata] = None,
+        metadata: MessageMetadata | None = None,
     ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
             return
@@ -579,7 +578,7 @@ class EventDispatcher(EventDispatcherGroup):
         source: AgentId,
         args: tuple,
         post_callbacks: Sequence[PostCallback] = tuple(),
-        metadata: Optional[MessageMetadata] = None,
+        metadata: MessageMetadata | None = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
@@ -600,7 +599,7 @@ class EventDispatcher(EventDispatcherGroup):
         event_name: str,
         source: AgentId,
         args: tuple,
-        metadata: Optional[MessageMetadata] = None,
+        metadata: MessageMetadata | None = None,
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
@@ -686,7 +685,7 @@ class EventProducer:
     async def anycast_event(
         self,
         event: AbstractAnycastEvent,
-        source_override: Optional[AgentId] = None,
+        source_override: AgentId | None = None,
     ) -> None:
         if self._closed:
             return
@@ -712,7 +711,7 @@ class EventProducer:
     async def broadcast_event(
         self,
         event: AbstractBroadcastEvent,
-        source_override: Optional[AgentId] = None,
+        source_override: AgentId | None = None,
     ) -> None:
         if self._closed:
             return

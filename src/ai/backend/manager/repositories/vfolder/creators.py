@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
@@ -33,9 +33,9 @@ class VFolderCreatorSpec(CreatorSpec[VFolderRow]):
     ownership_type: VFolderOwnershipType
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
     permission: VFolderMountPermission = VFolderMountPermission.READ_WRITE
-    user: Optional[uuid.UUID] = None
-    group: Optional[uuid.UUID] = None
-    unmanaged_path: Optional[str] = None
+    user: uuid.UUID | None = None
+    group: uuid.UUID | None = None
+    unmanaged_path: str | None = None
     cloneable: bool = False
     status: VFolderOperationStatus = VFolderOperationStatus.READY
 

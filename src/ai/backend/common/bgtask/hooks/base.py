@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.bgtask.task_result import TaskResult
 from ai.backend.common.bgtask.types import BgtaskNameBase, TaskID
@@ -16,7 +15,7 @@ class TaskContext:
 
     task_name: BgtaskNameBase
     task_id: TaskID
-    result: Optional[TaskResult] = None
+    result: TaskResult | None = None
 
 
 class AbstractTaskHook(ABC):

@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Final, Optional, Self
+from typing import Any, Final, Self
 
 from aiotools import cancel_and_wait
 from glide import (
@@ -44,8 +44,8 @@ SSL_CERT_REQUIRED = "required"
 @dataclass
 class ValkeyStandaloneTarget:
     address: str
-    password: Optional[str] = None
-    request_timeout: Optional[int] = None
+    password: str | None = None
+    request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -69,8 +69,8 @@ class ValkeyStandaloneTarget:
 class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
-    password: Optional[str] = None
-    request_timeout: Optional[int] = None
+    password: str | None = None
+    request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -132,9 +132,9 @@ class AbstractValkeyClient(ABC):
 
 class ValkeyStandaloneClient(AbstractValkeyClient):
     _target: ValkeyStandaloneTarget
-    _valkey_client: Optional[GlideClient]
+    _valkey_client: GlideClient | None
     _db_id: int
-    _pubsub_channels: Optional[set[str]]
+    _pubsub_channels: set[str] | None
     _human_readable_name: str
 
     def __init__(
@@ -142,7 +142,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         target: ValkeyStandaloneTarget,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> None:
         self._target = target
         self._valkey_client = None
@@ -228,16 +228,16 @@ class ValkeySentinelClient(AbstractValkeyClient):
     _db_id: int
     _human_readable_name: str
     _sentinel: Sentinel
-    _pubsub_channels: Optional[set[str]]
-    _valkey_client: Optional[GlideClient]
-    _master_address: Optional[tuple[str, int]]
+    _pubsub_channels: set[str] | None
+    _valkey_client: GlideClient | None
+    _master_address: tuple[str, int] | None
 
     def __init__(
         self,
         target: ValkeySentinelTarget,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> None:
         sentinel_addrs = []
         for addr in target.sentinel_addresses:
@@ -324,7 +324,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             self._human_readable_name,
         )
 
-    async def _get_master_address(self) -> Optional[tuple[str, int]]:
+    async def _get_master_address(self) -> tuple[str, int] | None:
         try:
             return await self._sentinel.discover_master(self._target.service_name)
         except Exception as e:
@@ -364,7 +364,7 @@ def _create_valkey_client_internal(
     valkey_target: ValkeyTarget,
     db_id: int,
     human_readable_name: str,
-    pubsub_channels: Optional[set[str]] = None,
+    pubsub_channels: set[str] | None = None,
 ) -> AbstractValkeyClient:
     """
     Internal helper to create a basic Valkey client (Standalone or Sentinel).
@@ -380,7 +380,7 @@ def create_valkey_client(
     valkey_target: ValkeyTarget,
     db_id: int,
     human_readable_name: str,
-    pubsub_channels: Optional[set[str]] = None,
+    pubsub_channels: set[str] | None = None,
 ) -> AbstractValkeyClient:
     """
     Factory function to create a Valkey client based on the target type.
@@ -424,7 +424,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     _operation_client: AbstractValkeyClient
     _monitor_client: AbstractValkeyClient
-    _monitor_task: Optional[asyncio.Task[None]]
+    _monitor_task: asyncio.Task[None] | None
     _reconnectable_exceptions: tuple[type[Exception], ...]
     _consecutive_failure_threshold: int
     _consecutive_failure_count: int

@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.types import AccessKey
@@ -16,10 +16,10 @@ class CompleteAction(SessionAction):
     owner_access_key: AccessKey
     code: str
     # TODO: Add type
-    options: Optional[Mapping[str, Any]]
+    options: Mapping[str, Any] | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -35,5 +35,5 @@ class CompleteActionResult(BaseActionResult):
     result: CodeCompletionResp
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

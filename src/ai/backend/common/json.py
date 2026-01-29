@@ -1,7 +1,7 @@
 import datetime
 import json
 import uuid
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import orjson
 
@@ -35,14 +35,14 @@ async def read_json(reader: AsyncReader) -> Any:
     return load_json(data)
 
 
-def dump_json_str(obj: Any, option: Optional[int] = None) -> str:
+def dump_json_str(obj: Any, option: int | None = None) -> str:
     """
     Dumps the given object into a JSON string.
     """
     return orjson.dumps(obj, option=option).decode("utf-8")
 
 
-def dump_json(obj: Any, option: Optional[int] = None) -> bytes:
+def dump_json(obj: Any, option: int | None = None) -> bytes:
     """
     Dumps the given object into a JSON bytes.
     """
