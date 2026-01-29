@@ -12,11 +12,16 @@ from ai.backend.manager.data.permission.entity import EntityData, EntityListResu
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
+    ObjectPermissionListResult,
 )
-from ai.backend.manager.data.permission.permission import ScopedPermissionCreateInput
+from ai.backend.manager.data.permission.permission import (
+    ScopedPermissionCreateInput,
+    ScopedPermissionListResult,
+)
 from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupCreatorBeforeRoleCreation,
+    PermissionGroupListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -834,6 +839,75 @@ class PermissionDBSource:
             items = [row.RoleRow.to_data() for row in result.rows]
 
             return RoleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_permission_groups(
+        self,
+        querier: BatchQuerier,
+    ) -> PermissionGroupListResult:
+        """Searches permission groups (scopes) with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(PermissionGroupRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.PermissionGroupRow.to_data() for row in result.rows]
+
+            return PermissionGroupListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_scoped_permissions(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopedPermissionListResult:
+        """Searches scoped permissions with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(PermissionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.PermissionRow.to_data() for row in result.rows]
+
+            return ScopedPermissionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_object_permissions(
+        self,
+        querier: BatchQuerier,
+    ) -> ObjectPermissionListResult:
+        """Searches object permissions with pagination and filtering."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ObjectPermissionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ObjectPermissionRow.to_data() for row in result.rows]
+
+            return ObjectPermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

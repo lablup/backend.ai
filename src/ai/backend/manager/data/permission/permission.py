@@ -51,3 +51,13 @@ class ScopedPermissionCreateInput:
     def to_scope_id(self) -> ScopeId:
         """Convert to ScopeId for permission group lookup"""
         return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
+
+
+@dataclass(frozen=True)
+class ScopedPermissionListResult:
+    """Result of scoped permission search with pagination info."""
+
+    items: list[PermissionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
