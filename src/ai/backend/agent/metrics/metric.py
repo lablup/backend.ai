@@ -258,7 +258,7 @@ class UtilizationMetricObserver:
                     except KeyError:
                         continue
 
-        def callback(task: asyncio.Task) -> None:
+        def callback(_task: asyncio.Task) -> None:
             self._removal_process_tasks.pop(removal_key, None)
             # Clean up local cache
             if container_id in process_metrics:
