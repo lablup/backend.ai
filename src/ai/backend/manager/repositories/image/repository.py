@@ -284,37 +284,6 @@ class ImageRepository:
         return await self._db_source.insert_image_alias_by_id(image_id, alias)
 
     @image_repository_resilience.apply()
-    async def get_images_by_ids(
-        self,
-        image_ids: list[UUID],
-        status_filter: list[ImageStatus] | None = None,
-        hide_agents: bool = False,
-    ) -> list[ImageWithAgentInstallStatus]:
-        """
-        Retrieves multiple images by their IDs with agent install status.
-        """
-        images_data = await self._db_source.query_images_by_ids(image_ids, status_filter)
-        image_id_list = list(images_data.keys())
-        installed_agents_for_images = await self._stateful_source.list_agents_with_images(
-            image_id_list
-        )
-
-        images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
-        for image_id_key, image in images_data.items():
-            installed_agents = installed_agents_for_images.get(image_id_key, set())
-            images_with_agent_install_status.append(
-                ImageWithAgentInstallStatus(
-                    image=image,
-                    agent_install_status=ImageAgentInstallStatus(
-                        installed=bool(installed_agents),
-                        agent_names=[] if hide_agents else list(installed_agents),
-                    ),
-                )
-            )
-
-        return images_with_agent_install_status
-
-    @image_repository_resilience.apply()
     async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
         """
         Clears image resource limits by image ID.
