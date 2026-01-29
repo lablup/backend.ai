@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec, UUIDInMatchSpec
 
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -180,8 +184,54 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.id != KernelId(spec.value)
+            return KernelRow.id == KernelId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            kernel_ids = [KernelId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.id.notin_(kernel_ids)
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.session_id.in_(session_ids)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for session_id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.session_id != SessionId(spec.value)
+            return KernelRow.session_id == SessionId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for session_id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            session_ids = [SessionId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.session_id.notin_(session_ids)
             return KernelRow.session_id.in_(session_ids)
 
         return inner

@@ -4860,9 +4860,9 @@ type KernelEdge
 input KernelFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUID = null
+  id: UUIDFilter = null
   status: KernelStatusFilter = null
-  sessionId: UUID = null
+  sessionId: UUIDFilter = null
 }
 
 """Added in 26.1.0. Lifecycle and status information for a kernel."""

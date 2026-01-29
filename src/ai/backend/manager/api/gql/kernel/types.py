@@ -11,8 +11,8 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import KernelId, SessionId, SessionResult, SessionTypes
-from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.common.types import SessionResult, SessionTypes
+from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ServicePortEntryGQL,
@@ -57,20 +57,30 @@ class KernelStatusFilterGQL:
     name="KernelFilter", description="Added in 26.1.0. Filter criteria for querying kernels."
 )
 class KernelFilterGQL(GQLFilter):
-    id: UUID | None = None
+    id: UUIDFilter | None = None
     status: KernelStatusFilterGQL | None = None
-    session_id: UUID | None = None
+    session_id: UUIDFilter | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.id:
-            conditions.append(KernelConditions.by_id(KernelId(self.id)))
+            condition = self.id.build_query_condition(
+                KernelConditions.by_id_filter_equals,
+                KernelConditions.by_id_filter_in,
+            )
+            if condition:
+                conditions.append(condition)
         if self.status:
             condition = self.status.build_condition()
             if condition:
                 conditions.append(condition)
         if self.session_id:
-            conditions.append(KernelConditions.by_session_ids([SessionId(self.session_id)]))
+            condition = self.session_id.build_query_condition(
+                KernelConditions.by_session_id_filter_equals,
+                KernelConditions.by_session_id_filter_in,
+            )
+            if condition:
+                conditions.append(condition)
         return conditions
 
 
