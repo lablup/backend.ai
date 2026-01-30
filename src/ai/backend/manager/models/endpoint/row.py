@@ -1337,7 +1337,7 @@ class ModelServiceHelper:
         )
 
         for vfolder in vfolder_mounts:
-            if vfolder.kernel_path == model_mount_destination:
+            if str(vfolder.kernel_path) == model_mount_destination:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
