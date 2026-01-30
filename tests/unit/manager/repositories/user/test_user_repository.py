@@ -510,7 +510,7 @@ class TestUserRepository:
             role=UserRole.USER,
             resource_policy="default",
         )
-        result = user_repository._validate_user_access(user_row, user_uuid)
+        result = user_repository._db_source._validate_user_access(user_row, user_uuid)
         assert result is True
 
     def test_validate_user_access_admin(
@@ -532,7 +532,7 @@ class TestUserRepository:
             role=UserRole.USER,
             resource_policy="default",
         )
-        result = user_repository._validate_user_access(user_row, None)
+        result = user_repository._db_source._validate_user_access(user_row, None)
         assert result is True
 
     def test_validate_user_access_other_user(
@@ -555,7 +555,7 @@ class TestUserRepository:
             resource_policy="default",
         )
         other_user_uuid = uuid.uuid4()
-        result = user_repository._validate_user_access(user_row, other_user_uuid)
+        result = user_repository._db_source._validate_user_access(user_row, other_user_uuid)
         # Current implementation allows all access
         assert result is True
 
