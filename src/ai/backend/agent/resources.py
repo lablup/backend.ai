@@ -33,11 +33,10 @@ from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 import ai.backend.agent.alloc_map as alloc_map_mod
-from ai.backend.agent.config.unified import AgentUnifiedConfig, ResourceAllocationMode
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors.resources import (
     AgentIdNotFoundError,
     InvalidResourceConfigError,
-    ResourceOverAllocatedError,
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
@@ -558,8 +557,8 @@ class ResourceAllocator(aobject):
         agent_computers = {}
         agent_reserved_slots = {}
         agent_resource_scaling_factor = {}
-        for agent_idx, agent_config in enumerate(self.agent_configs):
-            res = await self._calculate_agent_partition(agent_idx, agent_config, total_slots)
+        for agent_config in self.agent_configs:
+            res = await self._calculate_agent_partition(total_slots)
             agent_computer, reserved_slots, resource_scaling_factor = res
 
             agent_id = AgentId(agent_config.agent.defaulted_id)
@@ -570,8 +569,6 @@ class ResourceAllocator(aobject):
         self.agent_computers = agent_computers
         self.agent_reserved_slots = agent_reserved_slots
         self.agent_resource_scaling_factor = agent_resource_scaling_factor
-
-        self._ensure_slots_are_not_overallocated()
 
     async def __aexit__(self, *exc_info: Any) -> None:
         for _, computer in self.computers.items():
@@ -651,17 +648,23 @@ class ResourceAllocator(aobject):
 
     async def _calculate_agent_partition(
         self,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
         total_slots: SlotsMap,
     ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
+        """
+        Calculate the resource partition for an agent.
+
+        All allocation modes now behave like SHARED mode - agents see all devices
+        and no resources are reserved for partitioning. Reserved slots only account
+        for system-level reservations (reserved_cpu, reserved_mem, etc.).
+
+        BA-4143: This is a baseline simplification before implementing BEP-1041's
+        device-centric partitioning design.
+        """
         agent_computers: dict[DeviceName, ComputerContext] = {}
         devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
         devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
         for device_name, ctx in self.computers.items():
-            device_allocated_slots = self._calculate_device_slots(
-                ctx.alloc_map, agent_idx, agent_config
-            )
+            device_allocated_slots = self._calculate_device_slots(ctx.alloc_map)
             devices_allocated_slots.append(device_allocated_slots)
 
             agent_alloc_map = await ctx.instance.create_alloc_map()
@@ -675,79 +678,29 @@ class ResourceAllocator(aobject):
             devices_reserved_slots.append(device_reserved_slots)
 
         reserved_slots = _combine_mappings(devices_reserved_slots)
-        resource_scaling_factor = self._calculate_resource_scaling_factor(
-            allocated_slots=_combine_mappings(devices_allocated_slots)
-        )
+        resource_scaling_factor = self._calculate_resource_scaling_factor()
 
         return agent_computers, reserved_slots, resource_scaling_factor
 
     def _calculate_device_slots(
         self,
         alloc_map: AbstractAllocMap,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
     ) -> SlotsMap:
+        """
+        Calculate device slots for an agent.
+
+        All allocation modes now behave like SHARED mode - each agent sees all
+        available device slots. This is the baseline behavior before implementing
+        the new device-centric partitioning design per BEP-1041.
+
+        BA-4143: Removed mode-specific dispatch (_calculate_device_slot,
+        _calculate_device_slot_shared, _calculate_device_slot_auto_split,
+        _calculate_device_slot_manual) to establish SHARED-only baseline.
+        """
         return {
-            device_slot.slot_name: self._calculate_device_slot(
-                device_slot.slot_name,
-                agent_idx,
-                agent_config,
-                type(alloc_map),
-            )
+            device_slot.slot_name: self.available_total_slots[device_slot.slot_name]
             for device_slot in alloc_map.device_slots.values()
         }
-
-    def _calculate_device_slot(
-        self,
-        slot_name: SlotName,
-        agent_idx: int,
-        agent_config: AgentUnifiedConfig,
-        alloc_map_type: type[AbstractAllocMap],
-    ) -> Decimal:
-        match agent_config.resource.allocation_mode:
-            case ResourceAllocationMode.SHARED:
-                return self._calculate_device_slot_shared(slot_name)
-            case ResourceAllocationMode.AUTO_SPLIT:
-                return self._calculate_device_slot_auto_split(slot_name, alloc_map_type, agent_idx)
-            case ResourceAllocationMode.MANUAL:
-                return self._calculate_device_slot_manual(slot_name, agent_config)
-
-    def _calculate_device_slot_shared(self, slot_name: SlotName) -> Decimal:
-        return self.available_total_slots[slot_name]
-
-    def _calculate_device_slot_auto_split(
-        self,
-        slot_name: SlotName,
-        alloc_map_type: type[AbstractAllocMap],
-        agent_idx: int,
-    ) -> Decimal:
-        available_total_slot = self.available_total_slots[slot_name]
-        if alloc_map_type is DiscretePropertyAllocMap:
-            slot, slot_extra = divmod(available_total_slot, self.num_agents)
-            remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
-            return slot + remainder_value
-        if alloc_map_type is FractionAllocMap:
-            return available_total_slot / self.num_agents
-        raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
-
-    def _calculate_device_slot_manual(
-        self,
-        slot_name: SlotName,
-        agent_config: AgentUnifiedConfig,
-    ) -> Decimal:
-        resource_config = agent_config.resource
-        if resource_config.allocations is None:
-            raise InvalidResourceConfigError("Resource allocations are not configured.")
-
-        if slot_name == SlotName("cpu"):
-            return Decimal(resource_config.allocations.cpu)
-        if slot_name == SlotName("mem"):
-            return Decimal(resource_config.allocations.mem)
-        if slot_name not in resource_config.allocations.devices:
-            raise ValueError(
-                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
-            )
-        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -756,46 +709,19 @@ class ResourceAllocator(aobject):
             reserved_slots[slot_name] = max(total_slot - slot, Decimal(0))
         return reserved_slots
 
-    def _calculate_resource_scaling_factor(self, allocated_slots: SlotsMap) -> SlotsMap:
-        match self.local_config.resource.allocation_mode:
-            case ResourceAllocationMode.SHARED:
-                return defaultdict(lambda: Decimal(1.0))
-            case ResourceAllocationMode.AUTO_SPLIT:
-                return defaultdict(lambda: Decimal(1.0) / Decimal(self.num_agents))
-            case ResourceAllocationMode.MANUAL:
-                if (
-                    SlotName("cpu") not in allocated_slots
-                    or SlotName("cpu") not in self.available_total_slots
-                ):
-                    raise ValueError("CPU not in allocated or total slots seen")
-                if (
-                    SlotName("mem") not in allocated_slots
-                    or SlotName("mem") not in self.available_total_slots
-                ):
-                    raise ValueError("Memory not in allocated or total slots seen")
-                return {
-                    slot_name: slot / self.available_total_slots[slot_name]
-                    for slot_name, slot in allocated_slots.items()
-                }
+    def _calculate_resource_scaling_factor(self) -> SlotsMap:
+        """
+        Calculate the resource scaling factor for statistics reporting.
 
-    def _ensure_slots_are_not_overallocated(self) -> None:
-        if self.local_config.resource.allocation_mode != ResourceAllocationMode.MANUAL:
-            return
+        All allocation modes now use a scaling factor of 1.0 since all agents
+        see all devices (SHARED-like behavior). This is the baseline before
+        implementing the new device-centric design per BEP-1041.
 
-        allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for agent_reserved_slots in self.agent_reserved_slots.values():
-            for slot_name in self.available_total_slots.keys():
-                available_total_slot = self.available_total_slots[slot_name]
-                allocated_slot = available_total_slot - agent_reserved_slots[slot_name]
-                allocated_slots[slot_name] += allocated_slot
-
-        for slot_name, allocated_slot in allocated_slots.items():
-            available_total_slot = self.available_total_slots[slot_name]
-            if available_total_slot < allocated_slot:
-                raise ResourceOverAllocatedError(
-                    f"Resource slot {slot_name} was manually allocated {allocated_slot} across "
-                    f"all agents when total capacity is {available_total_slot}."
-                )
+        BA-4143: Removed mode-specific scaling factors and overallocation
+        validation (_ensure_slots_are_not_overallocated) to establish
+        SHARED-only baseline.
+        """
+        return defaultdict(lambda: Decimal(1.0))
 
     @cached_property
     def _agent_discovery(self) -> AbstractAgentDiscovery:
