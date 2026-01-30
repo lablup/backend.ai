@@ -676,9 +676,49 @@ class ResourcePartitioner:
     def generate_manual_assignments(
         cls,
         global_devices: GlobalDeviceMap,
+        agent_configs: Sequence[AgentUnifiedConfig],
     ) -> ResourceAssignments:
-        # TODO(BA-4146): Implement manual assignment parsing
-        return cls.generate_shared_assignments(global_devices)
+        assignments: dict[AgentId, dict[DeviceName, Partition]] = defaultdict(dict)
+
+        for agent_config in agent_configs:
+            agent_id = AgentId(agent_config.agent.defaulted_id)
+            allocations = agent_config.resource.allocations
+            if allocations is None:
+                raise InvalidResourceConfigError(
+                    f"Agent {agent_id} missing resource.allocations in MANUAL mode"
+                )
+
+            all_devices: dict[DeviceName, Sequence[DeviceId]] = dict(allocations.devices)
+            if allocations.cpu:
+                all_devices[DeviceName("cpu")] = allocations.cpu
+
+            for device_name, configured_ids in all_devices.items():
+                if device_name not in global_devices:
+                    available = ", ".join(str(d) for d in sorted(global_devices.keys()))
+                    raise InvalidResourceConfigError(
+                        f"Agent {agent_id}: Unknown device '{device_name}'. Available: {available}"
+                    )
+
+                available_ids = {d.device_id for d in global_devices[device_name].devices}
+                for device_id in configured_ids:
+                    if device_id not in available_ids:
+                        valid_ids = ", ".join(
+                            str(d) for d in sorted(available_ids, key=_natural_sort_key)
+                        )
+                        raise InvalidResourceConfigError(
+                            f"Agent {agent_id}: Unknown device ID '{device_id}' for '{device_name}'. "
+                            f"Available: {valid_ids}"
+                        )
+
+                assignments[agent_id][device_name] = DevicePartition(
+                    device_ids=list(configured_ids)
+                )
+
+            for device_name in global_devices:
+                if device_name not in assignments[agent_id]:
+                    assignments[agent_id][device_name] = DevicePartition(device_ids=[])
+
+        return assignments
 
 
 class ResourceAllocator(aobject):
@@ -857,7 +897,9 @@ class ResourceAllocator(aobject):
                     global_devices, self.agent_ids, self.available_total_slots
                 )
             case ResourceAllocationMode.MANUAL:
-                return ResourcePartitioner.generate_manual_assignments(global_devices)
+                return ResourcePartitioner.generate_manual_assignments(
+                    global_devices, self.agent_configs
+                )
 
     async def _apply_resource_assignments(
         self,

@@ -25,6 +25,7 @@ from ai.backend.agent.config.unified import (
     AgentUnifiedConfig,
     ResourceAllocationMode,
 )
+from ai.backend.agent.errors.resources import InvalidResourceConfigError
 from ai.backend.agent.resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -414,22 +415,72 @@ class TestResourcePartitionerAssignments:
         assert len(partition2.device_ids) == 2
         assert len(partition3.device_ids) == 1
 
-    def test_manual_currently_behaves_like_shared(self) -> None:
-        """MANUAL mode currently returns all devices (like SHARED)."""
+    def test_manual_assigns_configured_devices(self) -> None:
         global_devices = self._create_global_device_map({
             DeviceName("cuda"): create_discrete_alloc_map({
                 DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
             }),
         })
 
-        result = ResourcePartitioner.generate_manual_assignments(global_devices)
+        agent1_config = Mock()
+        agent1_config.agent.defaulted_id = "agent-1"
+        agent1_config.resource.allocations.cpu = []
+        agent1_config.resource.allocations.devices = {
+            DeviceName("cuda"): [DeviceId("cuda0"), DeviceId("cuda1")]
+        }
 
-        # Result is defaultdict - any AgentId gets the same assignment (like SHARED)
-        any_agent = AgentId("any-agent")
-        assert DeviceName("cuda") in result[any_agent]
-        partition = result[any_agent][DeviceName("cuda")]
-        assert isinstance(partition, DevicePartition)
-        assert len(partition.device_ids) == 4
+        agent2_config = Mock()
+        agent2_config.agent.defaulted_id = "agent-2"
+        agent2_config.resource.allocations.cpu = []
+        agent2_config.resource.allocations.devices = {
+            DeviceName("cuda"): [DeviceId("cuda2"), DeviceId("cuda3")]
+        }
+
+        result = ResourcePartitioner.generate_manual_assignments(
+            global_devices, [agent1_config, agent2_config]
+        )
+
+        agent1_partition = result[AgentId("agent-1")][DeviceName("cuda")]
+        assert isinstance(agent1_partition, DevicePartition)
+        assert set(agent1_partition.device_ids) == {DeviceId("cuda0"), DeviceId("cuda1")}
+
+        agent2_partition = result[AgentId("agent-2")][DeviceName("cuda")]
+        assert isinstance(agent2_partition, DevicePartition)
+        assert set(agent2_partition.device_ids) == {DeviceId("cuda2"), DeviceId("cuda3")}
+
+    def test_manual_raises_error_for_unknown_device_name(self) -> None:
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId("cuda0"): (SlotName("cuda.device"), Decimal("1"))
+            }),
+        })
+
+        agent_config = Mock()
+        agent_config.agent.defaulted_id = "agent-1"
+        agent_config.resource.allocations.cpu = []
+        agent_config.resource.allocations.devices = {DeviceName("tpu"): [DeviceId("tpu0")]}
+
+        with pytest.raises(InvalidResourceConfigError) as exc_info:
+            ResourcePartitioner.generate_manual_assignments(global_devices, [agent_config])
+
+        assert "Unknown device 'tpu'" in str(exc_info.value)
+
+    def test_manual_raises_error_for_unknown_device_id(self) -> None:
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId("cuda0"): (SlotName("cuda.device"), Decimal("1"))
+            }),
+        })
+
+        agent_config = Mock()
+        agent_config.agent.defaulted_id = "agent-1"
+        agent_config.resource.allocations.cpu = []
+        agent_config.resource.allocations.devices = {DeviceName("cuda"): [DeviceId("cuda99")]}
+
+        with pytest.raises(InvalidResourceConfigError) as exc_info:
+            ResourcePartitioner.generate_manual_assignments(global_devices, [agent_config])
+
+        assert "Unknown device ID 'cuda99'" in str(exc_info.value)
 
 
 # =============================================================================
@@ -703,44 +754,5 @@ class TestResourceAllocatorAutoSplitMode:
         # Memory: shared device, both see same device with divided slots
         assert len(agent1_computers[DeviceName("mem")].alloc_map.device_slots) == 1
         assert len(agent2_computers[DeviceName("mem")].alloc_map.device_slots) == 1
-
-        await allocator.__aexit__(None, None, None)
-
-
-@pytest.mark.skip(reason="BA-4143: MANUAL allocation temporarily disabled.")
-class TestResourceAllocatorManualMode:
-    """Integration tests for ResourceAllocator in MANUAL mode."""
-
-    async def test_respects_manual_allocations(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """MANUAL mode: allocations are per agent config."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.MANUAL,
-            allocated_cpu=4,
-            allocated_mem="8G",
-            num_agents=2,
-        )
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
-            }),
-            DeviceName("root"): create_fraction_alloc_map({
-                DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
-            }),
-        })
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        # Each agent gets 4 CPU and 8G mem
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("12")  # 16 - 4
-        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
-        assert reserved2[SlotName("cpu")] == Decimal("12")
-        assert reserved2[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
 
         await allocator.__aexit__(None, None, None)
