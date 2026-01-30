@@ -131,6 +131,7 @@ def upgrade():
                 )
             )
             user = connection.execute(query).first()
+            assert user is not None, "User insertion failed"
             user_uuid = user[0]
         # Update current keypair's `user` field with associated user's uuid.
         query = (

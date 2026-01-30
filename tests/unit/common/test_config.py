@@ -1,12 +1,13 @@
 import pickle
+from typing import Any
 
 import tomli
 
 from ai.backend.common.config import merge, override_key
 
 
-def test_override_key():
-    sample = {
+def test_override_key() -> None:
+    sample: dict[str, Any] = {
         "a": {
             "b": 0,
         },

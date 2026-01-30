@@ -108,11 +108,11 @@ async def test_api_method_override_with_different_ops(aiohttp_client):
     assert observed_method == "REPORT"
 
 
-async def test_api_ver(aiohttp_client):
-    inner_request = None
+async def test_api_ver(aiohttp_client) -> None:
+    inner_request: web.Request | None = None
     app = web.Application()
 
-    async def dummy_handler(request):
+    async def dummy_handler(request: web.Request) -> web.Response:
         nonlocal inner_request
         inner_request = request
         return web.Response(body=b"test")
@@ -129,6 +129,7 @@ async def test_api_ver(aiohttp_client):
         },
     )
     assert resp.status == 200
+    assert inner_request is not None
     assert inner_request["api_version"][0] == 5
 
     # normal call with different version
@@ -139,6 +140,7 @@ async def test_api_ver(aiohttp_client):
         },
     )
     assert resp.status == 200
+    assert inner_request is not None
     assert inner_request["api_version"][0] == 4
 
     # calling with invalid/deprecated version
