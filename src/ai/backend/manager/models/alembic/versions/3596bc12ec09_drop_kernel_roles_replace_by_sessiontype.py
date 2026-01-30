@@ -217,8 +217,9 @@ def downgrade():
 
     connection.execute(
         text(
-            "CREATE TYPE sessiontypes AS ENUM (%s)"
-            % (",".join(f"'{choice.name}'" for choice in OldSessionTypes))
+            "CREATE TYPE sessiontypes AS ENUM ({})".format(
+                ",".join(f"'{choice.name}'" for choice in OldSessionTypes)
+            )
         )
     )
     # Revert sessions.session_type to enum

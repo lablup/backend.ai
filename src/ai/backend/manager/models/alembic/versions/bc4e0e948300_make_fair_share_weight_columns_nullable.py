@@ -5,12 +5,13 @@ Revises: 3b27edfaae20
 Create Date: 2026-01-22 16:30:09.032337
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'bc4e0e948300'
-down_revision = '3b27edfaae20'
+revision = "bc4e0e948300"
+down_revision = "3b27edfaae20"
 branch_labels = None
 depends_on = None
 

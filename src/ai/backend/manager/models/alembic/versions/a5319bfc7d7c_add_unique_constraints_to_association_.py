@@ -123,7 +123,7 @@ def upgrade():
         t1 = table.alias("t1")
         t2 = table.alias("t2")
         subq = (
-            sa.select([t1.c.id])
+            sa.select(t1.c.id)
             .where(t1.c[field_1] == t2.c[field_1])
             .where(t1.c[field_2] == t2.c[field_2])
             .where(t1.c.id > t2.c.id)

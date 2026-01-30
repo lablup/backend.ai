@@ -212,7 +212,9 @@ class RoleCreator:
         cls._create_member_permissions(db_conn, permission_group_ids)
 
     @classmethod
-    def _query_domain_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_domain_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all domain rows with pagination.
         """
@@ -246,7 +248,7 @@ class RoleMapper:
     @classmethod
     def _query_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int, *, is_admin: bool
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         users_table = Tables.get_users_table()
         roles_table = get_roles_table()
         permission_groups_table = get_permission_groups_table()
@@ -357,7 +359,9 @@ class RoleMapper:
         cls._map_member_users_to_domain(db_conn)
 
     @classmethod
-    def _query_project_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_project_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all project rows with pagination.
         """

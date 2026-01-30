@@ -103,18 +103,14 @@ def upgrade():
         query = (
             sa.select([keypairs.c.user])
             .select_from(keypairs)
-            .where(keypairs.c.access_key == kernel["access_key"])
+            .where(keypairs.c.access_key == kernel.access_key)
         )
         kp = connection.execute(query).first()
         # Update kernel information.
-        query = """\
-            UPDATE kernels SET domain_name = 'default', group_id = '%s', user_uuid = '%s'
-            WHERE id = '%s';
-        """ % (
-            gid,
-            kp.user,
-            kernel["id"],
-        )
+        query = f"""\
+            UPDATE kernels SET domain_name = 'default', group_id = '{gid}', user_uuid = '{kp.user}'
+            WHERE id = '{kernel.id}';
+        """
         connection.execute(query)
 
     # Associate every users with the default group.
@@ -122,14 +118,11 @@ def upgrade():
     query = sa.select([users.c.uuid]).select_from(users)
     all_users = connection.execute(query).fetchall()
     for user in all_users:
-        query = """\
+        query = f"""\
             INSERT INTO association_groups_users (group_id, user_id)
-            VALUES ('%s', '%s')
+            VALUES ('{gid}', '{user.uuid}')
             ON CONFLICT (group_id, user_id) DO NOTHING;
-        """ % (
-            gid,
-            user.uuid,
-        )
+        """
         connection.execute(text(query))
 
     # Make kernel's new fields non-nullable.

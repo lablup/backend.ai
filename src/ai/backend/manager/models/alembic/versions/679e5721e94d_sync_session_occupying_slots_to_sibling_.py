@@ -39,7 +39,9 @@ class SessionRow(Base):
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    occupying_slots = sa.Column("occupying_slots", ResourceSlotColumn(), nullable=False)
+    occupying_slots: sa.Column[ResourceSlot] = sa.Column(
+        "occupying_slots", ResourceSlotColumn(), nullable=False
+    )
 
     kernels = relationship("KernelRow")
 
@@ -57,7 +59,9 @@ class KernelRow(Base):
         index=True,
         nullable=False,
     )
-    occupied_slots = sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False)
+    occupied_slots: sa.Column[ResourceSlot] = sa.Column(
+        "occupied_slots", ResourceSlotColumn(), nullable=False
+    )
 
 
 def _sync_single_kernel_cluster_session():
