@@ -62,7 +62,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -611,7 +610,7 @@ KERNEL_FILTERING_TEST_CASES = [
 ]
 
 
-class TestAgentDBSourceKernelFiltering:
+class TestAgentRepositoryKernelFiltering:
     """Test kernel filtering with with_loader_criteria at db_source level"""
 
     @pytest.fixture
@@ -873,13 +872,18 @@ class TestAgentDBSourceKernelFiltering:
         yield test_case_with_random_id
 
     @pytest.fixture
-    async def db_source(
+    def repository(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[AgentDBSource, None]:
-        """Create AgentDBSource for testing"""
-        db_source = AgentDBSource(db=db_with_tables)
-        yield db_source
+    ) -> AgentRepository:
+        """Create AgentRepository with the test db_source"""
+        return AgentRepository(
+            db=db_with_tables,
+            valkey_image=MagicMock(),
+            valkey_live=MagicMock(),
+            valkey_stat=MagicMock(),
+            config_provider=MagicMock(),
+        )
 
     @pytest.mark.parametrize(
         "agent_with_kernels",
@@ -889,7 +893,7 @@ class TestAgentDBSourceKernelFiltering:
     )
     async def test_search_agents_validates_actual_occupied_slots(
         self,
-        db_source: AgentDBSource,
+        repository: AgentRepository,
         agent_with_kernels: KernelFilteringTestCase,
     ) -> None:
         """Test that actual_occupied_slots correctly reflects kernel filtering via with_loader_criteria"""
@@ -899,7 +903,7 @@ class TestAgentDBSourceKernelFiltering:
             conditions=[lambda: AgentRow.id == agent_with_kernels.agent_id],
         )
 
-        result = await db_source.search_agents(querier)
+        result = await repository.search_agents(querier)
 
         assert len(result.items) == 1
         agent_detail = result.items[0]
@@ -916,11 +920,11 @@ class TestAgentDBSourceKernelFiltering:
     )
     async def test_get_by_id_loads_kernels_and_computes_actual_occupied_slots(
         self,
-        db_source: AgentDBSource,
+        repository: AgentRepository,
         agent_with_kernels: KernelFilteringTestCase,
     ) -> None:
         # Act - This should not raise MissingGreenlet error
-        agent_data = await db_source.get_by_id(agent_with_kernels.agent_id)
+        agent_data = await repository.get_by_id(agent_with_kernels.agent_id)
 
         # Assert - Verify actual_occupied_slots is computed correctly
         actual_cpu = agent_data.actual_occupied_slots.get("cpu", 0)
