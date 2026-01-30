@@ -163,6 +163,8 @@ class ImageServiceBaseFixtures:
             resources=ImageResourcesData(
                 resources_data={SlotName("cuda.device"): {"min": "1", "max": None}}
             ),
+            resource_limits=[],
+            tags=[],
             status=ImageStatus.ALIVE,
             created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC),
         )
