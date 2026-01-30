@@ -118,7 +118,6 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             raise ArtifactVerifyStorageTypeInvalid(
                 "Verify step requires VFS or VFolderStorage storage type"
             )
-        dst_storage = cast(VFSStorage | VFolderStorage, dst_storage)
 
         # Collect verification results from all verifiers
         verifier_results: dict[str, VerifierResult] = {}

@@ -284,8 +284,8 @@ async def server_main(
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
-    local_config = cast(ServerConfig, root_ctx.local_config)
-    am_config = cast(AccountManagerConfig, local_config.account_manager)
+    local_config = root_ctx.local_config
+    am_config = local_config.account_manager
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config.pyroscope.enabled,
@@ -433,7 +433,7 @@ def main(
     server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
-        account_manager_cfg = cast(AccountManagerConfig, server_config.account_manager)
+        account_manager_cfg = server_config.account_manager
         account_manager_cfg.pid_file.touch(exist_ok=True)
         account_manager_cfg.pid_file.write_text(str(os.getpid()))
         ipc_base_path = account_manager_cfg.ipc_base_path

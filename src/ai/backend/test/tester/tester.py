@@ -99,7 +99,7 @@ class Tester:
         Run all test specifications.
         """
         self._config = await self._load_tester_config(self._config_file_path)
-        exclude_tags = cast(TesterConfig, self._config).runner.exclude_tags
+        exclude_tags = self._config.runner.exclude_tags
 
         tasks = []
         for spec in self._spec_manager.all_specs():

@@ -419,9 +419,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         if params["vfid"].quota_scope_id is None:
             raise InvalidAPIParameters("quota_scope_id is required for vfid")
         ctx: RootContext = request.app["ctx"]
-        perm_mode = cast(
-            int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
-        )
+        perm_mode = params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
         async with ctx.get_volume(params["volume"]) as volume:
             try:
                 await volume.create_vfolder(params["vfid"], mode=perm_mode)

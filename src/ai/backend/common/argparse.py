@@ -37,7 +37,7 @@ def port_range(s: str) -> tuple[int, int]:
     if not (port_range[0] < port_range[1]):
         msg = f"{port_range[0]} should be less than {port_range[1]}."
         raise argparse.ArgumentTypeError(msg)
-    return cast(tuple[int, int], port_range)
+    return port_range
 
 
 def positive_int(s: str) -> int:

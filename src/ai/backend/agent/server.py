@@ -1065,7 +1065,7 @@ class AgentRPCServer(aobject):
         agent = self.runtime.get_agent(agent_id)
         bgtask_mgr = agent.background_task_manager
 
-        image_push_timeout = cast(float | None, self.local_config.api.push_timeout)
+        image_push_timeout = self.local_config.api.push_timeout
 
         async def _push_image(_reporter: ProgressReporter) -> None:
             await agent.push_image(
