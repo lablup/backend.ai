@@ -5741,17 +5741,6 @@ type Mutation
 
   """
   Added in 25.16.0.
-  Create or update domain-level app configuration.
-  The provided extra_config object will completely replace the existing configuration;
-  existing keys not present in the new extra_config will be removed.
-  All users in this domain will be affected by these settings when their configurations are merged,
-  unless they have user-level configurations that override specific keys.
-  Requires admin privileges.
-  """
-  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0.
   Create or update user-level app configuration.
   The provided extra_config object will completely replace the existing configuration;
   existing keys not present in the new extra_config will be removed.
@@ -5760,16 +5749,6 @@ type Mutation
   Users can only modify their own configuration, but admins can modify any user's configuration.
   """
   upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0.
-  Delete domain-level app configuration.
-  All users in this domain may be affected by this deletion.
-  After deletion, users will only receive their user-level configurations
-  when configurations are merged, with no domain-level defaults.
-  Requires admin privileges.
-  """
-  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.16.0.
@@ -5887,29 +5866,93 @@ type Mutation
   """
   createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload! @join__field(graph: STRAWBERRY)
 
+  """Create a new notification channel (admin only)"""
+  adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Update a notification channel (admin only)"""
+  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Delete a notification channel (admin only)"""
+  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Validate a notification channel (admin only)"""
+  adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Create a new notification rule (admin only)"""
+  adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Update a notification rule (admin only)"""
+  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Delete a notification rule (admin only)"""
+  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Validate a notification rule (admin only)"""
+  adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  Create or update domain-level app configuration (admin only).
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  """
+  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  Delete domain-level app configuration (admin only).
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  """
+  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @join__field(graph: STRAWBERRY)
+
   """Create a new notification channel"""
-  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Validate a notification channel"""
-  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Create a new notification rule"""
-  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @join__field(graph: STRAWBERRY)
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Validate a notification rule"""
-  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload! @join__field(graph: STRAWBERRY)
@@ -6008,39 +6051,74 @@ type Mutation
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY)
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
-  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
+  Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
-  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @join__field(graph: STRAWBERRY)
+  adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
+  """
+  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 }
 
 """Added in 24.12.0."""
@@ -7175,17 +7253,6 @@ type Query
 
   """
   Added in 25.16.0.
-  Retrieve domain-level app configuration.
-  Returns only the configuration set specifically for the domain, without merging.
-  This query is useful for checking what values are configured at the domain level
-  when you want to modify domain or user configurations separately.
-  For actual configuration values to be applied, use mergedAppConfig instead.
-  Requires admin privileges.
-  """
-  domainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 25.16.0.
   Retrieve user-level app configuration.
   Returns only the configuration set specifically for the user, without merging with domain config.
   This query is useful for checking what values are configured at the user level
@@ -7212,33 +7279,6 @@ type Query
   """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
 
-  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List domain fair shares (superadmin only)."""
-  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
-  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List project fair shares (superadmin only)."""
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List project usage buckets (superadmin only)."""
-  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List user fair shares (superadmin only)."""
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.1.0. List user usage buckets (superadmin only)."""
-  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
-
   """Added in 25.16.0"""
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection! @join__field(graph: STRAWBERRY)
 
@@ -7250,18 +7290,6 @@ type Query
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica @join__field(graph: STRAWBERRY)
-
-  """Get a notification channel by ID"""
-  notificationChannel(id: ID!): NotificationChannel @join__field(graph: STRAWBERRY)
-
-  """List notification channels"""
-  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @join__field(graph: STRAWBERRY)
-
-  """Get a notification rule by ID"""
-  notificationRule(id: ID!): NotificationRule @join__field(graph: STRAWBERRY)
-
-  """List notification rules"""
-  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @join__field(graph: STRAWBERRY)
 
   """List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]! @join__field(graph: STRAWBERRY)
@@ -7290,8 +7318,164 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.1.0. List resource groups"""
-  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
+  """Added in 26.2.0. List resource groups (admin only)"""
+  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
+
+  """List session scheduling history (admin only)"""
+  adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @join__field(graph: STRAWBERRY)
+
+  """List deployment history (admin only)"""
+  adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @join__field(graph: STRAWBERRY)
+
+  """List route history (admin only)"""
+  adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY)
+
+  """Get a notification channel by ID (admin only)"""
+  adminNotificationChannel(id: ID!): NotificationChannel @join__field(graph: STRAWBERRY)
+
+  """List notification channels (admin only)"""
+  adminNotificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @join__field(graph: STRAWBERRY)
+
+  """Get a notification rule by ID (admin only)"""
+  adminNotificationRule(id: ID!): NotificationRule @join__field(graph: STRAWBERRY)
+
+  """List notification rules (admin only)"""
+  adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  Retrieve domain-level app configuration (admin only).
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  """
+  adminDomainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Get domain fair share data (admin only)."""
+  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List domain fair shares (admin only)."""
+  adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Get project fair share data (admin only)."""
+  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List project fair shares (admin only)."""
+  adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Get user fair share data (admin only)."""
+  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List user fair shares (admin only)."""
+  adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List domain usage buckets (admin only)."""
+  adminDomainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List project usage buckets (admin only)."""
+  adminProjectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List user usage buckets (admin only)."""
+  adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Get domain fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List domain fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Get project fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List project fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Get user fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List user fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. List resource groups"""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List domain fair shares (superadmin only)."""
+  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get project fair share data (superadmin only)."""
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List project fair shares (superadmin only)."""
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get user fair share data (superadmin only)."""
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List user fair shares (superadmin only)."""
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
+  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List project usage buckets (superadmin only)."""
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List user usage buckets (superadmin only)."""
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
@@ -7311,13 +7495,13 @@ type Query
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection! @join__field(graph: STRAWBERRY)
 
   """List session scheduling history (superadmin only)"""
-  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @join__field(graph: STRAWBERRY)
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List deployment history (superadmin only)"""
-  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @join__field(graph: STRAWBERRY)
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List route history (superadmin only)"""
-  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY)
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 }
 
 type QuotaDetails
@@ -7573,7 +7757,7 @@ type ResourceGroup implements Node
   resourceInfo: ResourceInfo!
 }
 
-"""Added in 26.1.0. Resource group connection"""
+"""Added in 26.2.0. Resource group connection"""
 type ResourceGroupConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -7583,6 +7767,14 @@ type ResourceGroupConnection
   """Contains the nodes in this connection"""
   edges: [ResourceGroupEdge!]!
   count: Int!
+}
+
+"""Resource group scope for domain-level operations"""
+input ResourceGroupDomainScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
 }
 
 """An edge in a connection."""
@@ -7626,6 +7818,31 @@ enum ResourceGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Resource group + domain scope for project-level operations"""
+input ResourceGroupProjectScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
+
+  """Domain name to scope the operation"""
+  domainName: String!
+}
+
+"""Resource group + domain + project scope for user-level operations"""
+input ResourceGroupUserScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
+
+  """Domain name to scope the operation"""
+  domainName: String!
+
+  """Project ID to scope the operation"""
+  projectId: String!
 }
 
 """

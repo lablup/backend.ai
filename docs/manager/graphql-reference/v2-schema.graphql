@@ -2366,17 +2366,6 @@ type Mutation {
 
   """
   Added in 25.16.0.
-  Create or update domain-level app configuration.
-  The provided extra_config object will completely replace the existing configuration;
-  existing keys not present in the new extra_config will be removed.
-  All users in this domain will be affected by these settings when their configurations are merged,
-  unless they have user-level configurations that override specific keys.
-  Requires admin privileges.
-  """
-  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
-
-  """
-  Added in 25.16.0.
   Create or update user-level app configuration.
   The provided extra_config object will completely replace the existing configuration;
   existing keys not present in the new extra_config will be removed.
@@ -2385,16 +2374,6 @@ type Mutation {
   Users can only modify their own configuration, but admins can modify any user's configuration.
   """
   upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
-
-  """
-  Added in 25.16.0.
-  Delete domain-level app configuration.
-  All users in this domain may be affected by this deletion.
-  After deletion, users will only receive their user-level configurations
-  when configurations are merged, with no domain-level defaults.
-  Requires admin privileges.
-  """
-  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
 
   """
   Added in 25.16.0.
@@ -2512,29 +2491,93 @@ type Mutation {
   """
   createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
 
+  """Create a new notification channel (admin only)"""
+  adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
+
+  """Update a notification channel (admin only)"""
+  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
+
+  """Delete a notification channel (admin only)"""
+  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
+
+  """Validate a notification channel (admin only)"""
+  adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+
+  """Create a new notification rule (admin only)"""
+  adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
+
+  """Update a notification rule (admin only)"""
+  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
+
+  """Delete a notification rule (admin only)"""
+  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+
+  """Validate a notification rule (admin only)"""
+  adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
+
+  """
+  Added in 26.2.0.
+  Create or update domain-level app configuration (admin only).
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  """
+  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
+
+  """
+  Added in 26.2.0.
+  Delete domain-level app configuration (admin only).
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  """
+  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
+
   """Create a new notification channel"""
-  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Validate a notification channel"""
-  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Create a new notification rule"""
-  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Validate a notification rule"""
-  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
@@ -2633,39 +2676,74 @@ type Mutation {
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
 
   """
+  Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload!
+
+  """
+  Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload!
+
+  """
+  Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
+  """
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
+
+  """
+  Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload!
+
+  """
+  Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload!
+
+  """
+  Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
+  """
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload!
+
+  """
   Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload!
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload!
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
   """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload!
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload!
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload!
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
-  Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
+  Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
-  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
+  adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
+
+  """
+  Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
+  """
+  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 }
 
 """An object with a Globally Unique ID"""
@@ -3158,17 +3236,6 @@ type Query {
 
   """
   Added in 25.16.0.
-  Retrieve domain-level app configuration.
-  Returns only the configuration set specifically for the domain, without merging.
-  This query is useful for checking what values are configured at the domain level
-  when you want to modify domain or user configurations separately.
-  For actual configuration values to be applied, use mergedAppConfig instead.
-  Requires admin privileges.
-  """
-  domainAppConfig(domainName: String!): AppConfig
-
-  """
-  Added in 25.16.0.
   Retrieve user-level app configuration.
   Returns only the configuration set specifically for the user, without merging with domain config.
   This query is useful for checking what values are configured at the user level
@@ -3195,33 +3262,6 @@ type Query {
   """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment
 
-  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare
-
-  """Added in 26.1.0. List domain fair shares (superadmin only)."""
-  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
-
-  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
-  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
-
-  """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare
-
-  """Added in 26.1.0. List project fair shares (superadmin only)."""
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
-
-  """Added in 26.1.0. List project usage buckets (superadmin only)."""
-  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
-
-  """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
-
-  """Added in 26.1.0. List user fair shares (superadmin only)."""
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
-
-  """Added in 26.1.0. List user usage buckets (superadmin only)."""
-  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
-
   """Added in 25.16.0"""
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
@@ -3233,18 +3273,6 @@ type Query {
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica
-
-  """Get a notification channel by ID"""
-  notificationChannel(id: ID!): NotificationChannel
-
-  """List notification channels"""
-  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
-
-  """Get a notification rule by ID"""
-  notificationRule(id: ID!): NotificationRule
-
-  """List notification rules"""
-  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
 
   """List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]!
@@ -3273,8 +3301,164 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
-  """Added in 26.1.0. List resource groups"""
-  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
+  """Added in 26.2.0. List resource groups (admin only)"""
+  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
+
+  """List session scheduling history (admin only)"""
+  adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+
+  """List deployment history (admin only)"""
+  adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+
+  """List route history (admin only)"""
+  adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+
+  """Get a notification channel by ID (admin only)"""
+  adminNotificationChannel(id: ID!): NotificationChannel
+
+  """List notification channels (admin only)"""
+  adminNotificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+
+  """Get a notification rule by ID (admin only)"""
+  adminNotificationRule(id: ID!): NotificationRule
+
+  """List notification rules (admin only)"""
+  adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
+
+  """
+  Added in 26.2.0.
+  Retrieve domain-level app configuration (admin only).
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  """
+  adminDomainAppConfig(domainName: String!): AppConfig
+
+  """Added in 26.2.0. Get domain fair share data (admin only)."""
+  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare
+
+  """Added in 26.2.0. List domain fair shares (admin only)."""
+  adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """Added in 26.2.0. Get project fair share data (admin only)."""
+  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare
+
+  """Added in 26.2.0. List project fair shares (admin only)."""
+  adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """Added in 26.2.0. Get user fair share data (admin only)."""
+  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
+
+  """Added in 26.2.0. List user fair shares (admin only)."""
+  adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """Added in 26.2.0. List domain usage buckets (admin only)."""
+  adminDomainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+
+  """Added in 26.2.0. List project usage buckets (admin only)."""
+  adminProjectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+
+  """Added in 26.2.0. List user usage buckets (admin only)."""
+  adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+
+  """
+  Added in 26.2.0. Get domain fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare
+
+  """
+  Added in 26.2.0. List domain fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """
+  Added in 26.2.0. Get project fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare
+
+  """
+  Added in 26.2.0. List project fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """
+  Added in 26.2.0. Get user fair share data within resource group scope. This API is not yet implemented.
+  """
+  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare
+
+  """
+  Added in 26.2.0. List user fair shares within resource group scope. This API is not yet implemented.
+  """
+  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """
+  Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+
+  """
+  Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+
+  """
+  Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
+  """
+  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+
+  """Added in 26.2.0. List resource groups"""
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List domain fair shares (superadmin only)."""
+  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get project fair share data (superadmin only)."""
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List project fair shares (superadmin only)."""
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. Get user fair share data (superadmin only)."""
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List user fair shares (superadmin only)."""
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
+  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @deprecated(reason: "Use admin_domain_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List project usage buckets (superadmin only)."""
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @deprecated(reason: "Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Added in 26.1.0. List user usage buckets (superadmin only)."""
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @deprecated(reason: "Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel @deprecated(reason: "Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @deprecated(reason: "Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule @deprecated(reason: "Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @deprecated(reason: "Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
@@ -3294,13 +3478,13 @@ type Query {
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
 
   """List session scheduling history (superadmin only)"""
-  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List deployment history (superadmin only)"""
-  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @deprecated(reason: "Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List route history (superadmin only)"""
-  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 }
 
 """
@@ -3479,7 +3663,7 @@ type ResourceGroup implements Node {
   resourceInfo: ResourceInfo!
 }
 
-"""Added in 26.1.0. Resource group connection"""
+"""Added in 26.2.0. Resource group connection"""
 type ResourceGroupConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -3487,6 +3671,12 @@ type ResourceGroupConnection {
   """Contains the nodes in this connection"""
   edges: [ResourceGroupEdge!]!
   count: Int!
+}
+
+"""Resource group scope for domain-level operations"""
+input ResourceGroupDomainScope {
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
 }
 
 """An edge in a connection."""
@@ -3520,6 +3710,27 @@ input ResourceGroupOrderBy {
 """Added in 26.1.0. Fields available for ordering resource groups"""
 enum ResourceGroupOrderField {
   NAME
+}
+
+"""Resource group + domain scope for project-level operations"""
+input ResourceGroupProjectScope {
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
+
+  """Domain name to scope the operation"""
+  domainName: String!
+}
+
+"""Resource group + domain + project scope for user-level operations"""
+input ResourceGroupUserScope {
+  """Resource group name to scope the operation"""
+  resourceGroup: String!
+
+  """Domain name to scope the operation"""
+  domainName: String!
+
+  """Project ID to scope the operation"""
+  projectId: String!
 }
 
 """
