@@ -296,6 +296,14 @@ class PermissionControllerRepository:
                 return await self._db_source.search_project_scopes(querier)
             case ScopeType.USER:
                 return await self._db_source.search_user_scopes(querier)
+            case ScopeType.RESOURCE_GROUP:
+                return await self._db_source.search_resource_group_scopes(querier)
+            case ScopeType.CONTAINER_REGISTRY:
+                return await self._db_source.search_container_registry_scopes(querier)
+            case ScopeType.ARTIFACT_REGISTRY:
+                return await self._db_source.search_artifact_registry_scopes(querier)
+            case ScopeType.STORAGE_HOST:
+                return await self._db_source.search_storage_host_scopes(querier)
 
     @permission_controller_repository_resilience.apply()
     async def search_entities(
