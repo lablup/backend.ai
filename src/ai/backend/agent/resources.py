@@ -94,11 +94,20 @@ def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotNa
     return combined
 
 
-@attrs.define(auto_attribs=True, slots=True)
+@dataclass(slots=True)
 class ComputerContext:
     instance: AbstractComputePlugin
     devices: Collection[AbstractComputeDevice]
     alloc_map: AbstractAllocMap
+
+
+@dataclass(kw_only=True, frozen=True)
+class GlobalDeviceInfo:
+    plugin: AbstractComputePlugin
+    devices: Sequence[AbstractComputeDevice]
+
+
+type GlobalDeviceMap = Mapping[DeviceName, GlobalDeviceInfo]
 
 
 @dataclass
@@ -543,15 +552,20 @@ class ResourceAllocator(aobject):
 
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
-        computers = await self._load_resources()
+        plugins = await self._load_resources()
+        global_devices = await self._create_global_devices(plugins)
 
         computer_contexts: dict[DeviceName, ComputerContext] = {}
-        for name, computer in computers.items():
-            devices = await computer.list_devices()
-            alloc_map = await computer.create_alloc_map()
-            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
+        for device_name, device_info in global_devices.items():
+            alloc_map = await device_info.plugin.create_alloc_map()
+            computer_contexts[device_name] = ComputerContext(
+                instance=device_info.plugin,
+                devices=device_info.devices,
+                alloc_map=alloc_map,
+            )
         self.computers = computer_contexts
-        total_slots = self._calculate_total_slots()
+
+        total_slots = await self._calculate_total_slots()
         self.available_total_slots = self._calculate_available_total_slots(total_slots)
 
         agent_computers = {}
@@ -621,11 +635,25 @@ class ResourceAllocator(aobject):
             raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
         return self.agent_resource_scaling_factor[agent_id]
 
-    def _calculate_total_slots(self) -> SlotsMap:
+    async def _create_global_devices(
+        self,
+        plugins: Mapping[DeviceName, AbstractComputePlugin],
+    ) -> GlobalDeviceMap:
+        global_devices: dict[DeviceName, GlobalDeviceInfo] = {}
+        for device_name, plugin in plugins.items():
+            devices = await plugin.list_devices()
+            global_devices[device_name] = GlobalDeviceInfo(
+                plugin=plugin,
+                devices=list(devices),
+            )
+        return global_devices
+
+    async def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for device in self.computers.values():
-            for slot_info in device.alloc_map.device_slots.values():
-                total_slots[slot_info.slot_name] += slot_info.amount
+        for ctx in self.computers.values():
+            plugin_slots = await ctx.instance.available_slots()
+            for slot_name, amount in plugin_slots.items():
+                total_slots[slot_name] += amount
         return total_slots
 
     def _calculate_available_total_slots(self, total_slots: SlotsMap) -> SlotsMap:
