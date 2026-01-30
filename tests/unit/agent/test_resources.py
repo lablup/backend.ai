@@ -530,34 +530,45 @@ class TestGlobalDeviceInfo:
     """Tests for GlobalDeviceInfo dataclass."""
 
     def test_initialization_with_devices(self) -> None:
-        """Verify GlobalDeviceInfo correctly stores plugin and devices."""
+        """Verify GlobalDeviceInfo correctly stores plugin, devices, and alloc_map."""
         mock_plugin = Mock(spec=AbstractComputePlugin)
         mock_device = Mock(spec=AbstractComputeDevice)
         mock_device.device_id = DeviceId("0")
+        mock_alloc_map = Mock()
 
-        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[mock_device])
+        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[mock_device], alloc_map=mock_alloc_map)
 
         assert info.plugin is mock_plugin
         assert len(info.devices) == 1
         assert info.devices[0] is mock_device
+        assert info.alloc_map is mock_alloc_map
 
     def test_initialization_with_empty_devices(self) -> None:
         """Verify GlobalDeviceInfo handles empty device list."""
         mock_plugin = Mock(spec=AbstractComputePlugin)
+        mock_alloc_map = Mock()
 
-        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[])
+        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[], alloc_map=mock_alloc_map)
 
         assert info.plugin is mock_plugin
         assert len(info.devices) == 0
         assert isinstance(info.devices, Sequence)
+        assert info.alloc_map is mock_alloc_map
 
-    def test_no_alloc_map_attribute(self) -> None:
-        """Verify GlobalDeviceInfo does not have alloc_map (separation of concerns)."""
+    def test_device_ids_property(self) -> None:
+        """Verify device_ids property returns list of device IDs."""
         mock_plugin = Mock(spec=AbstractComputePlugin)
+        mock_alloc_map = Mock()
+        mock_device1 = Mock(spec=AbstractComputeDevice)
+        mock_device1.device_id = DeviceId("gpu-0")
+        mock_device2 = Mock(spec=AbstractComputeDevice)
+        mock_device2.device_id = DeviceId("gpu-1")
 
-        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[])
+        info = GlobalDeviceInfo(
+            plugin=mock_plugin, devices=[mock_device1, mock_device2], alloc_map=mock_alloc_map
+        )
 
-        assert not hasattr(info, "alloc_map")
+        assert info.device_ids == [DeviceId("gpu-0"), DeviceId("gpu-1")]
 
 
 @pytest.mark.asyncio
@@ -568,9 +579,11 @@ class TestCreateGlobalDevices:
         """Verify device discovery works with a single plugin."""
         mock_device = Mock(spec=AbstractComputeDevice)
         mock_device.device_id = DeviceId("gpu-0")
+        mock_alloc_map = Mock()
 
         mock_plugin = AsyncMock(spec=AbstractComputePlugin)
         mock_plugin.list_devices.return_value = [mock_device]
+        mock_plugin.create_alloc_map.return_value = mock_alloc_map
 
         plugins = {DeviceName("cuda"): mock_plugin}
 
@@ -585,7 +598,9 @@ class TestCreateGlobalDevices:
         assert DeviceName("cuda") in result
         assert result[DeviceName("cuda")].plugin is mock_plugin
         assert len(result[DeviceName("cuda")].devices) == 1
+        assert result[DeviceName("cuda")].alloc_map is mock_alloc_map
         mock_plugin.list_devices.assert_called_once()
+        mock_plugin.create_alloc_map.assert_called_once()
 
     async def test_discovers_devices_from_multiple_plugins(self) -> None:
         """Verify correct aggregation of devices from CPU, memory, and accelerator plugins."""
@@ -596,12 +611,19 @@ class TestCreateGlobalDevices:
         gpu_device = Mock(spec=AbstractComputeDevice)
         gpu_device.device_id = DeviceId("gpu-0")
 
+        cpu_alloc_map = Mock()
+        mem_alloc_map = Mock()
+        gpu_alloc_map = Mock()
+
         cpu_plugin = AsyncMock(spec=AbstractComputePlugin)
         cpu_plugin.list_devices.return_value = [cpu_device]
+        cpu_plugin.create_alloc_map.return_value = cpu_alloc_map
         mem_plugin = AsyncMock(spec=AbstractComputePlugin)
         mem_plugin.list_devices.return_value = [mem_device]
+        mem_plugin.create_alloc_map.return_value = mem_alloc_map
         gpu_plugin = AsyncMock(spec=AbstractComputePlugin)
         gpu_plugin.list_devices.return_value = [gpu_device]
+        gpu_plugin.create_alloc_map.return_value = gpu_alloc_map
 
         plugins = {
             DeviceName("cpu"): cpu_plugin,
@@ -626,6 +648,11 @@ class TestCreateGlobalDevices:
         assert result[DeviceName("mem")].devices[0].device_id == DeviceId("root")
         assert result[DeviceName("cuda")].devices[0].device_id == DeviceId("gpu-0")
 
+        # Verify alloc_maps are correctly assigned
+        assert result[DeviceName("cpu")].alloc_map is cpu_alloc_map
+        assert result[DeviceName("mem")].alloc_map is mem_alloc_map
+        assert result[DeviceName("cuda")].alloc_map is gpu_alloc_map
+
 
 @pytest.mark.asyncio
 class TestEmptyPluginHandling:
@@ -633,8 +660,10 @@ class TestEmptyPluginHandling:
 
     async def test_handles_plugin_with_no_devices(self) -> None:
         """Verify behavior when a plugin reports no devices."""
+        mock_alloc_map = Mock()
         mock_plugin = AsyncMock(spec=AbstractComputePlugin)
         mock_plugin.list_devices.return_value = []
+        mock_plugin.create_alloc_map.return_value = mock_alloc_map
 
         plugins = {DeviceName("mock"): mock_plugin}
 
@@ -648,6 +677,7 @@ class TestEmptyPluginHandling:
         assert DeviceName("mock") in result
         assert len(result[DeviceName("mock")].devices) == 0
         assert result[DeviceName("mock")].plugin is mock_plugin
+        assert result[DeviceName("mock")].alloc_map is mock_alloc_map
 
 
 @pytest.mark.asyncio
