@@ -68,6 +68,7 @@ from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -147,6 +148,7 @@ class ModelServingService:
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _repository: ModelServingRepository
+    _deployment_repository: DeploymentRepository
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
@@ -163,6 +165,7 @@ class ModelServingService:
         config_provider: ManagerConfigProvider,
         valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
+        deployment_repository: DeploymentRepository,
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
         revision_generator_registry: RevisionGeneratorRegistry,
@@ -175,6 +178,7 @@ class ModelServingService:
         self._config_provider = config_provider
         self._valkey_live = valkey_live
         self._repository = repository
+        self._deployment_repository = deployment_repository
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
         self._revision_generator_registry = revision_generator_registry
@@ -197,14 +201,19 @@ class ModelServingService:
         self,
         draft: ModelRevisionSpecDraft,
         vfolder_id: uuid.UUID,
+        scaling_group: str,
     ) -> ModelRevisionSpec:
         """Generate model revision using RevisionGenerator."""
+        default_architecture = (
+            await self._deployment_repository.get_default_architecture_from_scaling_group(
+                scaling_group
+            )
+        )
         generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
         return await generator.generate_revision(
             draft_revision=draft,
             vfolder_id=vfolder_id,
-            model_definition_path=None,
-            default_architecture=None,
+            default_architecture=default_architecture,
         )
 
     async def _check_model_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> None:
@@ -241,7 +250,9 @@ class ModelServingService:
                 environ=action.creator.config.environ,
             ),
         )
-        revision = await self._generate_revision(draft, model_vfolder_id)
+        revision = await self._generate_revision(
+            draft, model_vfolder_id, service_prepare_ctx.scaling_group
+        )
         action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
@@ -450,7 +461,9 @@ class ModelServingService:
                 environ=action.config.environ,
             ),
         )
-        revision = await self._generate_revision(draft, model_vfolder_id)
+        revision = await self._generate_revision(
+            draft, model_vfolder_id, service_prepare_ctx.scaling_group
+        )
         action = action.with_revision(revision)
 
         # Get user with keypair

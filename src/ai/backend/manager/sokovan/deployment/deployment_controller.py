@@ -105,7 +105,6 @@ class DeploymentController:
         model_revision = await generator.generate_revision(
             draft_revision=draft.draft_model_revision,
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
-            model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
             default_architecture=default_architecture,
         )
         await self._scheduling_controller.validate_session_spec(

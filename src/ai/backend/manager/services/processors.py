@@ -285,6 +285,7 @@ class Services:
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
+            deployment_repository=args.deployment_controller._deployment_repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
             revision_generator_registry=args.revision_generator_registry,
