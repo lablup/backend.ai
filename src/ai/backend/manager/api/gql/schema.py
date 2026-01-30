@@ -122,6 +122,8 @@ from .reservoir_registry import (
     update_reservoir_registry,
 )
 from .resource_group import (
+    admin_resource_groups,
+    admin_update_resource_group_fair_share_spec,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
@@ -190,6 +192,9 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
+    # Admin APIs
+    admin_resource_groups = admin_resource_groups
+    # Legacy APIs (deprecated)
     resource_groups = resource_groups
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
@@ -262,7 +267,9 @@ class Mutation:
     bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
     bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
-    # Resource Group
+    # Resource Group - Admin APIs
+    admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
+    # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
 
 
