@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class PreloadImageAction(ImageAction):
     agents: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,5 +27,5 @@ class PreloadImageActionResult(BaseActionResult):
     images: list[ImageData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
