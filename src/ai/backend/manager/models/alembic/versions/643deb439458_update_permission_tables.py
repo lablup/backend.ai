@@ -83,11 +83,10 @@ def downgrade() -> None:
     )
     op.drop_index("ix_role_id_entity_type_scope_id", table_name="scope_permissions")
     op.drop_index("ix_id_status", table_name="roles")
-    # Use IF EXISTS as these may not exist after oneshot installation
-    op.execute(
-        "ALTER TABLE object_permissions DROP CONSTRAINT IF EXISTS uq_object_permissions_entity_id_operation"
+    op.drop_constraint(
+        "uq_object_permissions_entity_id_operation", "object_permissions", type_="unique"
     )
-    op.execute("DROP INDEX IF EXISTS ix_role_id_entity_id")
+    op.drop_index("ix_role_id_entity_id", table_name="object_permissions")
 
     op.rename_table("scope_permissions", "role_permissions")
     op.drop_constraint("pk_scope_permissions", "role_permissions", type_="primary")
