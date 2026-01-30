@@ -27,11 +27,7 @@ pants_ignore = [
     "*.log",
     "/tools/pants-plugins",
     "/wheelhouse/*/",
-    "/wheelhouse/*.whl",
-    # Alembic migration files - legacy SQLAlchemy 1.x style, excluded from type checking
-    "/src/ai/backend/manager/models/alembic/versions/",
-    "/src/ai/backend/account_manager/models/alembic/versions/",
-    "/src/ai/backend/appproxy/coordinator/models/alembic/versions/",
+    "/wheelhouse/*.whl"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
