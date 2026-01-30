@@ -13,6 +13,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     DeploymentHistoryOrders,
@@ -125,8 +126,6 @@ async def admin_session_scheduling_histories(
     limit: int | None = None,
     offset: int | None = None,
 ) -> SessionSchedulingHistoryConnection:
-    from ai.backend.manager.api.gql.utils import check_admin_only
-
     check_admin_only()
 
     processors = info.context.processors
@@ -241,8 +240,6 @@ async def admin_deployment_histories(
     limit: int | None = None,
     offset: int | None = None,
 ) -> DeploymentHistoryConnection:
-    from ai.backend.manager.api.gql.utils import check_admin_only
-
     check_admin_only()
 
     processors = info.context.processors
@@ -351,8 +348,6 @@ async def admin_route_histories(
     limit: int | None = None,
     offset: int | None = None,
 ) -> RouteHistoryConnection:
-    from ai.backend.manager.api.gql.utils import check_admin_only
-
     check_admin_only()
 
     processors = info.context.processors
