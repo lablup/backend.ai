@@ -6,7 +6,6 @@ Create Date: 2025-08-25 02:21:32.142541
 
 """
 
-import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
@@ -25,7 +24,7 @@ def upgrade() -> None:
         existing_type=postgresql.TIMESTAMP(timezone=True),
         nullable=True,
         server_default=None,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     op.alter_column(
         "artifact_revisions",
@@ -33,7 +32,7 @@ def upgrade() -> None:
         existing_type=postgresql.TIMESTAMP(timezone=True),
         nullable=True,
         server_default=None,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     # ### end Alembic commands ###
 
@@ -45,13 +44,13 @@ def downgrade() -> None:
         "updated_at",
         existing_type=postgresql.TIMESTAMP(timezone=True),
         nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     op.alter_column(
         "artifact_revisions",
         "created_at",
         existing_type=postgresql.TIMESTAMP(timezone=True),
         nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     # ### end Alembic commands ###

@@ -175,7 +175,7 @@ def migrate_data_etcd_to_psql() -> None:
         def backup(etcd_container_registries: Mapping[str, Any]):
             backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
             backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())  # noqa: DTZ005
-            with open(backup_path, "w") as f:
+            with backup_path.open("w") as f:
                 json.dump(dict(etcd_container_registries), f, indent=4)
 
         # If there are no container registries, it returns an empty list.
@@ -263,7 +263,7 @@ def revert_data_psql_to_etcd() -> None:
     db_connection = op.get_bind()
 
     rows = db_connection.execute(
-        sa.select([
+        sa.select(
             ContainerRegistryRow.url,
             ContainerRegistryRow.registry_name,
             ContainerRegistryRow.type,
@@ -271,7 +271,7 @@ def revert_data_psql_to_etcd() -> None:
             ContainerRegistryRow.username,
             ContainerRegistryRow.password,
             ContainerRegistryRow.ssl_verify,
-        ])
+        )
     ).fetchall()
     items = []
 
@@ -334,11 +334,11 @@ def insert_registry_id_to_images() -> None:
     ContainerRegistry = get_container_registry_row_schema()
 
     registry_infos = db_connection.execute(
-        sa.select([
+        sa.select(
             ContainerRegistry.id,
             ContainerRegistry.registry_name,
             ContainerRegistry.project,
-        ])
+        )
     ).fetchall()
 
     if registry_infos:
@@ -392,12 +392,12 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
         registry_name, project = namespace
 
         registry_info = db_connection.execute(
-            sa.select([
+            sa.select(
                 ContainerRegistryRow.url,
                 ContainerRegistryRow.registry_name,
                 ContainerRegistryRow.type,
                 ContainerRegistryRow.ssl_verify,
-            ]).where(ContainerRegistryRow.registry_name == registry_name)
+            ).where(ContainerRegistryRow.registry_name == registry_name)
         ).fetchone()
 
         if not registry_info:
@@ -405,15 +405,14 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
 
         if project in added_projects:
             continue
-        else:
-            added_projects.append(project)
+        added_projects.append(project)
 
-        registry_info = dict(registry_info)
-        registry_info["project"] = project
+        registry_info_dict: dict[str, Any] = dict(registry_info._mapping)
+        registry_info_dict["project"] = project
 
         registry_id = db_connection.execute(
             sa.insert(ContainerRegistryRow)
-            .values(**registry_info)
+            .values(**registry_info_dict)
             .returning(ContainerRegistryRow.id)
         ).scalar_one()
 
@@ -465,7 +464,7 @@ def mark_local_images_with_missing_registry_id() -> None:
     }
 
     local_registry_id = db_connection.execute(
-        sa.select([ContainerRegistryRow.id]).where(
+        sa.select(ContainerRegistryRow.id).where(
             ContainerRegistryRow.type == ContainerRegistryType.LOCAL
         )
     ).scalar_one_or_none()

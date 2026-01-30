@@ -121,7 +121,9 @@ class RoleCreator:
         insert_if_data_exists(db_conn, get_permissions_table(), permission_inputs)
 
     @classmethod
-    def _query_user_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_user_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """
@@ -176,7 +178,9 @@ class RoleMapper:
         insert_if_data_exists(db_conn, user_roles_table, user_role_inputs)
 
     @classmethod
-    def _query_user_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_user_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """

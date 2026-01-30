@@ -4,6 +4,9 @@ from .resolver import (
     DeploymentHistoryConnection,
     RouteHistoryConnection,
     SessionSchedulingHistoryConnection,
+    admin_deployment_histories,
+    admin_route_histories,
+    admin_session_scheduling_histories,
     deployment_histories,
     route_histories,
     session_scheduling_histories,
@@ -41,7 +44,11 @@ __all__ = (
     "SessionSchedulingHistoryConnection",
     "DeploymentHistoryConnection",
     "RouteHistoryConnection",
-    # Queries
+    # Queries - Admin
+    "admin_session_scheduling_histories",
+    "admin_deployment_histories",
+    "admin_route_histories",
+    # Queries - Legacy (deprecated)
     "session_scheduling_histories",
     "deployment_histories",
     "route_histories",

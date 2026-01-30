@@ -13,6 +13,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     DeploymentHistoryOrders,
@@ -113,7 +114,66 @@ class RouteHistoryConnection(Connection[RouteHistory]):
 # Query fields
 
 
-@strawberry.field(description="List session scheduling history (superadmin only)")
+@strawberry.field(description="List session scheduling history (admin only)")
+async def admin_session_scheduling_histories(
+    info: Info[StrawberryGQLContext],
+    filter: SessionSchedulingHistoryFilter | None = None,
+    order_by: list[SessionSchedulingHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> SessionSchedulingHistoryConnection:
+    check_admin_only()
+
+    processors = info.context.processors
+
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_session_history_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
+    )
+
+    action_result = await processors.scheduling_history.search_session_history.wait_for_complete(
+        SearchSessionHistoryAction(querier=querier)
+    )
+
+    nodes = [SessionSchedulingHistory.from_dataclass(data) for data in action_result.histories]
+
+    edges = [
+        SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
+        for node in nodes
+    ]
+
+    return SessionSchedulingHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
+
+
+@strawberry.field(
+    description="List session scheduling history (superadmin only)",
+    deprecation_reason=(
+        "Use admin_session_scheduling_histories instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+    ),
+)
 async def session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -168,7 +228,63 @@ async def session_scheduling_histories(
     )
 
 
-@strawberry.field(description="List deployment history (superadmin only)")
+@strawberry.field(description="List deployment history (admin only)")
+async def admin_deployment_histories(
+    info: Info[StrawberryGQLContext],
+    filter: DeploymentHistoryFilter | None = None,
+    order_by: list[DeploymentHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> DeploymentHistoryConnection:
+    check_admin_only()
+
+    processors = info.context.processors
+
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_deployment_history_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
+    )
+
+    action_result = await processors.scheduling_history.search_deployment_history.wait_for_complete(
+        SearchDeploymentHistoryAction(querier=querier)
+    )
+
+    nodes = [DeploymentHistory.from_dataclass(data) for data in action_result.histories]
+
+    edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return DeploymentHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
+
+
+@strawberry.field(
+    description="List deployment history (superadmin only)",
+    deprecation_reason=(
+        "Use admin_deployment_histories instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+    ),
+)
 async def deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -220,7 +336,63 @@ async def deployment_histories(
     )
 
 
-@strawberry.field(description="List route history (superadmin only)")
+@strawberry.field(description="List route history (admin only)")
+async def admin_route_histories(
+    info: Info[StrawberryGQLContext],
+    filter: RouteHistoryFilter | None = None,
+    order_by: list[RouteHistoryOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RouteHistoryConnection:
+    check_admin_only()
+
+    processors = info.context.processors
+
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        _get_route_history_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
+    )
+
+    action_result = await processors.scheduling_history.search_route_history.wait_for_complete(
+        SearchRouteHistoryAction(querier=querier)
+    )
+
+    nodes = [RouteHistory.from_dataclass(data) for data in action_result.histories]
+
+    edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return RouteHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
+
+
+@strawberry.field(
+    description="List route history (superadmin only)",
+    deprecation_reason=(
+        "Use admin_route_histories instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+    ),
+)
 async def route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,

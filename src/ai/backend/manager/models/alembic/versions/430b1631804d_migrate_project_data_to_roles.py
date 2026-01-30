@@ -221,7 +221,9 @@ class RoleCreator:
         cls._create_member_permissions(db_conn, permission_group_ids)
 
     @classmethod
-    def _query_project_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_project_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all project rows with pagination.
         """
@@ -255,7 +257,7 @@ class RoleMapper:
     @classmethod
     def _query_admin_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query admin role rows with their associated users.
         All projects in a domain is queried with domain admin users.
@@ -334,7 +336,7 @@ class RoleMapper:
     @classmethod
     def _query_member_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query member role rows with their associated users.
         """

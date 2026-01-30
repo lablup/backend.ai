@@ -7,6 +7,7 @@ Create Date: 2025-08-07 23:53:34.718192
 """
 
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -88,7 +89,7 @@ class Tables:
 
 class PermissionCreator:
     @classmethod
-    def _query_roles(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_roles(cls, db_conn: Connection, offset: int, page_size: int) -> Sequence[Row[Any]]:
         """
         Query to get system roles that need vfolder permissions.
         """
@@ -115,7 +116,7 @@ class PermissionCreator:
     @classmethod
     def _query_vfolder_permission_rows_with_role(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         user_roles_table = get_user_roles_table()
         vfolder_permissions_table = Tables.get_vfolder_permissions_table()
 
@@ -217,7 +218,9 @@ class PermissionCreator:
 
 class EntityMapper:
     @classmethod
-    def _query_vfolder_rows(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_vfolder_rows(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         vfolder_table = Tables.get_vfolder_table()
         stmt = (
             sa.select(
@@ -271,7 +274,7 @@ class EntityMapper:
     @classmethod
     def _query_vfolder_permissions_rows(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         vfolder_permissions_table = Tables.get_vfolder_permissions_table()
         stmt = (
             sa.select(

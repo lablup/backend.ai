@@ -25,7 +25,7 @@ def upgrade() -> None:
         existing_type=postgresql.TIMESTAMP(),
         type_=sa.DateTime(timezone=True),
         existing_nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     op.alter_column(
         "artifacts",
@@ -33,7 +33,7 @@ def upgrade() -> None:
         existing_type=postgresql.TIMESTAMP(),
         type_=sa.DateTime(timezone=True),
         existing_nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     # ### end Alembic commands ###
 
@@ -46,7 +46,7 @@ def downgrade() -> None:
         existing_type=sa.DateTime(timezone=False),
         type_=postgresql.TIMESTAMP(),
         existing_nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     op.alter_column(
         "artifacts",
@@ -54,6 +54,6 @@ def downgrade() -> None:
         existing_type=sa.DateTime(timezone=False),
         type_=postgresql.TIMESTAMP(),
         existing_nullable=False,
-        existing_server_default=sa.text("now()"),
+        existing_server_default="now()",
     )
     # ### end Alembic commands ###

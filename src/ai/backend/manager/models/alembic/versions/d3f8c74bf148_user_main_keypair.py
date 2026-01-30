@@ -93,7 +93,9 @@ def upgrade() -> None:
         __table_args__ = {"extend_existing": True}
 
         uuid = sa.Column("uuid", GUID, primary_key=True)
-        role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
+        role: sa.Column[UserRole] = sa.Column(
+            "role", EnumValueType(UserRole), default=UserRole.USER
+        )
         email = sa.Column("email", sa.String(length=64))
         main_access_key = sa.Column(
             "main_access_key",
@@ -144,7 +146,7 @@ def upgrade() -> None:
             .limit(PAGE_SIZE)
             .options(selectinload(UserRow.keypairs))
         )
-        user_rows: list[UserRow] = db_session.scalars(user_query).all()
+        user_rows = db_session.scalars(user_query).all()
 
         if not user_rows:
             break

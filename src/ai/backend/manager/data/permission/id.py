@@ -3,6 +3,15 @@ from typing import Self
 
 from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
 
+__all__ = [
+    "EntityType",
+    "FieldType",
+    "ScopeType",
+    "FieldRef",
+    "ScopeId",
+    "ObjectId",
+]
+
 
 @dataclass(frozen=True)
 class FieldRef:

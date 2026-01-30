@@ -7,6 +7,7 @@ Create Date: 2018-06-17 13:52:13.346856
 """
 
 import os
+from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import op
@@ -58,7 +59,7 @@ def upgrade():
         print(f"There are {len(user_ids)} unique user IDs.")
 
         user_id_map = {}
-        with open("user_id_map.txt") as f:
+        with Path("user_id_map.txt").open() as f:
             for line in f:
                 num_id, str_id = line.split(maxsplit=1)
                 assert len(str_id) <= 256, f"Too long target user ID! ({num_id} -> {str_id!r})"
