@@ -74,6 +74,7 @@ class ObjectPermissionRow(Base):
         GUID,
         sa.ForeignKey("permission_groups.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
