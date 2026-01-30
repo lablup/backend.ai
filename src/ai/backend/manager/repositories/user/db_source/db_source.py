@@ -508,10 +508,6 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    def _validate_user_access(self, _user_row: UserRow, _requester_uuid: Optional[UUID]) -> bool:
-        """Private method to validate user access - can be extended for ownership logic."""
-        return True
-
     async def _add_user_to_groups(
         self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
     ) -> None:
