@@ -62,4 +62,5 @@ def downgrade() -> None:
         table_name="endpoints",
         postgresql_where=sa.text("lifecycle_stage != 'destroyed'"),
     )
+    op.drop_column("routings", "weight")
     op.drop_column("endpoints", "desired_replicas")
