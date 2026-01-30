@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,7 +13,7 @@ class SetImageResourceLimitByIdAction(ImageAction):
     resource_limit: ResourceLimitInput
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
 
     @override
@@ -27,5 +27,5 @@ class SetImageResourceLimitByIdActionResult(BaseActionResult):
     image_data: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_data.id)

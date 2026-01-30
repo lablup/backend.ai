@@ -40,7 +40,7 @@ class ForgetImageByIdAction(ImageAction):
     image_id: ImageID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image_id)
 
     @override
@@ -54,5 +54,5 @@ class ForgetImageByIdActionResult(BaseActionResult):
     image: ImageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.image.id)
