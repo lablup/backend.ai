@@ -44,16 +44,13 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
+def mock_get_vfolder_ownership_type_dry_run(mocker, mock_repositories):
     mock = mocker.patch.object(
         mock_repositories.repository,
-        "get_vfolder_by_id",
+        "get_vfolder_ownership_type",
         new_callable=AsyncMock,
     )
-    mock.return_value = MagicMock(
-        id=uuid.uuid4(),
-        ownership_type=VFolderOwnershipType.USER,
-    )
+    mock.return_value = VFolderOwnershipType.USER
     return mock
 
 
@@ -234,16 +231,13 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id_dry_run(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_vfolder_ownership_type_dry_run(self, mocker, mock_repositories) -> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
-            "get_vfolder_by_id",
+            "get_vfolder_ownership_type",
             new_callable=AsyncMock,
         )
-        mock.return_value = MagicMock(
-            id=uuid.uuid4(),
-            ownership_type=VFolderOwnershipType.USER,
-        )
+        mock.return_value = VFolderOwnershipType.USER
         return mock
 
     @pytest.fixture
@@ -332,7 +326,7 @@ class TestDryRunModelService:
         self,
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id_dry_run: MagicMock,
+        mock_get_vfolder_ownership_type_dry_run: AsyncMock,
         mock_get_user_with_keypair: AsyncMock,
         mock_resolve_image_for_endpoint_creation_dry_run: MagicMock,
         mock_background_task_manager_start: AsyncMock,

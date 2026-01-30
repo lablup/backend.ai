@@ -29,7 +29,7 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
-from ai.backend.manager.models.vfolder import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_model_service import (
@@ -50,16 +50,13 @@ from ai.backend.testutils.scenario import ScenarioBase
 
 
 @pytest.fixture
-def mock_get_vfolder_by_id(mocker, mock_repositories):
+def mock_get_vfolder_ownership_type(mocker, mock_repositories):
     mock = mocker.patch.object(
         mock_repositories.repository,
-        "get_vfolder_by_id",
+        "get_vfolder_ownership_type",
         new_callable=AsyncMock,
     )
-    mock.return_value = MagicMock(
-        id=uuid.uuid4(),
-        ownership_type=VFolderOwnershipType.USER,
-    )
+    mock.return_value = VFolderOwnershipType.USER
     return mock
 
 
@@ -295,16 +292,13 @@ class TestCreateModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_vfolder_ownership_type(self, mocker, mock_repositories) -> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
-            "get_vfolder_by_id",
+            "get_vfolder_ownership_type",
             new_callable=AsyncMock,
         )
-        mock.return_value = MagicMock(
-            id=uuid.uuid4(),
-            ownership_type=VFolderOwnershipType.USER,
-        )
+        mock.return_value = VFolderOwnershipType.USER
         return mock
 
     @pytest.fixture
@@ -575,7 +569,7 @@ class TestCreateModelService:
         self,
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id: MagicMock,
+        mock_get_vfolder_ownership_type: AsyncMock,
         mock_revision_generator: MagicMock,
         mock_resolve_image_for_endpoint_creation: MagicMock,
         mock_resolve_group_id: MagicMock,

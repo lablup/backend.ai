@@ -56,18 +56,16 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
@@ -195,15 +193,6 @@ class ModelServingService:
             SessionStatus.ERROR: "session_cancelled",
         }
 
-    async def _get_validated_model_vfolder(self, model_vfolder_id: uuid.UUID) -> VFolderRow:
-        """Get and validate model vfolder for service creation."""
-        model_vfolder_row = await self._repository.get_vfolder_by_id(model_vfolder_id)
-        if not model_vfolder_row:
-            raise VFolderNotFound(f"Model vfolder {model_vfolder_id} not found")
-        if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
-            raise InvalidAPIParameters("Cannot use project-type vfolder for model service")
-        return model_vfolder_row
-
     async def _generate_revision(
         self,
         draft: ModelRevisionSpecDraft,
@@ -218,10 +207,17 @@ class ModelServingService:
             default_architecture=None,
         )
 
+    async def _check_model_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> None:
+        """Check model vfolder ownership type."""
+        vfolder_ownership_type = await self._repository.get_vfolder_ownership_type(vfolder_id)
+        if vfolder_ownership_type == VFolderOwnershipType.GROUP:
+            raise InvalidAPIParameters("Cannot use project-type vfolder for model service")
+
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
 
-        model_vfolder_row = await self._get_validated_model_vfolder(service_prepare_ctx.model_id)
+        model_vfolder_id = service_prepare_ctx.model_id
+        await self._check_model_vfolder_ownership_type(model_vfolder_id)
 
         # Use RevisionGenerator to load service definition and merge with API request
         draft = ModelRevisionSpecDraft(
@@ -236,7 +232,7 @@ class ModelServingService:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=model_vfolder_row.id,
+                model_vfolder_id=model_vfolder_id,
                 model_definition_path=None,
             ),
             execution=ExecutionSpec(
@@ -245,16 +241,16 @@ class ModelServingService:
                 environ=action.creator.config.environ,
             ),
         )
-        revision = await self._generate_revision(draft, model_vfolder_row.id)
+        revision = await self._generate_revision(draft, model_vfolder_id)
         action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
-            service_prepare_ctx.model_id,
+            model_vfolder_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
         creation_config["mount_map"] = {
-            service_prepare_ctx.model_id: action.creator.config.model_mount_destination,
+            model_vfolder_id: action.creator.config.model_mount_destination,
             **{
                 m.vfid.folder_id: m.kernel_path.as_posix() for m in service_prepare_ctx.extra_mounts
             },
@@ -429,7 +425,8 @@ class ModelServingService:
         # TODO: Seperate background task definition and trigger into different layer
         service_prepare_ctx = action.model_service_prepare_ctx
 
-        model_vfolder_row = await self._get_validated_model_vfolder(service_prepare_ctx.model_id)
+        model_vfolder_id = service_prepare_ctx.model_id
+        await self._check_model_vfolder_ownership_type(model_vfolder_id)
 
         # Use RevisionGenerator to load service definition and merge with API request
         draft = ModelRevisionSpecDraft(
@@ -444,7 +441,7 @@ class ModelServingService:
                 resource_opts=None,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=model_vfolder_row.id,
+                model_vfolder_id=model_vfolder_id,
                 model_definition_path=None,
             ),
             execution=ExecutionSpec(
@@ -453,7 +450,7 @@ class ModelServingService:
                 environ=action.config.environ,
             ),
         )
-        revision = await self._generate_revision(draft, model_vfolder_row.id)
+        revision = await self._generate_revision(draft, model_vfolder_id)
         action = action.with_revision(revision)
 
         # Get user with keypair
@@ -468,9 +465,7 @@ class ModelServingService:
         ])
 
         creation_config = action.config.to_dict()
-        creation_config["mount_map"] = {
-            service_prepare_ctx.model_id: action.config.model_mount_destination
-        }
+        creation_config["mount_map"] = {model_vfolder_id: action.config.model_mount_destination}
         sudo_session_enabled = action.sudo_session_enabled
 
         # Build SessionCreationSpec for dry-run
@@ -479,11 +474,11 @@ class ModelServingService:
 
         # Prepare mounts and environ
         mounts = [
-            service_prepare_ctx.model_id,
+            model_vfolder_id,
             *[m.vfid for m in service_prepare_ctx.extra_mounts],
         ]
         mount_map: dict[uuid.UUID | VFolderID, str] = {
-            service_prepare_ctx.model_id: action.config.model_mount_destination,
+            model_vfolder_id: action.config.model_mount_destination,
         }
         for m in service_prepare_ctx.extra_mounts:
             mount_map[m.vfid] = str(m.kernel_path)
