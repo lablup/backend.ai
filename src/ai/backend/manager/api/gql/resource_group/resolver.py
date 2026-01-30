@@ -50,7 +50,7 @@ def _get_resource_group_pagination_spec() -> PaginationSpec:
 ResourceGroupEdge = Edge[ResourceGroupGQL]
 
 
-@strawberry.type(description="Added in 26.1.0. Resource group connection")
+@strawberry.type(description="Added in 26.2.0. Resource group connection")
 class ResourceGroupConnection(Connection[ResourceGroupGQL]):
     count: int
 
@@ -63,7 +63,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 
 
 @strawberry.field(
-    description="Added in 26.1.0. List resource groups (admin only)",
+    description="Added in 26.2.0. List resource groups (admin only)",
 )
 async def admin_resource_groups(
     info: Info[StrawberryGQLContext],
@@ -116,7 +116,7 @@ async def admin_resource_groups(
 
 
 @strawberry.field(
-    description="Added in 26.1.0. List resource groups",
+    description="Added in 26.2.0. List resource groups",
     deprecation_reason=(
         "Use admin_resource_groups instead. This API will be removed after v26.3.0. "
         "See BEP-1041 for migration guide."
@@ -175,7 +175,7 @@ async def resource_groups(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.1.0. Update fair share configuration for a resource group (admin only). "
+        "Added in 26.2.0. Update fair share configuration for a resource group (admin only). "
         "Only provided fields are updated; others retain their existing values. "
         "Resource weights are validated against capacity - only resource types available in "
         "the scaling group's capacity can be specified."
@@ -219,7 +219,7 @@ async def admin_update_resource_group_fair_share_spec(
 
 @strawberry.mutation(
     description=(
-        "Added in 26.1.0. Update fair share configuration for a resource group (superadmin only). "
+        "Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). "
         "Only provided fields are updated; others retain their existing values. "
         "Resource weights are validated against capacity - only resource types available in "
         "the scaling group's capacity can be specified."

@@ -7,6 +7,9 @@ from .agent import (
     agents_v2,
 )
 from .app_config import (
+    admin_delete_domain_app_config,
+    admin_domain_app_config,
+    admin_upsert_domain_app_config,
     delete_domain_app_config,
     delete_user_app_config,
     domain_app_config,
@@ -176,7 +179,6 @@ class Query:
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
-    domain_app_config = domain_app_config
     user_app_config = user_app_config
     merged_app_config = merged_app_config
     deployments = deployments
@@ -212,8 +214,10 @@ class Query:
     admin_notification_channels = admin_notification_channels
     admin_notification_rule = admin_notification_rule
     admin_notification_rules = admin_notification_rules
+    admin_domain_app_config = admin_domain_app_config
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
+    domain_app_config = domain_app_config
     notification_channel = notification_channel
     notification_channels = notification_channels
     notification_rule = notification_rule
@@ -233,9 +237,7 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
-    upsert_domain_app_config = upsert_domain_app_config
     upsert_user_app_config = upsert_user_app_config
-    delete_domain_app_config = delete_domain_app_config
     delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
@@ -259,6 +261,9 @@ class Mutation:
     admin_update_notification_rule = admin_update_notification_rule
     admin_delete_notification_rule = admin_delete_notification_rule
     admin_validate_notification_rule = admin_validate_notification_rule
+    # App Config - Admin APIs
+    admin_upsert_domain_app_config = admin_upsert_domain_app_config
+    admin_delete_domain_app_config = admin_delete_domain_app_config
     # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
@@ -268,6 +273,9 @@ class Mutation:
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
+    # App Config - Legacy (deprecated)
+    upsert_domain_app_config = upsert_domain_app_config
+    delete_domain_app_config = delete_domain_app_config
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
