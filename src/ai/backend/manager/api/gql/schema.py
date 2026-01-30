@@ -136,6 +136,9 @@ from .scheduler import (
     scheduling_events_by_session,
 )
 from .scheduling_history import (
+    admin_deployment_histories,
+    admin_route_histories,
+    admin_session_scheduling_histories,
     deployment_histories,
     route_histories,
     session_scheduling_histories,
@@ -194,6 +197,9 @@ class Query:
     reservoir_registries = reservoir_registries
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployment_histories = admin_deployment_histories
+    admin_route_histories = admin_route_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     default_artifact_registry = default_artifact_registry
