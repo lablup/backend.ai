@@ -354,11 +354,8 @@ async def test_hook_notify(etcd, mocker):
     try:
         await ctx.init()
         # notify() should return successfully no matter a plugin rejects/fails or not.
-        hook_result = await ctx.notify("HOOK1", ("a", "b"))
-        assert hook_result is None
-        hook_result = await ctx.notify("HOOK2", ("c", "d"))
-        assert hook_result is None
-        hook_result = await ctx.notify("HOOK3", ("e", "f"))
-        assert hook_result is None
+        await ctx.notify("HOOK1", ("a", "b"))
+        await ctx.notify("HOOK2", ("c", "d"))
+        await ctx.notify("HOOK3", ("e", "f"))
     finally:
         await ctx.cleanup()
