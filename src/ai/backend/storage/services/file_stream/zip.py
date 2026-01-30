@@ -33,7 +33,7 @@ class ArchiveDownloadTokenData(BaseModel):
     operation: Literal["download"]
     volume: str
     vfolder_id: VFolderIDField
-    files: list[PurePosixPath] = Field(min_length=1)
+    files: list[str] = Field(min_length=1)
 
 
 class ZipArchiveStreamReader(StreamReader):

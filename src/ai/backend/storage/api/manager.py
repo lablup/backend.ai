@@ -79,6 +79,7 @@ from ai.backend.storage.errors import (
     StorageProxyError,
     VFolderNotFoundError,
 )
+from ai.backend.storage.services.file_stream.zip import ArchiveDownloadTokenData
 from ai.backend.storage.types import QuotaConfig, VFolderID
 from ai.backend.storage.utils import check_params, log_manager_api_entry
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
@@ -1108,15 +1109,16 @@ async def create_archive_download_session(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "create_archive_download_session", params)
         ctx: RootContext = request.app["ctx"]
-        token_data = {
-            "operation": "download",
-            "volume": params["volume"],
-            "vfolder_id": str(params["vfid"]),
-            "files": params["files"],
-            "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
-        }
+        token_payload = ArchiveDownloadTokenData(
+            operation="download",
+            volume=params["volume"],
+            vfolder_id=params["vfid"],
+            files=params["files"],
+        )
+        payload = token_payload.model_dump(mode="json")
+        payload["exp"] = datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire
         token = jwt.encode(
-            token_data,
+            payload,
             ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
