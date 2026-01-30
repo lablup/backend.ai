@@ -191,7 +191,7 @@ async def query_accessible_session_templates(
             })
     if "group" in allowed_types:
         # Query group session_templates
-        if user_role == UserRole.ADMIN or user_role == "admin":
+        if user_role == UserRole.ADMIN:
             query = (
                 sa.select(groups.c.id)
                 .select_from(groups)
@@ -229,7 +229,7 @@ async def query_accessible_session_templates(
         if "user" in allowed_types:
             query = query.where(session_templates.c.user_uuid != user_uuid)
         result = await conn.execute(query)
-        is_owner = user_role == UserRole.ADMIN or user_role == "admin"
+        is_owner = user_role == UserRole.ADMIN
         for row in result:
             entries.append({
                 "name": row.session_templates_name,
