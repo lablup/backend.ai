@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Protocol
 from unittest.mock import patch
@@ -26,7 +25,7 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.common.types import SlotName
+from ai.backend.common.types import DeviceId, DeviceName
 from ai.backend.logging.config import LoggingConfig, default_pkg_ns
 from ai.backend.logging.types import LogLevel
 
@@ -836,15 +835,15 @@ class TestMultipleAgentsConfigValidation:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 2,
                         "mem": "8G",
+                        "devices": {"cuda": ["cuda0", "cuda1"]},
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "cpu": 1,
-                        "mem": "8G",
+                        "mem": "4G",
+                        "devices": {"cuda": ["cuda2"]},
                     },
                 },
             ],
@@ -853,9 +852,9 @@ class TestMultipleAgentsConfigValidation:
 
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].resource.allocations is not None
-        assert agent_configs[0].resource.allocations.cpu == 2
+        assert agent_configs[0].resource.allocations.mem == 8 * (1024**3)
         assert agent_configs[1].resource.allocations is not None
-        assert agent_configs[1].resource.allocations.cpu == 1
+        assert agent_configs[1].resource.allocations.mem == 4 * (1024**3)
 
     def test_agent_partial_override_preserves_other_fields(
         self,
@@ -921,8 +920,8 @@ class TestMultipleAgentsConfigValidation:
                 **default_raw_config["resource"],
                 "allocation-mode": "manual",
                 "allocations": {
-                    "cpu": 1,
                     "mem": "8G",
+                    "devices": {"cuda": ["cuda2"]},
                 },
             },
             "agents": [
@@ -933,8 +932,8 @@ class TestMultipleAgentsConfigValidation:
                     },
                     "container": {"port-range": [31000, 32000]},
                     "resource": {
-                        "cpu": 2,
-                        "mem": "8G",
+                        "mem": "16G",
+                        "devices": {"cuda": ["cuda0", "cuda1"]},
                     },
                 },
                 {
@@ -954,10 +953,10 @@ class TestMultipleAgentsConfigValidation:
         assert len(agent_configs) == 3
         assert agent_configs[0].agent.kernel_creation_concurrency == 8
         assert agent_configs[0].resource.allocations is not None
-        assert agent_configs[0].resource.allocations.cpu == 2
+        assert agent_configs[0].resource.allocations.mem == 16 * (1024**3)
         assert agent_configs[1].agent.kernel_creation_concurrency == 4
         assert agent_configs[1].resource.allocations is not None
-        assert agent_configs[1].resource.allocations.cpu == 1
+        assert agent_configs[1].resource.allocations.mem == 8 * (1024**3)
         assert agent_configs[2].agent.kernel_creation_concurrency == 4
 
     def test_agent_with_only_id_inherits_all_fields(
@@ -1214,7 +1213,7 @@ class TestResourceAllocationModes:
         assert config.resource.allocation_mode == ResourceAllocationMode.SHARED
         assert len(config.get_agent_configs()) == 2
 
-    def test_shared_mode_rejects_allocated_cpu(
+    def test_shared_mode_rejects_allocations(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
@@ -1228,8 +1227,8 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "8G",
+                        "devices": {"cpu": ["0", "1"]},
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1254,11 +1253,8 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "8G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.5,
-                        },
+                        "devices": {"cuda": ["cuda0"]},
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1287,7 +1283,7 @@ class TestResourceAllocationModes:
         config = AgentUnifiedConfig.model_validate(raw_config)
         assert config.resource.allocation_mode == ResourceAllocationMode.AUTO_SPLIT
 
-    def test_auto_split_mode_rejects_allocated_cpu(
+    def test_auto_split_mode_rejects_allocations(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
@@ -1301,8 +1297,8 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "8G",
+                        "devices": {"cpu": ["0", "1"]},
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1313,7 +1309,7 @@ class TestResourceAllocationModes:
 
         assert "must not specify manual resource" in str(exc_info.value)
 
-    def test_manual_mode_requires_allocated_cpu_mem_disk(
+    def test_manual_mode_requires_cpu_or_devices(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
@@ -1327,8 +1323,7 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
-                        # Missing mem - this should fail because mem is required
+                        "mem": "8G",
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1337,9 +1332,9 @@ class TestResourceAllocationModes:
         with pytest.raises(ValidationError) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "Field required" in str(exc_info.value)
+        assert "must specify cpu or devices" in str(exc_info.value)
 
-    def test_manual_mode_valid_configuration(
+    def test_manual_mode_valid_device_based_configuration(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
@@ -1353,15 +1348,21 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "32G",
+                        "devices": {
+                            "cpu": ["0", "1", "2", "3"],
+                            "cuda": ["cuda0", "cuda1"],
+                        },
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "cpu": 4,
                         "mem": "32G",
+                        "devices": {
+                            "cpu": ["4", "5", "6", "7"],
+                            "cuda": ["cuda2", "cuda3"],
+                        },
                     },
                 },
             ],
@@ -1370,11 +1371,17 @@ class TestResourceAllocationModes:
         assert config.resource.allocation_mode == ResourceAllocationMode.MANUAL
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].resource.allocations is not None
-        assert agent_configs[0].resource.allocations.cpu == 8
+        assert agent_configs[0].resource.allocations.devices[DeviceName("cuda")] == [
+            DeviceId("cuda0"),
+            DeviceId("cuda1"),
+        ]
         assert agent_configs[1].resource.allocations is not None
-        assert agent_configs[1].resource.allocations.cpu == 4
+        assert agent_configs[1].resource.allocations.devices[DeviceName("cuda")] == [
+            DeviceId("cuda2"),
+            DeviceId("cuda3"),
+        ]
 
-    def test_manual_mode_with_allocated_devices(
+    def test_manual_mode_agents_with_different_device_types_allowed(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
@@ -1388,20 +1395,19 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "32G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.3,
+                            "cpu": ["0", "1"],
+                            "cuda": ["cuda0"],
                         },
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
+                        "mem": "16G",
                         "devices": {
-                            SlotName("cuda.mem"): 0.7,
+                            "cpu": ["2", "3"],
                         },
                     },
                 },
@@ -1410,15 +1416,14 @@ class TestResourceAllocationModes:
         config = AgentUnifiedConfig.model_validate(raw_config)
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].resource.allocations is not None
-        assert agent_configs[0].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.3")
+        assert DeviceName("cuda") in agent_configs[0].resource.allocations.devices
         assert agent_configs[1].resource.allocations is not None
-        assert agent_configs[1].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.7")
+        assert DeviceName("cuda") not in agent_configs[1].resource.allocations.devices
 
-    def test_manual_mode_agents_with_same_slots_allowed(
+    def test_manual_mode_rejects_old_slot_based_format(
         self,
         default_raw_config: RawConfigT,
     ) -> None:
-        """Test that agents with the same slot names are allowed in MANUAL mode."""
         raw_config = {
             **default_raw_config,
             "resource": {
@@ -1429,272 +1434,83 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "cpu": 8,
                         "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.3,
-                            SlotName("cuda.shares"): 1.0,
-                        },
+                        "devices": {"cuda.mem": 0.5},
+                    },
+                },
+            ],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "Old slot-based format detected" in str(exc_info.value)
+
+    def test_manual_mode_rejects_old_integer_cpu_format(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "resource": {
+                **default_raw_config["resource"],
+                "allocation-mode": "manual",
+            },
+            "agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "resource": {
+                        "cpu": 4,
+                        "mem": "32G",
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
                         "cpu": 4,
-                        "mem": "16G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.7,
-                            SlotName("cuda.shares"): 2.0,
-                        },
+                        "mem": "32G",
+                    },
+                },
+            ],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "Old integer format detected for 'cpu'" in str(exc_info.value)
+
+    def test_manual_mode_cpu_only_is_valid(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "resource": {
+                **default_raw_config["resource"],
+                "allocation-mode": "manual",
+            },
+            "agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "resource": {
+                        "cpu": ["0", "1", "2", "3"],
+                        "mem": "32G",
+                    },
+                },
+                {
+                    "agent": {"id": "agent-2"},
+                    "resource": {
+                        "cpu": ["4", "5", "6", "7"],
+                        "mem": "32G",
                     },
                 },
             ],
         }
         config = AgentUnifiedConfig.model_validate(raw_config)
         agent_configs = config.get_agent_configs()
-
-        # Check that both agents have the same slot names
         assert agent_configs[0].resource.allocations is not None
-        assert set(agent_configs[0].resource.allocations.devices.keys()) == {
-            SlotName("cuda.mem"),
-            SlotName("cuda.shares"),
-        }
-        assert agent_configs[1].resource.allocations is not None
-        assert set(agent_configs[1].resource.allocations.devices.keys()) == {
-            SlotName("cuda.mem"),
-            SlotName("cuda.shares"),
-        }
-
-        # Check that values can differ
-        assert agent_configs[0].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.3")
-        assert agent_configs[1].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.7")
-
-    def test_manual_mode_agents_with_different_slots_rejected(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        """Test that agents with different slot names are rejected in MANUAL mode."""
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.7,
-                        },
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.shares"): 0.6,
-                        },
-                    },
-                },
-            ],
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            AgentUnifiedConfig.model_validate(raw_config)
-
-        assert "All agents must have the same slots defined" in str(exc_info.value)
-
-    def test_manual_mode_agents_with_subset_of_slots_rejected(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        """Test that agents where one has a subset of slots are rejected in MANUAL mode."""
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.5,
-                            SlotName("cuda.shares"): 1.0,
-                        },
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.5,
-                        },
-                    },
-                },
-            ],
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            AgentUnifiedConfig.model_validate(raw_config)
-
-        assert "All agents must have the same slots defined" in str(exc_info.value)
-
-    def test_manual_mode_agents_with_empty_devices_on_some_agents(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        """Test that agents with empty allocated_devices on some agents are rejected."""
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("cuda.mem"): 0.5,
-                        },
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        # No devices specified
-                    },
-                },
-            ],
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            AgentUnifiedConfig.model_validate(raw_config)
-
-        assert "All agents must have the same slots defined" in str(exc_info.value)
-
-    def test_manual_mode_agents_all_with_empty_devices_allowed(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        """Test that all agents with empty allocated_devices are allowed."""
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        # No devices specified
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 4,
-                        "mem": "16G",
-                        # No devices specified
-                    },
-                },
-            ],
-        }
-        config = AgentUnifiedConfig.model_validate(raw_config)
-        agent_configs = config.get_agent_configs()
-
-        # Both should have empty allocated_devices
-        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.cpu == [
+            DeviceId("0"),
+            DeviceId("1"),
+            DeviceId("2"),
+            DeviceId("3"),
+        ]
         assert agent_configs[0].resource.allocations.devices == {}
-        assert agent_configs[1].resource.allocations is not None
-        assert agent_configs[1].resource.allocations.devices == {}
-
-    def test_allocated_devices_parses_decimal_strings(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("foo"): "0.25",  # String value
-                        },
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("foo"): 0.75,  # Numeric value
-                        },
-                    },
-                },
-            ],
-        }
-        config = AgentUnifiedConfig.model_validate(raw_config)
-        agent_configs = config.get_agent_configs()
-        assert agent_configs[0].resource.allocations is not None
-        assert float(agent_configs[0].resource.allocations.devices[SlotName("foo")]) == 0.25
-        assert agent_configs[1].resource.allocations is not None
-        assert float(agent_configs[1].resource.allocations.devices[SlotName("foo")]) == 0.75
-
-    def test_allocated_devices_rejects_negative_values(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        raw_config = {
-            **default_raw_config,
-            "resource": {
-                **default_raw_config["resource"],
-                "allocation-mode": "manual",
-            },
-            "agents": [
-                {
-                    "agent": {"id": "agent-1"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                        "devices": {
-                            SlotName("foo"): "-1",
-                        },
-                    },
-                },
-                {
-                    "agent": {"id": "agent-2"},
-                    "resource": {
-                        "cpu": 8,
-                        "mem": "32G",
-                    },
-                },
-            ],
-        }
-        with pytest.raises(ValidationError) as exc_info:
-            AgentUnifiedConfig.model_validate(raw_config)
-
-        assert "must not be a negative value" in str(exc_info.value)
