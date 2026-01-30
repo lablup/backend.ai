@@ -624,6 +624,19 @@ class KernelRow(Base):
             sa.func.greatest("created_at", "terminated_at", "status_changed"),
             unique=False,
         ),
+        # Partial index for running kernels (fair share observation)
+        sa.Index(
+            "ix_kernels_fair_share_running",
+            "scaling_group",
+            postgresql_where=sa.text("terminated_at IS NULL AND starts_at IS NOT NULL"),
+        ),
+        # Partial index for terminated kernels (fair share observation)
+        sa.Index(
+            "ix_kernels_fair_share_terminated",
+            "scaling_group",
+            "terminated_at",
+            postgresql_where=sa.text("terminated_at IS NOT NULL AND starts_at IS NOT NULL"),
+        ),
     )
 
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
