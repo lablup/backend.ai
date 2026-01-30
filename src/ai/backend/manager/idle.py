@@ -770,7 +770,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             return True
         now = await self._redis_live.get_server_time()
         raw_last_access = await self._redis_live.get_live_data(f"session.{session_id}.last_access")
-        if raw_last_access is None or raw_last_access == "0":
+        if raw_last_access is None or raw_last_access == b"0":
             return True
         last_access = float(raw_last_access)
         # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"

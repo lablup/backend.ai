@@ -545,19 +545,19 @@ async def generate() -> dict[str, Any]:
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def main(output: Path) -> None:
+def main(output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
     openapi = asyncio.run(generate())
-    if output == "-" or output is None:
+    if output is None:
         print(pretty_json_str(openapi))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(pretty_json_str(openapi))
 
 

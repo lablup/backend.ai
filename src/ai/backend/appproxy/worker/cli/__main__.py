@@ -60,11 +60,11 @@ def main(
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_example_configuration(output: Path) -> None:
+def generate_example_configuration(output: Path | None) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Worker.
     """
@@ -75,10 +75,10 @@ def generate_example_configuration(output: Path) -> None:
     from ai.backend.appproxy.worker.config import ServerConfig
 
     generated_example = generate_example_json(ServerConfig)
-    if output == "-" or output is None:
+    if output is None:
         print(tomli_w.dumps(ensure_json_serializable(generated_example)))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
 
 
@@ -109,11 +109,11 @@ async def _generate() -> dict[str, Any]:
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_openapi_spec(output: Path) -> None:
+def generate_openapi_spec(output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
@@ -121,10 +121,10 @@ def generate_openapi_spec(output: Path) -> None:
     import json
 
     openapi = asyncio.run(_generate())
-    if output == "-" or output is None:
+    if output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 
