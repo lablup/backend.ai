@@ -122,6 +122,7 @@ from .reservoir_registry import (
     update_reservoir_registry,
 )
 from .resource_group import (
+    resource_group_resources,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
@@ -264,6 +265,7 @@ class Mutation:
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    resource_group_resources = resource_group_resources
 
 
 @strawberry.type

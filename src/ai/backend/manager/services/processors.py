@@ -185,6 +185,7 @@ class Services:
             args.config_provider,
             repositories.agent.repository,
             repositories.scheduler.repository,
+            repositories.scaling_group.repository,
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,

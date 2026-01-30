@@ -7,10 +7,12 @@ import yarl
 from async_timeout import timeout as _timeout
 from dateutil.tz import tzutc
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.exception import (
+    AgentResourceStatsNotAccessibleError,
     AgentWatcherResponseError,
     ErrorCode,
     ErrorDetail,
@@ -28,10 +30,16 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.get_scaling_group_resources import (
+    GetScalingGroupResourcesAction,
+    GetScalingGroupResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -99,6 +107,7 @@ class AgentService:
     _agent_registry: AgentRegistry
     _agent_repository: AgentRepository
     _scheduler_repository: SchedulerRepository
+    _scaling_group_repository: ScalingGroupRepository
     _hook_plugin_ctx: HookPluginContext
     _event_producer: EventProducer
     _agent_cache: AgentRPCCache
@@ -110,6 +119,7 @@ class AgentService:
         config_provider: ManagerConfigProvider,
         agent_repository: AgentRepository,
         scheduler_repository: SchedulerRepository,
+        scaling_group_repository: ScalingGroupRepository,
         hook_plugin_ctx: HookPluginContext,
         event_producer: EventProducer,
         agent_cache: AgentRPCCache,
@@ -119,6 +129,7 @@ class AgentService:
         self._config_provider = config_provider
         self._agent_repository = agent_repository
         self._scheduler_repository = scheduler_repository
+        self._scaling_group_repository = scaling_group_repository
         self._hook_plugin_ctx = hook_plugin_ctx
         self._event_producer = event_producer
         self._agent_cache = agent_cache
@@ -237,6 +248,69 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def _verify_current_user_scaling_group_access(
+        self,
+        scaling_group_name: str,
+    ) -> None:
+        """Verify that current user has access to the scaling group through:
+        1. Superadmin privilege (bypass all checks)
+        2. Project (user group) association
+        3. Domain association (fallback)
+
+        Raises InsufficientPrivilege if the user doesn't have access.
+        """
+        # Superadmin can access all scaling groups
+        me = current_user()
+        if me is None:
+            raise InsufficientPrivilege("Authentication required")
+
+        if me.is_superadmin:
+            return
+
+        # Raise error when hide_agent config is enabled and the user is not superadmin
+        if self._config_provider.config.manager.hide_agents:
+            raise AgentResourceStatsNotAccessibleError(
+                "Access to agent resources is restricted by manager configuration"
+            )
+
+        # Validate access: check if scaling group is associated with the project
+        has_project_access = (
+            await self._scaling_group_repository.check_user_is_in_project_with_scaling_group(
+                user_id=me.user_id,
+                scaling_group_name=scaling_group_name,
+            )
+        )
+        if has_project_access:
+            return
+
+        # Check if scaling group is associated with user's domain
+        has_domain_access = (
+            await self._scaling_group_repository.check_scaling_group_domain_association_exists(
+                scaling_group_name, me.domain_name
+            )
+        )
+        if has_domain_access:
+            return
+
+        raise InsufficientPrivilege(
+            f"No access to resource group '{scaling_group_name}' through project or domain"
+        )
+
+    async def get_scaling_group_resources(
+        self, action: GetScalingGroupResourcesAction
+    ) -> GetScalingGroupResourcesActionResult:
+        """Get aggregated resource stats for a specific scaling group."""
+        await self._verify_current_user_scaling_group_access(
+            scaling_group_name=action.scaling_group_name,
+        )
+
+        total_resources = (
+            await self._scheduler_repository.get_total_resource_slots_by_scaling_group(
+                action.scaling_group_name
+            )
+        )
+        return GetScalingGroupResourcesActionResult(total_resources=total_resources)
 
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
         """Searches agents. It is used by superadmin only."""
