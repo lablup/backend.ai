@@ -919,10 +919,6 @@ class TestAgentDBSourceKernelFiltering:
         db_source: AgentDBSource,
         agent_with_kernels: KernelFilteringTestCase,
     ) -> None:
-        """
-        Test that get_by_id properly loads kernels relationship via joinedload,
-        allowing actual_occupied_slots computation without MissingGreenlet error.
-        """
         # Act - This should not raise MissingGreenlet error
         agent_data = await db_source.get_by_id(agent_with_kernels.agent_id)
 
