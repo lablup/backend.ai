@@ -851,7 +851,7 @@ class PermissionDBSource:
         querier: BatchQuerier,
     ) -> PermissionGroupListResult:
         """Searches permission groups (scopes) with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(PermissionGroupRow)
 
             result = await execute_batch_querier(
@@ -874,7 +874,7 @@ class PermissionDBSource:
         querier: BatchQuerier,
     ) -> ScopedPermissionListResult:
         """Searches scoped permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(PermissionRow)
 
             result = await execute_batch_querier(
@@ -897,7 +897,7 @@ class PermissionDBSource:
         querier: BatchQuerier,
     ) -> ObjectPermissionListResult:
         """Searches object permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(ObjectPermissionRow)
 
             result = await execute_batch_querier(
