@@ -328,12 +328,14 @@ async def test_hook_dispatch(etcd, mocker):
         hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=FIRST_COMPLETED)
         assert hook_result.status == ERROR
         assert hook_result.result is None
+        assert hook_result.reason is not None
         assert "ZeroDivisionError" in hook_result.reason
         assert "oops" in hook_result.reason
         assert hook_result.src_plugin == "hook-e"
         hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=ALL_COMPLETED)
         assert hook_result.status == ERROR
         assert hook_result.result is None
+        assert hook_result.reason is not None
         assert "ZeroDivisionError" in hook_result.reason
         assert "oops" in hook_result.reason
         assert hook_result.src_plugin == "hook-e"
