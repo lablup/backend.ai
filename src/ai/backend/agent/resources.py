@@ -650,22 +650,13 @@ class ResourceAllocator(aobject):
         self,
         total_slots: SlotsMap,
     ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
-        """
-        Calculate the resource partition for an agent.
-
-        All allocation modes now behave like SHARED mode - agents see all devices
-        and no resources are reserved for partitioning. Reserved slots only account
-        for system-level reservations (reserved_cpu, reserved_mem, etc.).
-
-        BA-4143: This is a baseline simplification before implementing BEP-1041's
-        device-centric partitioning design.
-        """
         agent_computers: dict[DeviceName, ComputerContext] = {}
-        devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
         devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
         for device_name, ctx in self.computers.items():
-            device_allocated_slots = self._calculate_device_slots(ctx.alloc_map)
-            devices_allocated_slots.append(device_allocated_slots)
+            device_allocated_slots = {
+                slot.slot_name: self.available_total_slots[slot.slot_name]
+                for slot in ctx.alloc_map.device_slots.values()
+            }
 
             agent_alloc_map = await ctx.instance.create_alloc_map()
             agent_computers[device_name] = ComputerContext(
@@ -678,29 +669,9 @@ class ResourceAllocator(aobject):
             devices_reserved_slots.append(device_reserved_slots)
 
         reserved_slots = _combine_mappings(devices_reserved_slots)
-        resource_scaling_factor = self._calculate_resource_scaling_factor()
+        resource_scaling_factor: SlotsMap = defaultdict(lambda: Decimal(1.0))
 
         return agent_computers, reserved_slots, resource_scaling_factor
-
-    def _calculate_device_slots(
-        self,
-        alloc_map: AbstractAllocMap,
-    ) -> SlotsMap:
-        """
-        Calculate device slots for an agent.
-
-        All allocation modes now behave like SHARED mode - each agent sees all
-        available device slots. This is the baseline behavior before implementing
-        the new device-centric partitioning design per BEP-1041.
-
-        BA-4143: Removed mode-specific dispatch (_calculate_device_slot,
-        _calculate_device_slot_shared, _calculate_device_slot_auto_split,
-        _calculate_device_slot_manual) to establish SHARED-only baseline.
-        """
-        return {
-            device_slot.slot_name: self.available_total_slots[device_slot.slot_name]
-            for device_slot in alloc_map.device_slots.values()
-        }
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -708,20 +679,6 @@ class ResourceAllocator(aobject):
             total_slot = total_slots[slot_name]
             reserved_slots[slot_name] = max(total_slot - slot, Decimal(0))
         return reserved_slots
-
-    def _calculate_resource_scaling_factor(self) -> SlotsMap:
-        """
-        Calculate the resource scaling factor for statistics reporting.
-
-        All allocation modes now use a scaling factor of 1.0 since all agents
-        see all devices (SHARED-like behavior). This is the baseline before
-        implementing the new device-centric design per BEP-1041.
-
-        BA-4143: Removed mode-specific scaling factors and overallocation
-        validation (_ensure_slots_are_not_overallocated) to establish
-        SHARED-only baseline.
-        """
-        return defaultdict(lambda: Decimal(1.0))
 
     @cached_property
     def _agent_discovery(self) -> AbstractAgentDiscovery:
