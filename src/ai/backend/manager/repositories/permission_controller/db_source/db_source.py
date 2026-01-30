@@ -37,6 +37,8 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned, RoleNotAssigned, RoleNotFound
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -47,6 +49,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
@@ -980,6 +983,93 @@ class PermissionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_resource_group_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ScalingGroupRow.name)
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.RESOURCE_GROUP, scope_id=row.name),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_container_registry_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ContainerRegistryRow.id, ContainerRegistryRow.registry_name)
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.CONTAINER_REGISTRY, scope_id=str(row.id)),
+                    name=row.registry_name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifact_registry_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ArtifactRegistryRow.id, ArtifactRegistryRow.name)
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [
+                ScopeData(
+                    id=ScopeId(scope_type=ScopeType.ARTIFACT_REGISTRY, scope_id=str(row.id)),
+                    name=row.name,
+                )
+                for row in result.rows
+            ]
+
+            return ScopeListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_storage_host_scopes(
+        self,
+        querier: BatchQuerier,
+    ) -> ScopeListResult:
+        raise NotImplementedError("Storage host data is stored in etcd, not in the database.")
 
     async def search_entities_in_scope(
         self,

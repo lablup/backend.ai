@@ -7,6 +7,8 @@ import sqlalchemy as sa
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -20,6 +22,7 @@ from ai.backend.manager.models.rbac_models.permission.permission_group import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -588,3 +591,207 @@ class EntityScopeConditions:
             return AssociationScopesEntitiesRow.entity_type == entity_type
 
         return inner
+
+
+class ResourceGroupScopeConditions:
+    """Query conditions for resource group scope IDs."""
+
+    @staticmethod
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ScalingGroupRow.name) == spec.value.lower()
+            else:
+                condition = ScalingGroupRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+
+class ResourceGroupScopeOrders:
+    """Query orders for resource group scope IDs."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ScalingGroupRow.name.asc()
+        return ScalingGroupRow.name.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ScalingGroupRow.created_at.asc()
+        return ScalingGroupRow.created_at.desc()
+
+
+class ContainerRegistryScopeConditions:
+    """Query conditions for container registry scope IDs."""
+
+    @staticmethod
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ContainerRegistryRow.registry_name.ilike(f"%{spec.value}%")
+            else:
+                condition = ContainerRegistryRow.registry_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ContainerRegistryRow.registry_name) == spec.value.lower()
+            else:
+                condition = ContainerRegistryRow.registry_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ContainerRegistryRow.registry_name.ilike(f"{spec.value}%")
+            else:
+                condition = ContainerRegistryRow.registry_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ContainerRegistryRow.registry_name.ilike(f"%{spec.value}")
+            else:
+                condition = ContainerRegistryRow.registry_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+
+class ContainerRegistryScopeOrders:
+    """Query orders for container registry scope IDs."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ContainerRegistryRow.registry_name.asc()
+        return ContainerRegistryRow.registry_name.desc()
+
+
+class ArtifactRegistryScopeConditions:
+    """Query conditions for artifact registry scope IDs."""
+
+    @staticmethod
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRegistryRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = ArtifactRegistryRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ArtifactRegistryRow.name) == spec.value.lower()
+            else:
+                condition = ArtifactRegistryRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRegistryRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = ArtifactRegistryRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ArtifactRegistryRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = ArtifactRegistryRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+
+class ArtifactRegistryScopeOrders:
+    """Query orders for artifact registry scope IDs."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ArtifactRegistryRow.name.asc()
+        return ArtifactRegistryRow.name.desc()
