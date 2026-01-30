@@ -13,7 +13,7 @@ import os
 import urllib.parse
 from collections.abc import AsyncIterator
 from pathlib import Path, PurePosixPath
-from typing import Literal, Optional, override
+from typing import Literal, override
 
 import janus
 import zipstream
@@ -106,7 +106,7 @@ class ZipArchiveStreamReader(StreamReader):
         q.put(SENTINEL)
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/zip"
 
 
