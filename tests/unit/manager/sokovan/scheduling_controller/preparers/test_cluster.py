@@ -54,7 +54,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -77,7 +77,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -116,7 +116,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -168,7 +168,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -206,7 +206,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -244,7 +244,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]
@@ -285,7 +285,7 @@ class TestClusterConfigurationRule:
             creation_spec={},
         )
 
-        preparation_data = {}
+        preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
         kernel_configs = preparation_data["kernel_configs"]

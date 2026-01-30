@@ -153,8 +153,8 @@ class TestMessageMetadata:
         assert metadata.request_id == "req-no-user"
         assert metadata.user is None
 
-    def test_deserialize_empty_data(self):
-        data = {}
+    def test_deserialize_empty_data(self) -> None:
+        data: dict[str, str] = {}
         serialized = dump_json(data)
 
         metadata = MessageMetadata.deserialize(serialized)

@@ -114,7 +114,7 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
         mock_entrypoints_with_instance, mocked_plugin=mocked_plugin
     )
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-    ctx = BasePluginContext(etcd, {})
+    ctx: BasePluginContext = BasePluginContext(etcd, {})
     try:
         assert not ctx.plugins
         await ctx.init()
@@ -128,7 +128,7 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
 @pytest.mark.asyncio
 async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_list):
     allowlist, blocklist = allow_and_block_list
-    ctx = BasePluginContext(
+    ctx: BasePluginContext = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -141,7 +141,7 @@ async def test_plugin_context_config_allow_and_block_list_has_union(
     etcd, allow_and_block_list_has_union
 ):
     allowlist, blocklist = allow_and_block_list_has_union
-    ctx = BasePluginContext(
+    ctx: BasePluginContext = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -155,7 +155,7 @@ async def test_plugin_context_config(etcd, mocker):
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
     await etcd.put("config/plugins/XXX/dummy/etcd-key", "etcd-value")
-    ctx = BasePluginContext(
+    ctx: BasePluginContext = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -178,7 +178,7 @@ async def test_plugin_context_config_autoupdate(etcd, mocker):
     )
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
     await etcd.put_prefix("config/plugins/XXX/dummy", {"a": "1", "b": "2"})
-    ctx = BasePluginContext(
+    ctx: BasePluginContext = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )

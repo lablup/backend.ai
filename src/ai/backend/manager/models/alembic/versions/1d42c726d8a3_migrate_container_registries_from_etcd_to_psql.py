@@ -114,7 +114,7 @@ def get_container_registry_row_schema():
         id = IDColumn()
         url = sa.Column("url", sa.String(length=512), index=True)
         registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
+        type: sa.Column[Any] = sa.Column(
             "type",
             StrEnumType(ContainerRegistryType),
             default=ContainerRegistryType.DOCKER,

@@ -23,7 +23,7 @@ async def test_provisionstage_success():
     resource = DummyResource()
     provisioner.setup.return_value = resource
 
-    stage = ProvisionStage(provisioner)
+    stage: ProvisionStage = ProvisionStage(provisioner)
     await stage.setup(spec_gen)
     result = await stage.wait_for_resource()
     assert result is resource
@@ -37,7 +37,7 @@ async def test_provisionstage_setup_failure():
     provisioner = AsyncMock(spec=Provisioner)
     provisioner.setup.side_effect = Exception("fail")
 
-    stage = ProvisionStage(provisioner)
+    stage: ProvisionStage = ProvisionStage(provisioner)
     await stage.setup(spec_gen)
     with pytest.raises(RuntimeError):
         await stage.wait_for_resource()
@@ -53,7 +53,7 @@ async def test_provisionstage_teardown():
     resource = DummyResource()
     provisioner.setup.return_value = resource
 
-    stage = ProvisionStage(provisioner)
+    stage: ProvisionStage = ProvisionStage(provisioner)
     await stage.setup(spec_gen)
     await stage.wait_for_resource()
     await stage.teardown()
@@ -64,6 +64,6 @@ async def test_provisionstage_teardown():
 @pytest.mark.asyncio
 async def test_provisionstage_teardown_without_resource():
     provisioner = AsyncMock(spec=Provisioner)
-    stage = ProvisionStage(provisioner)
+    stage: ProvisionStage = ProvisionStage(provisioner)
     await stage.teardown()
     provisioner.teardown.assert_not_called()

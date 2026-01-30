@@ -1,6 +1,7 @@
 import json
 import tempfile
 import textwrap
+from typing import Any
 import unittest.mock
 import uuid
 from decimal import Decimal
@@ -235,7 +236,7 @@ async def test_allow_fractional_resource_fragmentation(monkeypatch):
         "unit_proc": 216,
         "unit_mem": "192G",
     }
-    local_config = {}
+    local_config: dict[str, Any] = {}
     cuda_plugin = MockPlugin(plugin_config, local_config)
     await cuda_plugin.init()
 
@@ -379,8 +380,8 @@ async def test_allow_fractional_resource_fragmentation(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_allocate_rollback(monkeypatch):
-    local_config = {}
+async def test_allocate_rollback(monkeypatch) -> None:
+    local_config: dict[str, Any] = {}
     cpu_plugin = CPUPlugin(
         {},
         local_config,

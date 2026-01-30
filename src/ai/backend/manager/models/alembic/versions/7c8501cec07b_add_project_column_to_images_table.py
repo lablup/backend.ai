@@ -7,6 +7,7 @@ Create Date: 2024-08-10 07:29:39.492116
 """
 
 import enum
+from typing import Any
 
 import sqlalchemy as sa
 import trafaret as t
@@ -34,7 +35,7 @@ def get_container_registry_row_schema():
         id = IDColumn()
         url = sa.Column("url", sa.String(length=512), index=True)
         registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
+        type: sa.Column[Any] = sa.Column(
             "type",
             StrEnumType(ContainerRegistryType),
             default=ContainerRegistryType.DOCKER,
@@ -84,10 +85,10 @@ def get_image_row_schema():
             nullable=False,
             server_default=sa.sql.expression.false(),
         )
-        type = sa.Column("type", sa.Enum(ImageType), nullable=False)
+        type: sa.Column[Any] = sa.Column("type", sa.Enum(ImageType), nullable=False)
         accelerators = sa.Column("accelerators", sa.String)
         labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
-        resources = sa.Column(
+        resources: sa.Column[Any] = sa.Column(
             "resources",
             StructuredJSONColumn(
                 t.Mapping(

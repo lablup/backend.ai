@@ -401,7 +401,7 @@ class TestGenericQueryBuilderStructure:
         ordering_applier = MockOrderingApplier()
         model_converter = MockModelConverter()
 
-        paginator = GenericQueryBuilder(
+        paginator: GenericQueryBuilder = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=filter_applier,
             ordering_applier=ordering_applier,
@@ -450,7 +450,7 @@ class TestGenericQueryBuilderStructure:
 
         # Create paginator with specialized components
         mock_model = MagicMock()
-        paginator = GenericQueryBuilder(
+        paginator: GenericQueryBuilder = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=SpecialFilterApplier(),
             ordering_applier=SpecialOrderingApplier(),

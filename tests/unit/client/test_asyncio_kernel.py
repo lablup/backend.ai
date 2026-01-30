@@ -71,8 +71,8 @@ async def test_restart_kernel_url(mocker):
 
 
 @pytest.mark.asyncio
-async def test_get_kernel_info_url(mocker):
-    return_value = {}
+async def test_get_kernel_info_url(mocker) -> None:
+    return_value: dict[str, str] = {}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.OK, json=mock_json_coro)

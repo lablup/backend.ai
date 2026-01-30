@@ -1,4 +1,6 @@
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -31,7 +33,7 @@ def test_auth_missing_signature(monkeypatch):
         rqst = Request("GET", "/auth")
         rqst.set_json({"echo": random_msg})
         # let it bypass actual signing
-        noop_sign = lambda *args, **kwargs: ({}, None)
+        noop_sign: Callable[..., tuple[dict[str, Any], None]] = lambda *args, **kwargs: ({}, None)
         monkeypatch.setattr(request, "generate_signature", noop_sign)
         with pytest.raises(BackendAPIError) as e, rqst.fetch():
             pass

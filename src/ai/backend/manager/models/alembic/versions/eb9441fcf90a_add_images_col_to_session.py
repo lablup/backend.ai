@@ -7,6 +7,8 @@ Create Date: 2023-07-06 13:51:52.098587
 """
 
 from collections import defaultdict
+from typing import Any
+from uuid import UUID
 
 import sqlalchemy as sa
 from alembic import op
@@ -47,19 +49,19 @@ def upgrade():
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id = sa.Column(
+        id: sa.Column[UUID] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
             nullable=False,
             primary_key=True,
         )
-        images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
+        images: sa.Column[list[str] | None] = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
 
     kernel_cnt = conn.execute(sa.select([sa.func.count()]).select_from(kernels)).scalar()
 
     for offset in range(0, kernel_cnt, PAGE_SIZE):
-        session_agent_ids_map = defaultdict(list)
+        session_agent_ids_map: defaultdict[UUID, list[Any]] = defaultdict(list)
         session_id_query = (
             sa.select([sa.distinct(kernels.c.session_id)])
             .where(kernels.c.image.is_not(None))

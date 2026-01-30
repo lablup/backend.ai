@@ -26,7 +26,7 @@ def test_get_env():
     with pytest.raises(KeyError), mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
         get_env("TESTKEY")
     with mock.patch.dict(os.environ, {"BACKEND_TESTKEY": "testkey"}):
-        r = get_env("TESTKEY")
+        r: str = get_env("TESTKEY")
         assert r == "testkey"
     with mock.patch.dict(os.environ, {"SORNA_TESTKEY": "testkey"}):
         r = get_env("TESTKEY")
