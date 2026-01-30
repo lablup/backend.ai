@@ -73,6 +73,18 @@ from .deployment import (
     update_route_traffic_status,
 )
 from .fair_share import (
+    admin_bulk_upsert_domain_fair_share_weight,
+    admin_bulk_upsert_project_fair_share_weight,
+    admin_bulk_upsert_user_fair_share_weight,
+    admin_domain_fair_share,
+    admin_domain_fair_shares,
+    admin_project_fair_share,
+    admin_project_fair_shares,
+    admin_upsert_domain_fair_share_weight,
+    admin_upsert_project_fair_share_weight,
+    admin_upsert_user_fair_share_weight,
+    admin_user_fair_share,
+    admin_user_fair_shares,
     bulk_upsert_domain_fair_share_weight,
     bulk_upsert_project_fair_share_weight,
     bulk_upsert_user_fair_share_weight,
@@ -80,6 +92,12 @@ from .fair_share import (
     domain_fair_shares,
     project_fair_share,
     project_fair_shares,
+    rg_domain_fair_share,
+    rg_domain_fair_shares,
+    rg_project_fair_share,
+    rg_project_fair_shares,
+    rg_user_fair_share,
+    rg_user_fair_shares,
     upsert_domain_fair_share_weight,
     upsert_project_fair_share_weight,
     upsert_user_fair_share_weight,
@@ -143,8 +161,14 @@ from .resource_group import (
     update_resource_group_fair_share_spec,
 )
 from .resource_usage import (
+    admin_domain_usage_buckets,
+    admin_project_usage_buckets,
+    admin_user_usage_buckets,
     domain_usage_buckets,
     project_usage_buckets,
+    rg_domain_usage_buckets,
+    rg_project_usage_buckets,
+    rg_user_usage_buckets,
     user_usage_buckets,
 )
 from .scheduler import (
@@ -183,15 +207,6 @@ class Query:
     merged_app_config = merged_app_config
     deployments = deployments
     deployment = deployment
-    domain_fair_share = domain_fair_share
-    domain_fair_shares = domain_fair_shares
-    domain_usage_buckets = domain_usage_buckets
-    project_fair_share = project_fair_share
-    project_fair_shares = project_fair_shares
-    project_usage_buckets = project_usage_buckets
-    user_fair_share = user_fair_share
-    user_fair_shares = user_fair_shares
-    user_usage_buckets = user_usage_buckets
     revisions = revisions
     revision = revision
     replicas = replicas
@@ -215,9 +230,37 @@ class Query:
     admin_notification_rule = admin_notification_rule
     admin_notification_rules = admin_notification_rules
     admin_domain_app_config = admin_domain_app_config
+    admin_domain_fair_share = admin_domain_fair_share
+    admin_domain_fair_shares = admin_domain_fair_shares
+    admin_project_fair_share = admin_project_fair_share
+    admin_project_fair_shares = admin_project_fair_shares
+    admin_user_fair_share = admin_user_fair_share
+    admin_user_fair_shares = admin_user_fair_shares
+    admin_domain_usage_buckets = admin_domain_usage_buckets
+    admin_project_usage_buckets = admin_project_usage_buckets
+    admin_user_usage_buckets = admin_user_usage_buckets
+    # Resource Group Scoped APIs
+    rg_domain_fair_share = rg_domain_fair_share
+    rg_domain_fair_shares = rg_domain_fair_shares
+    rg_project_fair_share = rg_project_fair_share
+    rg_project_fair_shares = rg_project_fair_shares
+    rg_user_fair_share = rg_user_fair_share
+    rg_user_fair_shares = rg_user_fair_shares
+    rg_domain_usage_buckets = rg_domain_usage_buckets
+    rg_project_usage_buckets = rg_project_usage_buckets
+    rg_user_usage_buckets = rg_user_usage_buckets
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config
+    domain_fair_share = domain_fair_share
+    domain_fair_shares = domain_fair_shares
+    project_fair_share = project_fair_share
+    project_fair_shares = project_fair_shares
+    user_fair_share = user_fair_share
+    user_fair_shares = user_fair_shares
+    domain_usage_buckets = domain_usage_buckets
+    project_usage_buckets = project_usage_buckets
+    user_usage_buckets = user_usage_buckets
     notification_channel = notification_channel
     notification_channels = notification_channels
     notification_rule = notification_rule
@@ -300,7 +343,14 @@ class Mutation:
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
-    # Fair Share
+    # Fair Share - Admin APIs
+    admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
+    admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
+    admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
+    admin_bulk_upsert_domain_fair_share_weight = admin_bulk_upsert_domain_fair_share_weight
+    admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
+    admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
+    # Fair Share - Legacy (deprecated)
     upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
     upsert_project_fair_share_weight = upsert_project_fair_share_weight
     upsert_user_fair_share_weight = upsert_user_fair_share_weight
