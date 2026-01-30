@@ -620,9 +620,13 @@ class TestSearchProjectFairSharesEntityBased:
     async def test_raises_error_for_nonexistent_resource_group(
         self,
         fair_share_repository: FairShareRepository,
+        domain_name: str,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
-        scope = ProjectFairShareSearchScope(resource_group="nonexistent-rg")
+        scope = ProjectFairShareSearchScope(
+            resource_group="nonexistent-rg",
+            domain_name=domain_name,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -639,10 +643,14 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_with_record: uuid.UUID,
     ) -> None:
         """Project with fair share record should have details populated."""
-        scope = ProjectFairShareSearchScope(resource_group=scaling_group)
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -662,10 +670,14 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_without_record: uuid.UUID,
     ) -> None:
         """Project without fair share record should have details as None."""
-        scope = ProjectFairShareSearchScope(resource_group=scaling_group)
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -685,11 +697,15 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_with_record: uuid.UUID,
         project_without_record: uuid.UUID,
     ) -> None:
         """Search should return both projects with and without records."""
-        scope = ProjectFairShareSearchScope(resource_group=scaling_group)
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -935,10 +951,16 @@ class TestSearchUserFairSharesEntityBased:
     async def test_raises_error_for_nonexistent_resource_group(
         self,
         fair_share_repository: FairShareRepository,
+        domain_name: str,
+        project_id: uuid.UUID,
     ) -> None:
         """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
 
-        scope = UserFairShareSearchScope(resource_group="nonexistent-rg")
+        scope = UserFairShareSearchScope(
+            resource_group="nonexistent-rg",
+            domain_name=domain_name,
+            project_id=project_id,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -955,12 +977,17 @@ class TestSearchUserFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_id: uuid.UUID,
         user_with_record: uuid.UUID,
     ) -> None:
         """User with fair share record should have details populated."""
 
-        scope = UserFairShareSearchScope(resource_group=scaling_group)
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -981,12 +1008,17 @@ class TestSearchUserFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_id: uuid.UUID,
         user_without_record: uuid.UUID,
     ) -> None:
         """User without fair share record should have details as None."""
 
-        scope = UserFairShareSearchScope(resource_group=scaling_group)
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -1007,13 +1039,18 @@ class TestSearchUserFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
+        domain_name: str,
         project_id: uuid.UUID,
         user_with_record: uuid.UUID,
         user_without_record: uuid.UUID,
     ) -> None:
         """Search should return both users with and without records."""
 
-        scope = UserFairShareSearchScope(resource_group=scaling_group)
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],

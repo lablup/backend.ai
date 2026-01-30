@@ -25,6 +25,12 @@ from .actions import (
     SearchDomainFairSharesActionResult,
     SearchProjectFairSharesAction,
     SearchProjectFairSharesActionResult,
+    SearchRGDomainFairSharesAction,
+    SearchRGDomainFairSharesActionResult,
+    SearchRGProjectFairSharesAction,
+    SearchRGProjectFairSharesActionResult,
+    SearchRGUserFairSharesAction,
+    SearchRGUserFairSharesActionResult,
     SearchUserFairSharesAction,
     SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
@@ -47,6 +53,9 @@ class FairShareProcessors(AbstractProcessorPackage):
     search_domain_fair_shares: ActionProcessor[
         SearchDomainFairSharesAction, SearchDomainFairSharesActionResult
     ]
+    search_rg_domain_fair_shares: ActionProcessor[
+        SearchRGDomainFairSharesAction, SearchRGDomainFairSharesActionResult
+    ]
 
     # Project Fair Share
     get_project_fair_share: ActionProcessor[
@@ -55,11 +64,17 @@ class FairShareProcessors(AbstractProcessorPackage):
     search_project_fair_shares: ActionProcessor[
         SearchProjectFairSharesAction, SearchProjectFairSharesActionResult
     ]
+    search_rg_project_fair_shares: ActionProcessor[
+        SearchRGProjectFairSharesAction, SearchRGProjectFairSharesActionResult
+    ]
 
     # User Fair Share
     get_user_fair_share: ActionProcessor[GetUserFairShareAction, GetUserFairShareActionResult]
     search_user_fair_shares: ActionProcessor[
         SearchUserFairSharesAction, SearchUserFairSharesActionResult
+    ]
+    search_rg_user_fair_shares: ActionProcessor[
+        SearchRGUserFairSharesAction, SearchRGUserFairSharesActionResult
     ]
 
     # Upsert Weight
@@ -90,6 +105,9 @@ class FairShareProcessors(AbstractProcessorPackage):
         self.search_domain_fair_shares = ActionProcessor(
             service.search_domain_fair_shares, action_monitors
         )
+        self.search_rg_domain_fair_shares = ActionProcessor(
+            service.search_rg_domain_fair_shares, action_monitors
+        )
 
         # Project Fair Share
         self.get_project_fair_share = ActionProcessor(
@@ -98,11 +116,17 @@ class FairShareProcessors(AbstractProcessorPackage):
         self.search_project_fair_shares = ActionProcessor(
             service.search_project_fair_shares, action_monitors
         )
+        self.search_rg_project_fair_shares = ActionProcessor(
+            service.search_rg_project_fair_shares, action_monitors
+        )
 
         # User Fair Share
         self.get_user_fair_share = ActionProcessor(service.get_user_fair_share, action_monitors)
         self.search_user_fair_shares = ActionProcessor(
             service.search_user_fair_shares, action_monitors
+        )
+        self.search_rg_user_fair_shares = ActionProcessor(
+            service.search_rg_user_fair_shares, action_monitors
         )
 
         # Upsert Weight
@@ -133,12 +157,15 @@ class FairShareProcessors(AbstractProcessorPackage):
             # Domain
             GetDomainFairShareAction.spec(),
             SearchDomainFairSharesAction.spec(),
+            SearchRGDomainFairSharesAction.spec(),
             # Project
             GetProjectFairShareAction.spec(),
             SearchProjectFairSharesAction.spec(),
+            SearchRGProjectFairSharesAction.spec(),
             # User
             GetUserFairShareAction.spec(),
             SearchUserFairSharesAction.spec(),
+            SearchRGUserFairSharesAction.spec(),
             # Upsert Weight
             UpsertDomainFairShareWeightAction.spec(),
             UpsertProjectFairShareWeightAction.spec(),

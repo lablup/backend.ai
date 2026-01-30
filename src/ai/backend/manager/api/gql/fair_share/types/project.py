@@ -67,7 +67,8 @@ class ProjectFairShareGQL(Node):
     @strawberry.field(
         description=(
             "Added in 26.1.0. List user fair shares belonging to this project. "
-            "Returns fair share data for all users within this project and scaling group."
+            "Returns fair share data for all users within this project and scaling group, "
+            "including users without fair share records (which use default values)."
         )
     )
     async def user_fair_shares(
@@ -82,11 +83,18 @@ class ProjectFairShareGQL(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> UserFairShareConnection:
-        from ai.backend.manager.api.gql.fair_share.fetcher import fetch_user_fair_shares
-        from ai.backend.manager.repositories.fair_share.options import UserFairShareConditions
+        from ai.backend.manager.api.gql.fair_share.fetcher import fetch_rg_user_fair_shares
+        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 
-        return await fetch_user_fair_shares(
+        scope = UserFairShareSearchScope(
+            resource_group=self.resource_group,
+            domain_name=self.domain_name,
+            project_id=self.project_id,
+        )
+
+        return await fetch_rg_user_fair_shares(
             info=info,
+            scope=scope,
             filter=filter,
             order_by=order_by,
             before=before,
@@ -95,10 +103,6 @@ class ProjectFairShareGQL(Node):
             last=last,
             limit=limit,
             offset=offset,
-            base_conditions=[
-                UserFairShareConditions.by_resource_group(self.resource_group),
-                UserFairShareConditions.by_project_id(self.project_id),
-            ],
         )
 
     @classmethod

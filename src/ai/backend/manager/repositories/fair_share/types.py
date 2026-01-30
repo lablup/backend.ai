@@ -16,7 +16,13 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareData,
     UserFairShareData,
 )
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ScalingGroupNotFound,
+)
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForProjectRow,
@@ -78,18 +84,25 @@ class DomainFairShareSearchScope(SearchScope):
 class ProjectFairShareSearchScope(SearchScope):
     """Required scope for project fair share entity search.
 
-    Used for Field-level queries where resource_group is determined by parent context.
+    Used for Field-level queries where resource_group and domain are determined by parent context.
     """
 
     resource_group: str
     """Required. The scaling group to search within."""
 
+    domain_name: str
+    """Required. The domain to search within."""
+
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for ScalingGroupForProjectRow."""
+        """Convert scope to a query condition for ScalingGroupForProjectRow joined with DomainRow."""
         resource_group = self.resource_group
+        domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group == resource_group
+            return sa.and_(
+                ScalingGroupForProjectRow.scaling_group == resource_group,
+                DomainRow.name == domain_name,
+            )
 
         return inner
 
@@ -102,6 +115,11 @@ class ProjectFairShareSearchScope(SearchScope):
                 value=self.resource_group,
                 error=ScalingGroupNotFound(self.resource_group),
             ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
         ]
 
 
@@ -109,29 +127,53 @@ class ProjectFairShareSearchScope(SearchScope):
 class UserFairShareSearchScope(SearchScope):
     """Required scope for user fair share entity search.
 
-    Used for Field-level queries where resource_group is determined by parent context.
+    Used for Field-level queries where resource_group, domain, and project are determined by parent context.
     """
 
     resource_group: str
     """Required. The scaling group to search within."""
 
+    domain_name: str
+    """Required. The domain to search within."""
+
+    project_id: uuid.UUID
+    """Required. The project to search within."""
+
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for ScalingGroupForProjectRow."""
+        """Convert scope to a query condition for ScalingGroupForProjectRow joined with DomainRow and GroupRow."""
         resource_group = self.resource_group
+        domain_name = self.domain_name
+        project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForProjectRow.scaling_group == resource_group
+            return sa.and_(
+                ScalingGroupForProjectRow.scaling_group == resource_group,
+                DomainRow.name == domain_name,
+                GroupRow.id == project_id,
+            )
 
         return inner
 
     @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(
+        self,
+    ) -> Sequence[ExistenceCheck[str] | ExistenceCheck[uuid.UUID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
                 column=ScalingGroupRow.name,
                 value=self.resource_group,
                 error=ScalingGroupNotFound(self.resource_group),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+            ExistenceCheck(
+                column=GroupRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(str(self.project_id)),
             ),
         ]
 
