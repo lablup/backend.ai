@@ -7732,8 +7732,7 @@
                     "type": "string"
                   },
                   "group": {
-                    "type": "string",
-                    "default": "default"
+                    "type": "string"
                   }
                 },
                 "required": [
