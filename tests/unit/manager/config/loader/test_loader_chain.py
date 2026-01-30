@@ -1,16 +1,14 @@
-from types import SimpleNamespace
 from typing import Any
 
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
 
-class DummyLoader(SimpleNamespace):
-    payload: dict[str, Any]
-
+class DummyLoader(AbstractConfigLoader):
     def __init__(self, payload: dict[str, Any]) -> None:
-        super().__init__(payload=payload)
+        self.payload = payload
 
-    async def load(self):
+    async def load(self) -> dict[str, Any]:
         return self.payload
 
 

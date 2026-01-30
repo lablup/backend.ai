@@ -7,6 +7,7 @@ from tenacity import BaseAction
 
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
@@ -47,7 +48,7 @@ class MockException(Exception):
     pass
 
 
-class MockActionMonitor:
+class MockActionMonitor(ActionMonitor):
     expected_prepare_action: MockAction
     expected_done_action: MockAction
     expected_done_result: ProcessResult
