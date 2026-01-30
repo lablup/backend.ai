@@ -124,7 +124,7 @@ class ImageDataWithDetails:
     labels: list[KVPair] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
-    created_at: Optional[datetime] = field(default=None)
+    created_at: datetime | None = field(default=None)
     # legacy
     hash: str | None = field(default=None)
 
@@ -165,7 +165,7 @@ class ImageAliasData:
 class ImageListResult:
     """Search result with total count and pagination info for images."""
 
-    items: list[ImageDataWithDetails]
+    items: list[ImageData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

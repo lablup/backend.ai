@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry.relay import Connection, Edge, Node, NodeID
@@ -195,12 +195,12 @@ class ImageMetadataInfoGQL:
         description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
     )
     labels: list[ImageLabelEntryGQL] = strawberry.field(description="Docker labels.")
-    digest: Optional[str] = strawberry.field(
+    digest: str | None = strawberry.field(
         description="Config digest (image hash) for verification."
     )
     size_bytes: int = strawberry.field(description="Image size in bytes.")
     status: ImageStatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
-    created_at: Optional[datetime] = strawberry.field(
+    created_at: datetime | None = strawberry.field(
         description="Timestamp when the image was created/registered."
     )
 
@@ -314,7 +314,7 @@ class ImageV2GQL(Node):
     requirements: ImageRequirementsInfoGQL = strawberry.field(
         description="Runtime requirements (supported_accelerators)."
     )
-    permission: Optional[ImagePermissionInfoGQL] = strawberry.field(
+    permission: ImagePermissionInfoGQL | None = strawberry.field(
         default=None, description="Permission info for the current user. May be null."
     )
 
@@ -327,7 +327,7 @@ class ImageV2GQL(Node):
     def from_data(
         cls,
         data: ImageData,
-        permissions: Optional[list[ImagePermission]] = None,
+        permissions: list[ImagePermission] | None = None,
     ) -> Self:
         """Create ImageV2GQL from ImageData.
 
@@ -353,7 +353,7 @@ class ImageV2GQL(Node):
     def from_detailed_data(
         cls,
         data: ImageDataWithDetails,
-        permissions: Optional[list[ImagePermission]] = None,
+        permissions: list[ImagePermission] | None = None,
     ) -> Self:
         """Create ImageV2GQL from ImageDataWithDetails.
 
@@ -413,13 +413,13 @@ class ImageConnectionV2GQL(Connection[ImageV2GQL]):
     """)
 )
 class ImageFilterGQL(GQLFilter):
-    status: Optional[list[ImageStatusGQL]] = None
-    name: Optional[StringFilter] = None
-    architecture: Optional[StringFilter] = None
+    status: list[ImageStatusGQL] | None = None
+    name: StringFilter | None = None
+    architecture: StringFilter | None = None
 
-    AND: Optional[list[ImageFilterGQL]] = None
-    OR: Optional[list[ImageFilterGQL]] = None
-    NOT: Optional[list[ImageFilterGQL]] = None
+    AND: list[ImageFilterGQL] | None = None
+    OR: list[ImageFilterGQL] | None = None
+    NOT: list[ImageFilterGQL] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.

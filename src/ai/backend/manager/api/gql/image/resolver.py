@@ -6,7 +6,6 @@ This module provides GraphQL query fields for ImageV2.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -42,14 +41,14 @@ from .types import (
 )
 async def images_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ImageFilterGQL] = None,
-    order_by: Optional[list[ImageOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: ImageFilterGQL | None = None,
+    order_by: list[ImageOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ImageConnectionV2GQL:
     # Default filter to ALIVE status if not specified
     if filter is None:
@@ -77,5 +76,5 @@ async def images_v2(
     metadata, resource requirements, and permission settings.
     """)
 )
-async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ImageV2GQL]:
+async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
     return await fetch_image(info, ImageID(UUID(id)))

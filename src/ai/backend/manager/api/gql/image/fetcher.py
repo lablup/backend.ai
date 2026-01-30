@@ -82,7 +82,7 @@ async def fetch_images(
 
     edges = []
     for image_data in action_result.data:
-        image = ImageV2GQL.from_detailed_data(image_data)
+        image = ImageV2GQL.from_data(image_data)
         cursor = encode_cursor(image_data.id)
         edges.append(ImageEdgeGQL(node=image, cursor=cursor))
 
@@ -116,4 +116,4 @@ async def fetch_image(
     image_data = await info.context.data_loaders.image_loader.load(image_id)
     if image_data is None:
         return None
-    return ImageV2GQL.from_detailed_data(image_data)
+    return ImageV2GQL.from_data(image_data)
