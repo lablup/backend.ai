@@ -453,7 +453,6 @@ class UserDBSource:
     ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
-        result = cast(Optional[str], result)
         return result is not None
 
     async def _check_resource_policy_exists(
@@ -464,7 +463,6 @@ class UserDBSource:
             UserResourcePolicyRow.name == policy_name
         )
         result = await session.scalar(query)
-        result = cast(Optional[str], result)
         return result is not None
 
     async def _check_user_exists_with_email_or_username(
