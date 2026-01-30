@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -79,7 +79,7 @@ class TestSearchRoles:
     ) -> list[CreatedRole]:
         """Create multiple roles for testing."""
         created: list[CreatedRole] = []
-        base_time = datetime(2025, 1, 1, tzinfo=UTC)
+        base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
         async with db_with_rbac_tables.begin_session() as db_sess:
             for i, (name, description) in enumerate([
@@ -87,12 +87,7 @@ class TestSearchRoles:
                 ("editor-role", "Editor role"),
                 ("viewer-role", "Viewer role"),
             ]):
-                created_at = datetime(
-                    base_time.year,
-                    base_time.month,
-                    base_time.day + i,
-                    tzinfo=UTC,
-                )
+                created_at = base_time + timedelta(minutes=i)
                 role = RoleRow(
                     name=name,
                     description=description,
@@ -202,5 +197,5 @@ class TestSearchRoles:
         role_ids = [item.id for item in result.items]
         expected_role_ids = [r.role_id for r in sorted(created_roles, key=lambda r: r.created_at)]
         assert role_ids == expected_role_ids, (
-            f"Failed to order roles by created_at got {[r.created_at for r in result.items]}, expected {[r.created_at for r in created_roles]}"
+            f"Failed to order roles by created_at: got {[r.created_at for r in result.items]}, expected {[r.created_at for r in created_roles]}"
         )
