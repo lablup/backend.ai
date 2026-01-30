@@ -114,6 +114,20 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .rbac import (
+    create_role,
+    create_role_assignment,
+    delete_role,
+    delete_role_assignment,
+    purge_role,
+    role,
+    role_object_permissions,
+    role_scopes,
+    roles,
+    scope_permissions,
+    update_role,
+    update_role_permissions,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -199,6 +213,11 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
+    role = role
+    roles = roles
+    role_scopes = role_scopes
+    role_object_permissions = role_object_permissions
+    scope_permissions = scope_permissions
 
 
 @strawberry.type
@@ -264,6 +283,14 @@ class Mutation:
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # RBAC
+    create_role = create_role
+    update_role = update_role
+    delete_role = delete_role
+    purge_role = purge_role
+    update_role_permissions = update_role_permissions
+    create_role_assignment = create_role_assignment
+    delete_role_assignment = delete_role_assignment
 
 
 @strawberry.type
