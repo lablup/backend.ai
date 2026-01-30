@@ -3,10 +3,15 @@ from datetime import UTC, datetime
 from typing import Final
 
 import pytest
-from tenacity import BaseAction
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
+from ai.backend.manager.actions.action import (
+    BaseAction,
+    BaseActionResult,
+    BaseActionResultMeta,
+    BaseActionTriggerMeta,
+    ProcessResult,
+)
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 
@@ -63,10 +68,12 @@ class MockActionMonitor(ActionMonitor):
         self.expected_done_action = expected_done_action
         self.expected_done_result = expected_done_result
 
-    async def prepare(self, action: MockAction, _meta: MockActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+        assert isinstance(action, MockAction)
         assert action == self.expected_prepare_action
 
-    async def done(self, action: MockAction, result: ProcessResult) -> None:
+    async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        assert isinstance(action, MockAction)
         assert action == self.expected_done_action
         # Partially check the result
         assert result.meta.status == self.expected_done_result.meta.status
