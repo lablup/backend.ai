@@ -1590,7 +1590,7 @@ type DomainFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group.
+  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group, including projects without fair share records (which use default values).
   """
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 }
@@ -2967,7 +2967,7 @@ type ProjectFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group.
+  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group, including users without fair share records (which use default values).
   """
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
 }

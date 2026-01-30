@@ -340,11 +340,12 @@ class FairShareDBSource:
                 sa.select(
                     ScalingGroupForProjectRow.scaling_group,
                     ScalingGroupForProjectRow.group.label("project_id"),
-                    GroupRow.domain_name,
+                    DomainRow.name.label("domain_name"),
                     ProjectFairShareRow,
                 )
                 .select_from(ScalingGroupForProjectRow)
                 .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .outerjoin(
                     ProjectFairShareRow,
                     sa.and_(
@@ -629,7 +630,7 @@ class FairShareDBSource:
                     ScalingGroupForProjectRow.scaling_group,
                     AssocGroupUserRow.user_id.label("user_uuid"),
                     AssocGroupUserRow.group_id.label("project_id"),
-                    GroupRow.domain_name,
+                    DomainRow.name.label("domain_name"),
                     UserFairShareRow,
                 )
                 .select_from(ScalingGroupForProjectRow)
@@ -637,6 +638,7 @@ class FairShareDBSource:
                     AssocGroupUserRow, ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id
                 )
                 .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(

@@ -19,7 +19,11 @@ from ai.backend.manager.errors.fair_share import FairShareNotFoundError
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import BatchQuerier, BulkUpserter, Upserter
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkUpserter,
+    Upserter,
+)
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.fair_share.upserters import (
     DomainFairShareBulkWeightUpserterSpec,
@@ -48,6 +52,12 @@ from .actions import (
     SearchDomainFairSharesActionResult,
     SearchProjectFairSharesAction,
     SearchProjectFairSharesActionResult,
+    SearchRGDomainFairSharesAction,
+    SearchRGDomainFairSharesActionResult,
+    SearchRGProjectFairSharesAction,
+    SearchRGProjectFairSharesActionResult,
+    SearchRGUserFairSharesAction,
+    SearchRGUserFairSharesActionResult,
     SearchUserFairSharesAction,
     SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
@@ -109,6 +119,85 @@ class FairShareService:
             updated_at=now,
         )
 
+    def _create_default_domain_fair_share(
+        self,
+        resource_group: str,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> DomainFairShareData:
+        """Create default DomainFairShareData for domains without fair share records.
+
+        Sets weight=None to ensure uses_default=true in GraphQL.
+        """
+        return DomainFairShareData(
+            id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted records
+            resource_group=resource_group,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,  # None triggers uses_default=true in GraphQL
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
+            metadata=self._create_default_metadata(),
+            default_weight=scaling_group_spec.default_weight,
+        )
+
+    def _create_default_project_fair_share(
+        self,
+        resource_group: str,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> ProjectFairShareData:
+        """Create default ProjectFairShareData for projects without fair share records."""
+        return ProjectFairShareData(
+            id=uuid.UUID(int=0),
+            resource_group=resource_group,
+            project_id=project_id,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
+            metadata=self._create_default_metadata(),
+            default_weight=scaling_group_spec.default_weight,
+        )
+
+    def _create_default_user_fair_share(
+        self,
+        resource_group: str,
+        user_uuid: uuid.UUID,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> UserFairShareData:
+        """Create default UserFairShareData for users without fair share records."""
+        return UserFairShareData(
+            id=uuid.UUID(int=0),
+            resource_group=resource_group,
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
+            metadata=self._create_default_metadata(),
+            default_weight=scaling_group_spec.default_weight,
+            scheduling_rank=None,  # No rank calculated yet
+        )
+
     # Domain Fair Share
 
     async def get_domain_fair_share(
@@ -161,6 +250,43 @@ class FairShareService:
         return SearchDomainFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
+        )
+
+    async def search_rg_domain_fair_shares(
+        self,
+        action: SearchRGDomainFairSharesAction,
+    ) -> SearchRGDomainFairSharesActionResult:
+        """Search domain fair shares within a resource group scope.
+
+        Returns all domains in the resource group, filling defaults for entities
+        without fair share records.
+        """
+        # Call entity-based repository method
+        entity_result = await self._repository.search_domain_fair_share_entities(
+            action.scope, action.querier
+        )
+
+        # Fetch scaling group spec once for all defaults
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.scope.resource_group
+        )
+
+        # Transform EntityItem → FairShareData
+        items: list[DomainFairShareData] = []
+        for entity_item in entity_result.items:
+            if entity_item.details is not None:
+                items.append(entity_item.details)
+            else:
+                default_data = self._create_default_domain_fair_share(
+                    resource_group=entity_item.resource_group,
+                    domain_name=entity_item.domain_name,
+                    scaling_group_spec=scaling_group_spec,
+                )
+                items.append(default_data)
+
+        return SearchRGDomainFairSharesActionResult(
+            items=items,
+            total_count=entity_result.total_count,
         )
 
     # Project Fair Share
@@ -216,6 +342,44 @@ class FairShareService:
         return SearchProjectFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
+        )
+
+    async def search_rg_project_fair_shares(
+        self,
+        action: SearchRGProjectFairSharesAction,
+    ) -> SearchRGProjectFairSharesActionResult:
+        """Search project fair shares within a resource group scope.
+
+        Returns all projects in the resource group, filling defaults for entities
+        without fair share records.
+        """
+        # Call entity-based repository method
+        entity_result = await self._repository.search_project_fair_share_entities(
+            action.scope, action.querier
+        )
+
+        # Fetch scaling group spec once for all defaults
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.scope.resource_group
+        )
+
+        # Transform EntityItem → FairShareData
+        items: list[ProjectFairShareData] = []
+        for entity_item in entity_result.items:
+            if entity_item.details is not None:
+                items.append(entity_item.details)
+            else:
+                default_data = self._create_default_project_fair_share(
+                    resource_group=entity_item.resource_group,
+                    project_id=entity_item.project_id,
+                    domain_name=entity_item.domain_name,
+                    scaling_group_spec=scaling_group_spec,
+                )
+                items.append(default_data)
+
+        return SearchRGProjectFairSharesActionResult(
+            items=items,
+            total_count=entity_result.total_count,
         )
 
     # User Fair Share
@@ -276,6 +440,45 @@ class FairShareService:
         return SearchUserFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
+        )
+
+    async def search_rg_user_fair_shares(
+        self,
+        action: SearchRGUserFairSharesAction,
+    ) -> SearchRGUserFairSharesActionResult:
+        """Search user fair shares within a resource group scope.
+
+        Returns all users in the resource group, filling defaults for entities
+        without fair share records.
+        """
+        # Call entity-based repository method
+        entity_result = await self._repository.search_user_fair_share_entities(
+            action.scope, action.querier
+        )
+
+        # Fetch scaling group spec once for all defaults
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.scope.resource_group
+        )
+
+        # Transform EntityItem → FairShareData
+        items: list[UserFairShareData] = []
+        for entity_item in entity_result.items:
+            if entity_item.details is not None:
+                items.append(entity_item.details)
+            else:
+                default_data = self._create_default_user_fair_share(
+                    resource_group=entity_item.resource_group,
+                    user_uuid=entity_item.user_uuid,
+                    project_id=entity_item.project_id,
+                    domain_name=entity_item.domain_name,
+                    scaling_group_spec=scaling_group_spec,
+                )
+                items.append(default_data)
+
+        return SearchRGUserFairSharesActionResult(
+            items=items,
+            total_count=entity_result.total_count,
         )
 
     # Upsert Weight Operations

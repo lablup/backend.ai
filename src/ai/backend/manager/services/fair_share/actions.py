@@ -13,7 +13,17 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareData,
     UserFairShareData,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, QueryPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    QueryCondition,
+    QueryOrder,
+    QueryPagination,
+)
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareSearchScope,
+    ProjectFairShareSearchScope,
+    UserFairShareSearchScope,
+)
 
 # Domain Fair Share
 
@@ -77,6 +87,39 @@ class SearchDomainFairSharesAction(DomainFairShareAction):
 @dataclass
 class SearchDomainFairSharesActionResult(BaseActionResult):
     """Result of searching domain fair shares."""
+
+    items: list[DomainFairShareData]
+    total_count: int
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class SearchRGDomainFairSharesAction(DomainFairShareAction):
+    """Action to search domain fair shares within a resource group scope.
+
+    Returns all domains in the resource group, filling defaults for
+    entities without fair share records.
+    """
+
+    scope: DomainFairShareSearchScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "search"
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.scope.resource_group
+
+
+@dataclass
+class SearchRGDomainFairSharesActionResult(BaseActionResult):
+    """Result of resource group domain fair share search."""
 
     items: list[DomainFairShareData]
     total_count: int
@@ -157,6 +200,39 @@ class SearchProjectFairSharesActionResult(BaseActionResult):
         return None
 
 
+@dataclass
+class SearchRGProjectFairSharesAction(ProjectFairShareAction):
+    """Action to search project fair shares within a resource group scope.
+
+    Returns all projects in the resource group, filling defaults for
+    entities without fair share records.
+    """
+
+    scope: ProjectFairShareSearchScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "search"
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.scope.resource_group
+
+
+@dataclass
+class SearchRGProjectFairSharesActionResult(BaseActionResult):
+    """Result of resource group project fair share search."""
+
+    items: list[ProjectFairShareData]
+    total_count: int
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
 # User Fair Share
 
 
@@ -220,6 +296,39 @@ class SearchUserFairSharesAction(UserFairShareAction):
 @dataclass
 class SearchUserFairSharesActionResult(BaseActionResult):
     """Result of searching user fair shares."""
+
+    items: list[UserFairShareData]
+    total_count: int
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class SearchRGUserFairSharesAction(UserFairShareAction):
+    """Action to search user fair shares within a resource group scope.
+
+    Returns all users in the resource group, filling defaults for
+    entities without fair share records.
+    """
+
+    scope: UserFairShareSearchScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "search"
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.scope.resource_group
+
+
+@dataclass
+class SearchRGUserFairSharesActionResult(BaseActionResult):
+    """Result of resource group user fair share search."""
 
     items: list[UserFairShareData]
     total_count: int
