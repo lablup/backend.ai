@@ -12,10 +12,11 @@ from datetime import datetime
 from typing import Self
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
     ImageData,
@@ -323,6 +324,18 @@ class ImageV2GQL(Node):
         description="UUID of the container registry where this image is stored."
     )
 
+    @strawberry.field(
+        description=dedent_strip("""
+        Added in 26.2.0.
+
+        User-defined aliases for this image.
+        Aliases provide alternative, memorable names for referencing images.
+        """)
+    )
+    async def aliases(self, info: Info[StrawberryGQLContext]) -> list[str]:
+        """Load aliases for this image using the data loader."""
+        return await info.context.data_loaders.image_aliases_loader.load(self.id)
+
     @classmethod
     def from_data(
         cls,
@@ -492,6 +505,11 @@ class ImageFilterGQL(GQLFilter):
 class ImageOrderFieldGQL(enum.Enum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    ARCHITECTURE = "ARCHITECTURE"
+    SIZE_BYTES = "SIZE_BYTES"
+    REGISTRY = "REGISTRY"
+    TAG = "TAG"
+    STATUS = "STATUS"
 
 
 @strawberry.input(
@@ -513,3 +531,13 @@ class ImageOrderByGQL(GQLOrderBy):
                 return ImageOrders.name(ascending)
             case ImageOrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
+            case ImageOrderFieldGQL.ARCHITECTURE:
+                return ImageOrders.architecture(ascending)
+            case ImageOrderFieldGQL.SIZE_BYTES:
+                return ImageOrders.size_bytes(ascending)
+            case ImageOrderFieldGQL.REGISTRY:
+                return ImageOrders.registry(ascending)
+            case ImageOrderFieldGQL.TAG:
+                return ImageOrders.tag(ascending)
+            case ImageOrderFieldGQL.STATUS:
+                return ImageOrders.status(ascending)

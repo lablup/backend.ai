@@ -42,6 +42,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
@@ -362,6 +366,9 @@ class ImageService:
         )
 
     async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
+        """
+        Deprecated. Use rescan_images_by_id instead.
+        """
         image_canonical = action.canonical
         architecture = action.architecture
 
@@ -441,3 +448,12 @@ class ImageService:
             action.resource_limit,
         )
         return SetImageResourceLimitByIdActionResult(image_data=image_data)
+
+    async def get_aliases_by_image_ids(
+        self, action: GetAliasesByImageIdsAction
+    ) -> GetAliasesByImageIdsActionResult:
+        """
+        Retrieves aliases for multiple images by their IDs.
+        """
+        aliases_map = await self._image_repository.get_aliases_by_image_ids(action.image_ids)
+        return GetAliasesByImageIdsActionResult(aliases_map=aliases_map)

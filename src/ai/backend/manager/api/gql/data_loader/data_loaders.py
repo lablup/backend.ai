@@ -35,7 +35,7 @@ from .deployment import (
     load_routes_by_ids,
 )
 from .huggingface_registry import load_huggingface_registries_by_ids
-from .image import load_images_by_ids
+from .image import load_aliases_by_image_ids, load_images_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
@@ -173,3 +173,9 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, ImageData | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
+
+    @cached_property
+    def image_aliases_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[str]]:
+        return DataLoader(load_fn=partial(load_aliases_by_image_ids, self._processors.image))
