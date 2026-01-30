@@ -1,10 +1,11 @@
 """Tests for ClusterConfigurationRule."""
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, KernelEnqueueingConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserInfo,
@@ -50,14 +51,14 @@ class TestClusterConfigurationRule:
             cluster_size=1,
             priority=10,
             resource_policy={},
-            kernel_specs=[{"image_ref": MagicMock(canonical="test-image")}],
+            kernel_specs=[cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})],
             creation_spec={},
         )
 
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 1
         assert kernel_configs[0]["cluster_role"] == DEFAULT_ROLE
 
@@ -73,14 +74,14 @@ class TestClusterConfigurationRule:
             cluster_size=4,
             priority=10,
             resource_policy={},
-            kernel_specs=[{"image_ref": MagicMock(canonical="test-image")}],
+            kernel_specs=[cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})],
             creation_spec={},
         )
 
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 4
 
         # Check main kernel
@@ -109,9 +110,9 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                {"image_ref": MagicMock(canonical="image1")},
-                {"image_ref": MagicMock(canonical="image2")},
-                {"image_ref": MagicMock(canonical="image3")},
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1")}),
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image2")}),
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image3")}),
             ],
             creation_spec={},
         )
@@ -119,7 +120,7 @@ class TestClusterConfigurationRule:
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 3
 
         # First kernel should be main
@@ -149,21 +150,21 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                {
+                cast(KernelEnqueueingConfig, {
                     "image_ref": MagicMock(canonical="image1"),
                     "cluster_role": "main",
                     "cluster_idx": 1,
-                },
-                {
+                }),
+                cast(KernelEnqueueingConfig, {
                     "image_ref": MagicMock(canonical="image2"),
                     "cluster_role": "sub",
                     "cluster_idx": 1,
-                },
-                {
+                }),
+                cast(KernelEnqueueingConfig, {
                     "image_ref": MagicMock(canonical="image3"),
                     "cluster_role": "sub",
                     "cluster_idx": 2,
-                },
+                }),
             ],
             creation_spec={},
         )
@@ -171,7 +172,7 @@ class TestClusterConfigurationRule:
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 3
 
         # Should preserve predefined roles
@@ -200,8 +201,8 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                {"image_ref": MagicMock(canonical="image1"), "cluster_hostname": "master"},
-                {"image_ref": MagicMock(canonical="image2"), "cluster_hostname": "worker1"},
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1"), "cluster_hostname": "master"}),
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image2"), "cluster_hostname": "worker1"}),
             ],
             creation_spec={},
         )
@@ -209,7 +210,7 @@ class TestClusterConfigurationRule:
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 2
 
         # Should preserve custom hostnames
@@ -229,17 +230,17 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                {"image_ref": MagicMock(canonical="image1")},  # Should auto-assign as main
-                {
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1")}),  # Should auto-assign as main
+                cast(KernelEnqueueingConfig, {
                     "image_ref": MagicMock(canonical="image2"),
                     "cluster_role": "sub",
-                },  # Predefined sub
-                {"image_ref": MagicMock(canonical="image3")},  # Should auto-assign as sub
-                {
+                }),  # Predefined sub
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image3")}),  # Should auto-assign as sub
+                cast(KernelEnqueueingConfig, {
                     "image_ref": MagicMock(canonical="image4"),
                     "cluster_role": "sub",
                     "cluster_idx": 5,
-                },  # Predefined sub with custom idx
+                }),  # Predefined sub with custom idx
             ],
             creation_spec={},
         )
@@ -247,7 +248,7 @@ class TestClusterConfigurationRule:
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == 4
 
         # First kernel auto-assigned as main
@@ -280,7 +281,7 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                {"image_ref": MagicMock(canonical="test-image")}
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})
             ],  # Single spec to replicate
             creation_spec={},
         )
@@ -288,7 +289,7 @@ class TestClusterConfigurationRule:
         preparation_data: dict[str, Any] = {}
         cluster_rule.prepare(spec, basic_context, preparation_data)
 
-        kernel_configs = preparation_data["kernel_configs"]
+        kernel_configs: list[KernelEnqueueingConfig] = preparation_data["kernel_configs"]
         assert len(kernel_configs) == cluster_size
 
         # Verify all sub kernels have correct indices
