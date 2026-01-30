@@ -400,7 +400,7 @@ class SessionService:
                 keypair_resource_policy,
                 domain_name,
                 group_name,
-                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+                query_on_behalf_of=owner_access_key,
             )
         except ValueError as e:
             raise InvalidAPIParameters(str(e)) from e
@@ -475,7 +475,7 @@ class SessionService:
             keypair_resource_policy,
             domain_name,
             group_name,
-            query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+            query_on_behalf_of=owner_access_key,
         )
 
         try:

@@ -544,9 +544,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
-        "owner_access_key": (
-            None if params.owner_access_key is undefined else params.owner_access_key
-        ),
+        "owner_access_key": params.owner_access_key,
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)

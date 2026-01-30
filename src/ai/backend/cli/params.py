@@ -249,7 +249,7 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
 
     def convert(
         self,
-        value: str,
+        value: str | Undefined,
         param: click.Parameter | None,
         ctx: click.Context | None,
     ) -> TScalar | Undefined:
