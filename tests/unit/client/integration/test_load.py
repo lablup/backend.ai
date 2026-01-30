@@ -110,7 +110,7 @@ def run_restart_kernel(kid):
     # 2nd params is currently ignored.
     if kid is not None:
         begin = time.monotonic()
-        ComputeSession(kid).restart()
+        ComputeSession(kid).restart()  # type: ignore[unused-coroutine]
         end = time.monotonic()
         return end - begin
     return None
@@ -137,7 +137,7 @@ def restart_kernels(kernel_ids, parallel=False):
 def run_destroy_kernel(kid):
     if kid is not None:
         begin = time.monotonic()
-        ComputeSession(kid).destroy()
+        ComputeSession(kid).destroy()  # type: ignore[unused-coroutine]
         end = time.monotonic()
         return end - begin
     return None

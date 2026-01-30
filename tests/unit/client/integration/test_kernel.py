@@ -156,14 +156,14 @@ def test_kernel_execution_batch_mode_user_input(py3_kernel):
 def test_kernel_execution_with_vfolder_mounts():
     with Session() as sess:
         vfname = "vftest-" + secrets.token_hex(4)
-        sess.VFolder.create(vfname)
+        sess.VFolder.create(vfname)  # type: ignore[unused-coroutine]
         vfolder = sess.VFolder(vfname)
         try:
             with tempfile.NamedTemporaryFile("w", suffix=".py", dir=Path.cwd()) as f:
                 f.write('print("hello world")\nx = 1 / 0\n')
                 f.flush()
                 f.seek(0)
-                vfolder.upload([f.name])
+                vfolder.upload([f.name])  # type: ignore[unused-coroutine]
             kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04", mounts=[vfname])
             try:
                 console, n = exec_loop(
@@ -181,7 +181,7 @@ def test_kernel_execution_with_vfolder_mounts():
             finally:
                 kernel.destroy()
         finally:
-            vfolder.delete()
+            vfolder.delete()  # type: ignore[unused-coroutine]
 
 
 def test_kernel_restart(py3_kernel):

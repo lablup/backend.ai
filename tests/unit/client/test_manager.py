@@ -37,7 +37,7 @@ def test_freeze(mocker):
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
-        session.Manager.freeze()
+        session.Manager.freeze()  # type: ignore[unused-coroutine]
         mock_req_obj.fetch.assert_called_once_with()
 
 
@@ -47,7 +47,7 @@ def test_freeze_opt_force_kill(mocker):
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
-        session.Manager.freeze(force_kill=True)
+        session.Manager.freeze(force_kill=True)  # type: ignore[unused-coroutine]
         mock_req_obj.fetch.assert_called_once_with()
 
 
@@ -57,5 +57,5 @@ def test_unfreeze(mocker):
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
-        session.Manager.unfreeze()
+        session.Manager.unfreeze()  # type: ignore[unused-coroutine]
         mock_req_obj.fetch.assert_called_once_with()

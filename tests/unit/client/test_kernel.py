@@ -52,7 +52,7 @@ def test_create_with_config(mocker, api_version):
         else:
             assert prefix == "session"
         assert session.config is myconfig
-        session.ComputeSession.get_or_create("python")
+        session.ComputeSession.get_or_create("python")  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with("POST", f"/{prefix}")
         current_api_session = api_session.get()
         assert str(current_api_session.config.endpoint) == "https://localhost:9999"
@@ -75,7 +75,7 @@ def test_create_kernel_url(mocker):
     mock_req = mocker.patch("ai.backend.client.func.session.Request", return_value=mock_req_obj)
     with Session() as session:
         prefix = get_naming(session.api_version, "path")
-        session.ComputeSession.get_or_create("python:3.6-ubuntu18.04")
+        session.ComputeSession.get_or_create("python:3.6-ubuntu18.04")  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with("POST", f"/{prefix}")
         mock_req_obj.fetch.assert_called_once_with()
         mock_req_obj.fetch.return_value.json.assert_called_once_with()
@@ -89,7 +89,7 @@ def test_destroy_kernel_url(mocker):
         prefix = get_naming(session.api_version, "path")
         session_name = secrets.token_hex(12)
         cs = session.ComputeSession(session_name)
-        cs.destroy()
+        cs.destroy()  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with("DELETE", f"/{prefix}/{session_name}", params={})
         mock_req_obj.fetch.assert_called_once_with()
 
@@ -102,7 +102,7 @@ def test_restart_kernel_url(mocker):
         prefix = get_naming(session.api_version, "path")
         session_name = secrets.token_hex(12)
         cs = session.ComputeSession(session_name)
-        cs.restart()
+        cs.restart()  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with("PATCH", f"/{prefix}/{session_name}", params={})
         mock_req_obj.fetch.assert_called_once_with()
 
@@ -117,7 +117,7 @@ def test_get_kernel_info_url(mocker):
         prefix = get_naming(session.api_version, "path")
         session_name = secrets.token_hex(12)
         cs = session.ComputeSession(session_name)
-        cs.get_info()
+        cs.get_info()  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with("GET", f"/{prefix}/{session_name}", params={})
         mock_req_obj.fetch.assert_called_once_with()
         mock_req_obj.fetch.return_value.json.assert_called_once_with()
@@ -134,7 +134,7 @@ def test_execute_code_url(mocker):
         session_name = secrets.token_hex(12)
         cs = session.ComputeSession(session_name)
         run_id = secrets.token_hex(8)
-        cs.execute(run_id, "hello")
+        cs.execute(run_id, "hello")  # type: ignore[unused-coroutine]
         mock_req.assert_called_once_with(
             "POST",
             f"/{prefix}/{session_name}",

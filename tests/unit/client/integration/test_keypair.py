@@ -16,7 +16,7 @@ async def test_keypair_manipulation_operations():
     with Session() as sess:
         try:
             # Create keypair
-            result = sess.KeyPair.create(
+            result = sess.KeyPair.create(  # type: ignore[unused-coroutine]
                 user_id=email,
                 is_active=True,
                 is_admin=False,
@@ -31,27 +31,27 @@ async def test_keypair_manipulation_operations():
             assert not keypairs[0]["is_admin"]
 
             # Update keypair
-            sess.KeyPair.update(access_key, is_active=False)
+            sess.KeyPair.update(access_key, is_active=False)  # type: ignore[unused-coroutine]
             keypairs = sess.KeyPair.list(user_id=email)
             assert not keypairs[0]["is_active"]
 
             # Activate keypair
-            sess.KeyPair.activate(access_key)
+            sess.KeyPair.activate(access_key)  # type: ignore[unused-coroutine]
             keypairs = sess.KeyPair.list(user_id=email)
             assert keypairs[0]["is_active"]
 
             # Deactivate keypair
-            sess.KeyPair.deactivate(access_key)
+            sess.KeyPair.deactivate(access_key)  # type: ignore[unused-coroutine]
             keypairs = sess.KeyPair.list(user_id=email)
             assert not keypairs[0]["is_active"]
 
             # Delete Keypair
-            sess.KeyPair.delete(access_key)
+            sess.KeyPair.delete(access_key)  # type: ignore[unused-coroutine]
             keypairs = sess.KeyPair.list(user_id=email)
             assert len(keypairs) == 0
         except Exception:
             if access_key:
-                sess.KeyPair.delete(access_key)
+                sess.KeyPair.delete(access_key)  # type: ignore[unused-coroutine]
             raise
 
 
@@ -59,7 +59,7 @@ async def test_keypair_manipulation_operations():
 async def test_user_cannot_create_keypair(userconfig):
     email = "testion" + uuid.uuid4().hex + "@test.mars"
     with Session() as sess, pytest.raises(BackendAPIError):
-        sess.KeyPair.create(
+        sess.KeyPair.create(  # type: ignore[unused-coroutine]
             user_id=email,
             is_active=True,
             is_admin=False,
@@ -72,6 +72,6 @@ async def test_user_cannot_create_keypair(userconfig):
 async def test_keypair_info():
     current_config = get_config()
     with Session() as sess:
-        result = sess.KeyPair(current_config.access_key).info()
+        result = sess.KeyPair(current_config.access_key).info()  # type: ignore[unused-coroutine]
     assert result["access_key"] == current_config.access_key
     assert result["secret_key"] == current_config.secret_key
