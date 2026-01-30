@@ -152,7 +152,7 @@ class KernelUsageRecordRow(Base):
     )
 
     __table_args__ = (
-        sa.Index("ix_kernel_usage_sg_period", "resource_group", "period_start"),
+        sa.Index("ix_kernel_usage_rg_period", "resource_group", "period_start"),
         sa.Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
 
