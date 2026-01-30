@@ -94,6 +94,13 @@ def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotNa
     return combined
 
 
+@attrs.define(auto_attribs=True, slots=True)
+class ComputerContext:
+    instance: AbstractComputePlugin
+    devices: Collection[AbstractComputeDevice]
+    alloc_map: AbstractAllocMap
+
+
 @dataclass
 class DeviceView:
     device: DeviceName
@@ -507,13 +514,6 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
-
-
-@dataclass(slots=True)
-class ComputerContext:
-    instance: AbstractComputePlugin
-    devices: Collection[AbstractComputeDevice]
-    alloc_map: AbstractAllocMap
 
 
 @dataclass(kw_only=True, frozen=True)
