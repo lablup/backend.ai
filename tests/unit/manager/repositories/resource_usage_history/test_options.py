@@ -7,11 +7,6 @@ from operator import eq
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.resource_usage_history import (
-    DomainUsageBucketRow,
-    ProjectUsageBucketRow,
-    UserUsageBucketRow,
-)
 from ai.backend.manager.repositories.resource_usage_history.options import (
     DomainUsageBucketConditions,
     ProjectUsageBucketConditions,
