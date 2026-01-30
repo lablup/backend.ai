@@ -5,10 +5,12 @@ import tempfile
 import textwrap
 import unittest.mock
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest import mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from aioresponses import aioresponses
@@ -19,7 +21,15 @@ from ai.backend.agent import resources
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
 from ai.backend.agent.exception import FractionalResourceFragmented, InsufficientResource
-from ai.backend.agent.resources import ComputerContext, align_memory, scan_resource_usage_per_slot
+from ai.backend.agent.resources import (
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    ComputerContext,
+    GlobalDeviceInfo,
+    ResourceAllocator,
+    align_memory,
+    scan_resource_usage_per_slot,
+)
 from ai.backend.agent.vendor import linux
 from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
 
@@ -514,3 +524,194 @@ def test_align_memory() -> None:
         assert usable % align == 0
         assert usable + actual_reserved == orig
         assert 990 <= actual_reserved <= 1010
+
+
+class TestGlobalDeviceInfo:
+    """Tests for GlobalDeviceInfo dataclass."""
+
+    def test_initialization_with_devices(self) -> None:
+        """Verify GlobalDeviceInfo correctly stores plugin and devices."""
+        mock_plugin = Mock(spec=AbstractComputePlugin)
+        mock_device = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = DeviceId("0")
+
+        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[mock_device])
+
+        assert info.plugin is mock_plugin
+        assert len(info.devices) == 1
+        assert info.devices[0] is mock_device
+
+    def test_initialization_with_empty_devices(self) -> None:
+        """Verify GlobalDeviceInfo handles empty device list."""
+        mock_plugin = Mock(spec=AbstractComputePlugin)
+
+        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[])
+
+        assert info.plugin is mock_plugin
+        assert len(info.devices) == 0
+        assert isinstance(info.devices, Sequence)
+
+    def test_no_alloc_map_attribute(self) -> None:
+        """Verify GlobalDeviceInfo does not have alloc_map (separation of concerns)."""
+        mock_plugin = Mock(spec=AbstractComputePlugin)
+
+        info = GlobalDeviceInfo(plugin=mock_plugin, devices=[])
+
+        assert not hasattr(info, "alloc_map")
+
+
+@pytest.mark.asyncio
+class TestCreateGlobalDevices:
+    """Tests for _create_global_devices method."""
+
+    async def test_discovers_devices_from_single_plugin(self) -> None:
+        """Verify device discovery works with a single plugin."""
+        mock_device = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = DeviceId("gpu-0")
+
+        mock_plugin = AsyncMock(spec=AbstractComputePlugin)
+        mock_plugin.list_devices.return_value = [mock_device]
+
+        plugins = {DeviceName("cuda"): mock_plugin}
+
+        # Create a minimal ResourceAllocator mock to test the method
+        allocator = Mock(spec=ResourceAllocator)
+        allocator._create_global_devices = ResourceAllocator._create_global_devices.__get__(
+            allocator, ResourceAllocator
+        )
+
+        result = await allocator._create_global_devices(plugins)
+
+        assert DeviceName("cuda") in result
+        assert result[DeviceName("cuda")].plugin is mock_plugin
+        assert len(result[DeviceName("cuda")].devices) == 1
+        mock_plugin.list_devices.assert_called_once()
+
+    async def test_discovers_devices_from_multiple_plugins(self) -> None:
+        """Verify correct aggregation of devices from CPU, memory, and accelerator plugins."""
+        cpu_device = Mock(spec=AbstractComputeDevice)
+        cpu_device.device_id = DeviceId("0")
+        mem_device = Mock(spec=AbstractComputeDevice)
+        mem_device.device_id = DeviceId("root")
+        gpu_device = Mock(spec=AbstractComputeDevice)
+        gpu_device.device_id = DeviceId("gpu-0")
+
+        cpu_plugin = AsyncMock(spec=AbstractComputePlugin)
+        cpu_plugin.list_devices.return_value = [cpu_device]
+        mem_plugin = AsyncMock(spec=AbstractComputePlugin)
+        mem_plugin.list_devices.return_value = [mem_device]
+        gpu_plugin = AsyncMock(spec=AbstractComputePlugin)
+        gpu_plugin.list_devices.return_value = [gpu_device]
+
+        plugins = {
+            DeviceName("cpu"): cpu_plugin,
+            DeviceName("mem"): mem_plugin,
+            DeviceName("cuda"): gpu_plugin,
+        }
+
+        allocator = Mock(spec=ResourceAllocator)
+        allocator._create_global_devices = ResourceAllocator._create_global_devices.__get__(
+            allocator, ResourceAllocator
+        )
+
+        result = await allocator._create_global_devices(plugins)
+
+        assert len(result) == 3
+        assert DeviceName("cpu") in result
+        assert DeviceName("mem") in result
+        assert DeviceName("cuda") in result
+
+        # Verify each plugin's devices are correctly mapped
+        assert result[DeviceName("cpu")].devices[0].device_id == DeviceId("0")
+        assert result[DeviceName("mem")].devices[0].device_id == DeviceId("root")
+        assert result[DeviceName("cuda")].devices[0].device_id == DeviceId("gpu-0")
+
+
+@pytest.mark.asyncio
+class TestEmptyPluginHandling:
+    """Tests for behavior when a plugin reports no devices."""
+
+    async def test_handles_plugin_with_no_devices(self) -> None:
+        """Verify behavior when a plugin reports no devices."""
+        mock_plugin = AsyncMock(spec=AbstractComputePlugin)
+        mock_plugin.list_devices.return_value = []
+
+        plugins = {DeviceName("mock"): mock_plugin}
+
+        allocator = Mock(spec=ResourceAllocator)
+        allocator._create_global_devices = ResourceAllocator._create_global_devices.__get__(
+            allocator, ResourceAllocator
+        )
+
+        result = await allocator._create_global_devices(plugins)
+
+        assert DeviceName("mock") in result
+        assert len(result[DeviceName("mock")].devices) == 0
+        assert result[DeviceName("mock")].plugin is mock_plugin
+
+
+@pytest.mark.asyncio
+class TestCalculateTotalSlots:
+    """Tests for _calculate_total_slots method."""
+
+    async def test_calculate_total_slots_with_plugins(self) -> None:
+        """Verify _calculate_total_slots returns correct values using plugin.available_slots()."""
+        # Create mock plugins that return specific slot amounts
+        cpu_plugin = AsyncMock()
+        cpu_plugin.available_slots.return_value = {SlotName("cpu"): Decimal(4)}
+
+        mem_plugin = AsyncMock()
+        mem_plugin.available_slots.return_value = {SlotName("mem"): Decimal(8192)}
+
+        # Create mock computer contexts
+        cpu_ctx = Mock(spec=ComputerContext)
+        cpu_ctx.instance = cpu_plugin
+
+        mem_ctx = Mock(spec=ComputerContext)
+        mem_ctx.instance = mem_plugin
+
+        # Create allocator mock with computers attribute
+        allocator = Mock(spec=ResourceAllocator)
+        allocator.computers = {
+            DeviceName("cpu"): cpu_ctx,
+            DeviceName("mem"): mem_ctx,
+        }
+        allocator._calculate_total_slots = ResourceAllocator._calculate_total_slots.__get__(
+            allocator, ResourceAllocator
+        )
+
+        total_slots = await allocator._calculate_total_slots()
+
+        assert total_slots[SlotName("cpu")] == Decimal(4)
+        assert total_slots[SlotName("mem")] == Decimal(8192)
+        cpu_plugin.available_slots.assert_called_once()
+        mem_plugin.available_slots.assert_called_once()
+
+    async def test_calculate_total_slots_aggregates_same_slot_names(self) -> None:
+        """Verify _calculate_total_slots aggregates slots with the same name from multiple plugins."""
+        # Create two plugins that both report a "gpu" slot
+        gpu1_plugin = AsyncMock()
+        gpu1_plugin.available_slots.return_value = {SlotName("cuda.shares"): Decimal("2.0")}
+
+        gpu2_plugin = AsyncMock()
+        gpu2_plugin.available_slots.return_value = {SlotName("cuda.shares"): Decimal("3.0")}
+
+        gpu1_ctx = Mock(spec=ComputerContext)
+        gpu1_ctx.instance = gpu1_plugin
+
+        gpu2_ctx = Mock(spec=ComputerContext)
+        gpu2_ctx.instance = gpu2_plugin
+
+        allocator = Mock(spec=ResourceAllocator)
+        allocator.computers = {
+            DeviceName("cuda1"): gpu1_ctx,
+            DeviceName("cuda2"): gpu2_ctx,
+        }
+        allocator._calculate_total_slots = ResourceAllocator._calculate_total_slots.__get__(
+            allocator, ResourceAllocator
+        )
+
+        total_slots = await allocator._calculate_total_slots()
+
+        # Slots with the same name should be aggregated
+        assert total_slots[SlotName("cuda.shares")] == Decimal("5.0")
