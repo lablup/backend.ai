@@ -57,8 +57,8 @@ async def test_get_volume(mock_log, mock_service, mock_volume_pool):
     assert isinstance(result, VolumeMeta)
     assert result.volume_id == volume_id
     assert result.backend == "mock-backend"
-    assert result.path == "/mock/path"
-    assert result.fsprefix == "mock-fsprefix"
+    assert str(result.path) == "/mock/path"
+    assert str(result.fsprefix) == "mock-fsprefix"
     assert result.capabilities == ["capability1", "capability2"]
 
 

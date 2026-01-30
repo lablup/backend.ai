@@ -110,7 +110,9 @@ async def test_subscribe(redis_queue: RedisQueue):
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == test_payload
+    assert received_messages[0].payload == {
+        k.encode(): v.encode() for k, v in test_payload.items()
+    }
 
 
 async def test_broadcast_with_cache(redis_queue: RedisQueue):
@@ -136,7 +138,9 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue):
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == test_payload
+    assert received_messages[0].payload == {
+        k.encode(): v.encode() for k, v in test_payload.items()
+    }
 
     # Fetch cached message
     cached_message = await redis_queue.fetch_cached_broadcast_message(cache_id)

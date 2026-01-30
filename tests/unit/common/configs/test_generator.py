@@ -31,9 +31,9 @@ from ai.backend.common.meta import (
 
 class TestFieldVisibility:
     def test_enum_values(self) -> None:
-        assert FieldVisibility.REQUIRED == "required"
-        assert FieldVisibility.OPTIONAL == "optional"
-        assert FieldVisibility.HIDDEN == "hidden"
+        assert FieldVisibility.REQUIRED.value == "required"
+        assert FieldVisibility.OPTIONAL.value == "optional"
+        assert FieldVisibility.HIDDEN.value == "hidden"
 
 
 class TestFormattedValue:

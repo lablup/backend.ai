@@ -1,4 +1,5 @@
 import tempfile
+from typing import Any, cast
 
 import pytest
 
@@ -68,23 +69,23 @@ def test_update_nested_dict():
     with pytest.raises(TypeError):
         utils.update_nested_dict(o, {"a": 3})
 
-    o = {
+    o: dict[str, Any] = {
         "a": {
             "x": 1,
         },
         "b": 2,
     }
     utils.update_nested_dict(o, {"a": {"x": 3, "y": 4}, "b": 5})
-    assert o["a"] == {
+    assert cast(dict, o["a"]) == {
         "x": 3,
         "y": 4,
     }
     assert o["b"] == 5
 
-    o = {
+    o: dict[str, Any] = {
         "a": [1, 2],
         "b": 3,
     }
     utils.update_nested_dict(o, {"a": [4, 5], "b": 6})
-    assert o["a"] == [1, 2, 4, 5]
+    assert cast(list, o["a"]) == [1, 2, 4, 5]
     assert o["b"] == 6
