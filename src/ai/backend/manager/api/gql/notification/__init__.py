@@ -1,6 +1,18 @@
 """GraphQL notification module."""
 
 from .resolver import (
+    admin_create_notification_channel,
+    admin_create_notification_rule,
+    admin_delete_notification_channel,
+    admin_delete_notification_rule,
+    admin_notification_channel,
+    admin_notification_channels,
+    admin_notification_rule,
+    admin_notification_rules,
+    admin_update_notification_channel,
+    admin_update_notification_rule,
+    admin_validate_notification_channel,
+    admin_validate_notification_rule,
     create_notification_channel,
     create_notification_rule,
     delete_notification_channel,
@@ -64,12 +76,27 @@ __all__ = (
     "ValidateNotificationChannelPayload",
     "ValidateNotificationRuleInput",
     "ValidateNotificationRulePayload",
-    # Resolvers
+    # Query Resolvers - Admin
+    "admin_notification_channel",
+    "admin_notification_channels",
+    "admin_notification_rule",
+    "admin_notification_rules",
+    # Mutation Resolvers - Admin
+    "admin_create_notification_channel",
+    "admin_update_notification_channel",
+    "admin_delete_notification_channel",
+    "admin_validate_notification_channel",
+    "admin_create_notification_rule",
+    "admin_update_notification_rule",
+    "admin_delete_notification_rule",
+    "admin_validate_notification_rule",
+    # Query Resolvers - Legacy (deprecated)
     "notification_channel",
     "notification_channels",
     "notification_rule",
     "notification_rules",
     "notification_rule_types",
+    # Mutation Resolvers - Legacy (deprecated)
     "create_notification_channel",
     "update_notification_channel",
     "delete_notification_channel",

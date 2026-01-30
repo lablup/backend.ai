@@ -91,6 +91,18 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .notification import (
+    admin_create_notification_channel,
+    admin_create_notification_rule,
+    admin_delete_notification_channel,
+    admin_delete_notification_rule,
+    admin_notification_channel,
+    admin_notification_channels,
+    admin_notification_rule,
+    admin_notification_rules,
+    admin_update_notification_channel,
+    admin_update_notification_rule,
+    admin_validate_notification_channel,
+    admin_validate_notification_rule,
     create_notification_channel,
     create_notification_rule,
     delete_notification_channel,
@@ -182,10 +194,6 @@ class Query:
     revision = revision
     replicas = replicas
     replica = replica
-    notification_channel = notification_channel
-    notification_channels = notification_channels
-    notification_rule = notification_rule
-    notification_rules = notification_rules
     notification_rule_types = notification_rule_types
     object_storage = object_storage
     object_storages = object_storages
@@ -200,8 +208,16 @@ class Query:
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
+    admin_notification_channel = admin_notification_channel
+    admin_notification_channels = admin_notification_channels
+    admin_notification_rule = admin_notification_rule
+    admin_notification_rules = admin_notification_rules
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
+    notification_channel = notification_channel
+    notification_channels = notification_channels
+    notification_rule = notification_rule
+    notification_rules = notification_rules
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
@@ -234,6 +250,16 @@ class Mutation:
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     create_model_revision = create_model_revision
+    # Notification - Admin APIs
+    admin_create_notification_channel = admin_create_notification_channel
+    admin_update_notification_channel = admin_update_notification_channel
+    admin_delete_notification_channel = admin_delete_notification_channel
+    admin_validate_notification_channel = admin_validate_notification_channel
+    admin_create_notification_rule = admin_create_notification_rule
+    admin_update_notification_rule = admin_update_notification_rule
+    admin_delete_notification_rule = admin_delete_notification_rule
+    admin_validate_notification_rule = admin_validate_notification_rule
+    # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
