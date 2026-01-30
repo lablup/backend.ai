@@ -3652,6 +3652,22 @@ type ResourceGroup implements Node {
   """
   name: String!
 
+  """Added in 26.2.0. Status information including active and public flags."""
+  status: ResourceGroupStatus!
+
+  """
+  Added in 26.2.0. Metadata including description and creation timestamp.
+  """
+  metadata: ResourceGroupMetadata!
+
+  """Added in 26.2.0. Network configuration for the resource group."""
+  network: ResourceGroupNetworkConfig!
+
+  """
+  Added in 26.2.0. Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.
+  """
+  scheduler: ResourceGroupSchedulerConfig!
+
   """
   Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
   """
@@ -3701,6 +3717,26 @@ input ResourceGroupInput {
   name: String!
 }
 
+"""Added in 26.2.0. Metadata for a resource group."""
+type ResourceGroupMetadata {
+  """Human-readable description of the resource group."""
+  description: String
+
+  """Timestamp when the resource group was created."""
+  createdAt: DateTime!
+}
+
+"""Added in 26.2.0. Network configuration for a resource group."""
+type ResourceGroupNetworkConfig {
+  """WebSocket proxy address for this resource group."""
+  wsproxyAddr: String
+
+  """
+  Whether to use host network mode for containers in this resource group.
+  """
+  useHostNetwork: Boolean!
+}
+
 """Added in 26.1.0. Order by specification for resource groups"""
 input ResourceGroupOrderBy {
   field: ResourceGroupOrderField!
@@ -3719,6 +3755,23 @@ input ResourceGroupProjectScope {
 
   """Domain name to scope the operation"""
   domainName: String!
+}
+
+"""Added in 26.2.0. Scheduler configuration for a resource group."""
+type ResourceGroupSchedulerConfig {
+  """
+  Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
+  """
+  type: SchedulerType!
+}
+
+"""Added in 26.2.0. Status information for a resource group."""
+type ResourceGroupStatus {
+  """Whether the resource group is active and can accept new sessions."""
+  isActive: Boolean!
+
+  """Whether the resource group is publicly accessible to all users."""
+  isPublic: Boolean!
 }
 
 """Resource group + domain + project scope for user-level operations"""
@@ -4112,6 +4165,16 @@ These artifacts are registered with SCANNED status and can be imported for actua
 """
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""
+Added in 26.2.0. Type of scheduler used for session scheduling in a resource group.
+"""
+enum SchedulerType {
+  FIFO
+  LIFO
+  DRF
+  FAIR_SHARE
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""

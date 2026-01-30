@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Self, override
@@ -21,6 +22,7 @@ from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
+    SchedulerType,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
@@ -40,13 +42,101 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
     "ResourceGroupFilterGQL",
+    "ResourceGroupGQL",
+    "ResourceGroupMetadataGQL",
+    "ResourceGroupNetworkConfigGQL",
     "ResourceGroupOrderByGQL",
     "ResourceGroupOrderFieldGQL",
-    "ResourceGroupGQL",
+    "ResourceGroupSchedulerConfigGQL",
+    "ResourceGroupStatusGQL",
     "ResourceInfoGQL",
+    "SchedulerTypeGQL",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupFairShareSpecPayload",
 )
+
+
+@strawberry.enum(
+    name="SchedulerType",
+    description="Added in 26.2.0. Type of scheduler used for session scheduling in a resource group.",
+)
+class SchedulerTypeGQL(StrEnum):
+    """Scheduler type enumeration for GraphQL."""
+
+    FIFO = "fifo"
+    LIFO = "lifo"
+    DRF = "drf"
+    FAIR_SHARE = "fair-share"
+
+    @classmethod
+    def from_scheduler_type(cls, scheduler_type: SchedulerType) -> SchedulerTypeGQL:
+        """Convert from data layer SchedulerType to GQL type."""
+        match scheduler_type:
+            case SchedulerType.FIFO:
+                return cls.FIFO
+            case SchedulerType.LIFO:
+                return cls.LIFO
+            case SchedulerType.DRF:
+                return cls.DRF
+            case SchedulerType.FAIR_SHARE:
+                return cls.FAIR_SHARE
+
+
+@strawberry.type(
+    name="ResourceGroupStatus",
+    description="Added in 26.2.0. Status information for a resource group.",
+)
+class ResourceGroupStatusGQL:
+    """Status information for a resource group."""
+
+    is_active: bool = strawberry.field(
+        description="Whether the resource group is active and can accept new sessions."
+    )
+    is_public: bool = strawberry.field(
+        description="Whether the resource group is publicly accessible to all users."
+    )
+
+
+@strawberry.type(
+    name="ResourceGroupMetadata",
+    description="Added in 26.2.0. Metadata for a resource group.",
+)
+class ResourceGroupMetadataGQL:
+    """Metadata for a resource group."""
+
+    description: str | None = strawberry.field(
+        description="Human-readable description of the resource group."
+    )
+    created_at: datetime = strawberry.field(
+        description="Timestamp when the resource group was created."
+    )
+
+
+@strawberry.type(
+    name="ResourceGroupNetworkConfig",
+    description="Added in 26.2.0. Network configuration for a resource group.",
+)
+class ResourceGroupNetworkConfigGQL:
+    """Network configuration for a resource group."""
+
+    wsproxy_addr: str | None = strawberry.field(
+        description="WebSocket proxy address for this resource group."
+    )
+    use_host_network: bool = strawberry.field(
+        description="Whether to use host network mode for containers in this resource group."
+    )
+
+
+@strawberry.type(
+    name="ResourceGroupSchedulerConfig",
+    description="Added in 26.2.0. Scheduler configuration for a resource group.",
+)
+class ResourceGroupSchedulerConfigGQL:
+    """Scheduler configuration for a resource group."""
+
+    type: SchedulerTypeGQL = strawberry.field(
+        description="Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share)."
+    )
 
 
 @strawberry.type(
@@ -151,6 +241,21 @@ class ResourceGroupGQL(Node):
             Used as primary key and referenced by agents, sessions, and resource presets.
         """)
     )
+    status: ResourceGroupStatusGQL = strawberry.field(
+        description="Added in 26.2.0. Status information including active and public flags."
+    )
+    metadata: ResourceGroupMetadataGQL = strawberry.field(
+        description="Added in 26.2.0. Metadata including description and creation timestamp."
+    )
+    network: ResourceGroupNetworkConfigGQL = strawberry.field(
+        description="Added in 26.2.0. Network configuration for the resource group."
+    )
+    scheduler: ResourceGroupSchedulerConfigGQL = strawberry.field(
+        description=(
+            "Added in 26.2.0. Scheduler configuration for the resource group. "
+            "Use scheduler.type to check if fair-share scheduling is enabled."
+        )
+    )
     fair_share_spec: FairShareScalingGroupSpecGQL = strawberry.field(
         description=(
             "Added in 26.1.0. Fair share calculation configuration for this resource group. "
@@ -163,6 +268,21 @@ class ResourceGroupGQL(Node):
         return cls(
             id=data.name,
             name=data.name,
+            status=ResourceGroupStatusGQL(
+                is_active=data.status.is_active,
+                is_public=data.status.is_public,
+            ),
+            metadata=ResourceGroupMetadataGQL(
+                description=data.metadata.description if data.metadata.description else None,
+                created_at=data.metadata.created_at,
+            ),
+            network=ResourceGroupNetworkConfigGQL(
+                wsproxy_addr=data.network.wsproxy_addr if data.network.wsproxy_addr else None,
+                use_host_network=data.network.use_host_network,
+            ),
+            scheduler=ResourceGroupSchedulerConfigGQL(
+                type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
+            ),
             fair_share_spec=FairShareScalingGroupSpecGQL.from_model(data.fair_share_spec),
         )
 

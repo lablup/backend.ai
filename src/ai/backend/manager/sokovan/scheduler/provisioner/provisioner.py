@@ -117,7 +117,7 @@ class SessionProvisioner:
         pool["fifo"] = FIFOSequencer()
         pool["lifo"] = LIFOSequencer()
         pool["drf"] = DRFSequencer()
-        pool["fairshare"] = FairShareSequencer(self._fair_share_repository)
+        pool["fair-share"] = FairShareSequencer(self._fair_share_repository)
         return pool
 
     @classmethod
