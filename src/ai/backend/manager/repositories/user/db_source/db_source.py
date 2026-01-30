@@ -23,7 +23,6 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserCreateResultData, UserData
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -413,15 +412,12 @@ class UserDBSource:
                 )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
-        try:
-            await initiate_vfolder_deletion(
-                self._db,
-                target_vfs,
-                storage_manager,
-                storage_ptask_group,
-            )
-        except VFolderOperationFailed:
-            raise
+        await initiate_vfolder_deletion(
+            self._db,
+            target_vfs,
+            storage_manager,
+            storage_ptask_group,
+        )
 
         return len(target_vfs)
 
