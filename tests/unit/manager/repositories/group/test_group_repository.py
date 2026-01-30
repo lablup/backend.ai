@@ -63,6 +63,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -70,7 +71,7 @@ from ai.backend.testutils.db import with_tables
 
 
 class TestGroupRepositoryDeleteEndpoints:
-    """Test cases for GroupRepository._delete_group_endpoints"""
+    """Test cases for GroupDBSource._delete_group_endpoints"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -226,18 +227,12 @@ class TestGroupRepositoryDeleteEndpoints:
         return MagicMock(spec=StorageSessionManager)
 
     @pytest.fixture
-    async def group_repository(
+    async def group_db_source(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        storage_manager_mock: StorageSessionManager,
-    ) -> GroupRepository:
-        """Create GroupRepository instance"""
-        return GroupRepository(
-            db=db_with_cleanup,
-            config_provider=MagicMock(),
-            valkey_stat_client=MagicMock(),
-            storage_manager=storage_manager_mock,
-        )
+    ) -> GroupDBSource:
+        """Create GroupDBSource instance"""
+        return GroupDBSource(db=db_with_cleanup)
 
     # Test-specific fixtures
 
@@ -524,14 +519,14 @@ class TestGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
+        group_db_source: GroupDBSource,
         test_group: uuid.UUID,
         inactive_endpoints_with_routings: list[uuid.UUID],
     ) -> None:
         """Test successful deletion of endpoints with routing entries"""
         # Call _delete_group_endpoints
         async with db_with_cleanup.begin_session() as session:
-            await group_repository._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted
@@ -551,7 +546,7 @@ class TestGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_with_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
+        group_db_source: GroupDBSource,
         test_group: uuid.UUID,
         inactive_endpoint_with_session_and_routing: dict[str, uuid.UUID],
     ) -> None:
@@ -561,7 +556,7 @@ class TestGroupRepositoryDeleteEndpoints:
 
         # Call _delete_group_endpoints
         async with db_with_cleanup.begin_session() as session:
-            await group_repository._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted
@@ -587,7 +582,7 @@ class TestGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_with_active_endpoints(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
+        group_db_source: GroupDBSource,
         test_group: uuid.UUID,
         active_endpoint: uuid.UUID,
     ) -> None:
@@ -595,7 +590,7 @@ class TestGroupRepositoryDeleteEndpoints:
         # Call _delete_group_endpoints and expect exception
         with pytest.raises(ProjectHasActiveEndpointsError):
             async with db_with_cleanup.begin_session() as session:
-                await group_repository._delete_group_endpoints(session, test_group)
+                await group_db_source._delete_group_endpoints(session, test_group)
 
         # Verify endpoint is NOT deleted
         async with db_with_cleanup.begin_session() as session:
@@ -607,14 +602,14 @@ class TestGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_empty(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
+        group_db_source: GroupDBSource,
         test_group: uuid.UUID,
     ) -> None:
         """Test deletion with no endpoints (should complete without errors)"""
         # Call _delete_group_endpoints on group with no endpoints
         async with db_with_cleanup.begin_session() as session:
             # Should not raise any exception
-            await group_repository._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify no errors occurred (test passes if no exception raised)
@@ -622,7 +617,7 @@ class TestGroupRepositoryDeleteEndpoints:
     async def test_delete_group_endpoints_no_synchronize_session_error(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository: GroupRepository,
+        group_db_source: GroupDBSource,
         test_group: uuid.UUID,
         multiple_endpoints_with_sessions: dict[str, list[uuid.UUID]],
     ) -> None:
@@ -637,7 +632,7 @@ class TestGroupRepositoryDeleteEndpoints:
 
         # This should NOT raise synchronize_session errors thanks to the fix
         async with db_with_cleanup.begin_session() as session:
-            await group_repository._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(session, test_group)
             await session.commit()
 
         # Verify all data is deleted
@@ -722,9 +717,22 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         return policy_name
 
     @pytest.fixture
+    async def group_db_source_with_mock_role_manager(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> GroupDBSource:
+        """GroupDBSource with mocked RoleManager for create tests."""
+        db_source = GroupDBSource(db=db_with_cleanup)
+        mock_role_manager = MagicMock()
+        mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        db_source._role_manager = mock_role_manager
+        return db_source
+
+    @pytest.fixture
     async def group_repository_with_mock_role_manager(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source_with_mock_role_manager: GroupDBSource,
     ) -> GroupRepository:
         """GroupRepository with mocked RoleManager for create tests."""
         repo = GroupRepository(
@@ -733,9 +741,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             valkey_stat_client=MagicMock(),
             storage_manager=MagicMock(spec=StorageSessionManager),
         )
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        repo._role_manager = mock_role_manager
+        repo._db_source = group_db_source_with_mock_role_manager
         return repo
 
     @pytest.mark.asyncio
@@ -1019,10 +1025,23 @@ class TestGroupRepository:
         )
 
     @pytest.fixture
+    async def group_db_source_with_mock_role_manager(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> GroupDBSource:
+        """GroupDBSource with mocked RoleManager for create tests"""
+        db_source = GroupDBSource(db=db_with_cleanup)
+        mock_role_manager = MagicMock()
+        mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        db_source._role_manager = mock_role_manager
+        return db_source
+
+    @pytest.fixture
     async def group_repository_with_mock_role_manager(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         storage_manager_mock: StorageSessionManager,
+        group_db_source_with_mock_role_manager: GroupDBSource,
     ) -> GroupRepository:
         """GroupRepository with mocked RoleManager for create tests"""
         repo = GroupRepository(
@@ -1031,9 +1050,7 @@ class TestGroupRepository:
             valkey_stat_client=MagicMock(),
             storage_manager=storage_manager_mock,
         )
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        repo._role_manager = mock_role_manager
+        repo._db_source = group_db_source_with_mock_role_manager
         return repo
 
     @pytest.fixture
