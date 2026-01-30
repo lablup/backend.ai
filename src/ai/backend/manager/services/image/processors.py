@@ -123,7 +123,6 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
-    get_images_by_ids: ActionProcessor[GetImagesByIdsAction, GetImagesByIdsActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     get_aliases_by_image_ids: ActionProcessor[
         GetAliasesByImageIdsAction, GetAliasesByImageIdsActionResult
@@ -165,7 +164,6 @@ class ImageProcessors(AbstractProcessorPackage):
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
-        self.get_images_by_ids = ActionProcessor(service.get_images_by_ids, action_monitors)
         self.search_images = ActionProcessor(service.search_images, action_monitors)
         self.get_aliases_by_image_ids = ActionProcessor(
             service.get_aliases_by_image_ids, action_monitors

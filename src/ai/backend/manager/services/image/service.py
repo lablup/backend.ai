@@ -80,10 +80,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_images_by_id import (
-    RescanImagesByIdAction,
-    RescanImagesByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
