@@ -472,7 +472,8 @@ class ModelServingService:
             raise InvalidAPIParameters("User not found")
 
         image_row = await self._repository.resolve_image_for_endpoint_creation([
-            # image and architecture must be provided either from service definition or API request
+            # Image and architecture must be provided either from service definition or API request
+            # If Architecture is not provided, default arch from scaling group is used in revision generation
             ImageIdentifier(cast(str, action.image), cast(str, action.architecture)),
             ImageAlias(cast(str, action.image)),
         ])
