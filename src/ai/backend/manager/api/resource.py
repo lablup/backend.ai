@@ -83,7 +83,7 @@ async def list_presets(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict({
         t.Key("scaling_group", default=None): t.Null | t.String,
-        t.Key("group", default="default"): t.String,
+        t.Key("group"): t.String,
     })
 )
 async def check_presets(request: web.Request, params: Any) -> web.Response:
