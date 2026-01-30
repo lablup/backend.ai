@@ -575,6 +575,42 @@ class KernelFilteringTestCase:
     expected_actual_occupied_cpu: Decimal
 
 
+KERNEL_FILTERING_TEST_CASES = [
+    KernelFilteringTestCase(
+        test_id="mixed_kernels",
+        agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
+        occupied_kernel_count=3,
+        non_occupied_kernel_count=2,
+        cpu_per_kernel=Decimal("1.0"),
+        expected_actual_occupied_cpu=Decimal("3.0"),
+    ),
+    KernelFilteringTestCase(
+        test_id="only_occupied",
+        agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
+        occupied_kernel_count=4,
+        non_occupied_kernel_count=0,
+        cpu_per_kernel=Decimal("2.0"),
+        expected_actual_occupied_cpu=Decimal("8.0"),
+    ),
+    KernelFilteringTestCase(
+        test_id="only_non_occupied",
+        agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
+        occupied_kernel_count=0,
+        non_occupied_kernel_count=5,
+        cpu_per_kernel=Decimal("1.0"),
+        expected_actual_occupied_cpu=Decimal("0.0"),
+    ),
+    KernelFilteringTestCase(
+        test_id="no_kernels",
+        agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
+        occupied_kernel_count=0,
+        non_occupied_kernel_count=0,
+        cpu_per_kernel=Decimal("0.0"),
+        expected_actual_occupied_cpu=Decimal("0.0"),
+    ),
+]
+
+
 class TestAgentDBSourceKernelFiltering:
     """Test kernel filtering with with_loader_criteria at db_source level"""
 
@@ -847,40 +883,7 @@ class TestAgentDBSourceKernelFiltering:
 
     @pytest.mark.parametrize(
         "agent_with_kernels",
-        [
-            KernelFilteringTestCase(
-                test_id="mixed_kernels",
-                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
-                occupied_kernel_count=3,
-                non_occupied_kernel_count=2,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("3.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_occupied",
-                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=4,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("2.0"),
-                expected_actual_occupied_cpu=Decimal("8.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_non_occupied",
-                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=5,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="no_kernels",
-                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("0.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-        ],
+        KERNEL_FILTERING_TEST_CASES,
         indirect=True,
         ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
     )
@@ -907,40 +910,7 @@ class TestAgentDBSourceKernelFiltering:
 
     @pytest.mark.parametrize(
         "agent_with_kernels",
-        [
-            KernelFilteringTestCase(
-                test_id="mixed_kernels",
-                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
-                occupied_kernel_count=3,
-                non_occupied_kernel_count=2,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("3.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_occupied",
-                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=4,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("2.0"),
-                expected_actual_occupied_cpu=Decimal("8.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_non_occupied",
-                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=5,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="no_kernels",
-                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("0.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-        ],
+        KERNEL_FILTERING_TEST_CASES,
         indirect=True,
         ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
     )
