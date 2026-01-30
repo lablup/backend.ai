@@ -296,6 +296,10 @@ class PermissionControllerRepository:
                 return await self._db_source.search_project_scopes(querier)
             case ScopeType.USER:
                 return await self._db_source.search_user_scopes(querier)
+            case ScopeType.CONTAINER_REGISTRY:
+                raise NotImplementedError(
+                    "Container registry scope querier is not implemented yet."
+                )
 
     @permission_controller_repository_resilience.apply()
     async def search_entities(

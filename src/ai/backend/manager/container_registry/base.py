@@ -21,8 +21,10 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.docker import (
     ImageRef,
+    LabelName,
     arch_name_aliases,
     validate_image_labels,
 )
@@ -42,11 +44,13 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.image.adapter import ImageCreatorAdapter
@@ -154,6 +158,23 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
+    def _determine_image_scope(
+        self,
+        labels: dict[str, str],
+    ) -> ScopeId:
+        """Determine the RBAC scope of an image based on its labels.
+
+        For customized images (those with an owner label), the scope is set to
+        the USER scope of the owner. For non-customized images, the scope is set
+        to the CONTAINER_REGISTRY scope, delegating access control to the
+        registry's domain/project mappings.
+        """
+        owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
+        if owner_label is not None:
+            _, _, scope_id = owner_label.partition(":")
+            return ScopeId(scope_type=ScopeType.USER, scope_id=scope_id)
+        return ScopeId(scope_type=ScopeType.CONTAINER_REGISTRY, scope_id=str(self.registry_info.id))
+
     async def commit_rescan_result(self) -> list[ImageData]:
         scanned_images: list[ImageData] = []
         _all_updates = all_updates.get()
@@ -205,7 +226,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    rbac_creator = self._creator_adapter.build(
+                    scope = self._determine_image_scope(update["labels"])
+                    rbac_creator = RBACEntityCreator(
                         spec=ImageRowCreatorSpec(
                             name=parsed_img.canonical,
                             project=self.registry_info.project,
@@ -221,7 +243,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             accelerators=update.get("accels"),
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
-                        )
+                        ),
+                        scope_id=scope.scope_id,
+                        scope_type=scope.scope_type,
+                        entity_type=EntityType.IMAGE,
                     )
                     result = await execute_rbac_entity_creator(session, rbac_creator)
                     scanned_images.append(result.row.to_dataclass())

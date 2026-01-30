@@ -163,5 +163,7 @@ class ScopeType(enum.StrEnum):
     USER = "user"
     GLOBAL = "global"
 
+    CONTAINER_REGISTRY = "container_registry"
+
 
 GLOBAL_SCOPE_ID = "global"
