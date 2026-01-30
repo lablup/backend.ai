@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
@@ -25,7 +26,6 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.permission_controller.options import (
     RoleConditions,
     RoleOrders,
-    StringMatchSpec,
 )
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
