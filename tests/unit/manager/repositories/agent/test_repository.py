@@ -904,3 +904,58 @@ class TestAgentDBSourceKernelFiltering:
         # Validate actual_occupied_slots reflects only resource-occupied kernels
         actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
         assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
+
+    @pytest.mark.parametrize(
+        "agent_with_kernels",
+        [
+            KernelFilteringTestCase(
+                test_id="mixed_kernels",
+                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
+                occupied_kernel_count=3,
+                non_occupied_kernel_count=2,
+                cpu_per_kernel=Decimal("1.0"),
+                expected_actual_occupied_cpu=Decimal("3.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="only_occupied",
+                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
+                occupied_kernel_count=4,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("2.0"),
+                expected_actual_occupied_cpu=Decimal("8.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="only_non_occupied",
+                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
+                occupied_kernel_count=0,
+                non_occupied_kernel_count=5,
+                cpu_per_kernel=Decimal("1.0"),
+                expected_actual_occupied_cpu=Decimal("0.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="no_kernels",
+                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
+                occupied_kernel_count=0,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("0.0"),
+                expected_actual_occupied_cpu=Decimal("0.0"),
+            ),
+        ],
+        indirect=True,
+        ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
+    )
+    async def test_get_by_id_loads_kernels_and_computes_actual_occupied_slots(
+        self,
+        db_source: AgentDBSource,
+        agent_with_kernels: KernelFilteringTestCase,
+    ) -> None:
+        """
+        Test that get_by_id properly loads kernels relationship via joinedload,
+        allowing actual_occupied_slots computation without MissingGreenlet error.
+        """
+        # Act - This should not raise MissingGreenlet error
+        agent_data = await db_source.get_by_id(agent_with_kernels.agent_id)
+
+        # Assert - Verify actual_occupied_slots is computed correctly
+        actual_cpu = agent_data.actual_occupied_slots.get("cpu", 0)
+        assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
