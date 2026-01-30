@@ -30,10 +30,10 @@ def upgrade() -> None:
         sa.Column("desired_replicas", sa.Integer(), server_default=sa.text("NULL"), nullable=True),
     )
     op.add_column("routings", sa.Column("weight", sa.Integer(), nullable=True))
-    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE '{PENDING}'")
-    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE '{SCALING}'")
-    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE '{READY}'")
-    op.execute(f"ALTER TYPE {route_status_enum_name} ADD VALUE '{TERMINATED}'")
+    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE IF NOT EXISTS '{PENDING}'")
+    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE IF NOT EXISTS '{SCALING}'")
+    op.execute(f"ALTER TYPE {endpoint_lifecycle_enum_name} ADD VALUE IF NOT EXISTS '{READY}'")
+    op.execute(f"ALTER TYPE {route_status_enum_name} ADD VALUE IF NOT EXISTS '{TERMINATED}'")
     op.create_index(
         "ix_endpoints_unique_name_when_not_destroyed",
         "endpoints",
