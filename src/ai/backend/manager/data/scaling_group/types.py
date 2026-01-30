@@ -18,6 +18,7 @@ class SchedulerType(StrEnum):
     FIFO = "fifo"
     LIFO = "lifo"
     DRF = "drf"
+    FAIR_SHARE = "fair-share"
 
 
 @dataclass

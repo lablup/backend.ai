@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,7 +12,12 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
     ResourceGroupGQL,
+    ResourceGroupMetadataGQL,
+    ResourceGroupNetworkConfigGQL,
+    ResourceGroupSchedulerConfigGQL,
+    ResourceGroupStatusGQL,
     ResourceInfoGQL,
+    SchedulerTypeGQL,
 )
 from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -140,6 +146,16 @@ class TestResourceGroupGQLResourceInfoResolver:
         return ResourceGroupGQL(
             id="test-group",
             name="test-group",
+            status=ResourceGroupStatusGQL(is_active=True, is_public=True),
+            metadata=ResourceGroupMetadataGQL(
+                description="Test resource group",
+                created_at=datetime.now(UTC),
+            ),
+            network=ResourceGroupNetworkConfigGQL(
+                wsproxy_addr=None,
+                use_host_network=False,
+            ),
+            scheduler=ResourceGroupSchedulerConfigGQL(type=SchedulerTypeGQL.FIFO),
             fair_share_spec=MagicMock(),
         )
 
