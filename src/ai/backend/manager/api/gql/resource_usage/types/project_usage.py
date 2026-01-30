@@ -129,6 +129,7 @@ class ProjectUsageBucketGQL(Node):
             base_conditions=[
                 UserUsageBucketConditions.by_project_id(self.project_id),
                 UserUsageBucketConditions.by_resource_group(self.resource_group),
+                UserUsageBucketConditions.by_period_start(self.metadata.period_start),
             ],
         )
 

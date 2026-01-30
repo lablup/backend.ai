@@ -102,6 +102,15 @@ class DomainUsageBucketConditions:
         return inner
 
     @staticmethod
+    def by_period_start(period_start: date) -> QueryCondition:
+        """Filter by exact period start date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
@@ -178,6 +187,15 @@ class ProjectUsageBucketConditions:
                 ProjectUsageBucketRow.period_start >= start,
                 ProjectUsageBucketRow.period_start <= end,
             )
+
+        return inner
+
+    @staticmethod
+    def by_period_start(period_start: date) -> QueryCondition:
+        """Filter by exact period start date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start == period_start
 
         return inner
 
@@ -265,6 +283,15 @@ class UserUsageBucketConditions:
                 UserUsageBucketRow.period_start >= start,
                 UserUsageBucketRow.period_start <= end,
             )
+
+        return inner
+
+    @staticmethod
+    def by_period_start(period_start: date) -> QueryCondition:
+        """Filter by exact period start date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start == period_start
 
         return inner
 
