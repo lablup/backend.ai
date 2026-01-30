@@ -319,8 +319,10 @@ class TestSharedMode:
 
 
 @pytest.mark.skip(
-    reason="BA-4143: AUTO_SPLIT partitioning temporarily disabled. "
-    "All modes now behave like SHARED until BEP-1041 device-centric design is implemented."
+    reason=(
+        "BA-4143: AUTO_SPLIT partitioning temporarily disabled. All modes now behave "
+        "like SHARED until BEP-1041 device-centric design is implemented."
+    )
 )
 class TestAutoSplitMode:
     async def test_fraction_alloc_map(
@@ -499,8 +501,10 @@ class TestAutoSplitMode:
 
 
 @pytest.mark.skip(
-    reason="BA-4143: MANUAL allocation temporarily disabled. "
-    "All modes now behave like SHARED until BEP-1041 device-centric design is implemented."
+    reason=(
+        "BA-4143: MANUAL allocation temporarily disabled. All modes now behave "
+        "like SHARED until BEP-1041 device-centric design is implemented."
+    )
 )
 class TestManualMode:
     async def test_cpu_mem(
