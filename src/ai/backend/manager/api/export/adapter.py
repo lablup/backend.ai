@@ -180,6 +180,48 @@ class ExportAdapter(BaseFilterAdapter):
             statement_timeout_sec=statement_timeout_sec,
         )
 
+    def build_keypair_query(
+        self,
+        report: ReportDef,
+        fields: list[str] | None,
+        filter: None,  # No filter support for keypair export yet
+        order: None,  # No order support for keypair export yet
+        max_rows: int,
+        statement_timeout_sec: int,
+    ) -> StreamingExportQuery:
+        """Build StreamingExportQuery for keypair export.
+
+        Dynamically applies JOINs based on selected fields.
+        Fields with joins attribute will trigger LEFT JOIN operations.
+
+        Args:
+            report: Keypair report definition
+            fields: Field keys to include (None = all fields)
+            filter: Not yet supported for keypair export
+            order: Not yet supported for keypair export
+            max_rows: Maximum rows to export
+            statement_timeout_sec: Query timeout in seconds
+
+        Returns:
+            StreamingExportQuery ready for execution
+        """
+        selected_fields = self._select_fields(report, fields)
+
+        # Collect all required JOINs from selected fields
+        all_joins = self._collect_joins(selected_fields)
+
+        # Build select_from with dynamic JOINs
+        select_from = self._build_select_from_with_joins(report.select_from, all_joins)
+
+        return StreamingExportQuery(
+            select_from=select_from,
+            fields=selected_fields,
+            conditions=[],  # No filter support yet
+            orders=[],  # No order support yet
+            max_rows=max_rows,
+            statement_timeout_sec=statement_timeout_sec,
+        )
+
     def _collect_joins(
         self,
         fields: list[ExportFieldDef],
