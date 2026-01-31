@@ -30,7 +30,11 @@ class ObjectStorageDBSource:
         Get an existing object storage configuration from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.name == storage_name)
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.name == storage_name)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
@@ -44,7 +48,11 @@ class ObjectStorageDBSource:
         Get an existing object storage configuration from the database by ID.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
+            query = (
+                sa.select(ObjectStorageRow)
+                .where(ObjectStorageRow.id == storage_id)
+                .options(selectinload(ObjectStorageRow.meta))
+            )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
@@ -59,7 +67,11 @@ class ObjectStorageDBSource:
             query = (
                 sa.select(StorageNamespaceRow)
                 .where(StorageNamespaceRow.id == storage_namespace_id)
-                .options(selectinload(StorageNamespaceRow.object_storage_row))
+                .options(
+                    selectinload(StorageNamespaceRow.object_storage_row).selectinload(
+                        ObjectStorageRow.meta
+                    )
+                )
             )
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
@@ -114,7 +126,7 @@ class ObjectStorageDBSource:
         List all object storage configurations from the database.
         """
         async with self._db.begin_session() as db_session:
-            query = sa.select(ObjectStorageRow)
+            query = sa.select(ObjectStorageRow).options(selectinload(ObjectStorageRow.meta))
             result = await db_session.execute(query)
             rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
