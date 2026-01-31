@@ -63,7 +63,7 @@ class UserInfo(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> UserInfo | None:
         if row is None:
             return None
@@ -156,7 +156,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> KeyPair:
         return cls(
             id=row.access_key,

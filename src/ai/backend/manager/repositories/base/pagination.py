@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
@@ -34,13 +34,13 @@ class QueryPagination(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+    def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """Apply pagination to a SQLAlchemy select statement."""
 
         raise NotImplementedError
 
     @abstractmethod
-    def compute_page_info(self, rows: list[Row], total_count: int) -> PageInfoResult[Row]:
+    def compute_page_info(self, rows: list[Row[Any]], total_count: int) -> PageInfoResult[Row[Any]]:
         """Compute pagination info and slice rows if needed.
 
         Args:
@@ -76,11 +76,11 @@ class NoPagination(QueryPagination):
     def uses_window_function(self) -> bool:
         return False
 
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+    def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """No pagination applied - returns query unchanged."""
         return query
 
-    def compute_page_info(self, rows: list[Row], _total_count: int) -> PageInfoResult[Row]:
+    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
         """No pagination - no next/previous pages."""
         return PageInfoResult(
             rows=rows,
@@ -109,7 +109,7 @@ class OffsetPagination(QueryPagination):
     def uses_window_function(self) -> bool:
         return True
 
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+    def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """Apply offset-based pagination to query."""
 
         query = query.limit(self.limit)
@@ -117,7 +117,7 @@ class OffsetPagination(QueryPagination):
             query = query.offset(self.offset)
         return query
 
-    def compute_page_info(self, rows: list[Row], total_count: int) -> PageInfoResult[Row]:
+    def compute_page_info(self, rows: list[Row[Any]], total_count: int) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for offset-based pagination."""
 
         has_previous_page = self.offset > 0
@@ -155,7 +155,7 @@ class CursorForwardPagination(QueryPagination):
     def uses_window_function(self) -> bool:
         return False
 
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+    def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """
         Apply cursor-based forward pagination to query.
 
@@ -166,7 +166,7 @@ class CursorForwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.first + 1)
 
-    def compute_page_info(self, rows: list[Row], _total_count: int) -> PageInfoResult[Row]:
+    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for cursor-based forward pagination."""
 
         # has_previous_page is True only if cursor was provided (meaning we're past the first page)
@@ -207,7 +207,7 @@ class CursorBackwardPagination(QueryPagination):
     def uses_window_function(self) -> bool:
         return False
 
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+    def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """
         Apply cursor-based backward pagination to query.
 
@@ -218,7 +218,7 @@ class CursorBackwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.last + 1)
 
-    def compute_page_info(self, rows: list[Row], _total_count: int) -> PageInfoResult[Row]:
+    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for cursor-based backward pagination."""
 
         # has_next_page is True only if cursor was provided (meaning there are items after this page)

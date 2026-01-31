@@ -2,7 +2,7 @@
 
 import uuid
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest

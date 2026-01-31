@@ -152,11 +152,14 @@ class TestListModelService:
     def mock_list_endpoints_by_owner_validated(
         self, mocker: Any, mock_repositories: MagicMock
     ) -> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "list_endpoints_by_owner_validated",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.mark.parametrize(
         "scenario",

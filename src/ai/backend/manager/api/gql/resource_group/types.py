@@ -286,7 +286,7 @@ class ResourceGroupGQL(Node):
             fair_share_spec=FairShareScalingGroupSpecGQL.from_model(data.fair_share_spec),
         )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description=(
             "Added in 26.1.0. Resource usage information for this resource group. "
             "Provides aggregated metrics for capacity, used, and free resources. "

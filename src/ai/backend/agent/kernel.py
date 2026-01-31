@@ -195,7 +195,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     state: KernelLifecycleStatus
     session_type: SessionTypes
 
-    _tasks: set[asyncio.Task]
+    _tasks: set[asyncio.Task[Any]]
 
     runner: AbstractCodeRunner | None
 
@@ -673,9 +673,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     current_run_id: str | None
     pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
-    read_task: asyncio.Task | None
-    status_task: asyncio.Task | None
-    watchdog_task: asyncio.Task | None
+    read_task: asyncio.Task[Any] | None
+    status_task: asyncio.Task[Any] | None
+    watchdog_task: asyncio.Task[Any] | None
 
     _closed: bool
 
@@ -811,7 +811,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.watchdog_task = loop.create_task(self.watchdog())
 
     async def _close_tasks(self) -> None:
-        concurrent_safe_tasks: tuple[asyncio.Task | None, ...] = (
+        concurrent_safe_tasks: tuple[asyncio.Task[Any] | None, ...] = (
             self.status_task,
             self.read_task,
             self.watchdog_task,

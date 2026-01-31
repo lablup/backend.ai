@@ -25,7 +25,9 @@ class Manager(BaseFunction):
             "status": "running",
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -71,7 +73,9 @@ class Manager(BaseFunction):
         """
         rqst = Request("GET", "/manager/announcement")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod

@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from typing import cast
 
 from ai.backend.client.request import Request
 
@@ -17,7 +18,7 @@ class System(BaseFunction):
     async def get_versions(cls) -> Mapping[str, str]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            return cast(Mapping[str, str], await resp.json())
 
     @api_function
     @classmethod

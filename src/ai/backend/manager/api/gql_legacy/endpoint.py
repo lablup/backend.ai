@@ -952,7 +952,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "EndpointStatistics.by_endpoint"
         )
-        return await loader.load(self.endpoint_id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.endpoint_id))
 
 
 class EndpointList(graphene.ObjectType):  # type: ignore[misc]

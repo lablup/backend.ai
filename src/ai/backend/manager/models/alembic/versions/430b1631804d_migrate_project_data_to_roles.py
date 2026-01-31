@@ -118,7 +118,7 @@ class Tables:
 
 class RoleCreator:
     @classmethod
-    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_project_id_map: dict[str, uuid.UUID] = {}
@@ -132,7 +132,7 @@ class RoleCreator:
         return role_name_project_id_map
 
     @classmethod
-    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_project_id_map: dict[str, uuid.UUID] = {}
@@ -194,7 +194,7 @@ class RoleCreator:
 
     @classmethod
     def _create_project_admin_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_project_id_map = cls._create_admin_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_project_id_map.keys()))
@@ -208,7 +208,7 @@ class RoleCreator:
 
     @classmethod
     def _create_project_member_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_project_id_map = cls._create_member_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_project_id_map.keys()))

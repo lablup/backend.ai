@@ -274,7 +274,7 @@ class AgentRPCServer(aobject):
     rpc_addr: str
     agent_addr: str
 
-    debug_server_task: asyncio.Task
+    debug_server_task: asyncio.Task[Any]
     stats_monitor: AgentStatsPluginContext
     error_monitor: AgentErrorPluginContext
     health_probe: HealthProbe

@@ -5,7 +5,7 @@ import enum
 import functools
 import uuid
 from collections.abc import Iterable, MutableMapping
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -180,7 +180,7 @@ class UtilizationMetricObserver:
                     except KeyError:
                         continue
 
-        def callback(_task: asyncio.Task) -> None:
+        def callback(_task: asyncio.Task[Any]) -> None:
             self._removal_kernel_tasks.pop(kernel_id, None)
             kernel_metrics.pop(kernel_id, None)
 
@@ -258,7 +258,7 @@ class UtilizationMetricObserver:
                     except KeyError:
                         continue
 
-        def callback(_task: asyncio.Task) -> None:
+        def callback(_task: asyncio.Task[Any]) -> None:
             self._removal_process_tasks.pop(removal_key, None)
             # Clean up local cache
             if container_id in process_metrics:

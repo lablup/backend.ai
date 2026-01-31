@@ -108,7 +108,7 @@ images_table = sa.Table(
 
 
 def get_container_registry_row_schema() -> type[Any]:
-    class ContainerRegistryRow(Base):
+    class ContainerRegistryRow(Base):  # type: ignore[misc]
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()

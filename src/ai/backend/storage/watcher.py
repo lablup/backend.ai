@@ -425,7 +425,7 @@ class WatcherClient:
         self.output_sock = zctx.socket(zmq.PULL)
         self.output_sock_addr = get_zmq_socket_file_path(output_sock_prefix, self.pidx)
         self.result_queue: asyncio.Queue[Response] = asyncio.Queue(maxsize=128)
-        self.output_listening_task: asyncio.Task | None = None
+        self.output_listening_task: asyncio.Task[Any] | None = None
 
     async def init(self) -> None:
         self.input_sock.connect(self.input_sock_addr)

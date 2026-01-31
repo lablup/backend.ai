@@ -68,7 +68,9 @@ class Dotfile(BaseFunction):
 
         rqst = Request("GET", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     def __init__(
         self,
@@ -100,7 +102,9 @@ class Dotfile(BaseFunction):
 
         rqst = Request("GET", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def update(self, data: str, permission: str) -> dict[str, Any]:
@@ -125,7 +129,9 @@ class Dotfile(BaseFunction):
         rqst = Request("PATCH", rqst_endpoint)
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def delete(self) -> dict[str, Any]:
@@ -145,4 +151,6 @@ class Dotfile(BaseFunction):
 
         rqst = Request("DELETE", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

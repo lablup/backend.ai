@@ -837,7 +837,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Self | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | VFolderRow | None) -> Self | None:
         match row:
             case None:
                 return None
@@ -1312,7 +1312,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
     user_email = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> VirtualFolderPermissionGQL | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> VirtualFolderPermissionGQL | None:
         if row is None:
             return None
         return cls(

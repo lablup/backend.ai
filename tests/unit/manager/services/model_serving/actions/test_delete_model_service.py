@@ -18,6 +18,8 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from typing import cast
+
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
@@ -148,34 +150,46 @@ class TestDeleteModelService:
 
     @pytest.fixture
     def mock_get_endpoint_by_id(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_by_id",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_access_validation_data",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_update_endpoint_lifecycle(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "update_endpoint_lifecycle",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_check_user_access(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
-        mock = mocker.patch.object(
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
             model_serving_service,
             "check_user_access",
             new_callable=AsyncMock,
+        ),
         )
         mock.return_value = None
         return mock

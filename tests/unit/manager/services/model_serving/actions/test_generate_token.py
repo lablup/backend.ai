@@ -151,47 +151,62 @@ class TestGenerateToken:
 
     @pytest.fixture
     def mock_check_user_access_token(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
-        mock = mocker.patch.object(
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
             model_serving_service,
             "check_user_access",
             new_callable=AsyncMock,
+        ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
     def mock_get_endpoint_by_id_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_by_id",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_token(
         self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_access_validation_data",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_create_endpoint_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "create_endpoint_token",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_get_scaling_group_info_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_scaling_group_info",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.mark.parametrize(
         "scenario",

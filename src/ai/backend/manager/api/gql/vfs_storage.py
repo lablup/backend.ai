@@ -51,7 +51,7 @@ class VFSStorageConnection(Connection[VFSStorage]):
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.16.0. Get a VFS storage by ID")
+@strawberry.field(description="Added in 25.16.0. Get a VFS storage by ID")  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
     processors = info.context.processors
     action_result = await processors.vfs_storage.get.wait_for_complete(
@@ -60,7 +60,7 @@ async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | 
     return VFSStorage.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="Added in 25.16.0. List all VFS storages")
+@strawberry.field(description="Added in 25.16.0. List all VFS storages")  # type: ignore[misc]
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -142,7 +142,7 @@ class DeleteVFSStoragePayload:
     id: ID
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="createVFSStorage", description="Added in 25.16.0. Create a new VFS storage"
 )
 async def create_vfs_storage(
@@ -159,7 +159,7 @@ async def create_vfs_storage(
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="updateVFSStorage", description="Added in 25.16.0. Update an existing VFS storage"
 )
 async def update_vfs_storage(
@@ -176,7 +176,7 @@ async def update_vfs_storage(
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
 
 
-@strawberry.mutation(name="deleteVFSStorage", description="Added in 25.16.0. Delete a VFS storage")
+@strawberry.mutation(name="deleteVFSStorage", description="Added in 25.16.0. Delete a VFS storage")  # type: ignore[misc]
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -198,7 +198,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "EndpointStatistics.by_replica")
-        return await loader.load((self._endpoint_row.id, self.routing_id))
+        return cast(Mapping[str, Any] | None, await loader.load((self._endpoint_row.id, self.routing_id)))
 
 
 class RoutingList(graphene.ObjectType):  # type: ignore[misc]

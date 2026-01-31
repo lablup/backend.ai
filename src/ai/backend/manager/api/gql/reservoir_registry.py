@@ -96,7 +96,7 @@ class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
     processors = info.context.processors
     action_result = await processors.artifact_registry.get_reservoir_registry.wait_for_complete(
@@ -105,7 +105,7 @@ async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> Reserv
     return ReservoirRegistry.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def reservoir_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -203,7 +203,7 @@ class DeleteReservoirRegistryPayload:
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
@@ -221,7 +221,7 @@ async def create_reservoir_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
@@ -236,7 +236,7 @@ async def update_reservoir_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def delete_reservoir_registry(
     input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteReservoirRegistryPayload:

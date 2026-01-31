@@ -109,7 +109,7 @@ class Tables:
 
 class RoleCreator:
     @classmethod
-    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, str]:
+    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, str]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_domain_name_map: dict[str, str] = {}
@@ -122,7 +122,7 @@ class RoleCreator:
         return role_name_domain_name_map
 
     @classmethod
-    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, str]:
+    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, str]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_domain_name_map: dict[str, str] = {}
@@ -183,7 +183,7 @@ class RoleCreator:
 
     @classmethod
     def _create_domain_admin_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_domain_name_map = cls._create_admin_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_domain_name_map.keys()))
@@ -198,7 +198,7 @@ class RoleCreator:
 
     @classmethod
     def _create_domain_member_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_domain_name_map = cls._create_member_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_domain_name_map.keys()))

@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Final, override
+from typing import Any, Final, override
 
 import aiohttp
 import aiotools

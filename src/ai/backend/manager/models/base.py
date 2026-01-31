@@ -501,13 +501,13 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
     def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value: list[TBaseModel] | None, _dialect: Dialect) -> list:
+    def process_bind_param(self, value: list[TBaseModel] | None, _dialect: Dialect) -> list[dict[str, Any]]:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
             return [item.model_dump(mode="json") for item in value]
         return []
 
-    def process_result_value(self, value: list | str | None, _dialect: Dialect) -> list[TBaseModel]:
+    def process_result_value(self, value: list[dict[str, Any]] | str | None, _dialect: Dialect) -> list[TBaseModel]:
         # JSONB returns already parsed Python objects, not strings
         # Handle case where value is stored as JSON string (legacy data)
         if value is not None:
@@ -636,7 +636,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, dialect)
+            host: self.perm_col.process_result_value(perms, dialect)  # type: ignore[misc]
             for host, perms in value.items()
         })
 

@@ -75,7 +75,7 @@ class Route(Node):
         description="Error data if the route is in a failed state.",
     )
 
-    @strawberry.field(description="The deployment this route belongs to.")
+    @strawberry.field(description="The deployment this route belongs to.")  # type: ignore[misc]
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
@@ -89,7 +89,7 @@ class Route(Node):
             raise EndpointNotFound(extra_msg=f"id={self._deployment_id}")
         return ModelDeployment.from_dataclass(deployment_data)
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session associated with the route. Can be null if the route is still provisioning."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
@@ -101,7 +101,7 @@ class Route(Node):
         )
         return ID(session_global_id)
 
-    @strawberry.field(description="The revision associated with the route.")
+    @strawberry.field(description="The revision associated with the route.")  # type: ignore[misc]
     async def revision(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:

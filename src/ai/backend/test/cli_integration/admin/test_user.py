@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from contextlib import closing
+from typing import Any
 
 from ai.backend.test.cli_integration.conftest import User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
@@ -120,7 +121,7 @@ def test_update_user(
         assert isinstance(updated_user_list, list), "Expected user list"
 
     for i, updated_user in enumerate(updated_users):
-        user_dict: dict = get_user_from_list(updated_user_list, updated_user.username)
+        user_dict: dict[str, Any] = get_user_from_list(updated_user_list, updated_user.username)
         assert bool(user_dict), f"Account not found - Account#{i + 1}"
         assert user_dict.get("full_name") == updated_user.full_name, (
             f"Full name mismatch: Account#{i + 1}"
@@ -165,7 +166,7 @@ def test_list_user(run_admin: ClientRunnerFunc) -> None:
         assert isinstance(user_list, list)
 
 
-def get_user_from_list(users: list, username: str) -> dict:
+def get_user_from_list(users: list[dict[str, Any]], username: str) -> dict[str, Any]:
     for user in users:
         if user.get("username") == username:
             return user

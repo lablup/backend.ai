@@ -32,7 +32,7 @@ from ai.backend.manager.services.fair_share.actions import (
 # Admin APIs
 
 
-@strawberry.field(description="Added in 26.2.0. Get user fair share data (admin only).")
+@strawberry.field(description="Added in 26.2.0. Get user fair share data (admin only).")  # type: ignore[misc]
 async def admin_user_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group: str,
@@ -56,7 +56,7 @@ async def admin_user_fair_share(
     return UserFairShareGQL.from_dataclass(action_result.data)
 
 
-@strawberry.field(description="Added in 26.2.0. List user fair shares (admin only).")
+@strawberry.field(description="Added in 26.2.0. List user fair shares (admin only).")  # type: ignore[misc]
 async def admin_user_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: UserFairShareFilter | None = None,
@@ -87,7 +87,7 @@ async def admin_user_fair_shares(
 # Resource Group Scoped APIs
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Get user fair share data within resource group scope. "
         "This API is not yet implemented."
@@ -102,7 +102,7 @@ async def rg_user_fair_share(
     raise NotImplementedError("rg_user_fair_share is not yet implemented")
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. List user fair shares within resource group scope. "
         "This API is not yet implemented."
@@ -127,7 +127,7 @@ async def rg_user_fair_shares(
 # Legacy APIs (deprecated)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.1.0. Get user fair share data (superadmin only).",
     deprecation_reason=(
         "Use admin_user_fair_share instead. "
@@ -159,7 +159,7 @@ async def user_fair_share(
     return UserFairShareGQL.from_dataclass(action_result.data)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.1.0. List user fair shares (superadmin only).",
     deprecation_reason=(
         "Use admin_user_fair_shares instead. "
@@ -198,7 +198,7 @@ async def user_fair_shares(
 # Admin Mutations
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Upsert user fair share weight (admin only). "
         "Creates a new record if it doesn't exist, or updates the weight if it does."
@@ -227,7 +227,7 @@ async def admin_upsert_user_fair_share_weight(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Bulk upsert user fair share weights (admin only). "
         "Creates new records if they don't exist, or updates weights if they do."
@@ -264,7 +264,7 @@ async def admin_bulk_upsert_user_fair_share_weight(
 # Legacy Mutations (deprecated)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.1.0. Upsert user fair share weight (superadmin only). "
         "Creates a new record if it doesn't exist, or updates the weight if it does."
@@ -299,7 +299,7 @@ async def upsert_user_fair_share_weight(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). "
         "Creates new records if they don't exist, or updates weights if they do."

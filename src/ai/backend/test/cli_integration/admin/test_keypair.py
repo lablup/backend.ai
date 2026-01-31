@@ -1,5 +1,6 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.test.cli_integration.conftest import KeypairOption, User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
@@ -329,7 +330,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc) -> None:
         assert loaded.get("ok") is True, "Keypair deletion failed"
 
 
-def get_keypair_from_list(keypairs: list, userid: str) -> dict:
+def get_keypair_from_list(keypairs: list[dict[str, Any]], userid: str) -> dict[str, Any]:
     for keypair in keypairs:
         if keypair.get("user_id", "") == userid:
             return keypair

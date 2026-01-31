@@ -144,7 +144,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row | None,
+        row: Row[Any] | None,
     ) -> KeyPairResourcePolicy | None:
         if row is None:
             return None

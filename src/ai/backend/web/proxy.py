@@ -6,7 +6,7 @@ import json
 import logging
 import random
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Final, cast
+from typing import Any, Final, cast
 
 import aiohttp
 from aiohttp import web
@@ -62,7 +62,7 @@ class WebSocketProxy:
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
     upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
-    upstream_buffer_task: asyncio.Task | None
+    upstream_buffer_task: asyncio.Task[Any] | None
 
     def __init__(
         self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse

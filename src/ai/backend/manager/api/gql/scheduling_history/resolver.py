@@ -114,7 +114,7 @@ class RouteHistoryConnection(Connection[RouteHistory]):
 # Query fields
 
 
-@strawberry.field(description="List session scheduling history (admin only)")
+@strawberry.field(description="List session scheduling history (admin only)")  # type: ignore[misc]
 async def admin_session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -167,7 +167,7 @@ async def admin_session_scheduling_histories(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="List session scheduling history (superadmin only)",
     deprecation_reason=(
         "Use admin_session_scheduling_histories instead. "
@@ -228,7 +228,7 @@ async def session_scheduling_histories(
     )
 
 
-@strawberry.field(description="List deployment history (admin only)")
+@strawberry.field(description="List deployment history (admin only)")  # type: ignore[misc]
 async def admin_deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -278,7 +278,7 @@ async def admin_deployment_histories(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="List deployment history (superadmin only)",
     deprecation_reason=(
         "Use admin_deployment_histories instead. "
@@ -336,7 +336,7 @@ async def deployment_histories(
     )
 
 
-@strawberry.field(description="List route history (admin only)")
+@strawberry.field(description="List route history (admin only)")  # type: ignore[misc]
 async def admin_route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -386,7 +386,7 @@ async def admin_route_histories(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="List route history (superadmin only)",
     deprecation_reason=(
         "Use admin_route_histories instead. "

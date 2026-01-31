@@ -378,7 +378,7 @@ class AgentV2GQL(Node):
         """)
     )
 
-    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")
+    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")  # type: ignore[misc]
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],

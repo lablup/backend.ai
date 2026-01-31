@@ -149,12 +149,12 @@ class OneFSClient:
     async def get_drive_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/drive") as resp:
             data = await resp.json()
-        return data["drive"]
+        return cast(Mapping[str, Any], data["drive"])
 
     async def get_protocol_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/protocol-stats") as resp:
             data = await resp.json()
-        return data["protocol-stats"]
+        return cast(Mapping[str, Any], data["protocol-stats"])
 
     async def get_workload_stats(self) -> Mapping[str, Any]:
         params = {}
@@ -178,12 +178,12 @@ class OneFSClient:
     async def list_all_quota(self) -> Mapping[str, Any]:
         async with self._request("GET", "quota/quotas") as resp:
             data = await resp.json()
-        return data["quotas"]
+        return cast(Mapping[str, Any], data["quotas"])
 
     async def get_quota(self, quota_id: str) -> Mapping[str, Any]:
         async with self._request("GET", f"quota/quotas/{quota_id}") as resp:
             data = await resp.json()
-        return data["quotas"][0]
+        return cast(Mapping[str, Any], data["quotas"][0])
 
     async def create_quota(
         self,
@@ -204,7 +204,7 @@ class OneFSClient:
             "quota/quotas",
             json=data,
         ) as resp:
-            return await resp.json()
+            return cast(Mapping[str, Any], await resp.json())
 
     async def delete_quota(self, quota_id: str) -> None:
         async with self._request(

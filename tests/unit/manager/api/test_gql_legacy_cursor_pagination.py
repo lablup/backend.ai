@@ -46,7 +46,7 @@ class ExpectedStatements:
 # ============= Helper Functions =============
 
 
-def compile_to_sql(stmt: sa.sql.Select) -> str:
+def compile_to_sql(stmt: sa.sql.Select[Any]) -> str:
     """Compile SQLAlchemy statement to PostgreSQL SQL string."""
     return str(
         stmt.compile(
@@ -57,8 +57,8 @@ def compile_to_sql(stmt: sa.sql.Select) -> str:
 
 
 def verify_statements(
-    stmt: sa.sql.Select,
-    count_stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
+    count_stmt: sa.sql.Select[Any],
     conditions: list[WhereClauseType],
     expected: ExpectedStatements,
 ) -> None:

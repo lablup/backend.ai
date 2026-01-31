@@ -330,8 +330,8 @@ class EventDispatcher(EventDispatcherGroup):
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
-    _consumer_loop_task: asyncio.Task | None
-    _subscriber_loop_task: asyncio.Task | None
+    _consumer_loop_task: asyncio.Task[Any] | None
+    _subscriber_loop_task: asyncio.Task[Any] | None
     _consumer_taskgroup: PersistentTaskGroup
     _subscriber_taskgroup: PersistentTaskGroup
 
@@ -377,7 +377,7 @@ class EventDispatcher(EventDispatcherGroup):
             await self._consumer_taskgroup.shutdown()
             await self._subscriber_taskgroup.shutdown()
 
-            def cancel_task(task: asyncio.Task | None) -> None:
+            def cancel_task(task: asyncio.Task[Any] | None) -> None:
                 if task is not None and not task.done():
                     task.cancel()
                     cancelled_tasks.append(task)
@@ -609,7 +609,7 @@ class EventDispatcher(EventDispatcherGroup):
             )
             await asyncio.sleep(0)
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def _consume_loop(self) -> None:
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
@@ -637,7 +637,7 @@ class EventDispatcher(EventDispatcherGroup):
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def _subscribe_loop(self) -> None:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:

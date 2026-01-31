@@ -103,9 +103,9 @@ class QueryOrderParser:
 
     def append_ordering(
         self,
-        sa_query: sa.sql.Select,
+        sa_query: sa.sql.Select[Any],
         order_expr: str,
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.

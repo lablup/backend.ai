@@ -114,7 +114,7 @@ class ConnectionConstructor(Protocol):
     ) -> Connection: ...
 
 
-class AsyncNodeField(NodeField):
+class AsyncNodeField(NodeField):  # type: ignore[misc]
     def wrap_resolve(self, parent_resolver: Callable) -> functools.partial:
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
@@ -125,7 +125,7 @@ def _resolve_global_id(global_id: str) -> tuple[str, str]:
     return type_, id_
 
 
-class AsyncNode(Node):
+class AsyncNode(Node):  # type: ignore[misc]
     """
     This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/node.py

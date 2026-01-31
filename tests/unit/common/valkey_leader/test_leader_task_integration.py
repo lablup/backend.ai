@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,7 +28,7 @@ class MockLeaderTask(LeaderTask):
         self.stop_called = False
         self.leadership_checker: LeadershipChecker | None = None
         self.execution_count = 0
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[Any] | None = None
         self._stopped = False
 
     async def start(self, leadership_checker: LeadershipChecker) -> None:

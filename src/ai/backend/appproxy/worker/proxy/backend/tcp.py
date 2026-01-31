@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import socket
-from typing import Final
+from typing import Any, Final
 
 import aiotools
 

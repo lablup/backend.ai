@@ -3,6 +3,7 @@ import hashlib
 import logging
 import socket
 from collections.abc import AsyncGenerator, Mapping
+from typing import Any, cast
 
 import hiredis
 from aiotools.server import process_index
@@ -43,7 +44,7 @@ class HiRedisQueue(AbstractMessageQueue):
     _consumer_id: str
     _closed: bool
     # loop tasks for consuming messages
-    _loop_tasks: list[asyncio.Task]
+    _loop_tasks: list[asyncio.Task[Any]]
 
     def __init__(self, target: RedisTarget, args: RedisMQArgs) -> None:
         self._target = target
@@ -120,7 +121,7 @@ class HiRedisQueue(AbstractMessageQueue):
             reply = await client.execute(["GET", cache_id])
             if reply is None:
                 return None
-            return load_json(reply)
+            return cast(Mapping[str, str] | None, load_json(reply))
 
     async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """

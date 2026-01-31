@@ -1,6 +1,7 @@
 import importlib.resources
 import logging
 import ssl
+from typing import Any
 
 import aiohttp_jinja2
 import jinja2

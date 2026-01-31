@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -1401,7 +1401,7 @@ class ScheduleDBSource:
         db_sess: SASession,
         user_scope: UserScope,
         access_key: AccessKey,
-        vfolder_mounts: list,
+        vfolder_mounts: Sequence[VFolderMount],
     ) -> dict[str, Any]:
         """
         Fetch dotfile data for the session using existing DB session.
@@ -1466,7 +1466,7 @@ class ScheduleDBSource:
         self,
         user_scope: UserScope,
         access_key: AccessKey,
-        vfolder_mounts: list,
+        vfolder_mounts: Sequence[VFolderMount],
     ) -> dict[str, Any]:
         """
         Prepare dotfile data for the session.

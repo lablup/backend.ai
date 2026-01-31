@@ -830,23 +830,23 @@ class AbstractAgent[
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    timer_tasks: MutableSequence[asyncio.Task]
+    timer_tasks: MutableSequence[asyncio.Task[Any]]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
 
     stat_ctx: StatContext
     stat_sync_sockpath: Path
-    stat_sync_task: asyncio.Task
+    stat_sync_task: asyncio.Task[Any]
 
     stats_monitor: StatsPluginContext  # unused currently
     error_monitor: ErrorPluginContext  # unused in favor of produce_error_event()
 
     background_task_manager: BackgroundTaskManager
 
-    _pending_creation_tasks: dict[KernelId, set[asyncio.Task]]
-    _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
-    _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _pending_creation_tasks: dict[KernelId, set[asyncio.Task[Any]]]
+    _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task[Any]]
+    _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task[Any]]
     _metric_registry: CommonMetricRegistry
 
     # Health monitoring tracking

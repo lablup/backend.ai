@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -9,6 +10,7 @@ if TYPE_CHECKING:
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
@@ -82,7 +84,7 @@ class SessionRepository:
         owner_access_key: AccessKey,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
-        eager_loading_op: list | None = None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -190,7 +192,7 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         owner_access_key: AccessKey,
-        eager_loading_op: list,
+        eager_loading_op: Sequence[_AbstractLoad],
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(

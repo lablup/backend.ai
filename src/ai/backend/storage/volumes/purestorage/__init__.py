@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from typing import Any
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter

@@ -395,7 +395,7 @@ async def test_global_timer_redlock(
     delay = 3.0
     interval = 0.5
     target_count = delay / interval
-    tasks: list[tuple[asyncio.Task, asyncio.Event]] = []
+    tasks: list[tuple[asyncio.Task[Any], asyncio.Event]] = []
     for thread_idx in range(num_threads):
         stop_event = asyncio.Event()
         task = asyncio.create_task(

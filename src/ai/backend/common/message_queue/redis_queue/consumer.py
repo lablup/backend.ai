@@ -8,7 +8,7 @@ import socket
 import time
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import Self, override
+from typing import Any, Self, override
 
 import glide
 from aiotools.server import process_index
@@ -77,7 +77,7 @@ class RedisConsumer(AbstractConsumer):
     _redis_target: RedisTarget
     _autoclaim_idle_timeout: int
     _closed: bool
-    _loop_tasks: list[asyncio.Task]
+    _loop_tasks: list[asyncio.Task[Any]]
     _backoff_initial_delay: float
     _backoff_max_delay: float
     _backoff_max_attempts: int | None

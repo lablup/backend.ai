@@ -27,8 +27,8 @@ class BraceMessage:
         return self.fmt.format(*self.args)
 
 
-class BraceStyleAdapter(logging.LoggerAdapter):
-    def log(self, level: int, msg: object, *args: object, **kwargs: object) -> None:  # type: ignore[override]
+class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
+    def log(self, level: int, msg: object, *args: object, **kwargs: object) -> None:
         if self.isEnabledFor(level):
             _msg, _kwargs = self.process(msg, kwargs)
             self.logger._log(level, BraceMessage(_msg, args), (), **_kwargs)

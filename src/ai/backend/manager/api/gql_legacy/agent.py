@@ -651,7 +651,7 @@ async def _query_domain_groups_by_ak(
 
 async def _append_sgroup_from_clause(
     graph_ctx: GraphQueryContext,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     access_key: str,
     domain_name: str | None,
     scaling_group: str | None = None,

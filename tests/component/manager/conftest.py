@@ -904,7 +904,9 @@ async def prepare_kernel(
         }).encode()
         headers = get_headers("POST", url, req_bytes)
         response = await client.post(url, data=req_bytes, headers=headers)
-        return await response.json()
+        result: dict[str, Any] = await response.json()
+
+        return result
 
     yield app, client, create_kernel
 

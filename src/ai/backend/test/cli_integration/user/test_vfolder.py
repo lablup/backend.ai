@@ -2,6 +2,7 @@ import json
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -260,7 +261,7 @@ def test_list_vfolder(run_user: ClientRunnerFunc) -> None:
         assert isinstance(folder_list, list)
 
 
-def get_folder_from_list(folders: list, foldername: str) -> dict:
+def get_folder_from_list(folders: list[dict[str, Any]], foldername: str) -> dict[str, Any]:
     for folder in folders:
         if folder.get("name", "") == foldername:
             return folder

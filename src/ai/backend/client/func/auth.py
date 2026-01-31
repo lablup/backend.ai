@@ -83,7 +83,9 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -104,7 +106,9 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -124,4 +128,6 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

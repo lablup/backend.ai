@@ -591,7 +591,7 @@ async def query_accessible_vfolders(
         # users.c.email,
     ]
 
-    async def _append_entries(_query: sa.sql.Select, _is_owner: bool = True) -> None:
+    async def _append_entries(_query: sa.sql.Select[Any], _is_owner: bool = True) -> None:
         if extra_vf_conds is not None:
             _query = _query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:

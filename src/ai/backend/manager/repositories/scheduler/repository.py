@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -296,13 +296,13 @@ class SchedulerRepository:
     async def prepare_vfolder_mounts(
         self,
         storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
+        allowed_vfolder_types: Sequence[str],
         user_scope: UserScope,
-        resource_policy: dict,
-        combined_mounts: list,
-        combined_mount_map: dict,
-        requested_mount_options: dict,
-    ) -> list[VFolderMount]:
+        resource_policy: Mapping[str, object],
+        combined_mounts: Sequence[str | UUID],
+        combined_mount_map: Mapping[str | UUID, str],
+        requested_mount_options: Mapping[str | UUID, object],
+    ) -> Sequence[VFolderMount]:
         """
         Prepare vfolder mounts for the session.
         """

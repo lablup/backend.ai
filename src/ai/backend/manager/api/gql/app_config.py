@@ -155,7 +155,7 @@ class DeleteUserConfigPayload:
     deleted: bool
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 26.2.0.
@@ -185,7 +185,7 @@ async def admin_domain_app_config(
     return AppConfig(extra_config=action_result.result.extra_config)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -222,7 +222,7 @@ async def domain_app_config(
     return AppConfig(extra_config=action_result.result.extra_config)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -262,7 +262,7 @@ async def user_app_config(
     return AppConfig(extra_config=action_result.result.extra_config)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -290,7 +290,7 @@ async def merged_app_config(
     return AppConfig(extra_config=action_result.merged_config)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="adminUpsertDomainAppConfig",
     description=dedent_strip(
         """\
@@ -323,7 +323,7 @@ async def admin_upsert_domain_app_config(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="upsertDomainAppConfig",
     description=dedent_strip(
         """\
@@ -363,7 +363,7 @@ async def upsert_domain_app_config(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="upsertUserAppConfig",
     description=dedent_strip(
         """\
@@ -405,7 +405,7 @@ async def upsert_user_app_config(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="adminDeleteDomainAppConfig",
     description=dedent_strip(
         """\
@@ -432,7 +432,7 @@ async def admin_delete_domain_app_config(
     return DeleteDomainConfigPayload(deleted=action_result.deleted)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="deleteDomainAppConfig",
     description=dedent_strip(
         """\
@@ -466,7 +466,7 @@ async def delete_domain_app_config(
     return DeleteDomainConfigPayload(deleted=action_result.deleted)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="deleteUserAppConfig",
     description=dedent_strip(
         """\

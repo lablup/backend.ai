@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -302,48 +302,69 @@ def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -
 @pytest.fixture
 def patch_endpoint_get(mocker: Any) -> AsyncMock:
     """Patch EndpointRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
+    return cast(
+        AsyncMock,
+        mocker.patch(
+            "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
+        ),
     )
 
 
 @pytest.fixture
 def patch_routing_get(mocker: Any) -> AsyncMock:
     """Patch RoutingRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
+    return cast(
+        AsyncMock,
+        mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock),
+    )
 
 
 @pytest.fixture
 def patch_user_get(mocker: Any) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
+    return cast(
+        AsyncMock,
+        mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock),
+    )
 
 
 @pytest.fixture
 def patch_vfolder_get(mocker: Any) -> AsyncMock:
     """Patch VFolderRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
+    return cast(
+        AsyncMock,
+        mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock),
+    )
 
 
 @pytest.fixture
 def patch_image_resolve(mocker: Any) -> AsyncMock:
     """Patch ImageRow.resolve method using mocker."""
-    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
+    return cast(
+        AsyncMock,
+        mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock),
+    )
 
 
 @pytest.fixture
 def patch_session_get(mocker: Any) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
+    return cast(
+        AsyncMock,
+        mocker.patch(
+            "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
+        ),
     )
 
 
 @pytest.fixture
 def patch_auto_scaling_rule_get(mocker: Any) -> AsyncMock:
     """Patch EndpointAutoScalingRuleRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
+    return cast(
+        AsyncMock,
+        mocker.patch(
+            "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
+        ),
     )
 
 

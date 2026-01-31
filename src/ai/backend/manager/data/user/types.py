@@ -101,7 +101,7 @@ class UserData:
         return {EntityType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row) -> Self:
+    def from_row(cls, row: Row[Any]) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """

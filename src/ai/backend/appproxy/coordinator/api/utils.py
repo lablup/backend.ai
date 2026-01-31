@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
 import jwt
 from aiohttp import web

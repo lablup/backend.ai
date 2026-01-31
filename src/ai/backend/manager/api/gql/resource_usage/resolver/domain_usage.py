@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 # Admin APIs
 
 
-@strawberry.field(description="Added in 26.2.0. List domain usage buckets (admin only).")
+@strawberry.field(description="Added in 26.2.0. List domain usage buckets (admin only).")  # type: ignore[misc]
 async def admin_domain_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: DomainUsageBucketFilter | None = None,
@@ -50,7 +50,7 @@ async def admin_domain_usage_buckets(
 # Resource Group Scoped APIs
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. List domain usage buckets within resource group scope. "
         "This API is not yet implemented."
@@ -75,7 +75,7 @@ async def rg_domain_usage_buckets(
 # Legacy APIs (deprecated)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.1.0. List domain usage buckets (superadmin only).",
     deprecation_reason=(
         "Use admin_domain_usage_buckets instead. "

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from glide import Batch, ExpirySet, ExpiryType
 
@@ -62,7 +62,7 @@ class AppConfigCacheSource:
             count += 1
             if cached_value:
                 log.debug("Cache hit for merged config: {}, hit count: {}", user_id, count)
-                return load_json(cached_value)
+                return cast(Mapping[str, Any] | None, load_json(cached_value))
             log.debug("Cache miss for merged config: {}", user_id)
         return None
 

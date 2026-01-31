@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import textwrap
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp_cors
 import attrs
@@ -174,7 +174,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    db_status_report_task: asyncio.Task
+    db_status_report_task: asyncio.Task[Any]
 
 
 async def init(app: web.Application) -> None:

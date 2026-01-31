@@ -39,8 +39,8 @@ class MockFilterApplier(BaseFilterApplier[MockFilterOptions]):
     """Test implementation of BaseFilterApplier"""
 
     def apply_entity_filters(
-        self, stmt: Select, filters: MockFilterOptions
-    ) -> tuple[list[Any], Select]:
+        self, stmt: Select[Any], filters: MockFilterOptions
+    ) -> tuple[list[Any], Select[Any]]:
         """Apply test-specific filters"""
         conditions = []
 

@@ -29,7 +29,7 @@ def get_container_registry_row_schema() -> type[Base]:
         HARBOR2 = "harbor2"
         LOCAL = "local"
 
-    class ContainerRegistryRow(Base):
+    class ContainerRegistryRow(Base):  # type: ignore[misc]
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
@@ -58,7 +58,7 @@ def get_image_row_schema() -> type[Base]:
         SYSTEM = "system"
         SERVICE = "service"
 
-    class ImageRow(Base):
+    class ImageRow(Base):  # type: ignore[misc]
         __tablename__ = "images"
         __table_args__ = {"extend_existing": True}
         id = IDColumn("id")

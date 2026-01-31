@@ -32,6 +32,6 @@ class Runner(BaseRunner):
         log.warning("batch-mode execution is not supported")
         return 0
 
-    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[None, dict]:
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[None, dict[str, Any]]:
         # app kernels use service-definition templates.
         return None, {}

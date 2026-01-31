@@ -165,7 +165,7 @@ class ModelReplica(Node):
     )
     created_at: datetime = strawberry.field(description="Timestamp when the replica was created.")
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:

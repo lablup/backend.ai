@@ -68,7 +68,7 @@ class TCPProxy(ServiceProxy):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.down_task: asyncio.Task | None = None
+        self.down_task: asyncio.Task[Any] | None = None
 
     async def proxy(self) -> web.WebSocketResponse:
         try:

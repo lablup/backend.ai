@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult

@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import aiohttp
 import yarl
@@ -196,7 +196,7 @@ class StorageProxyHTTPClient:
             resp_bytes = await response_stream.read()
             if not resp_bytes:
                 return None
-            return load_json(resp_bytes)
+            return cast(Mapping[str, Any] | None, load_json(resp_bytes))
 
     async def request_with_response(
         self,

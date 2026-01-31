@@ -44,7 +44,7 @@ TOrdering = TypeVar("TOrdering")
 class PaginationQueryResult:
     """Result of a pagination query."""
 
-    data_query: Select
+    data_query: Select[Any]
     pagination_order: ConnectionPaginationOrder | None = None
 
 
@@ -57,7 +57,7 @@ class PaginatableModel(Protocol):
 class FilterApplier(Protocol):
     """Protocol for applying filters to a query"""
 
-    def apply_filters(self, stmt: Select, filters: Any) -> Select:
+    def apply_filters(self, stmt: Select[Any], filters: Any) -> Select[Any]:
         """Apply filters to the query statement"""
         ...
 
@@ -66,8 +66,8 @@ class OrderingApplier(Protocol):
     """Protocol for applying ordering to a query"""
 
     def apply_ordering(
-        self, stmt: Select, ordering: Any
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
+        self, stmt: Select[Any], ordering: Any
+    ) -> tuple[Select[Any], list[tuple[sa.Column, bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         ...
 
@@ -317,14 +317,14 @@ class BaseFilterOptions(Protocol):
 class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
     """Base class for applying filters to queries with common logical operations"""
 
-    def apply_filters(self, stmt: Select, filters: T) -> Select:
+    def apply_filters(self, stmt: Select[Any], filters: T) -> Select[Any]:
         """Apply filters to the query statement"""
         condition, stmt = self._build_filter_condition(stmt, filters)
         if condition is not None:
             stmt = stmt.where(condition)
         return stmt
 
-    def _build_filter_condition(self, stmt: Select, filters: T) -> tuple[Any | None, Select]:
+    def _build_filter_condition(self, stmt: Select[Any], filters: T) -> tuple[Any | None, Select[Any]]:
         """Build a filter condition from FilterOptions, handling logical operations"""
         conditions = []
 
@@ -397,7 +397,7 @@ class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
         return final_condition, stmt
 
     @abstractmethod
-    def apply_entity_filters(self, stmt: Select, filters: T) -> tuple[list[Any], Select]:
+    def apply_entity_filters(self, stmt: Select[Any], filters: T) -> tuple[list[Any], Select[Any]]:
         """Apply entity-specific filters and return list of conditions and updated statement
 
         Args:
@@ -423,8 +423,8 @@ class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
     """Base class for applying ordering to queries"""
 
     def apply_ordering(
-        self, stmt: Select, ordering: TOrderingOptions
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
+        self, stmt: Select[Any], ordering: TOrderingOptions
+    ) -> tuple[Select[Any], list[tuple[sa.Column, bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         order_clauses = []
         sql_order_clauses = []

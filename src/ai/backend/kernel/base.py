@@ -68,7 +68,7 @@ class HealthStatus(enum.Enum):
 
 async def pipe_output(
     stream: asyncio.StreamReader,
-    outsock: zmq.Socket,
+    outsock: zmq.Socket[Any],
     target: str,
     log_fd: int,
 ) -> None:
@@ -131,7 +131,7 @@ class BaseRunner(metaclass=ABCMeta):
         logging.LogRecord
     ]  # Actually contains tuples due to LogQHandler transformation
     task_queue: asyncio.Queue[Any]  # Contains partial functions returning Coroutines
-    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
+    default_runtime_path: ClassVar[str | os.PathLike[str]] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -168,9 +168,9 @@ class BaseRunner(metaclass=ABCMeta):
     # Set by subclasses.
     user_input_queue: asyncio.Queue[str] | _AsyncQueueProxy[str] | None
 
-    _main_task: asyncio.Task
-    _run_task: asyncio.Task
-    _health_check_task: asyncio.Task | None
+    _main_task: asyncio.Task[Any]
+    _run_task: asyncio.Task[Any]
+    _health_check_task: asyncio.Task[Any] | None
 
     def __init__(self, runtime_path: Path) -> None:
         setup_logger_basic(self.log_prefix, False)
@@ -335,7 +335,7 @@ class BaseRunner(metaclass=ABCMeta):
                     if not await self.kernel_mgr.is_alive():
                         log.error("jupyter query mode is disabled: failed to start jupyter kernel")
                     else:
-                        self.kernel_client = self.kernel_mgr.client()  # type: ignore
+                        self.kernel_client = self.kernel_mgr.client()
                         if self.kernel_client is None:
                             raise RuntimeError("Failed to create kernel client")
                         self.kernel_client.start_channels(
@@ -889,7 +889,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "error": error_reason,
                         }
 
-                    cmdargs: Sequence[str | os.PathLike] | None
+                    cmdargs: Sequence[str | os.PathLike[str]] | None
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":

@@ -470,9 +470,9 @@ class AbstractIdleChecker(ABC):
     @abstractmethod
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -524,7 +524,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 
     async def get_grace_period_end(
         self,
-        kernel: Row,
+        kernel: Row[Any],
     ) -> datetime | None:
         """
         Calculate the user's initial grace period for idle checkers.
@@ -750,9 +750,9 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -825,9 +825,9 @@ class SessionLifetimeChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -1003,7 +1003,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
-    def get_time_window(self, policy: Row) -> timedelta:
+    def get_time_window(self, policy: Row[Any]) -> timedelta:
         # Respect idle_timeout, from keypair resource policy, over time_window.
         if (idle_timeout := policy.idle_timeout) >= 0:
             return timedelta(seconds=idle_timeout)
@@ -1018,9 +1018,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:

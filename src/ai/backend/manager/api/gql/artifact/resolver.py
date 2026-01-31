@@ -94,7 +94,7 @@ from .types import (
 
 
 # Query Fields
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -134,7 +134,7 @@ async def artifacts(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -148,7 +148,7 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     return await fetch_artifact(info, UUID(id))
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -185,7 +185,7 @@ async def artifact_revisions(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -199,7 +199,7 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Artifac
     return await fetch_artifact_revision(info, UUID(id))
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -242,7 +242,7 @@ async def scan_artifacts(
 
 
 # Mutations
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -304,7 +304,7 @@ async def import_artifacts(
     return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -355,7 +355,7 @@ async def delegate_scan_artifacts(
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -433,7 +433,7 @@ async def delegate_import_artifacts(
     return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -473,7 +473,7 @@ async def update_artifact(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -518,7 +518,7 @@ async def cleanup_artifact_revisions(
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -550,7 +550,7 @@ async def delete_artifacts(
     return DeleteArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -582,7 +582,7 @@ async def restore_artifacts(
     return RestoreArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -607,7 +607,7 @@ async def cancel_import_artifact(
 
 
 # TODO: Make this available when only having super-admin privileges
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -631,7 +631,7 @@ async def approve_artifact_revision(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -655,7 +655,7 @@ async def reject_artifact_revision(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -700,7 +700,7 @@ async def scan_artifact_models(
 
 
 # Subscriptions
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -720,7 +720,7 @@ async def artifact_status_changed(
         yield ArtifactStatusChangedPayload(artifact=Artifact())
 
 
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.14.0.
 

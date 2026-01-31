@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
+from typing import Any
 
 from yarl import URL
 
@@ -19,8 +20,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class PortFrontend(H2Frontend[int]):
     processes: list[subprocess.Process]
     healthy: bool
-    proc_monitor_tasks: list[asyncio.Task] = []
-    log_monitor_tasks: list[asyncio.Task] = []
+    proc_monitor_tasks: list[asyncio.Task[Any]] = []
+    log_monitor_tasks: list[asyncio.Task[Any]] = []
 
     api_ports: dict[int, int]
 

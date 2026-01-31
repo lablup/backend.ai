@@ -1,3 +1,5 @@
+from typing import Any
+
 from ai.backend.client.request import Request
 
 from .base import BaseFunction, api_function
@@ -48,7 +50,9 @@ class EtcdConfig(BaseFunction):
             "value": value,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -65,4 +69,6 @@ class EtcdConfig(BaseFunction):
             "prefix": prefix,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

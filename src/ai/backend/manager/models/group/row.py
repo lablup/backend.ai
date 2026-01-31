@@ -356,8 +356,8 @@ groups = GroupRow.__table__
 
 def by_id(project_id: uuid.UUID) -> QueryCondition:
     def _by_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(GroupRow.id == project_id)
 
     return _by_id

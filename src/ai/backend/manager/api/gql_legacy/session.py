@@ -299,8 +299,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     def _add_basic_options_to_query(
-        cls, stmt: sa.sql.Select, is_count: bool = False
-    ) -> sa.sql.Select:
+        cls, stmt: sa.sql.Select[Any], is_count: bool = False
+    ) -> sa.sql.Select[Any]:
         options = [
             join_by_related_field(SessionRow.user),
             join_by_related_field(SessionRow.group),
@@ -998,7 +998,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     inference_metrics = graphene.JSONString()
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         if row is None:
             raise DataTransformationFailed("Session row cannot be None")
         email = row.email
@@ -1072,7 +1072,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1085,7 +1085,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
         )
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_containers(
         self,

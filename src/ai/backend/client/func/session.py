@@ -164,7 +164,9 @@ class ComputeSession(BaseFunction):
     async def hello(cls) -> str:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -661,7 +663,9 @@ class ComputeSession(BaseFunction):
         )
         async with rqst.fetch() as resp:
             if resp.status == 200:
-                return await resp.json()
+                result: dict[str, Any] = await resp.json()
+
+                return result
         return None
 
     @api_function
@@ -715,7 +719,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def export_to_image(self, new_image_name: str) -> dict[str, Any]:
@@ -733,7 +739,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def interrupt(self) -> None:
@@ -790,7 +798,9 @@ class ComputeSession(BaseFunction):
             },
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_info(self) -> dict[str, Any]:
@@ -807,7 +817,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def detail(
@@ -869,7 +881,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_dependency_graph(self) -> dict[str, Any]:
@@ -890,7 +904,9 @@ class ComputeSession(BaseFunction):
         )
 
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_status_history(self) -> dict[str, Any]:
@@ -907,7 +923,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def execute(
@@ -1150,7 +1168,9 @@ class ComputeSession(BaseFunction):
             "path": path,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def stream_app_info(self) -> Mapping[str, Any]:
@@ -1165,7 +1185,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with api_request.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def get_abusing_report(self) -> Mapping[str, Any]:
@@ -1182,7 +1204,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def start_service(
@@ -1215,7 +1239,9 @@ class ComputeSession(BaseFunction):
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     # only supported in AsyncAPISession
     def listen_events(self, scope: str = "*") -> SSEContextManager:
@@ -1362,7 +1388,9 @@ class InferenceSession(BaseFunction):
     async def hello(cls) -> str:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod

@@ -443,8 +443,8 @@ def by_user_uuid(
     user_uuid: UUID,
 ) -> QueryCondition:
     def _by_user_uuid(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.uuid == user_uuid)
 
     return _by_user_uuid
@@ -454,8 +454,8 @@ def by_username(
     username: str,
 ) -> QueryCondition:
     def _by_username(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.username == username)
 
     return _by_username
@@ -465,8 +465,8 @@ def by_user_email(
     email: str,
 ) -> QueryCondition:
     def _by_email(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.email == email)
 
     return _by_email

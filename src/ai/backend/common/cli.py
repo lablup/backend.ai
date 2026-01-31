@@ -10,7 +10,7 @@ from typing import Any
 import click
 
 
-def wrap_method(method: Callable) -> Callable:
+def wrap_method(method: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(method)
     def wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
         return method(self._impl, *args, **kwargs)

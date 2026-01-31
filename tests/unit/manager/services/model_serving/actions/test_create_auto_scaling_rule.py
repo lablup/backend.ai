@@ -9,6 +9,8 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from typing import cast
+
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -81,10 +83,13 @@ class TestCreateEndpointAutoScalingRule:
 
     @pytest.fixture
     def mock_check_user_access_create(self, mocker: Any, auto_scaling_service: Any)-> AsyncMock:
-        mock = mocker.patch.object(
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
             auto_scaling_service,
             "check_user_access",
             new_callable=AsyncMock,
+        ),
         )
         mock.return_value = None
         return mock
@@ -93,19 +98,25 @@ class TestCreateEndpointAutoScalingRule:
     def mock_get_endpoint_access_validation_data_create(
         self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_access_validation_data",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.fixture
     def mock_create_auto_scaling_rule(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
-        return mocker.patch.object(
+        return cast(
+        AsyncMock,
+        mocker.patch.object(
             mock_repositories.repository,
             "create_auto_scaling_rule",
             new_callable=AsyncMock,
-        )
+        ),
+    )
 
     @pytest.mark.parametrize(
         "scenario",

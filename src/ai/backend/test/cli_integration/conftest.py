@@ -8,7 +8,7 @@ from collections.abc import Callable, Generator, Iterator, Sequence
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pexpect
 import pytest
@@ -16,6 +16,9 @@ from faker import Faker
 
 from ai.backend.plugin.entrypoint import find_build_root
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, run
+
+if TYPE_CHECKING:
+    from pexpect import spawn
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
@@ -49,7 +52,7 @@ def make_run_fixture(profile_env: str) -> Callable[[Path], Iterator[ClientRunner
     ) -> Iterator[ClientRunnerFunc]:
         env_from_file = get_env_from_profile(profile_env)
 
-        def run_impl(cmdargs: Sequence[str | Path], *args: Any, **kwargs: Any) -> pexpect.spawn:
+        def run_impl(cmdargs: Sequence[str | Path], *args: Any, **kwargs: Any) -> spawn[str]:
             return run([client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file})
 
         yield run_impl
@@ -139,7 +142,7 @@ def new_keypair_options() -> tuple[KeypairOption, ...]:
 @pytest.fixture(scope="module")
 def keypair_resource_policy() -> str:
     fake = Faker()
-    return fake.unique.word()
+    return str(fake.unique.word())
 
 
 @pytest.fixture

@@ -358,7 +358,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Group | None:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any]) -> Group | None:
         if row is None:
             return None
         return cls(

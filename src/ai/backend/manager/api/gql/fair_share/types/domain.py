@@ -62,7 +62,7 @@ class DomainFairShareGQL(Node):
         description="Timestamp when this record was last updated."
     )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description=(
             "Added in 26.1.0. List project fair shares belonging to this domain. "
             "Returns fair share data for all projects within this domain and scaling group, "

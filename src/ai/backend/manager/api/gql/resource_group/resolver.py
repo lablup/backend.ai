@@ -62,7 +62,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 # Query fields
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.2.0. List resource groups (admin only)",
 )
 async def admin_resource_groups(
@@ -115,7 +115,7 @@ async def admin_resource_groups(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.2.0. List resource groups",
     deprecation_reason=(
         "Use admin_resource_groups instead. This API will be removed after v26.3.0. "
@@ -173,7 +173,7 @@ async def resource_groups(
 # Mutation fields
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Update fair share configuration for a resource group (admin only). "
         "Only provided fields are updated; others retain their existing values. "
@@ -217,7 +217,7 @@ async def admin_update_resource_group_fair_share_spec(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). "
         "Only provided fields are updated; others retain their existing values. "

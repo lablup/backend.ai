@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 import colorama

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import pexpect
+
+if TYPE_CHECKING:
+    from pexpect import spawn
 
 EOF = pexpect.EOF
 TIMEOUT = pexpect.TIMEOUT
@@ -16,7 +19,7 @@ class ClientRunnerFunc(Protocol):
         cmdargs: Sequence[str | Path],
         *args: Any,
         **kwargs: Any,
-    ) -> pexpect.spawn:
+    ) -> spawn[str]:
         pass
 
 
@@ -25,7 +28,7 @@ def run(
     *,
     default_timeout: int = 5,
     **kwargs: Any,
-) -> pexpect.spawn:
+) -> spawn[str]:
     return pexpect.spawn(
         str(args[0]),
         [str(arg) for arg in args[1:]],

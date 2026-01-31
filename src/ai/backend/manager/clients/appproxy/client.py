@@ -50,7 +50,8 @@ class AppProxyClient:
             },
         ) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @appproxy_client_resilience.apply()
     async def delete_endpoint(

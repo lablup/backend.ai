@@ -27,7 +27,7 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
 async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
@@ -41,7 +41,7 @@ async def create_auto_scaling_rule(
     )
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
 async def update_auto_scaling_rule(
     input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateAutoScalingRulePayload:
@@ -53,7 +53,7 @@ async def update_auto_scaling_rule(
     )
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:

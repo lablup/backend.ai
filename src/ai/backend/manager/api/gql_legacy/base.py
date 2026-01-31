@@ -383,17 +383,17 @@ class _SQLBasedGQLObject(Protocol):
     def from_row(
         cls: type[T_SQLBasedGQLObject],
         ctx: GraphQueryContext,
-        row: Row | DeclarativeMeta,
+        row: Row[Any] | DeclarativeMeta,
     ) -> T_SQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -414,10 +414,10 @@ async def batch_result(
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -438,10 +438,10 @@ async def batch_multiresult(
 async def batch_result_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -459,10 +459,10 @@ async def batch_result_in_session(
 async def batch_result_in_scalar_stream(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -480,10 +480,10 @@ async def batch_result_in_scalar_stream(
 async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -503,10 +503,10 @@ async def batch_multiresult_in_session(
 async def batch_multiresult_in_scalar_stream(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -759,7 +759,7 @@ async def simple_db_mutate_returning_item[
     *,
     item_cls: type[ItemType],
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[Row]] | None = None,
+    post_func: Callable[[SAConnection, Result], Awaitable[Row[Any]]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given
@@ -942,7 +942,7 @@ class _StmtWithConditions:
 
 
 def _apply_ordering(
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     pagination_order: ConnectionPaginationOrder | None,
@@ -986,7 +986,7 @@ def _apply_ordering(
 
 
 def _apply_filter_conditions(
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     orm_class: type[Any],
     filter_expr: FilterExprArg,
 ) -> _StmtWithConditions:
@@ -1005,7 +1005,7 @@ def _apply_filter_conditions(
 
 def _apply_cursor_pagination(
     info: graphene.ResolveInfo,
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     cursor_id: str,

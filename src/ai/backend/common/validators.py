@@ -21,6 +21,7 @@ from typing import (
     Any,
     Literal,
     TypeVar,
+    cast,
 )
 
 import dateutil.tz
@@ -215,7 +216,8 @@ class Enum[T_enum: enum.Enum](t.Trafaret):
 class JSONString(t.Trafaret):
     def check_and_return(self, value: Any) -> dict[str, Any]:
         try:
-            return json.loads(value)
+            result: dict[str, Any] = json.loads(value)
+            return result
         except (KeyError, ValueError):
             self._failure("value is not a valid JSON string", value=value)
 
@@ -669,8 +671,8 @@ if jwt_available:
             try:
                 token_data = jwt.decode(value, self.secret, algorithms=self.algorithms)
                 if self.inner_iv is not None:
-                    return self.inner_iv.check(token_data)
-                return token_data
+                    return cast(Mapping[str, Any], self.inner_iv.check(token_data))
+                return cast(Mapping[str, Any], token_data)
             except jwt.PyJWTError as e:
                 self._failure(f"cannot decode the given value as JWT: {e}", value=value)
 

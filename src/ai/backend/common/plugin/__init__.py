@@ -99,7 +99,7 @@ class BasePluginContext[P: AbstractPlugin]:
     allowlist: ClassVar[set[str] | None] = None
     blocklist: ClassVar[set[str] | None] = None
 
-    _config_watchers: WeakSet[asyncio.Task]
+    _config_watchers: WeakSet[asyncio.Task[Any]]
 
     def __init__(self, etcd: AbstractKVStore, local_config: Mapping[str, Any]) -> None:
         self.etcd = etcd

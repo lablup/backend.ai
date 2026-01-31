@@ -4,7 +4,7 @@ import asyncio
 import signal
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiotools
 
@@ -56,7 +56,7 @@ class AgentRuntime:
 
         agent_configs = local_config.get_agent_configs()
         etcd_views: dict[AgentId, AgentEtcdClientView] = {}
-        create_agent_tasks: list[asyncio.Task] = []
+        create_agent_tasks: list[asyncio.Task[Any]] = []
         async with asyncio.TaskGroup() as tg:
             for i, agent_config in enumerate(agent_configs):
                 agent_id = AgentId(agent_config.agent.defaulted_id)

@@ -279,7 +279,7 @@ def upgrade() -> None:
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
 
-    def migrate_kernel_to_session(kernel_query: sa.sql.Select, is_single_kernel: bool) -> None:
+    def migrate_kernel_to_session(kernel_query: sa.sql.Select[Any], is_single_kernel: bool) -> None:
         session_map: dict[UUID, dict[str, Any]] = {}
         main_kernel_rows: dict[UUID, dict[str, Any]] = {}
         single_kernel_ids: dict[UUID, UUID] = {}

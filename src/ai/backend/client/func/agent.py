@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult

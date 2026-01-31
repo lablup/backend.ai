@@ -1,5 +1,6 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
@@ -165,7 +166,7 @@ def test_list_domain(run_admin: ClientRunnerFunc) -> None:
         assert isinstance(domain_list, list), "Domain list not printed properly"
 
 
-def get_domain_from_list(domains: list, name: str) -> dict:
+def get_domain_from_list(domains: list[dict[str, Any]], name: str) -> dict[str, Any]:
     for domain in domains:
         if domain.get("name") == name:
             return domain

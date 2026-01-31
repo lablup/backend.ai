@@ -340,7 +340,7 @@ class ModelDeployment(Node):
             _deployment_id=self._deployment_id,
         )
 
-    @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")
+    @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")  # type: ignore[misc]
     async def deployment_policy(
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:

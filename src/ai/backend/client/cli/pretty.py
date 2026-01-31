@@ -215,7 +215,7 @@ def show_warning(
     )
 
 
-class ProgressBarWithSpinner(tqdm):
+class ProgressBarWithSpinner(tqdm[Any]):
     """
     A simple extension to tqdm adding a spinner.
 
@@ -269,7 +269,7 @@ class ProgressBarWithSpinner(tqdm):
             unit=unit,
         )
         # Deactivate the progress bar display by default
-        self.format_meter = self.alt_format_meter  # type: ignore
+        self.format_meter = self.alt_format_meter
         self.set_description_str(initial_desc)
         self.set_postfix_str(style("", reset=True))
 
@@ -294,7 +294,7 @@ class ProgressBarWithSpinner(tqdm):
     def total(self, value: int | float) -> None:
         self._total = value
         # Reactivate the progress bar display when total is first set
-        self.format_meter = self._orig_format_meter  # type: ignore
+        self.format_meter = self._orig_format_meter
 
     async def __aenter__(self) -> Self:
         self.spinner_task = asyncio.create_task(self.spin())

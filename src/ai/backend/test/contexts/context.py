@@ -62,7 +62,7 @@ class BaseTestContext[T]:
     """
 
     _ctxvar: ContextVar[T | None] | None = None
-    _used: MutableMapping[ContextName, "BaseTestContext"] = {}
+    _used: MutableMapping[ContextName, "BaseTestContext[T]"] = {}
 
     def __init_subclass__(cls) -> None:
         if cls._ctxvar is not None:
@@ -82,7 +82,7 @@ class BaseTestContext[T]:
         )
 
     @classmethod
-    def used_contexts(cls) -> Mapping[ContextName, "BaseTestContext"]:
+    def used_contexts(cls) -> Mapping[ContextName, "BaseTestContext[T]"]:
         """
         Get all used contexts
         :return: mapping of context names to context instances

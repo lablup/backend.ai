@@ -73,7 +73,7 @@ class SchedulingBroadcastEventPayload:
             reason=event.reason,
         )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
@@ -83,7 +83,7 @@ class SchedulingBroadcastEventPayload:
         return Session(id=strawberry.ID(session_global_id))
 
 
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description="Subscribe to real-time scheduling events for a specific session. "
     "Streams status transition events during the session lifecycle "
     "(PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). "

@@ -134,8 +134,8 @@ class RelationLoadingOption(enum.StrEnum):
 
 
 def _apply_loading_option(
-    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
-) -> sa.sql.Select:
+    query_stmt: sa.sql.Select[Any], options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select[Any]:
     for op in options:
         match op:
             case RelationLoadingOption.ALIASES:

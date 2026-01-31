@@ -1061,7 +1061,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> ResourceSlot:
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping[str, Any]) -> ResourceSlot:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])

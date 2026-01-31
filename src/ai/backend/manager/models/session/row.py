@@ -1617,8 +1617,8 @@ class SessionRow(Base):  # type: ignore[misc]
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.status.in_(statuses))
 
     return _by_status
@@ -1626,8 +1626,8 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
 
 def by_user_id(user_id: UUID) -> QueryCondition:
     def _by_user_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.user_uuid == user_id)
 
     return _by_user_id
@@ -1635,8 +1635,8 @@ def by_user_id(user_id: UUID) -> QueryCondition:
 
 def by_project_id(project_id: UUID) -> QueryCondition:
     def _by_project_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.group_id == project_id)
 
     return _by_project_id
@@ -1644,8 +1644,8 @@ def by_project_id(project_id: UUID) -> QueryCondition:
 
 def by_domain_name(domain_name: str) -> QueryCondition:
     def _by_domain_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.domain_name == domain_name)
 
     return _by_domain_name
@@ -1653,8 +1653,8 @@ def by_domain_name(domain_name: str) -> QueryCondition:
 
 def by_resource_group_name(resource_group_name: str) -> QueryCondition:
     def _by_resource_group_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
 
     return _by_resource_group_name
@@ -1662,8 +1662,8 @@ def by_resource_group_name(resource_group_name: str) -> QueryCondition:
 
 def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition:
     def _by_raw_filter(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         qfparser = QueryFilterParser(filter_spec)
         new_cond = qfparser.parse_filter(SessionRow, raw_filter)
         return query_stmt.where(new_cond)

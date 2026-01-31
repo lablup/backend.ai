@@ -314,7 +314,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
@@ -607,7 +607,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
@@ -675,7 +675,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         return await self._resolve_legacy_metric(info, "io_scratch_size", "current", int)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         from ai.backend.manager.errors.resource import DataTransformationFailed
 
         if row is None:
@@ -742,7 +742,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         }
 
     @classmethod
-    def from_row(cls, context: GraphQueryContext, row: Row) -> LegacyComputeSession | None:
+    def from_row(cls, context: GraphQueryContext, row: Row[Any]) -> LegacyComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(context, row)

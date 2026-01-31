@@ -163,7 +163,7 @@ class SessionSchedulingHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The session ID this history record belongs to.")
+    @strawberry.field(description="The session ID this history record belongs to.")  # type: ignore[misc]
     def session_id(self) -> ID:
         return ID(str(self._session_id))
 
@@ -200,7 +200,7 @@ class DeploymentHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The deployment ID this history record belongs to.")
+    @strawberry.field(description="The deployment ID this history record belongs to.")  # type: ignore[misc]
     def deployment_id(self) -> ID:
         return ID(str(self._deployment_id))
 
@@ -238,11 +238,11 @@ class RouteHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The route ID this history record belongs to.")
+    @strawberry.field(description="The route ID this history record belongs to.")  # type: ignore[misc]
     def route_id(self) -> ID:
         return ID(str(self._route_id))
 
-    @strawberry.field(description="The deployment ID this route belongs to.")
+    @strawberry.field(description="The deployment ID this route belongs to.")  # type: ignore[misc]
     def deployment_id(self) -> ID:
         return ID(str(self._deployment_id))
 

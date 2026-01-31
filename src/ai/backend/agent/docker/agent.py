@@ -1371,9 +1371,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_info: Mapping[str, Any]
-    monitor_docker_task: asyncio.Task
+    monitor_docker_task: asyncio.Task[Any]
     agent_sockpath: Path
-    agent_sock_task: asyncio.Task
+    agent_sock_task: asyncio.Task[Any]
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
@@ -2146,7 +2146,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]

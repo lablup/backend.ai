@@ -31,7 +31,7 @@ Base: Any = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     __table_args__ = {"extend_existing": True}
 
@@ -46,7 +46,7 @@ class SessionRow(Base):
     kernels = relationship("KernelRow")
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
     __table_args__ = {"extend_existing": True}
 

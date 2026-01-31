@@ -3,6 +3,7 @@ import functools
 import logging
 import socket
 import time
+from typing import Any
 
 from aiohttp import web
 
@@ -26,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class TCPFrontend(BaseFrontend[TCPBackend, int]):
     servers: list[asyncio.Server]
-    server_tasks: list[asyncio.Task]
+    server_tasks: list[asyncio.Task[Any]]
 
     root_context: RootContext
 

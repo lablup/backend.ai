@@ -397,8 +397,8 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    status_watch_task: asyncio.Task
-    db_status_report_task: asyncio.Task
+    status_watch_task: asyncio.Task[Any]
+    db_status_report_task: asyncio.Task[Any]
 
 
 async def init(app: web.Application) -> None:

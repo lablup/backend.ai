@@ -1,5 +1,6 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
@@ -187,7 +188,7 @@ def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc) -> None:
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
 
-def get_keypair_resource_policy_from_list(krps: list, name: str) -> dict:
+def get_keypair_resource_policy_from_list(krps: list[dict[str, Any]], name: str) -> dict[str, Any]:
     for krp in krps:
         if krp.get("name") == name:
             return krp

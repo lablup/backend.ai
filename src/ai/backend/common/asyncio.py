@@ -37,7 +37,7 @@ async def cancel_tasks(
     return await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
-async def cancel_task(task: asyncio.Task) -> None:
+async def cancel_task(task: asyncio.Task[Any]) -> None:
     """
     Cancel the given task and wait for its completion.
     """
@@ -53,9 +53,9 @@ async def cancel_task(task: asyncio.Task) -> None:
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore
+    current_loop = asyncio.get_running_loop
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore
+    current_loop = asyncio.get_event_loop
 
 
 async def run_through(
@@ -94,11 +94,11 @@ async def run_through(
     for f in awaitable_or_callables:
         try:
             if inspect.iscoroutinefunction(f):
-                await f()  # type: ignore
+                await f()
             elif inspect.isawaitable(f):
-                await f  # type: ignore
+                await f
             else:
-                f()  # type: ignore
+                f()
         except Exception as e:
             if isinstance(e, cast(tuple[Any, ...], ignored_exceptions)):
                 continue

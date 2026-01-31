@@ -28,7 +28,7 @@ class Vec2D(tuple[float, float]):
             return Vec2D(self[0] * other, self[1] * other)
         return None
 
-    def __sub__(self, other: Vec2D) -> Vec2D:  # type: ignore[override]
+    def __sub__(self, other: Vec2D) -> Vec2D:
         return Vec2D(self[0] - other[0], self[1] - other[1])
 
     def __neg__(self) -> Vec2D:
@@ -67,7 +67,7 @@ class Turtle:
             fill=Colors.from_rgba([255, 200, 200, 255]),
             angle=90,
         )
-        self.angle = 90
+        self.angle: float | int = 90
         self.points.append((w / 2, h / 2))
 
     def forward(self, amt: float | int) -> None:
@@ -85,11 +85,11 @@ class Turtle:
 
     def left(self, deg: float | int) -> None:
         self.cursor.rotate(-deg)
-        self.angle -= deg  # type: ignore[assignment]
+        self.angle -= deg
 
     def right(self, deg: float | int) -> None:
         self.cursor.rotate(deg)
-        self.angle += deg  # type: ignore[assignment]
+        self.angle += deg
 
     def pos(self) -> Vec2D:
         base_x, base_y = self.points[0][0], self.points[0][1]
@@ -103,23 +103,29 @@ class Turtle:
 
     def setpos(self, x: float | int | Vec2D, y: float | int | None = None) -> None:
         base_x, base_y = self.points[0][0], self.points[0][1]
+        pos_x: float
+        pos_y: float
         if y is None:
-            _x = x[0]  # type: ignore[index]
-            _y = x[1]  # type: ignore[index]
-            x, y = _x, _y
+            assert isinstance(x, Vec2D)
+            pos_x = x[0]
+            pos_y = x[1]
+        else:
+            assert isinstance(x, (float, int))
+            pos_x = x
+            pos_y = y
         self.canvas.begin_group()
         if self.pen:
             self.canvas.line(
                 self.points[-1][0],
                 self.points[-1][1],
-                x + base_x,  # type: ignore[operator]
-                y + base_y,  # type: ignore[operator]
+                pos_x + base_x,
+                pos_y + base_y,
                 color=Colors.from_rgba([255, 0, 0, 128]),
             )
-        self.cursor.set_x(x + base_x)  # type: ignore[operator]
-        self.cursor.set_y(y + base_y)  # type: ignore[operator]
+        self.cursor.set_x(pos_x + base_x)
+        self.cursor.set_y(pos_y + base_y)
         self.canvas.end_group()
-        self.points.append((x + base_x, y + base_y))  # type: ignore[operator]
+        self.points.append((pos_x + base_x, pos_y + base_y))
 
 
 __all__ = [

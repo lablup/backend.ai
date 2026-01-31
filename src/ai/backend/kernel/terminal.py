@@ -12,7 +12,7 @@ import struct
 import sys
 import termios
 import traceback
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import zmq
 import zmq.asyncio
@@ -40,7 +40,7 @@ class Terminal:
         auto_restart: bool = True,
         loop: AbstractEventLoop | None = None,
     ) -> None:
-        self._sorna_media: list = []
+        self._sorna_media: list[Any] = []
         self.zctx = sock_out.context
 
         self.ev_term = ev_term

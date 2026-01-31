@@ -295,7 +295,7 @@ class LogHandlerConfig(BaseConfigModel):
         self,
         handler: Any,
     ) -> dict[str, Any]:
-        data = handler(self)
+        data: dict[str, Any] = handler(self)
         if "class_" in data:
             data["class"] = data.pop("class_")
         return data

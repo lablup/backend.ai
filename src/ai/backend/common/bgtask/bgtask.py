@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMappi
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import (
+    Any,
     Concatenate,
     Final,
     ParamSpec,
@@ -148,7 +149,7 @@ class BackgroundTaskMeta(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def async_tasks(self) -> Sequence[asyncio.Task]:
+    def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         raise NotImplementedError
 
     def cancel(self) -> None:
@@ -166,9 +167,9 @@ class BackgroundTaskMeta(ABC):
 
 
 class LocalBgtask(BackgroundTaskMeta):
-    _task: asyncio.Task
+    _task: asyncio.Task[Any]
 
-    def __init__(self, task: asyncio.Task) -> None:
+    def __init__(self, task: asyncio.Task[Any]) -> None:
         self._task = task
 
     def total_info(self) -> TaskTotalInfo:
@@ -177,18 +178,18 @@ class LocalBgtask(BackgroundTaskMeta):
     def retriable(self) -> bool:
         return False
 
-    def async_tasks(self) -> Sequence[asyncio.Task]:
+    def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
 
 class SingleBgtask(BackgroundTaskMeta):
     _total_info: TaskTotalInfo
-    _task: asyncio.Task
+    _task: asyncio.Task[Any]
 
     def __init__(
         self,
         total_info: TaskTotalInfo,
-        task: asyncio.Task,
+        task: asyncio.Task[Any],
     ) -> None:
         self._total_info = total_info
         self._task = task
@@ -199,18 +200,18 @@ class SingleBgtask(BackgroundTaskMeta):
     def retriable(self) -> bool:
         return True
 
-    def async_tasks(self) -> Sequence[asyncio.Task]:
+    def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
 
 class ParallelBgtask(BackgroundTaskMeta):
     _total_info: TaskTotalInfo
-    _tasks: Sequence[asyncio.Task]
+    _tasks: Sequence[asyncio.Task[Any]]
 
     def __init__(
         self,
         total_info: TaskTotalInfo,
-        tasks: Sequence[asyncio.Task],
+        tasks: Sequence[asyncio.Task[Any]],
     ) -> None:
         self._total_info = total_info
         self._tasks = tasks
@@ -221,7 +222,7 @@ class ParallelBgtask(BackgroundTaskMeta):
     def retriable(self) -> bool:
         return True
 
-    def async_tasks(self) -> Sequence[asyncio.Task]:
+    def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return self._tasks
 
 
@@ -267,8 +268,8 @@ class BackgroundTaskManager:
     _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
 
-    _heartbeat_loop_task: asyncio.Task
-    _retry_loop_task: asyncio.Task
+    _heartbeat_loop_task: asyncio.Task[Any]
+    _retry_loop_task: asyncio.Task[Any]
 
     def __init__(
         self,
@@ -608,7 +609,7 @@ class BackgroundTaskManager:
                         )
             return
 
-        async_tasks: list[asyncio.Task] = []
+        async_tasks: list[asyncio.Task[Any]] = []
         for subkey_info in total_info.task_key_list:
             if subkey_info.status == TaskStatus.ONGOING:
                 task_key = subkey_info.key
