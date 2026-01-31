@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import Any
 
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -24,8 +25,6 @@ from ai.backend.manager.repositories.base.export import (
 
 def _serialize_json(value: Any) -> str:
     """Serialize value to JSON string, converting sets to lists and Decimals to strings."""
-    from decimal import Decimal
-
     if not value:
         return ""
 
