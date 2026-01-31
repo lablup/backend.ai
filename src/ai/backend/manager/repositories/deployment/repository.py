@@ -762,7 +762,7 @@ class DeploymentRepository:
         if metric_requested_endpoints:
             endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
                 self._valkey_stat,
-                cast(list[uuid.UUID], metric_requested_endpoints),
+                metric_requested_endpoints,
             )
             endpoint_statistics_by_id = {
                 endpoint_id: metric

@@ -304,8 +304,8 @@ async def recalc_agent_resource_occupancy_using_orm(
         )
     )
     occupied_slots = ResourceSlot()
-    agent_row = cast(AgentRow, await db_session.scalar(agent_query))
-    kernel_rows = cast(list[KernelRow], agent_row.kernels)
+    agent_row = await db_session.scalar(agent_query)
+    kernel_rows = agent_row.kernels
     for kernel in kernel_rows:
         if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
             occupied_slots += kernel.occupied_slots
@@ -449,7 +449,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -478,7 +478,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -515,7 +515,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)

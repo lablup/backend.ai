@@ -319,7 +319,6 @@ class UserRepository:
     ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
-        result = cast(str | None, result)
         return result is not None
 
     async def _check_resource_policy_exists(
@@ -330,7 +329,6 @@ class UserRepository:
             UserResourcePolicyRow.name == policy_name
         )
         result = await session.scalar(query)
-        result = cast(str | None, result)
         return result is not None
 
     async def _check_user_exists_with_email_or_username(
@@ -340,7 +338,6 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
-        result = cast(UUID | None, result)
         return result is not None
 
     async def _check_username_exists_for_other_user(
@@ -351,7 +348,6 @@ class UserRepository:
             sa.and_(UserRow.username == username, UserRow.email != exclude_email)
         )
         result = await conn.scalar(query)
-        result = cast(UUID | None, result)
         return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:

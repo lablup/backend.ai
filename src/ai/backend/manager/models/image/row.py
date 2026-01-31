@@ -165,12 +165,9 @@ async def load_configured_registries(
                 },
             )
         else:
-            registries = cast(
-                dict[str, ContainerRegistryRow],
-                {join(row.registry_name, row.project): row for row in result.scalars().all()},
-            )
+            registries = {join(row.registry_name, row.project): row for row in result.scalars().all()}
 
-    return cast(dict[str, ContainerRegistryRow], registries)
+    return registries
 
 
 async def scan_registries(
@@ -1096,7 +1093,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
 
     async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
         image_row = rbac_obj
-        image_id = cast(UUID, image_row.id)
+        image_id = image_row.id
         permissions: set[ImagePermission] = set()
 
         if (
@@ -1278,7 +1275,7 @@ class ImagePermissionContextBuilder(
         )
 
         for row in await self.db_session.scalars(img_query_stmt):
-            image_row = cast(ImageRow, row)
+            image_row = row
             if not image_row.customized or not access_criteria.is_accessible_image(image_row):
                 continue
 
@@ -1319,7 +1316,7 @@ class ImagePermissionContextBuilder(
         )
 
         for row in await self.db_session.scalars(img_query_stmt):
-            image_row = cast(ImageRow, row)
+            image_row = row
             if not access_criteria.is_accessible_image(image_row):
                 continue
 
@@ -1397,7 +1394,7 @@ class ImagePermissionContextBuilder(
 
         result = (await self.db_session.scalars(image_select_stmt)).unique()
         for row in result:
-            img_row = cast(ImageRow, row)
+            img_row = row
 
             allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
             access_criteria = ImageAccessCriteria(

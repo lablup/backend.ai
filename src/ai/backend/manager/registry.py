@@ -1259,9 +1259,8 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
-                        session_status = cast(SessionStatus, session_row.status)
+                        session_status = session_row.status
                         if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             if kernel.agent is not None:
                                 occupied_slots_per_agent[kernel.agent] += ResourceSlot(
@@ -1439,10 +1438,10 @@ class AgentRegistry:
                     .where(SessionRow.id == session_id)
                     .options(selectinload(SessionRow.kernels))
                 )
-                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                session_row = await db_session.scalar(_stmt)
                 if session_row is None:
                     raise SessionNotFound(f"Session not found (id: {session_id})")
-                kernel_rows = cast(list[KernelRow], session_row.kernels)
+                kernel_rows = session_row.kernels
                 kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
                 for kern in kernel_rows:
                     kern.status = kernel_target_status
@@ -1506,8 +1505,6 @@ class AgentRegistry:
                 target_session = (await db_session.scalars(query)).first()
             if not target_session:
                 raise SessionNotFound
-
-            target_session = cast(SessionRow, target_session)
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
                 await self.valkey_stat.decrement_keypair_concurrency(

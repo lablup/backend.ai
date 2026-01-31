@@ -1044,7 +1044,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp = {}
-        sess_type = cast(SessionTypes, sess.session_type)
+        sess_type = sess.session_type
         if sess_type in PRIVATE_SESSION_TYPES:
             if sess.main_kernel.agent_row is None:
                 raise KernelNotReady(

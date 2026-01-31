@@ -1111,7 +1111,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
         return cls(data)
 
-    def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
+    def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
         try:
             return {
                 k: type(self)._humanize_value(Decimal(v), slot_types[k])
@@ -1228,7 +1228,10 @@ class VFolderID:
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
     def __eq__(self, other: Any) -> bool:
-        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+        result: bool = (
+            self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+        )
+        return result
 
     def __hash__(self) -> int:
         qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
@@ -1803,7 +1806,7 @@ class RedisHelperConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis
+    client: Redis[Any]
     name: str  # connection pool name
     service_name: str | None
     sentinel: redis.asyncio.sentinel.Sentinel | None

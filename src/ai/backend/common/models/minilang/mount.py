@@ -24,7 +24,7 @@ _grammar = r"""
 type PairType = tuple[str, str]
 
 
-class DictTransformer(Transformer):
+class DictTransformer(Transformer[Any, Any]):
     reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
 
     def start(self, pairs: Sequence[PairType]) -> Mapping[str, str]:

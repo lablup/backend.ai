@@ -137,8 +137,8 @@ class BasePluginContext[P: AbstractPlugin]:
     async def init(
         self,
         context: Any | None = None,
-        allowlist: set | None = None,
-        blocklist: set | None = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> None:
         if allowlist is not None and blocklist is not None:
             if union := allowlist & blocklist:

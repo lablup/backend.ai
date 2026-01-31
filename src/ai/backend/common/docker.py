@@ -360,7 +360,7 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     return common_labels
 
 
-class PlatformTagSet(Mapping):
+class PlatformTagSet(Mapping[str, str]):
     __slots__ = ("_data",)
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")

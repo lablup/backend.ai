@@ -28,7 +28,8 @@ class BoolExprType(click.ParamType):
         if isinstance(value, bool):
             return value
         try:
-            return trafaret.ToBool().check(value)
+            result: bool = trafaret.ToBool().check(value)
+            return result
         except trafaret.DataError:
             self.fail(f"Cannot parser/convert {value!r} as a boolean.", param, ctx)
 
@@ -256,12 +257,14 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
         try:
             if value is undefined:
                 return undefined
+            result: TScalar | Undefined
             match self.type_:
                 case click.ParamType():
-                    return self.type_(value)
+                    result = self.type_(value)
                 case type() if issubclass(self.type_, click.ParamType):
-                    return self.type_()(value)
+                    result = self.type_()(value)
                 case _:
-                    return self.type_(value)
+                    result = self.type_(value)
+            return result
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

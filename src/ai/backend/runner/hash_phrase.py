@@ -24,7 +24,8 @@ def load_dictionary(dictionary_file: str | None = None) -> list[str]:
         dictionary_file = "/opt/kernel/words.json"
 
     with Path(dictionary_file).open() as f:
-        return json.load(f)
+        result: list[str] = json.load(f)
+        return result
 
 
 def default_hasher(data: str) -> str:

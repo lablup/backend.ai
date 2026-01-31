@@ -147,7 +147,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 yield conn_with_isolation
@@ -192,7 +191,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(
                 isolation_level="READ COMMITTED",
                 postgresql_readonly=True,
@@ -230,13 +228,11 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
                 self._sess_factory.configure(bind=conn_with_isolation, expire_on_commit=False)
                 session = self._sess_factory()
-                session = cast(SASession, session)
                 yield session
                 await session.commit()
 
@@ -274,7 +270,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED and readonly mode
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(
                 isolation_level="READ COMMITTED",
                 postgresql_readonly=True,
@@ -283,7 +278,6 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # Configure session factory with the connection
                 self._readonly_sess_factory.configure(bind=conn_with_isolation)
                 session = self._readonly_sess_factory()
-                session = cast(SASession, session)
                 yield session
 
     @actxmgr

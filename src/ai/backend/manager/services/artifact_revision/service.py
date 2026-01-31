@@ -180,9 +180,9 @@ class ArtifactRevisionService:
         """
         match reservoir_config.config.storage_type:
             case ArtifactStorageType.OBJECT_STORAGE.value:
-                return cast(ReservoirObjectStorageConfig, reservoir_config.config).bucket_name
+                return reservoir_config.config.bucket_name
             case ArtifactStorageType.VFS_STORAGE.value:
-                return cast(ReservoirVFSStorageConfig, reservoir_config.config).subpath
+                return reservoir_config.config.subpath
             case _:
                 raise UnsupportedStorageTypeError(
                     f"Unsupported storage type: {reservoir_config.config.storage_type}"

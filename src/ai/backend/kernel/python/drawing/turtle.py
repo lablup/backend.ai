@@ -35,7 +35,8 @@ class Vec2D(tuple[float, float]):
         return Vec2D(-self[0], -self[1])
 
     def __abs__(self) -> float:
-        return (self[0] ** 2 + self[1] ** 2) ** 0.5
+        result: float = (self[0] ** 2 + self[1] ** 2) ** 0.5
+        return result
 
     def rotate(self, angle: float | int) -> Vec2D:
         """rotate self counterclockwise by angle"""

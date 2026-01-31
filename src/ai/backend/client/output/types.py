@@ -105,7 +105,7 @@ class FieldSpec:
         return default_output_formatter
 
 
-class FieldSet(UserDict, Mapping[str, FieldSpec]):
+class FieldSet(UserDict[str, FieldSpec], Mapping[str, FieldSpec]):
     def __init__(self, fields: Sequence[FieldSpec]) -> None:
         fields_set = {f.alt_name: f for f in fields}
         fields_set.update({f.field_ref: fields_set[f.alt_name] for f in fields})
@@ -183,7 +183,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         item: Mapping[str, Any],
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         raise NotImplementedError
 
@@ -194,7 +194,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         msg: str = "Failed",
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         raise NotImplementedError
 

@@ -56,13 +56,13 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-type FilterableSQLQuery = sa.sql.Select | sa.sql.Update | sa.sql.Delete
-_TQuery = TypeVar("_TQuery", sa.sql.Select, sa.sql.Update, sa.sql.Delete)
+type FilterableSQLQuery = sa.sql.Select[Any] | sa.sql.Update | sa.sql.Delete
+_TQuery = TypeVar("_TQuery", sa.sql.Select[Any], sa.sql.Update, sa.sql.Delete)
 type FieldSpecType = Mapping[str, FieldSpecItem] | None
 type WhereClauseType = sa.sql.expression.ColumnElement[bool]
 
 
-class QueryFilterTransformer(Transformer):
+class QueryFilterTransformer(Transformer[Any, Any]):
     def __init__(
         self, sa_table: sa.Table | sa.sql.Join | type, fieldspec: FieldSpecType | None = None
     ) -> None:

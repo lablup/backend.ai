@@ -143,7 +143,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     closed_cxn_metrics = []
     redis_cxn_metrics = []
     for stat in status:
-        sqlalchemy_info = cast(SQLAlchemyConnectionInfo, stat.sqlalchemy_info)
+        sqlalchemy_info = stat.sqlalchemy_info
 
         total_cxn_metrics.append(
             SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)

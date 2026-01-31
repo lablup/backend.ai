@@ -301,7 +301,7 @@ class Path(PurePath):
 
 
 class IPNetwork(t.Trafaret):
-    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork:
+    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork[Any]:
         try:
             return ipaddress.ip_network(value)
         except ValueError:
@@ -699,7 +699,7 @@ class URL(t.Trafaret):
 
 
 class ToSet(t.Trafaret):
-    def check_and_return(self, value: Any) -> set:
+    def check_and_return(self, value: Any) -> set[Any]:
         if isinstance(value, Iterable):
             return set(value)
         self._failure("value must be Iterable")

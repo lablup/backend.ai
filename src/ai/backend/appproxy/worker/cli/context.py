@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.logging.types import LogLevel
 
 
-class CLIContext(AbstractContextManager):
+class CLIContext(AbstractContextManager[Self]):
     _logger: AbstractLogger
 
     def __init__(self, log_level: LogLevel, config_path: Path | None = None) -> None:

@@ -1144,7 +1144,6 @@ async def update_vfolder_status(
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
         async with engine.begin_readonly_session() as db_session:
             for vf_row in await db_session.scalars(select_stmt):
-                vf_row = cast(VFolderRow, vf_row)
                 mount_sessions = await get_sessions_by_mounted_folder(
                     db_session, VFolderID.from_row(vf_row)
                 )
@@ -1159,7 +1158,6 @@ async def update_vfolder_status(
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
         async with engine.begin_readonly_session() as db_session:
             for vf_row in await db_session.scalars(select_stmt):
-                vf_row = cast(VFolderRow, vf_row)
                 if vf_row.status == VFolderOperationStatus.DELETE_PENDING:
                     folder_ids.append(vf_row.id)
         cond = VFolderRow.id.in_(folder_ids)
@@ -1550,7 +1548,7 @@ class VFolderPermissionContext(
         self, rbac_obj: VFolderRow
     ) -> frozenset[VFolderRBACPermission]:
         vfolder_row = rbac_obj
-        vfolder_id = cast(uuid.UUID, vfolder_row.id)
+        vfolder_id = vfolder_row.id
         permissions: set[VFolderRBACPermission] = set()
 
         if (
@@ -1681,7 +1679,7 @@ class VFolderPermissionContextBuilder(
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
-            _row = cast(GroupRow, row)
+            _row = row
             _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
             result.merge(_project_perm_ctx)
         return result

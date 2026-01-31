@@ -117,7 +117,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     rules = []
     if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         rules.append(CustomIntrospectionRule)
-    max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
+    max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:

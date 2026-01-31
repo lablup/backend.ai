@@ -47,7 +47,7 @@ class Auth(BaseFunction):
             body["otp"] = otp
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            data = await resp.json()
+            data: dict[str, Any] = await resp.json()
             data["cookies"] = resp.raw_response.cookies
             data["config"] = {
                 "username": user_id,

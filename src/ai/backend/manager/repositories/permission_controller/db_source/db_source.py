@@ -257,7 +257,7 @@ class PermissionDBSource:
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        result = cast(RoleRow | None, role_row)
+        result = role_row
         if result is None:
             raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
         return result
@@ -289,7 +289,7 @@ class PermissionDBSource:
             PermissionGroupRow.scope_id == scope_id.scope_id,
         )
         result = await db_session.scalar(stmt)
-        return cast(PermissionGroupRow | None, result)
+        return result
 
     async def _find_permission_groups_by_scopes(
         self,

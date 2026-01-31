@@ -385,9 +385,9 @@ class UserRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.keypair import KeyPairRow
 
         keypair_candidate: KeyPairRow | None = None
-        main_keypair_row = cast(KeyPairRow | None, self.main_keypair)
+        main_keypair_row = self.main_keypair
         if main_keypair_row is None:
-            keypair_rows = cast(list[KeyPairRow], self.keypairs)
+            keypair_rows = self.keypairs
             active_keypairs = [row for row in keypair_rows if row.is_active]
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:

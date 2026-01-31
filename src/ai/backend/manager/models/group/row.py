@@ -599,7 +599,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
-        project_id = cast(uuid.UUID, project_row.id)
+        project_id = project_row.id
         permissions: frozenset[ProjectPermission] = frozenset()
 
         if (

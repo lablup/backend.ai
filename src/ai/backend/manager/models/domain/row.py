@@ -278,7 +278,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
 
     async def calculate_final_permission(self, rbac_obj: DomainRow) -> frozenset[DomainPermission]:
         domain_row = rbac_obj
-        domain_name = cast(str, domain_row.name)
+        domain_name = domain_row.name
         permissions: frozenset[DomainPermission] = frozenset()
 
         if (

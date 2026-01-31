@@ -171,10 +171,10 @@ class PermissionContextBuilder(
             .where(DomainRow.name == scope.domain_name)
             .options(load_only(DomainRow.allowed_vfolder_hosts))
         )
-        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
+        domain_row = await self.db_session.scalar(stmt)
         if domain_row is None:
             return PermissionContext()
-        host_permissions = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
+        host_permissions = domain_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
                 host: _legacy_vf_perms_to_host_rbac_perms(perms)
@@ -200,10 +200,10 @@ class PermissionContextBuilder(
             .where(GroupRow.id == scope.project_id)
             .options(load_only(GroupRow.allowed_vfolder_hosts))
         )
-        project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
+        project_row = await self.db_session.scalar(stmt)
         if project_row is None:
             return PermissionContext()
-        host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
+        host_permissions = project_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
                 host: _legacy_vf_perms_to_host_rbac_perms(perms)
@@ -243,10 +243,10 @@ class PermissionContextBuilder(
         ] = defaultdict(frozenset)
 
         for keypair in user_row.keypairs:
-            resource_policy = cast(KeyPairResourcePolicyRow | None, keypair.resource_policy)
+            resource_policy = keypair.resource_policy
             if resource_policy is None:
                 continue
-            host_permissions = cast(VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts)
+            host_permissions = resource_policy.allowed_vfolder_hosts
             for host, perms in host_permissions.items():
                 object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_rbac_perms(
                     perms

@@ -37,11 +37,11 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]
     order_direction: OrderDirection
 
 
-class QueryOrderTransformer(Transformer):
+class QueryOrderTransformer(Transformer[Any, Any]):
     def __init__(
         self, sa_table: sa.Table | sa.sql.Join | type, column_map: ColumnMapType | None = None
     ) -> None:
@@ -51,7 +51,7 @@ class QueryOrderTransformer(Transformer):
 
     def _get_col(
         self, col_name: str
-    ) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
+    ) -> sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]:
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]

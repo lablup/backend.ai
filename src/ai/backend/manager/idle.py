@@ -398,7 +398,7 @@ class IdleCheckerHost:
                     remaining_time_type=checker.remaining_time_type.value,
                     extra=None,
                 )
-            raw_report = cast(bytes | None, report)
+            raw_report = report
             if raw_report is None:
                 continue
 
@@ -1056,10 +1056,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if util_now - util_last_collected < interval:
             return True
 
-        raw_util_first_collected = cast(
-            bytes | None,
-            await self._redis_live.get_live_data(util_first_collected_key),
-        )
+        raw_util_first_collected = await self._redis_live.get_live_data(util_first_collected_key)
         if raw_util_first_collected is None:
             util_first_collected = util_now
             await self._redis_live.store_live_data(
@@ -1095,7 +1092,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             if Decimal(slot_val) == 0:
                 # The resource is not allocated to this session.
                 continue
-            _slot_name = cast(str, slot_name)
+            _slot_name = slot_name
             resource_name, _, _ = _slot_name.partition(".")
             if resource_name:
                 requested_resource_names.add(resource_name)
@@ -1120,10 +1117,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Update utilization time-series data.
-        raw_util_series = cast(
-            bytes | None,
-            await self._redis_live.get_live_data(util_series_key),
-        )
+        raw_util_series = await self._redis_live.get_live_data(util_series_key)
 
         def default_util_series() -> dict[str, list[float]]:
             return {resource: [] for resource in current_utilizations.keys()}

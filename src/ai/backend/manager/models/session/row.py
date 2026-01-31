@@ -1290,7 +1290,7 @@ class SessionRow(Base):  # type: ignore[misc]
     def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
-        for kernel_row in cast(list[KernelRow], self.kernels):
+        for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
 
     @staticmethod
@@ -1716,7 +1716,7 @@ class SessionLifecycleManager:
             def _calculate_session_occupied_slots(session_row: SessionRow) -> None:
                 session_occupying_slots = ResourceSlot()
                 for row in session_row.kernels:
-                    kernel_row = cast(KernelRow, row)
+                    kernel_row = row
                     kernel_allocs = kernel_row.occupied_slots
                     session_occupying_slots.sync_keys(kernel_allocs)
                     for key, val in session_occupying_slots.items():
@@ -1992,7 +1992,7 @@ class ComputeSessionPermissionContext(
         self, rbac_obj: SessionRow
     ) -> frozenset[ComputeSessionPermission]:
         session_row = rbac_obj
-        session_id = cast(SessionId, session_row.id)
+        session_id = session_row.id
         permissions: frozenset[ComputeSessionPermission] = frozenset()
 
         if (
@@ -2138,7 +2138,7 @@ class ComputeSessionPermissionContextBuilder(
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
-            _row = cast(GroupRow, row)
+            _row = row
             _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
             result.merge(_project_perm_ctx)
         return result

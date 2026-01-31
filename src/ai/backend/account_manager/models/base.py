@@ -55,10 +55,10 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator[Any]:
         if dialect.name == "postgresql":
-            return cast(TypeDecorator, dialect.type_descriptor(UUID()))
-        return cast(TypeDecorator, dialect.type_descriptor(CHAR(16)))
+            return cast(TypeDecorator[Any], dialect.type_descriptor(UUID()))
+        return cast(TypeDecorator[Any], dialect.type_descriptor(CHAR(16)))
 
     def process_bind_param(
         self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect
@@ -131,12 +131,12 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class PasswordColumn(TypeDecorator):
+class PasswordColumn(TypeDecorator[str]):
     impl = VARCHAR
 
     def process_bind_param(self, value: Any, dialect: Dialect) -> str:
         return hash_password(value)
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))

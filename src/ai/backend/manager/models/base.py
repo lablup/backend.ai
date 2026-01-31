@@ -246,7 +246,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class CurvePublicKeyColumn(TypeDecorator):
+class CurvePublicKeyColumn(TypeDecorator[bytes]):
     """
     A column type wrapper for string-based Z85-encoded CURVE public key.
 
@@ -261,7 +261,7 @@ class CurvePublicKeyColumn(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(40))
 
     def process_bind_param(
@@ -281,7 +281,7 @@ class CurvePublicKeyColumn(TypeDecorator):
         return PublicKey(value.encode("ascii"))
 
 
-class QuotaScopeIDType(TypeDecorator):
+class QuotaScopeIDType(TypeDecorator[QuotaScopeID]):
     """
     A column type wrapper for string-based quota scope ID.
     """
@@ -289,7 +289,7 @@ class QuotaScopeIDType(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(64))
 
     def process_bind_param(
@@ -307,7 +307,7 @@ class QuotaScopeIDType(TypeDecorator):
         return QuotaScopeID.parse(value) if value else None
 
 
-class ResourceSlotColumn(TypeDecorator):
+class ResourceSlotColumn(TypeDecorator[ResourceSlot]):
     """
     A column type wrapper for ResourceSlot from JSONB.
     """
@@ -340,7 +340,7 @@ class ResourceSlotColumn(TypeDecorator):
             return ResourceSlot.from_user_input(value, None)
 
 
-class StructuredJSONColumn(TypeDecorator):
+class StructuredJSONColumn(TypeDecorator[Any]):
     """
     A column type to convert JSON values back and forth using a Trafaret.
     """
@@ -352,7 +352,7 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
@@ -386,7 +386,7 @@ class StructuredJSONColumn(TypeDecorator):
         return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
-class StructuredJSONObjectColumn(TypeDecorator):
+class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
     """
     A column type to convert JSON values back and forth using JSONSerializableMixin.
     """
@@ -400,7 +400,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
 
     def process_bind_param(
         self, value: JSONSerializableMixin | None, _dialect: Dialect
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         if value is None:
             return None
         return self._schema.to_json(value)  # type: ignore[arg-type]
@@ -416,7 +416,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
-class StructuredJSONObjectListColumn(TypeDecorator):
+class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]]):
     """
     A column type to convert JSON values back and forth using JSONSerializableMixin,
     but store and load a list of the objects.
@@ -434,7 +434,7 @@ class StructuredJSONObjectListColumn(TypeDecorator):
 
     def process_bind_param(
         self, value: list[JSONSerializableMixin] | None, _dialect: Dialect
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         return [self._schema.to_json(item) for item in value] if value is not None else []
 
     def process_result_value(

@@ -103,13 +103,13 @@ def get_graphquery_context(
     database_engine: ExtendedAsyncSAEngine, processors: Processors
 ) -> GraphQueryContext:
     return GraphQueryContext(
-        schema=None,  # type: ignore
+        schema=None,
         dataloader_manager=None,  # type: ignore
         config_provider=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
+        db=database_engine,
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore

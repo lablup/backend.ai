@@ -116,7 +116,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(float | None, root_ctx.config_provider.config.manager.status_update_interval)
+    interval = root_ctx.config_provider.config.manager.status_update_interval
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -366,7 +366,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     closed_cxn_metrics = []
     redis_cxn_metrics = []
     for stat in status:
-        sqlalchemy_info = cast(SQLAlchemyConnectionInfo, stat.sqlalchemy_info)
+        sqlalchemy_info = stat.sqlalchemy_info
 
         total_cxn_metrics.append(
             SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)

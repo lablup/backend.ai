@@ -188,7 +188,7 @@ class BackendAgentError(BackendAIError):
                 "title": exc_info,
             }
         elif isinstance(exc_info, AgentError):
-            e = cast(AgentError, exc_info)
+            e = exc_info
             agent_details = {
                 "type": agent_error_type,
                 "title": "Agent-side exception occurred.",

@@ -654,10 +654,10 @@ class ScalingGroupPermissionContextBuilder(
             .where(DomainRow.name == scope.domain_name)
             .options(selectinload(DomainRow.sgroup_for_domains_rows))
         )
-        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
+        domain_row = await self.db_session.scalar(stmt)
         if domain_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
+        scaling_groups = domain_row.sgroup_for_domains_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: permissions for row in scaling_groups
@@ -682,10 +682,10 @@ class ScalingGroupPermissionContextBuilder(
             .where(GroupRow.id == scope.project_id)
             .options(selectinload(GroupRow.sgroup_for_groups_rows))
         )
-        project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
+        project_row = await self.db_session.scalar(stmt)
         if project_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
+        scaling_groups = project_row.sgroup_for_groups_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: project_permissions for row in scaling_groups
@@ -721,9 +721,7 @@ class ScalingGroupPermissionContextBuilder(
 
         object_id_to_additional_permission_map: dict[str, frozenset[ScalingGroupPermission]] = {}
         for keypair in user_row.keypairs:
-            scaling_groups = cast(
-                list[ScalingGroupForKeypairsRow], keypair.sgroup_for_keypairs_rows
-            )
+            scaling_groups = keypair.sgroup_for_keypairs_rows
             for sg in scaling_groups:
                 if sg.scaling_group not in object_id_to_additional_permission_map:
                     object_id_to_additional_permission_map[sg.scaling_group] = user_permissions

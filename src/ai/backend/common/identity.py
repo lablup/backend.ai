@@ -95,11 +95,12 @@ async def detect_cloud() -> CloudProvider | None:
             delay=0.001,
         )
         if winner_value is not None:
-            return winner_value
+            result: CloudProvider | None = winner_value
+            return result
     return None
 
 
-def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
+def fetch_local_ipaddrs(cidr: BaseIPNetwork[Any]) -> Iterable[BaseIPAddress]:
     proto = socket.AF_INET if cidr.version == 4 else socket.AF_INET6
     for adapter in ifaddr.get_adapters():
         if not adapter.ips:
@@ -166,7 +167,7 @@ else:
 
 _defined: bool = False
 get_instance_id: Callable[[], Awaitable[str]]
-get_instance_ip: Callable[[BaseIPNetwork | None], Awaitable[str]]
+get_instance_ip: Callable[[BaseIPNetwork[Any] | None], Awaitable[str]]
 get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
@@ -191,7 +192,7 @@ def _define_functions() -> None:
                     _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
                 )
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
             async def _get_instance_type() -> str:
@@ -223,7 +224,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
@@ -233,7 +234,8 @@ def _define_functions() -> None:
                 if data is None:
                     return "127.0.0.1"
                 o = json.loads(data)
-                return o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+                result: str = o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+                return result
 
             async def _get_instance_type() -> str:
                 data = await curl(
@@ -245,7 +247,8 @@ def _define_functions() -> None:
                 if data is None:
                     return "unknown"
                 o = json.loads(data)
-                return o["compute"]["vmSize"]
+                result: str = o["compute"]["vmSize"]
+                return result
 
             async def _get_instance_region() -> str:
                 data = await curl(
@@ -280,7 +283,7 @@ def _define_functions() -> None:
                 vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 return await curl(
                     _metadata_prefix + "instance/network-interfaces/0/ip",
                     "127.0.0.1",
@@ -309,7 +312,7 @@ def _define_functions() -> None:
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
 
-            async def _get_instance_ip(_subnet_hint: BaseIPNetwork | None = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 if _subnet_hint is not None and _subnet_hint.prefixlen > 0:
                     local_ipaddrs = [*fetch_local_ipaddrs(_subnet_hint)]
                     if local_ipaddrs:
@@ -321,7 +324,8 @@ def _define_functions() -> None:
                     myself = socket.gethostname()
                     resolver = aiodns.DNSResolver()
                     result = await resolver.gethostbyname(myself, socket.AF_INET)
-                    return result.addresses[0]
+                    address: str = result.addresses[0]
+                    return address
                 except aiodns.error.DNSError:
                     return "127.0.0.1"
 

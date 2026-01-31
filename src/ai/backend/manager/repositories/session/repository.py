@@ -333,7 +333,6 @@ class SessionRepository:
             session_row = await db_session.scalar(query_stmt)
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
 
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
@@ -491,7 +490,7 @@ class SessionRepository:
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
-                    session_ids = [cast(SessionId, session.id)]
+                    session_ids = [session.id]
 
                 return session_ids
             except SessionNotFound:

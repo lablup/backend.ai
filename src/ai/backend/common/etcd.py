@@ -366,7 +366,7 @@ class AsyncEtcd(AbstractKVStore):
         have the immutable version in typeshed.
         (ref: https://github.com/python/typeshed/issues/6042)
         """
-        return ChainMap(cast(MutableMapping, override) or {}, self.scope_prefix_map)
+        return ChainMap(cast(MutableMapping[str, Any], override) or {}, self.scope_prefix_map)
 
     async def put(
         self,

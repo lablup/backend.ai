@@ -104,7 +104,7 @@ class NotificationAPIHandler:
 
         # Convert request to creator
         # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
-        validated_spec = cast(WebhookSpec | EmailSpec, body.parsed.spec)
+        validated_spec = body.parsed.spec
         creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name=body.parsed.name,
