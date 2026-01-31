@@ -20,7 +20,7 @@ def export() -> None:
     """
     CSV export administration commands.
 
-    Supports report-specific exports: users, sessions, projects, audit-logs.
+    Supports report-specific exports: users, sessions, projects, keypairs, audit-logs.
     """
 
 
@@ -332,6 +332,95 @@ def export_sessions(
                     fields=field_list,
                     filter=session_filter,
                     order=session_orders,
+                    encoding=encoding,
+                ):
+                    sys.stdout.buffer.write(chunk)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# Keypairs Export
+# =============================================================================
+
+
+@export.command(name="keypairs")
+@pass_ctx_obj
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path.")
+@click.option("--fields", type=str, default=None, help="Comma-separated field keys.")
+@click.option(
+    "--filter-access-key", type=str, default=None, help="Filter by access key (contains)."
+)
+@click.option(
+    "--filter-user-id", type=str, default=None, help="Filter by user ID/email (contains)."
+)
+@click.option(
+    "--filter-active/--filter-inactive",
+    default=None,
+    help="Filter by active status (--filter-active or --filter-inactive).",
+)
+@click.option(
+    "--filter-admin/--filter-non-admin",
+    default=None,
+    help="Filter by admin status (--filter-admin or --filter-non-admin).",
+)
+@click.option(
+    "--filter-after", type=click.DateTime(), default=None, help="Filter created_at after."
+)
+@click.option(
+    "--filter-before", type=click.DateTime(), default=None, help="Filter created_at before."
+)
+@click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
+def export_keypairs(
+    ctx: CLIContext,
+    output: str | None,
+    fields: str | None,
+    filter_access_key: str | None,
+    filter_user_id: str | None,
+    filter_active: bool | None,
+    filter_admin: bool | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
+    encoding: str,
+) -> None:
+    """
+    Export keypairs as CSV.
+    """
+    from ai.backend.client.session import Session
+
+    field_list = [f.strip() for f in fields.split(",")] if fields else None
+
+    # Note: Keypair export currently doesn't support filtering/ordering
+    # This is consistent with the backend implementation (BA-4062)
+    if any([
+        filter_access_key,
+        filter_user_id,
+        filter_active is not None,
+        filter_admin is not None,
+        filter_after,
+        filter_before,
+    ]):
+        click.echo(
+            "Warning: Keypair export does not support filtering yet. All filters will be ignored.",
+            err=True,
+        )
+
+    with Session() as session:
+        try:
+            if output:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
+                    f.writelines(
+                        session.Export.stream_keypairs_csv(
+                            fields=field_list,
+                            encoding=encoding,
+                        )
+                    )
+                click.echo(f"Exported to {output}")
+            else:
+                for chunk in session.Export.stream_keypairs_csv(
+                    fields=field_list,
                     encoding=encoding,
                 ):
                     sys.stdout.buffer.write(chunk)

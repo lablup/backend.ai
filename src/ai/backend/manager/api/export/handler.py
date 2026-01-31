@@ -6,6 +6,7 @@ Report-specific CSV export handlers are in separate modules:
 - users.py: POST /export/users/csv
 - sessions.py: POST /export/sessions/csv
 - projects.py: POST /export/projects/csv
+- keypairs.py: POST /export/keypairs/csv
 - audit_logs.py: POST /export/audit-logs/csv
 """
 
@@ -39,6 +40,7 @@ from ai.backend.manager.services.export.actions import (
 )
 
 from .audit_logs import AuditLogExportHandler
+from .keypairs import KeypairExportHandler
 from .projects import ProjectExportHandler
 from .sessions import SessionExportHandler
 from .users import UserExportHandler
@@ -153,6 +155,9 @@ def create_app(
 
     project_handler = ProjectExportHandler()
     cors.add(app.router.add_route("POST", "/projects/csv", project_handler.export_csv))
+
+    keypair_handler = KeypairExportHandler()
+    cors.add(app.router.add_route("POST", "/keypairs/csv", keypair_handler.export_csv))
 
     audit_log_handler = AuditLogExportHandler()
     cors.add(app.router.add_route("POST", "/audit-logs/csv", audit_log_handler.export_csv))

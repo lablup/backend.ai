@@ -15,6 +15,7 @@ from .actions.export_audit_logs_csv import (
     ExportAuditLogsCSVAction,
     ExportAuditLogsCSVActionResult,
 )
+from .actions.export_keypairs_csv import ExportKeypairsCSVAction, ExportKeypairsCSVActionResult
 from .actions.export_projects_csv import ExportProjectsCSVAction, ExportProjectsCSVActionResult
 from .actions.export_sessions_csv import ExportSessionsCSVAction, ExportSessionsCSVActionResult
 from .actions.export_users_csv import ExportUsersCSVAction, ExportUsersCSVActionResult
@@ -142,6 +143,32 @@ class ExportService:
         row_iterator = self._repository.execute_export(action.query)
 
         return ExportProjectsCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_keypairs_csv(
+        self, action: ExportKeypairsCSVAction
+    ) -> ExportKeypairsCSVActionResult:
+        """Execute keypair CSV export.
+
+        Args:
+            action: Export keypairs CSV action with pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"keypairs-{timestamp}.csv"
+
+        field_names = [f.name for f in action.query.fields]
+        row_iterator = self._repository.execute_export(action.query)
+
+        return ExportKeypairsCSVActionResult(
             field_names=field_names,
             row_iterator=row_iterator,
             encoding=action.encoding,

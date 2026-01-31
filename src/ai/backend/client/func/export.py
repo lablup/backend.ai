@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
     GetExportReportResponse,
+    KeypairExportCSVRequest,
     ListExportReportsResponse,
     ProjectExportCSVRequest,
     ProjectExportFilter,
@@ -181,6 +182,45 @@ class Export(BaseFunction):
         )
 
         rqst = Request("POST", "/export/projects/csv")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        if filename:
+            rqst.headers["X-Export-Filename"] = filename
+
+        async with rqst.fetch() as resp:
+            async for chunk in resp.content.iter_chunked(chunk_size):
+                yield chunk
+
+    # =========================================================================
+    # Keypair Export
+    # =========================================================================
+
+    @api_function
+    @classmethod
+    async def stream_keypairs_csv(
+        cls,
+        *,
+        fields: list[str] | None = None,
+        encoding: str = "utf-8",
+        filename: str | None = None,
+        chunk_size: int = 8192,
+    ) -> AsyncIterator[bytes]:
+        """
+        Stream keypair export as an async iterator of chunks.
+
+        Note: Keypair export does not currently support filtering or ordering.
+
+        :param fields: Optional list of field keys to include (default: all fields)
+        :param encoding: CSV encoding (default: utf-8, also supports euc-kr)
+        :param filename: Optional filename for the export
+        :param chunk_size: Size of chunks to yield (default: 8192 bytes)
+        :yields: Chunks of CSV data as bytes
+        """
+        request = KeypairExportCSVRequest(
+            fields=fields,
+            encoding=encoding,
+        )
+
+        rqst = Request("POST", "/export/keypairs/csv")
         rqst.set_json(request.model_dump(mode="json", exclude_none=True))
         if filename:
             rqst.headers["X-Export-Filename"] = filename

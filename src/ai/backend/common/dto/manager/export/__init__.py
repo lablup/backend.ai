@@ -18,6 +18,7 @@ from .audit_logs import (
     AuditLogExportOrder,
     AuditLogExportOrderField,
 )
+from .keypairs import KeypairExportCSVRequest
 from .projects import (
     BooleanFilter,
     ProjectExportCSVRequest,
@@ -72,6 +73,8 @@ __all__ = (
     "ProjectExportOrder",
     "ProjectExportOrderField",
     "ProjectExportCSVRequest",
+    # Keypair Export DTOs
+    "KeypairExportCSVRequest",
     # Audit Log Export DTOs
     "AuditLogExportFilter",
     "AuditLogExportOrder",
