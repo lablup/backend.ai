@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,11 +55,11 @@ class MockFilterApplier(BaseFilterApplier[MockFilterOptions]):
 class TestBaseFilterApplier:
     """Test cases for BaseFilterApplier"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.filter_applier = MockFilterApplier()
         self.base_stmt = sa.select(MockModel)
 
-    def test_no_filters(self):
+    def test_no_filters() -> None:
         """Test with empty filter options"""
         filters = MockFilterOptions()
 
@@ -66,7 +68,7 @@ class TestBaseFilterApplier:
         # Should return original statement when no filters are applied
         assert str(result_stmt) == str(self.base_stmt)
 
-    def test_simple_filters(self):
+    def test_simple_filters() -> None:
         """Test basic entity filters"""
         filters = MockFilterOptions(name="test", status="active")
 
@@ -78,7 +80,7 @@ class TestBaseFilterApplier:
         assert "test_table.status = 'active'" in where_clause
         assert "AND" in where_clause
 
-    def test_single_filter(self):
+    def test_single_filter() -> None:
         """Test with only one filter"""
         filters = MockFilterOptions(name="test")
 
@@ -89,7 +91,7 @@ class TestBaseFilterApplier:
         # Check that there's only one WHERE condition (no status filter)
         assert "WHERE test_table.name = 'test'" in where_clause
 
-    def test_and_operation(self):
+    def test_and_operation() -> None:
         """Test AND logical operation"""
         filters = MockFilterOptions(
             AND=[MockFilterOptions(name="test1"), MockFilterOptions(status="active")]
@@ -102,7 +104,7 @@ class TestBaseFilterApplier:
         assert "test_table.status = 'active'" in where_clause
         assert "AND" in where_clause
 
-    def test_or_operation(self):
+    def test_or_operation() -> None:
         """Test OR logical operation"""
         filters = MockFilterOptions(
             OR=[MockFilterOptions(name="test1"), MockFilterOptions(name="test2")]
@@ -115,7 +117,7 @@ class TestBaseFilterApplier:
         assert "test_table.name = 'test2'" in where_clause
         assert "OR" in where_clause
 
-    def test_not_operation(self):
+    def test_not_operation() -> None:
         """Test NOT logical operation"""
         filters = MockFilterOptions(NOT=[MockFilterOptions(status="inactive")])
 
@@ -125,7 +127,7 @@ class TestBaseFilterApplier:
         # SQLAlchemy renders NOT as != for simple conditions
         assert "test_table.status != 'inactive'" in where_clause
 
-    def test_combined_base_and_logical_filters(self):
+    def test_combined_base_and_logical_filters() -> None:
         """Test combination of base filters and logical operations"""
         filters = MockFilterOptions(
             name="base_name",
@@ -140,7 +142,7 @@ class TestBaseFilterApplier:
         assert "test_table.status = 'pending'" in where_clause
         assert "OR" in where_clause
 
-    def test_nested_logical_operations(self):
+    def test_nested_logical_operations() -> None:
         """Test nested logical operations"""
         filters = MockFilterOptions(
             AND=[
@@ -160,7 +162,7 @@ class TestBaseFilterApplier:
         assert "AND" in where_clause
         assert "OR" in where_clause
 
-    def test_multiple_not_operations(self):
+    def test_multiple_not_operations() -> None:
         """Test multiple NOT operations"""
         filters = MockFilterOptions(
             NOT=[MockFilterOptions(status="inactive"), MockFilterOptions(name="excluded")]
@@ -175,7 +177,7 @@ class TestBaseFilterApplier:
         assert "test_table.name = 'excluded'" in where_clause
         assert "AND" in where_clause
 
-    def test_empty_logical_operations(self):
+    def test_empty_logical_operations() -> None:
         """Test empty logical operation lists"""
         filters = MockFilterOptions(name="test", AND=[], OR=[], NOT=[])
 
@@ -185,7 +187,7 @@ class TestBaseFilterApplier:
         assert "test_table.name = 'test'" in where_clause
         # Empty logical operations should not affect the query
 
-    def test_complex_combination(self):
+    def test_complex_combination() -> None:
         """Test complex combination of all logical operations"""
         filters = MockFilterOptions(
             name="base",

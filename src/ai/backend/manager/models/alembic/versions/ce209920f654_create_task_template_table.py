@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_table(
         "session_templates",
         IDColumn("id"),
@@ -46,7 +46,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_table("session_templates")
     op.execute(text("DROP TYPE templatetypes"))
     op.drop_column("kernels", "bootstrap_script")

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -148,7 +150,7 @@ class TestGenerateToken:
         )
 
     @pytest.fixture
-    def mock_check_user_access_token(self, mocker, model_serving_service) -> AsyncMock:
+    def mock_check_user_access_token(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
         mock = mocker.patch.object(
             model_serving_service,
             "check_user_access",
@@ -158,7 +160,7 @@ class TestGenerateToken:
         return mock
 
     @pytest.fixture
-    def mock_get_endpoint_by_id_token(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_endpoint_by_id_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_by_id",
@@ -167,7 +169,7 @@ class TestGenerateToken:
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_token(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
@@ -176,7 +178,7 @@ class TestGenerateToken:
         )
 
     @pytest.fixture
-    def mock_create_endpoint_token(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_create_endpoint_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "create_endpoint_token",
@@ -184,7 +186,7 @@ class TestGenerateToken:
         )
 
     @pytest.fixture
-    def mock_get_scaling_group_info_token(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_scaling_group_info_token(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "get_scaling_group_info",
@@ -262,11 +264,11 @@ class TestGenerateToken:
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_token,
-        mock_get_endpoint_by_id_token,
-        mock_get_endpoint_access_validation_data_token,
-        mock_create_endpoint_token,
-        mock_get_scaling_group_info_token,
+        mock_check_user_access_token: AsyncMock,
+        mock_get_endpoint_by_id_token: AsyncMock,
+        mock_get_endpoint_access_validation_data_token: AsyncMock,
+        mock_create_endpoint_token: AsyncMock,
+        mock_get_scaling_group_info_token: AsyncMock,
     ) -> None:
         action = scenario.input
         expected = scenario.expected
@@ -319,7 +321,7 @@ class TestGenerateToken:
 
             with patch("uuid.uuid4", return_value=expected.data.id):
 
-                async def generate_token(action: GenerateTokenAction):
+                async def generate_token(action: GenerateTokenAction) -> GenerateTokenActionResult:
                     return await model_serving_processors.generate_token.wait_for_complete(action)
 
                 await scenario.test(generate_token)

@@ -286,5 +286,5 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
                     pass  # there's no more room we can do anything
                 raise e
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         return await self.disconnect()

@@ -1,9 +1,12 @@
 from pathlib import PurePosixPath
+from typing import Any
 from uuid import UUID
 
 import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from collections.abc import Sequence
+
 from ai.backend.common.types import VFolderMount
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolder
@@ -199,12 +202,12 @@ FIXTURES = [
     ],
 )
 async def test_batch_load_by_id(
-    test_case,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-):
+    test_case: dict[str, Any],
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -260,7 +263,9 @@ async def test_batch_load_by_id(
         ],
     ],
 )
-def test_mounts_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
 
 
@@ -296,7 +301,9 @@ def test_mounts_duplicate(vf_id_subpath_pair, vfmounts) -> None:
         ],
     ],
 )
-def test_mounts_not_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_not_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert not is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
 
 
@@ -324,5 +331,7 @@ def test_mounts_not_duplicate(vf_id_subpath_pair, vfmounts) -> None:
         ]
     ],
 )
-def test_mounts_inclusion_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_inclusion_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)

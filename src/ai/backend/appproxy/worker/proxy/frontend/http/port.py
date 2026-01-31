@@ -20,7 +20,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class PortFrontend(BaseHTTPFrontend[int]):
     sites: list[web.TCPSite]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.sites = []

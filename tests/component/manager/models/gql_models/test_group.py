@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -26,7 +27,7 @@ def client() -> Client:
 
 
 def get_graphquery_context(
-    database_engine: ExtendedAsyncSAEngine, services_ctx
+    database_engine: ExtendedAsyncSAEngine, services_ctx: Any
 ) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
@@ -60,11 +61,11 @@ def get_graphquery_context(
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST, indirect=True)
 async def test_harbor_read_project_quota(
     client: Client,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-):
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -116,7 +117,7 @@ async def test_harbor_read_project_quota(
 
 
 async def test_default_value_types_correctly_processed(
-    database_fixture,
+    database_fixture: None,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
     group_name = "test_group_default"
@@ -141,7 +142,7 @@ async def test_default_value_types_correctly_processed(
 
 
 async def test_db_data_insertion(
-    database_fixture,
+    database_fixture: None,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
     group_name = "test_data_insertion"

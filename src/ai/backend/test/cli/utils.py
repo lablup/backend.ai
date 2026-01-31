@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import click
 
 
@@ -15,7 +17,7 @@ class CommaSeparatedChoice(click.Choice):
 
 
 class CustomUsageArgsCommand(click.Command):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._usage_args = kwargs.pop("usage_args")
         super().__init__(*args, **kwargs)
 

@@ -186,8 +186,8 @@ def pydantic_api_response_handler(
     @functools.wraps(handler)
     async def wrapped(
         request: web.Request,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> web.StreamResponse:
         response = await handler(request, *args, **kwargs)
         return ensure_stream_response_type(response)
@@ -208,8 +208,8 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
@@ -304,7 +304,7 @@ def mime_match(base_array: str, compare: str, strict: bool = False) -> bool:
 
 
 class BackendAIAccessLogger(AccessLogger):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:

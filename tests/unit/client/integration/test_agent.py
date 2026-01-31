@@ -7,7 +7,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_list_agent():
+async def test_list_agent() -> None:
     with Session() as sess:
         result = sess.Agent.list_with_limit(1, 0)
         assert len(result["items"]) == 1

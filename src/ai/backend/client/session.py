@@ -138,7 +138,7 @@ class _SyncWorkerThread(threading.Thread):
         "work_queue",
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.work_queue = queue.Queue()
         self.done_queue = queue.Queue()
@@ -404,13 +404,13 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __enter__(self) -> BaseSession:
         raise NotImplementedError
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
     async def __aenter__(self) -> BaseSession:
         raise NotImplementedError
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
 
@@ -487,7 +487,7 @@ class Session(BaseSession):
                 pass
         return self
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         self.close()
         return False  # raise up the inner exception
 
@@ -561,7 +561,7 @@ class AsyncSession(BaseSession):
                 pass
         return self
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
 

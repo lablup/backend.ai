@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import random
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,7 +32,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 )
 
 
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: Any) -> None:
     parser.addoption(
         "--skip-test-redis",
         action="store_true",
@@ -38,11 +41,11 @@ def pytest_addoption(parser) -> None:
     )
 
 
-def pytest_configure(config) -> None:
+def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "redis: mark test as part of Redis test suite")
 
 
-def pytest_collection_modifyitems(config, items) -> None:
+def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     if config.getoption("--skip-test-redis"):
         # auto-skip tests marked with "redis" unless --test-redis option is given.
         do_skip = pytest.mark.skip(
@@ -64,7 +67,7 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def test_valkey_live(redis_container) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
+async def test_valkey_live(redis_container: pytest.fixture) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -81,7 +84,7 @@ async def test_valkey_live(redis_container) -> AsyncIterator[ValkeyLiveClient]: 
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
+async def test_valkey_stream(redis_container: pytest.fixture) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -99,7 +102,7 @@ async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClien
 
 
 @pytest.fixture
-async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
+async def test_valkey_rate_limit(redis_container: pytest.fixture) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -117,7 +120,7 @@ async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLim
 
 @pytest.fixture
 async def test_valkey_artifact(
-    redis_container,  # noqa: F811
+    redis_container: pytest.fixture,  # noqa: F811
 ) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
@@ -135,7 +138,7 @@ async def test_valkey_artifact(
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[RedisQueue]:  # noqa: F811
+async def test_valkey_stream_mq(redis_container: pytest.fixture, test_node_id: str) -> AsyncIterator[RedisQueue]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
@@ -164,7 +167,7 @@ async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
+async def gateway_etcd(etcd_container: pytest.fixture, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     async with AsyncEtcd(
         addrs=[etcd_container[1]],
         namespace=test_ns,

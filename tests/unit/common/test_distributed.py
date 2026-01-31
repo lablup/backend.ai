@@ -62,7 +62,7 @@ def drange(start: Decimal, stop: Decimal, step: Decimal) -> Iterable[Decimal]:
         start += step
 
 
-def dslice(start: Decimal, stop: Decimal, num: int):
+def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
     """
     A simplified version of numpy.linspace with default options
     """
@@ -79,7 +79,7 @@ class NoopAnycastEvent(AbstractAnycastEvent):
         return (self.test_case_ns,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> NoopAnycastEvent:
         return cls(value[0])
 
     @classmethod
@@ -159,8 +159,8 @@ async def run_timer(
 
 
 def etcd_timer_node_process(
-    queue,
-    stop_event,
+    queue: Any,
+    stop_event: Any,
     etcd_ctx: EtcdLockContext,
     timer_ctx: TimerNodeContext,
     etcd_client: Literal["etcd-client-py"],
@@ -323,10 +323,10 @@ class TimerNode(threading.Thread):
 
 @pytest.mark.asyncio
 async def test_global_timer_filelock(
-    request,
-    test_case_ns,
-    redis_container,
-    test_node_id,
+    request: pytest.FixtureRequest,
+    test_case_ns: str,
+    redis_container: tuple[Any, HostPortPair],
+    test_node_id: str,
 ) -> None:
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
@@ -376,8 +376,8 @@ async def test_global_timer_filelock(
 
 @pytest.mark.asyncio
 async def test_global_timer_redlock(
-    test_case_ns,
-    redis_container,
+    test_case_ns: str,
+    redis_container: tuple[Any, HostPortPair],
 ) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
@@ -493,10 +493,10 @@ async def test_global_timer_redlock(
 
 @pytest.mark.asyncio
 async def test_global_timer_join_leave(
-    request,
-    test_case_ns,
-    test_valkey_stream_mq,
-    test_node_id,
+    request: pytest.FixtureRequest,
+    test_case_ns: str,
+    test_valkey_stream_mq: RedisQueue,
+    test_node_id: str,
 ) -> None:
     event_records = []
 
@@ -531,7 +531,7 @@ async def test_global_timer_join_leave(
 
 
 @pytest.mark.asyncio
-async def test_filelock_watchdog(request, test_case_ns) -> None:
+async def test_filelock_watchdog(request: pytest.FixtureRequest, test_case_ns: str) -> None:
     """
     This test case is for verifying
     if watchdog releases the lock after the timeout(ttl)
@@ -546,7 +546,7 @@ async def test_filelock_watchdog(request, test_case_ns) -> None:
     vclock = aiotools.VirtualClock()
     with vclock.patch_loop():
 
-        async def _main(ttl: float, delay: float = 5.0, interval: float = 0.03):
+        async def _main(ttl: float, delay: float = 5.0, interval: float = 0.03) -> None:
             async with FileLock(lock_path, timeout=0, lifetime=ttl, debug=True) as lock:
                 t = 0.0
                 while lock.is_locked and t < delay:

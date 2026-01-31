@@ -22,7 +22,7 @@ depends_on = None
 metadata = sa.MetaData(naming_convention=convention)
 
 
-def upgrade():
+def upgrade() -> None:
     workers = sa.Table(
         "workers",
         metadata,
@@ -53,7 +53,7 @@ def upgrade():
     op.drop_column("workers", "use_tls")
 
 
-def downgrade():
+def downgrade() -> None:
     op.add_column(
         "workers", sa.Column("use_tls", sa.BOOLEAN(), autoincrement=False, nullable=False)
     )

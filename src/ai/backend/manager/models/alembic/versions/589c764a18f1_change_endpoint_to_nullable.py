@@ -24,7 +24,7 @@ metadata = sa.MetaData(naming_convention=convention)
 BATCH_SIZE = 100
 
 
-def upgrade():
+def upgrade() -> None:
     op.alter_column("endpoints", "model", nullable=True)
     op.drop_constraint(
         "fk_endpoint_tokens_endpoint_endpoints", "endpoint_tokens", type_="foreignkey"
@@ -48,7 +48,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     conn = op.get_bind()
 
     endpoint_tokens = sa.Table(
@@ -68,7 +68,7 @@ def downgrade():
         extend_existing=True,
     )
 
-    def _delete(table, null_field):
+    def _delete(table: sa.Table, null_field: sa.Column) -> None:
         while True:
             subq = sa.select([table.c.id]).where(null_field.is_(sa.null())).limit(BATCH_SIZE)
             delete_stmt = sa.delete(table).where(table.c.id.in_(subq))

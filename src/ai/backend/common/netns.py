@@ -2,6 +2,7 @@ import ctypes
 import ctypes.util
 import os
 from pathlib import Path
+from typing import Any
 
 
 def setns(fd: int) -> None:
@@ -19,7 +20,7 @@ class NetworkNamespaceManager:
     def __enter__(self) -> None:
         setns(self.new_ns)
 
-    def __exit__(self, *exc_info_args) -> None:
+    def __exit__(self, *exc_info_args: Any) -> None:
         setns(self.self_ns)
         os.close(self.new_ns)
         os.close(self.self_ns)

@@ -13,7 +13,7 @@ class TestError(BackendAIError):
         return ErrorCode.default()
 
 
-def test_backend_error_obj():
+def test_backend_error_obj() -> None:
     eobj = TestError()
     assert eobj.args == (eobj.status_code, eobj.reason, eobj.error_type)
     assert json.loads(eobj.body) == json.loads(
@@ -32,7 +32,7 @@ def test_backend_error_obj():
     assert extra_msg in repr(eobj)
 
 
-def test_backend_error_obj_pickle():
+def test_backend_error_obj_pickle() -> None:
     eobj = TestError()
     encoded = pickle.dumps(eobj)
     decoded = pickle.loads(encoded)
@@ -43,7 +43,7 @@ def test_backend_error_obj_pickle():
     assert eobj.extra_msg == decoded.extra_msg
 
 
-def test_backend_agent_error_obj():
+def test_backend_agent_error_obj() -> None:
     eobj = BackendAgentError("timeout")
 
     assert eobj.args == (eobj.status_code, eobj.reason, eobj.error_type, eobj.agent_error_type)
@@ -65,7 +65,7 @@ def test_backend_agent_error_obj():
     )
 
 
-def test_backend_agent_error_obj_pickle():
+def test_backend_agent_error_obj_pickle() -> None:
     eobj = BackendAgentError("timeout")
     encoded = pickle.dumps(eobj)
     decoded = pickle.loads(encoded)

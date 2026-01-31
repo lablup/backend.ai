@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import pytest
 
@@ -21,12 +22,12 @@ from ai.backend.manager.server import (
 
 @pytest.mark.asyncio
 async def test_check_rlim_for_anonymous_query(
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-):
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             event_hub_ctx,
@@ -55,13 +56,13 @@ async def test_check_rlim_for_anonymous_query(
 
 @pytest.mark.asyncio
 async def test_check_rlim_for_authorized_query(
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             event_hub_ctx,

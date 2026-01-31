@@ -364,7 +364,7 @@ class Circuit(SerializableCircuit):
         MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._app_inference_metrics = {}
         self._replica_inference_metrics = {}

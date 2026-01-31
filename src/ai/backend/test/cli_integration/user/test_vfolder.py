@@ -9,7 +9,7 @@ from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 @pytest.mark.dependency()
-def test_create_vfolder(run_user: ClientRunnerFunc):
+def test_create_vfolder(run_user: ClientRunnerFunc) -> None:
     """
     Test create vfolder function.
     This test should be executed first in test_vfolder.py.
@@ -53,7 +53,7 @@ def test_create_vfolder(run_user: ClientRunnerFunc):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder"])
-def test_rename_vfolder(run_user: ClientRunnerFunc):
+def test_rename_vfolder(run_user: ClientRunnerFunc) -> None:
     """
     Test rename vfolder function.
     !! Make sure you execute this test after test_create_vfolder !!
@@ -78,7 +78,7 @@ def test_rename_vfolder(run_user: ClientRunnerFunc):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder"])
-def test_upload_file(run_user: ClientRunnerFunc, txt_file: TextIOWrapper):
+def test_upload_file(run_user: ClientRunnerFunc, txt_file: TextIOWrapper) -> None:
     """
     Test for uploading a file to the vfolder.
     !! Make sure you execute this test after test_create_vfolder !!
@@ -100,7 +100,7 @@ def test_upload_file(run_user: ClientRunnerFunc, txt_file: TextIOWrapper):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder", "test_upload_file"])
-def test_rename_file(run_user: ClientRunnerFunc):
+def test_rename_file(run_user: ClientRunnerFunc) -> None:
     """
     Test for renaming a file from the vfolder.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file !!
@@ -123,7 +123,7 @@ def test_rename_file(run_user: ClientRunnerFunc):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder", "test_upload_file", "test_rename_file"])
-def test_download_file(run_user: ClientRunnerFunc):
+def test_download_file(run_user: ClientRunnerFunc) -> None:
     """
     Test for downloading a file from the vfolder.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file !!
@@ -146,7 +146,7 @@ def test_download_file(run_user: ClientRunnerFunc):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder"])
-def test_mkdir_vfolder(run_user: ClientRunnerFunc):
+def test_mkdir_vfolder(run_user: ClientRunnerFunc) -> None:
     """
     Test for creating an empty directory in the vfolder.
     !! Make sure you execute this test after test_create_vfolder !!
@@ -177,7 +177,7 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
 @pytest.mark.dependency(
     depends=["test_create_vfolder", "test_upload_file", "test_rename_file", "test_mkdir_vfolder"]
 )
-def test_mv_file(run_user: ClientRunnerFunc):
+def test_mv_file(run_user: ClientRunnerFunc) -> None:
     """
     Test for moving a file within the vfolder.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_upload_file, 3. test_rename_file, 4. test_mkdir_vfolder !!
@@ -204,7 +204,7 @@ def test_mv_file(run_user: ClientRunnerFunc):
 
 
 @pytest.mark.dependency(depends=["test_create_vfolder", "test_rename_file"])
-def test_delete_vfolder(run_user: ClientRunnerFunc):
+def test_delete_vfolder(run_user: ClientRunnerFunc) -> None:
     """
     Test delete vfolder function.
     !! Make sure you execute this test after 1. test_create_vfolder, 2. test_rename_vfolder !!
@@ -222,7 +222,7 @@ def test_delete_vfolder(run_user: ClientRunnerFunc):
 
 def test_delete_vfolder_the_same_vfolder_name(
     run_user: ClientRunnerFunc, run_user2: ClientRunnerFunc
-):
+) -> None:
     """
     Test delete vfolder function.
     Delete two vfolders that have the same name.
@@ -248,7 +248,7 @@ def test_delete_vfolder_the_same_vfolder_name(
         )
 
 
-def test_list_vfolder(run_user: ClientRunnerFunc):
+def test_list_vfolder(run_user: ClientRunnerFunc) -> None:
     """
     Test list vfolder function.
     """

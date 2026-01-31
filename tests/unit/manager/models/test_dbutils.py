@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import MagicMock
 
 import aiotools
@@ -16,23 +17,23 @@ from ai.backend.manager.models.utils import (
 
 
 @pytest.mark.asyncio
-async def test_execute_with_retry():
+async def test_execute_with_retry() -> None:
     class DummyDBError(Exception):
-        def __init__(self, pgcode):
+        def __init__(self, pgcode: str) -> None:
             self.pgcode = pgcode
 
-    async def txn_func_generic_failure():
+    async def txn_func_generic_failure() -> None:
         raise sa.exc.IntegrityError("DUMMY_SQL", params=None, orig=DummyDBError("999"))
 
-    async def txn_func_generic_failure_2():
+    async def txn_func_generic_failure_2() -> None:
         raise ZeroDivisionError("oops")
 
-    async def txn_func_permanent_serialization_failure():
+    async def txn_func_permanent_serialization_failure() -> None:
         raise sa.exc.DBAPIError("DUMMY_SQL", params=None, orig=DummyDBError("40001"))
 
     _fail_count = 0
 
-    async def txn_func_temporary_serialization_failure():
+    async def txn_func_temporary_serialization_failure() -> int:
         nonlocal _fail_count
         _fail_count += 1
         if _fail_count == 10:
@@ -56,23 +57,23 @@ async def test_execute_with_retry():
 
 
 @pytest.mark.asyncio
-async def test_execute_with_trx_retry(database_connection):
+async def test_execute_with_trx_retry() -> None:
     class DummyDBError(Exception):
-        def __init__(self, pgcode):
+        def __init__(self, pgcode: str) -> None:
             self.pgcode = pgcode
 
-    async def txn_func_generic_failure(db_session):
+    async def txn_func_generic_failure(db_session: Any) -> None:
         raise sa.exc.IntegrityError("DUMMY_SQL", params=None, orig=DummyDBError("999"))
 
-    async def txn_func_generic_failure_2(db_session):
+    async def txn_func_generic_failure_2(db_session: Any) -> None:
         raise ZeroDivisionError("oops")
 
-    async def txn_func_permanent_serialization_failure(db_session):
+    async def txn_func_permanent_serialization_failure(db_session: Any) -> None:
         raise sa.exc.DBAPIError("DUMMY_SQL", params=None, orig=DummyDBError("40001"))
 
     _fail_count = 0
 
-    async def txn_func_temporary_serialization_failure(db_session):
+    async def txn_func_temporary_serialization_failure(db_session: Any) -> int:
         nonlocal _fail_count
         _fail_count += 1
         if _fail_count == 5:

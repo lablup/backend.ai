@@ -13,7 +13,7 @@ from ai.backend.client.session import AsyncSession, Session
 pytestmark = pytest.mark.integration
 
 
-def test_auth():
+def test_auth() -> None:
     random_msg = uuid.uuid4().hex
     with Session():
         request = Request("GET", "/auth")
@@ -27,7 +27,7 @@ def test_auth():
             assert data["echo"] == random_msg
 
 
-def test_auth_missing_signature(monkeypatch):
+def test_auth_missing_signature(monkeypatch: Any) -> None:
     random_msg = uuid.uuid4().hex
     with Session():
         rqst = Request("GET", "/auth")
@@ -40,7 +40,7 @@ def test_auth_missing_signature(monkeypatch):
         assert e.value.status == 401
 
 
-def test_auth_malformed():
+def test_auth_malformed() -> None:
     with Session():
         request = Request("GET", "/auth")
         request.set_content(
@@ -52,7 +52,7 @@ def test_auth_malformed():
         assert e.value.status == 400
 
 
-def test_auth_missing_body():
+def test_auth_missing_body() -> None:
     with Session():
         request = Request("GET", "/auth")
         with pytest.raises(BackendAPIError) as e, request.fetch():
@@ -61,7 +61,7 @@ def test_auth_missing_body():
 
 
 @pytest.mark.asyncio
-async def test_async_auth():
+async def test_async_auth() -> None:
     random_msg = uuid.uuid4().hex
     async with AsyncSession():
         request = Request("GET", "/auth")

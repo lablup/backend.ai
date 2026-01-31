@@ -16,7 +16,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_index(
         op.f("ix_kernels_uuid_prefix"),
         "kernels",
@@ -24,7 +24,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index(
         op.f("ix_kernels_uuid_prefix"),
         "kernels",

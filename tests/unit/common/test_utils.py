@@ -207,7 +207,7 @@ class TestAsyncBarrier:
         assert barrier.cond is not None  # default condition
 
     @pytest.mark.asyncio
-    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker) -> None:
+    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker: pytest.fixture) -> None:
         mock_cond = mocker.patch.object(asyncio, "Condition")
         mock_resp = {
             "notify_all": mock.Mock(),
@@ -225,7 +225,7 @@ class TestAsyncBarrier:
         mock_cond.return_value.notify_all.assert_called_once_with()  # type: ignore
         mock_cond.return_value.wait.assert_not_called()  # type: ignore
 
-    def test_async_barrier_reset(self):
+    def test_async_barrier_reset(self) -> None:
         barrier = AsyncBarrier(num_parties=5)
         barrier.count = 5
 
@@ -238,12 +238,12 @@ class TestAsyncBarrier:
 async def test_run_through() -> None:
     i = 0
 
-    async def do():
+    async def do() -> None:
         nonlocal i
         i += 1
         raise ZeroDivisionError
 
-    def do_sync():
+    def do_sync() -> None:
         nonlocal i
         i += 1
         raise ZeroDivisionError

@@ -6,11 +6,11 @@ from ai.backend.common.contexts.request_id import (
 )
 
 
-def test_current_request_id_without_context():
+def test_current_request_id_without_context() -> None:
     assert current_request_id() is None
 
 
-def test_with_request_id_context():
+def test_with_request_id_context() -> None:
     # Test with explicit request ID
     test_id = str(uuid.uuid4())
     with with_request_id(test_id):
@@ -27,7 +27,7 @@ def test_with_request_id_context():
     assert current_request_id() is None
 
 
-def test_nested_request_id_contexts():
+def test_nested_request_id_contexts() -> None:
     outer_id = str(uuid.uuid4())
     inner_id = str(uuid.uuid4())
 

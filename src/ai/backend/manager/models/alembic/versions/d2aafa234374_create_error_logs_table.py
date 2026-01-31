@@ -20,7 +20,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_table(
         "error_logs",
         IDColumn(),
@@ -45,6 +45,6 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_table("error_logs")
     op.execute(text("DROP TYPE errorlog_severity"))

@@ -16,11 +16,11 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "endpoints", sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("endpoint", "retries")

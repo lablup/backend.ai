@@ -35,7 +35,7 @@ class TestUserServiceCompatibility:
     """Test compatibility of user service with test scenarios."""
 
     @pytest.fixture
-    def mock_dependencies(self):
+    def mock_dependencies(self) -> None:
         """Create mocked dependencies for testing."""
         storage_manager = MagicMock(spec=StorageSessionManager)
         valkey_client = MagicMock(spec=ValkeyStatClient)
@@ -52,7 +52,7 @@ class TestUserServiceCompatibility:
         }
 
     @pytest.fixture
-    def user_service(self, mock_dependencies):
+    def user_service(self, mock_dependencies: dict[str, AsyncMock]) -> UserService:
         """Create UserService instance with mocked dependencies."""
         return UserService(
             storage_manager=mock_dependencies["storage_manager"],
@@ -62,7 +62,11 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.fixture
-    def user_processors(self, user_service, mock_dependencies):
+    def user_processors(
+        self,
+        user_service: UserService,
+        mock_dependencies: dict[str, AsyncMock],
+    ) -> UserProcessors:
         """Create UserProcessors instance."""
         return UserProcessors(
             user_service=user_service,
@@ -70,7 +74,7 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_create_user_action_structure(self, user_service, mock_dependencies):
+    async def test_create_user_action_structure() -> None:
         """Test that CreateUserAction has the expected structure from test scenarios."""
         # Mock successful user creation
         mock_user_data = MagicMock()
@@ -109,7 +113,7 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].create_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_user_with_container_config(self, user_service, mock_dependencies):
+    async def test_create_user_with_container_config() -> None:
         """Test 1.5: Container UID/GID configuration support."""
         mock_user_data = MagicMock()
         mock_dependencies["user_repository"].create_user_validated = AsyncMock(
@@ -146,7 +150,7 @@ class TestUserServiceCompatibility:
         assert user_data.spec.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
-    async def test_modify_user_action_structure(self, user_service, mock_dependencies):
+    async def test_modify_user_action_structure() -> None:
         """Test that ModifyUserAction supports the expected modifications."""
         mock_user_data = MagicMock()
         mock_user_data.full_name = "Updated Name"
@@ -172,7 +176,7 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_user_action_structure(self, user_service, mock_dependencies):
+    async def test_delete_user_action_structure() -> None:
         """Test that DeleteUserAction works as expected."""
         mock_dependencies["user_repository"].soft_delete_user_validated = AsyncMock()
 
@@ -184,7 +188,7 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_purge_user_action_structure(self, user_service, mock_dependencies):
+    async def test_purge_user_action_structure() -> None:
         """Test that PurgeUserAction handles the expected scenarios."""
         # Mock user data
         mock_user_data = MagicMock()
@@ -215,7 +219,7 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].purge_user.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_user_month_stats_action_structure(self, user_service, mock_dependencies):
+    async def test_user_month_stats_action_structure() -> None:
         """Test that UserMonthStatsAction works as expected."""
         mock_stats = {"cpu_time": 3600, "memory_usage": 2048}
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats = AsyncMock(
@@ -232,7 +236,7 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_admin_month_stats_action_structure(self, user_service, mock_dependencies):
+    async def test_admin_month_stats_action_structure() -> None:
         """Test that AdminMonthStatsAction works as expected."""
         mock_stats = {"total_users": 100, "total_cpu_time": 360000}
         mock_dependencies["user_repository"].get_admin_time_binned_monthly_stats = AsyncMock(
@@ -248,7 +252,7 @@ class TestUserServiceCompatibility:
             "user_repository"
         ].get_admin_time_binned_monthly_stats.assert_called_once()
 
-    def test_user_creator_fields(self):
+    def test_user_creator_fields() -> None:
         """Test that UserCreator has all expected fields from test scenarios."""
         # Test that UserCreator can be created with all scenario fields
         password_info = PasswordInfo(
@@ -287,7 +291,7 @@ class TestUserServiceCompatibility:
         assert creator.spec.resource_policy == "default-policy"
         assert creator.spec.sudo_session_enabled is False
 
-    def test_user_updater_spec_fields(self):
+    def test_user_updater_spec_fields() -> None:
         """Test that UserUpdaterSpec supports expected modification fields."""
         spec = UserUpdaterSpec(
             full_name=OptionalState.update("Updated Name"),

@@ -94,7 +94,7 @@ async def mock_exception_processor_func(action: MockAction) -> MockActionResult:
     raise MockException("Mock exception")
 
 
-async def test_processor_success():
+async def test_processor_success() -> None:
     monitor = MockActionMonitor(
         expected_prepare_action=MockAction(
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
@@ -124,7 +124,7 @@ async def test_processor_success():
     assert result.entity_id() == "1"
 
 
-async def test_processor_exception():
+async def test_processor_exception() -> None:
     monitor = MockActionMonitor(
         expected_prepare_action=MockAction(
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE

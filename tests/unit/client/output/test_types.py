@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from ai.backend.client.output.types import FieldSet, FieldSpec
 
 
-def test_fieldspec_init():
+def test_fieldspec_init() -> None:
     f = FieldSpec("key_foo")
     assert f.field_ref == "key_foo"
     assert f.field_name == "key_foo"

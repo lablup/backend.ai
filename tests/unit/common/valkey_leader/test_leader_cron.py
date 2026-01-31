@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from unittest.mock import AsyncMock, MagicMock, create_autospec
 
 import pytest
@@ -56,7 +57,7 @@ class MockTask(PeriodicTask):
 
 
 @pytest.fixture
-async def mock_event_producer():
+async def mock_event_producer() -> AsyncMock:
     """Create a mock EventProducer."""
     producer = AsyncMock(spec=EventProducer)
     producer.anycast_event = AsyncMock()
@@ -64,13 +65,13 @@ async def mock_event_producer():
 
 
 @pytest.fixture
-async def mock_event():
+async def mock_event() -> AbstractAnycastEvent:
     """Create a mock event."""
     return create_autospec(AbstractAnycastEvent, instance=True)
 
 
 @pytest.fixture
-async def mock_tasks():
+async def mock_tasks() -> list[MockTask]:
     """Create mock tasks."""
     return [
         MockTask(name="task1", interval=0.1, initial_delay=0.0),
@@ -79,13 +80,15 @@ async def mock_tasks():
 
 
 @pytest.fixture
-async def leader_cron(mock_tasks):
+async def leader_cron(mock_tasks: Sequence[PeriodicTask]) -> LeaderCron:
     """Create a LeaderCron instance with mock tasks."""
     return LeaderCron(tasks=mock_tasks)
 
 
 @pytest.fixture
-async def event_tasks(mock_event_producer, mock_event):
+async def event_tasks(
+    mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent
+) -> list[EventProducerTask]:
     """Create EventProducerTask instances."""
     tasks = []
     for i in range(2):
@@ -100,7 +103,9 @@ async def event_tasks(mock_event_producer, mock_event):
 
 
 @pytest.fixture
-async def leader_cron_with_event_tasks(event_tasks):
+async def leader_cron_with_event_tasks(
+    event_tasks: Sequence[EventProducerTask],
+) -> LeaderCron:
     """Create a LeaderCron with EventTasks."""
     return LeaderCron(tasks=event_tasks)
 
@@ -108,7 +113,7 @@ async def leader_cron_with_event_tasks(event_tasks):
 class TestLeaderCron:
     """Test cases for LeaderCron."""
 
-    async def test_initialization(self, mock_tasks):
+    async def test_initialization(self, mock_tasks: Sequence[MockTask]) -> None:
         """Test LeaderCron initialization."""
         leader_cron = LeaderCron(tasks=mock_tasks)
 
@@ -116,7 +121,7 @@ class TestLeaderCron:
         assert len(leader_cron._tasks) == 2
         assert len(leader_cron._task_runners) == 0
 
-    async def test_start_stop(self, leader_cron):
+    async def test_start_stop(self, leader_cron: LeaderCron) -> None:
         """Test starting and stopping the cron."""
         # Create a mock leadership checker
         leadership_checker = MagicMock(spec=LeadershipChecker)
@@ -140,7 +145,7 @@ class TestLeaderCron:
         assert leader_cron._stopped is True
         assert len(leader_cron._task_runners) == 0
 
-    async def test_tasks_execute_as_leader(self, mock_tasks):
+    async def test_tasks_execute_as_leader(self, mock_tasks: list[MockTask]) -> None:
         """Test that tasks execute when server is leader."""
         # Create LeaderCron with mock tasks
         leader_cron = LeaderCron(tasks=mock_tasks)
@@ -162,7 +167,7 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron.stop()
 
-    async def test_no_task_execution_as_follower(self, mock_tasks):
+    async def test_no_task_execution_as_follower(self, mock_tasks: list[MockTask]) -> None:
         """Test that tasks don't execute when server is not leader."""
         # Create LeaderCron with mock tasks
         leader_cron = LeaderCron(tasks=mock_tasks)
@@ -186,9 +191,9 @@ class TestLeaderCron:
 
     async def test_event_tasks_produce_events(
         self,
-        leader_cron_with_event_tasks,
-        mock_event_producer,
-    ):
+        leader_cron_with_event_tasks: LeaderCron,
+        mock_event_producer: AsyncMock,
+    ) -> None:
         """Test that EventTasks produce events when leader."""
         # Set up as leader
         leadership_checker = MagicMock(spec=LeadershipChecker)
@@ -206,7 +211,9 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron_with_event_tasks.stop()
 
-    async def test_leadership_change_during_execution(self, mock_tasks):
+    async def test_leadership_change_during_execution(
+        self, mock_tasks: list[MockTask]
+    ) -> None:
         """Test behavior when leadership changes during execution."""
         # Create LeaderCron with mock tasks
         leader_cron = LeaderCron(tasks=mock_tasks)
@@ -243,7 +250,7 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron.stop()
 
-    async def test_task_restart_on_failure(self, mock_event_producer):
+    async def test_task_restart_on_failure(self, mock_event_producer: AsyncMock) -> None:
         """Test that tasks are restarted if they fail."""
         # Create a task that will fail
         failing_task = MockTask(
@@ -271,7 +278,7 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron.stop()
 
-    async def test_initial_delay(self, mock_event_producer):
+    async def test_initial_delay(self, mock_event_producer: AsyncMock) -> None:
         """Test that initial_delay is respected."""
         # Create task with initial delay
         delayed_task = MockTask(
@@ -304,7 +311,9 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron.stop()
 
-    async def test_mixed_task_types(self, mock_event_producer, mock_event):
+    async def test_mixed_task_types(
+        self, mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent
+    ) -> None:
         """Test LeaderCron with mixed PeriodicTask types."""
         # Create different types of tasks
         mock_task = MockTask(name="mock-task", interval=0.1)

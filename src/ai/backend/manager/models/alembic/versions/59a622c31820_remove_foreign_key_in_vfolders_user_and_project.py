@@ -15,14 +15,14 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint("fk_vfolders_user_users", "vfolders", type_="foreignkey")
     op.drop_constraint("fk_vfolders_group_groups", "vfolders", type_="foreignkey")
     op.drop_constraint("ck_vfolders_ownership_type_match_with_user_or_group", "vfolders")
     op.drop_constraint("ck_vfolders_either_one_of_user_or_group", "vfolders")
 
 
-def downgrade():
+def downgrade() -> None:
     op.create_foreign_key("fk_vfolders_group_groups", "vfolders", "groups", ["group"], ["id"])
     op.create_foreign_key("fk_vfolders_user_users", "vfolders", "users", ["user"], ["uuid"])
     op.create_check_constraint(

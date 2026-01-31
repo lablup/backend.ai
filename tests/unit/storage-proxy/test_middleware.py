@@ -1,3 +1,5 @@
+from typing import Any
+
 import aiohttp
 import pytest
 from aiohttp import web
@@ -7,8 +9,8 @@ from ai.backend.storage.api.manager import token_auth_middleware
 
 class TestStorageManagerAPIMiddleware:
     @pytest.mark.asyncio
-    async def test_auth_token_middleware_return_json_body_response(self, aiohttp_client) -> None:
-        async def handler(request):
+    async def test_auth_token_middleware_return_json_body_response(self, aiohttp_client: Any) -> None:
+        async def handler(request: web.Request) -> web.Response:
             return web.Response(text="OK")
 
         app = web.Application(middlewares=[token_auth_middleware])

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import asyncio
+from typing import Any
 
 import pytest
 from etcd_client import CondVar, WatchEventType
@@ -195,7 +198,7 @@ async def test_watch(etcd: AsyncEtcd) -> None:
     r_ready = CondVar()
     rp_ready = CondVar()
 
-    async def _record():
+    async def _record() -> None:
         recv_count = 0
         async for ev in etcd.watch("wow", ready_event=r_ready):
             records.append(ev)
@@ -203,7 +206,7 @@ async def test_watch(etcd: AsyncEtcd) -> None:
             if recv_count == 2:
                 return
 
-    async def _record_prefix():
+    async def _record_prefix() -> None:
         recv_count = 0
         async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
             records_prefix.append(ev)
@@ -254,7 +257,7 @@ async def test_watch_once(etcd: AsyncEtcd) -> None:
     r_ready = CondVar()
     rp_ready = CondVar()
 
-    async def _record():
+    async def _record() -> None:
         recv_count = 0
         async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
             records.append(ev)
@@ -262,7 +265,7 @@ async def test_watch_once(etcd: AsyncEtcd) -> None:
             if recv_count == 1:
                 return
 
-    async def _record_prefix():
+    async def _record_prefix() -> None:
         recv_count = 0
         async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
             records_prefix.append(ev)

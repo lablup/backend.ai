@@ -433,6 +433,6 @@ AgentV2Edge = Edge[AgentV2GQL]
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count

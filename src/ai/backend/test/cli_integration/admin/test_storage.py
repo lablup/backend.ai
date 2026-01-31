@@ -4,7 +4,7 @@ from contextlib import closing
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_list_storage(run_admin: ClientRunnerFunc):
+def test_list_storage(run_admin: ClientRunnerFunc) -> None:
     """
     Test list storage.
     """
@@ -17,7 +17,7 @@ def test_list_storage(run_admin: ClientRunnerFunc):
         assert isinstance(storage_list, list), "Storage list not printed properly"
 
 
-def test_info_storage(run_admin: ClientRunnerFunc):
+def test_info_storage(run_admin: ClientRunnerFunc) -> None:
     """
     Test storage info.
     """

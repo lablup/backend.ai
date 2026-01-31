@@ -40,7 +40,7 @@ class ObjectNotFound(BackendAIError, web.HTTPNotFound):
         extra_data: Any | None = None,
         *,
         object_name: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         if object_name:
             self.object_name = object_name

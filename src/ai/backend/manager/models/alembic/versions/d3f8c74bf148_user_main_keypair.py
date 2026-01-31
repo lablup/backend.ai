@@ -115,9 +115,9 @@ def upgrade() -> None:
             return None
 
     def prepare_keypair(
-        user_email,
-        user_id,
-        user_role,
+        user_email: str,
+        user_id: Any,
+        user_role: UserRole,
     ) -> dict[str, Any]:
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()

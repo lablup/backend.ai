@@ -16,13 +16,13 @@ def mock_corofunc(return_value: Any) -> mock.Mock:
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*_args, **_kargs) -> Any:
+    async def _mock_corofunc(*_args: Any, **_kargs: Any) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs) -> AsyncMock:
+async def mock_awaitable(**kwargs: Any) -> AsyncMock:
     """
     Mock awaitable.
 
@@ -42,7 +42,7 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)

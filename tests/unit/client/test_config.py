@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 
 import pytest
@@ -6,9 +9,12 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig, bool_env, get_config, get_env, set_config
 
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
 
 @pytest.fixture
-def cfg_params():
+def cfg_params() -> dict[str, Any]:
     return {
         "endpoint": "http://127.0.0.1:8081",
         "version": "vtest",
@@ -20,7 +26,7 @@ def cfg_params():
     }
 
 
-def test_get_env():
+def test_get_env() -> None:
     with pytest.raises(KeyError):
         get_env("TESTKEY")
     with pytest.raises(KeyError), mock.patch.dict(os.environ, {"TESTKEY": "testkey"}):
@@ -33,7 +39,7 @@ def test_get_env():
         assert r == "testkey"
 
 
-def test_bool_env():
+def test_bool_env() -> None:
     assert bool_env("y")
     assert bool_env("Y")
     assert bool_env("yes")
@@ -58,7 +64,7 @@ def test_bool_env():
         bool_env("other")
 
 
-def test_api_config_initialization(cfg_params):
+def test_api_config_initialization(cfg_params: dict[str, Any]) -> None:
     params = cfg_params
     cfg = APIConfig(**params)
 
@@ -80,7 +86,7 @@ def test_api_config_initialization(cfg_params):
     assert isinstance(cfg.vfolder_mounts, list)
 
 
-def test_validation():
+def test_validation() -> None:
     mandatory_args = {"access_key": "a", "secret_key": "s"}
     with pytest.raises(ValueError):
         APIConfig(endpoint="/mylocalpath", **mandatory_args)
@@ -92,7 +98,7 @@ def test_validation():
     assert set(cfg.vfolder_mounts) == {"abc", "def"}
 
 
-def test_set_and_get_config(mocker, cfg_params):
+def test_set_and_get_config(mocker: MockerFixture, cfg_params: dict[str, Any]) -> None:
     # Mocking the global variable ``_config``.
     # The value of a global variable will affect other test cases.
     mocker.patch("ai.backend.client.config._config", None)
@@ -101,7 +107,7 @@ def test_set_and_get_config(mocker, cfg_params):
     assert get_config() == cfg
 
 
-def test_get_config_return_default_config_when_config_is_none(mocker, cfg_params):
+def test_get_config_return_default_config_when_config_is_none(mocker: MockerFixture, cfg_params: dict[str, Any]) -> None:
     mocker.patch("ai.backend.client.config._config", None)
     mocker.patch(
         "os.environ",

@@ -129,7 +129,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_Enum], **opts: Any) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -151,7 +151,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -170,7 +170,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_Enum], **opts: Any) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -192,7 +192,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -209,7 +209,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     cache_ok = True
 
     def __init__(
-        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts
+        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts: Any
     ) -> None:
         self._opts = opts
         super().__init__(length=length, **opts)
@@ -238,7 +238,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -382,7 +382,7 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -412,7 +412,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
             return None
         return self._schema.from_json(value)  # type: ignore[arg-type]
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -444,7 +444,7 @@ class StructuredJSONObjectListColumn(TypeDecorator):
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -481,7 +481,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
             return self._schema.model_validate(value)
         return None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
 
@@ -516,7 +516,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
             return [self._schema.model_validate(item) for item in value]
         return []
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 

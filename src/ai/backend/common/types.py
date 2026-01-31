@@ -173,7 +173,7 @@ class aobject:
     """
 
     @classmethod
-    async def new(cls: type[Self], *args, **kwargs) -> Self:
+    async def new(cls: type[Self], *args: Any, **kwargs: Any) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -184,7 +184,7 @@ class aobject:
         await instance.__ainit__()
         return instance
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     async def __ainit__(self) -> None:

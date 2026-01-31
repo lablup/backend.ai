@@ -1065,7 +1065,7 @@ class TestUploadFiles:
         mock_reader = MagicMock()
         call_count = 0
 
-        async def mock_next():
+        async def mock_next() -> None:
             nonlocal call_count
             if call_count == 0:
                 call_count += 1

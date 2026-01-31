@@ -4,7 +4,7 @@ from contextlib import closing
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_domain(run_admin: ClientRunnerFunc):
+def test_add_domain(run_admin: ClientRunnerFunc) -> None:
     print("[ Add domain ]")
 
     vfolder_volume_name = "local:volume1"
@@ -72,7 +72,7 @@ def test_add_domain(run_admin: ClientRunnerFunc):
     )
 
 
-def test_update_domain(run_admin: ClientRunnerFunc):
+def test_update_domain(run_admin: ClientRunnerFunc) -> None:
     print("[ Update domain ]")
 
     vfolder_volume_name = "local:volume2"
@@ -144,7 +144,7 @@ def test_update_domain(run_admin: ClientRunnerFunc):
     )
 
 
-def test_delete_domain(run_admin: ClientRunnerFunc):
+def test_delete_domain(run_admin: ClientRunnerFunc) -> None:
     print("[ Delete domain ]")
 
     # Delete domain
@@ -156,7 +156,7 @@ def test_delete_domain(run_admin: ClientRunnerFunc):
         assert response.get("ok") is True, "Domain deletion failed"
 
 
-def test_list_domain(run_admin: ClientRunnerFunc):
+def test_list_domain(run_admin: ClientRunnerFunc) -> None:
     with closing(run_admin(["--output=json", "admin", "domain", "list"])) as p:
         p.expect(EOF)
         decoded = decode(p.before)

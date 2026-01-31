@@ -64,7 +64,7 @@ class BaseTestContext[T]:
     _ctxvar: ContextVar[T | None] | None = None
     _used: MutableMapping[ContextName, "BaseTestContext"] = {}
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)

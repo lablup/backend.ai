@@ -22,7 +22,7 @@ branch_labels = None
 depends_on = None
 
 
-def get_container_registry_row_schema():
+def get_container_registry_row_schema() -> type[Base]:
     class ContainerRegistryType(enum.StrEnum):
         DOCKER = "docker"
         HARBOR = "harbor"
@@ -52,7 +52,7 @@ def get_container_registry_row_schema():
     return ContainerRegistryRow
 
 
-def get_image_row_schema():
+def get_image_row_schema() -> type[Base]:
     class ImageType(enum.Enum):
         COMPUTE = "compute"
         SYSTEM = "system"
@@ -105,7 +105,7 @@ def get_image_row_schema():
     return ImageRow
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("images", sa.Column("project", sa.String, nullable=True))
 
     ImageRow = get_image_row_schema()
@@ -120,5 +120,5 @@ def upgrade():
     op.get_bind().execute(update_stmt)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("images", "project")

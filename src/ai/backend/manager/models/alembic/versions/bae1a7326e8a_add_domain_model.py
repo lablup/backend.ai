@@ -22,7 +22,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     # partial table to insert "default" domain
@@ -79,7 +79,7 @@ def upgrade():
     connection.execute(text(query))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(op.f("fk_users_domain_name_domains"), "users", type_="foreignkey")
     op.drop_index(op.f("ix_users_domain_name"), table_name="users")
     op.drop_column("users", "domain_name")

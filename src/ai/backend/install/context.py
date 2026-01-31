@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
+from typing import Any
 from pathlib import Path
 from typing import Any, Final
 
@@ -91,7 +92,7 @@ class Context(metaclass=ABCMeta):
         self,
         dist_info: DistInfo,
         install_variable: InstallVariable,
-        app: App,
+        app: App[None],
         *,
         non_interactive: bool = False,
     ) -> None:
@@ -151,7 +152,7 @@ class Context(metaclass=ABCMeta):
             case "Darwin":
                 await self.run_shell(f"brew install {distro_pkg_name}")
 
-    async def run_exec(self, cmdargs: Sequence[str], **kwargs) -> int:
+    async def run_exec(self, cmdargs: Sequence[str], **kwargs: Any) -> int:
         p = await asyncio.create_subprocess_exec(
             *cmdargs,
             stdout=kwargs.pop("stdout", asyncio.subprocess.PIPE),
@@ -191,14 +192,14 @@ class Context(metaclass=ABCMeta):
                 exit_code = await p.wait()
         return exit_code
 
-    async def run_shell(self, script: str, **kwargs) -> int:
+    async def run_shell(self, script: str, **kwargs: Any) -> int:
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
         raise NotImplementedError
 
     @staticmethod
-    def sed_in_place(path: Path, pattern: str | re.Pattern, replacement: str) -> None:
+    def sed_in_place(path: Path, pattern: str | re.Pattern[str], replacement: str) -> None:
         content = path.read_text()
         match pattern:
             case str():
@@ -208,7 +209,7 @@ class Context(metaclass=ABCMeta):
         path.write_text(content)
 
     @staticmethod
-    def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern, str]]) -> None:
+    def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern[str], str]]) -> None:
         content = path.read_text()
         for pattern, replacement in subs:
             match pattern:

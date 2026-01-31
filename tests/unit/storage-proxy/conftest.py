@@ -40,7 +40,7 @@ def vfroot() -> Iterator[Path]:
 
 
 @pytest.fixture
-def local_volume(vfroot) -> Iterator[Path]:
+def local_volume(vfroot: Path) -> Iterator[Path]:
     volume = vfroot / "local"
     volume.mkdir(parents=True, exist_ok=True)
     yield volume
@@ -81,9 +81,9 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
     ]
 )
 async def volume(
-    request,
-    local_volume,
-    mock_etcd,
+    request: Any,
+    local_volume: Path,
+    mock_etcd: AsyncEtcd,
 ) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
@@ -144,7 +144,7 @@ async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
 
 
 @pytest.fixture
-async def s3_client(minio_container):  # noqa: F811
+async def s3_client(minio_container: Any) -> AsyncIterator[S3Client]:  # noqa: F811
     """Create S3Client instance for testing with MinIO container"""
     container_id, host_port = minio_container
 

@@ -68,7 +68,7 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
 
 

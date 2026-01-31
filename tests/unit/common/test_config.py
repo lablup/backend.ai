@@ -28,7 +28,7 @@ def test_override_key() -> None:
     assert sample["c"] == -1
 
 
-def test_merge():
+def test_merge() -> None:
     left = {
         "a": {
             "a": 5,
@@ -55,7 +55,7 @@ def test_merge():
     }
 
 
-def test_sanitize_inline_dicts():
+def test_sanitize_inline_dicts() -> None:
     sample = """
     [section]
     a = { x = 1, y = 1 }

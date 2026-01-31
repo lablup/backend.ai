@@ -91,8 +91,8 @@ class WekaFs:
         )
 
 
-def error_handler(inner: Callable[..., Awaitable[Any]]) -> Any:
-    async def outer(*args, **kwargs) -> Any:
+def error_handler(inner: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    async def outer(*args: Any, **kwargs: Any) -> Any:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:

@@ -39,7 +39,7 @@ Base = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 

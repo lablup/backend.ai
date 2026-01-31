@@ -23,7 +23,7 @@ class SubdomainFrontend(H2Frontend[str]):
 
     api_port: int | None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.process = None

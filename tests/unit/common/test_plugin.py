@@ -6,7 +6,9 @@ from typing import Any, overload
 from unittest.mock import AsyncMock
 
 import pytest
+from pytest_mock import MockerFixture
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
@@ -22,7 +24,7 @@ from ai.backend.common.plugin.hook import (
 
 
 class DummyPlugin(AbstractPlugin):
-    def __init__(self, plugin_config, local_config) -> None:
+    def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
 
     async def init(self, context: Any | None = None) -> None:
@@ -42,7 +44,7 @@ class DummyEntrypoint:
     value: str = "dummy.mod.DummyPlugin"
     group: str = "dummy_group_v00"
 
-    def load(self):
+    def load(self) -> type[AbstractPlugin] | Callable[..., AbstractPlugin]:
         return self.load_result
 
 
@@ -51,8 +53,8 @@ def mock_entrypoints_with_instance(
     allowlist: set[str] | None = None,
     blocklist: set[str] | None = None,
     *,
-    mocked_plugin,
-):
+    mocked_plugin: AbstractPlugin,
+) -> Iterator[DummyEntrypoint]:
     # Since mocked_plugin is already an instance constructed via AsyncMock,
     # we emulate the original constructor using a lambda fucntion.
     yield DummyEntrypoint(
@@ -87,8 +89,8 @@ def mock_entrypoints_with_class(
     allowlist: set[str] | None = None,
     blocklist: set[str] | None = None,
     *,
-    plugin_cls,
-):
+    plugin_cls: type[AbstractPlugin] | list[type[AbstractPlugin]],
+) -> DummyEntrypoint | Iterator[DummyEntrypoint]:
     if isinstance(plugin_cls, list):
         yield from (
             DummyEntrypoint(
@@ -107,7 +109,7 @@ def mock_entrypoints_with_class(
 
 
 @pytest.mark.asyncio
-async def test_plugin_context_init_cleanup(etcd, mocker):
+async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     print("test plugin context init cleanup")
     mocked_plugin = AsyncMock(DummyPlugin)
     mocked_entrypoints = functools.partial(
@@ -126,7 +128,9 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
 
 
 @pytest.mark.asyncio
-async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_list):
+async def test_plugin_context_config_allow_and_block_list(
+    etcd: AsyncEtcd, allow_and_block_list: tuple[set[str], set[str]]
+) -> None:
     allowlist, blocklist = allow_and_block_list
     ctx: BasePluginContext = BasePluginContext(
         etcd,
@@ -138,8 +142,8 @@ async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_
 
 @pytest.mark.asyncio
 async def test_plugin_context_config_allow_and_block_list_has_union(
-    etcd, allow_and_block_list_has_union
-):
+    etcd: AsyncEtcd, allow_and_block_list_has_union: tuple[set[str], set[str]]
+) -> None:
     allowlist, blocklist = allow_and_block_list_has_union
     ctx: BasePluginContext = BasePluginContext(
         etcd,
@@ -151,7 +155,7 @@ async def test_plugin_context_config_allow_and_block_list_has_union(
 
 
 @pytest.mark.asyncio
-async def test_plugin_context_config(etcd, mocker):
+async def test_plugin_context_config(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
     await etcd.put("config/plugins/XXX/dummy/etcd-key", "etcd-value")
@@ -171,7 +175,7 @@ async def test_plugin_context_config(etcd, mocker):
 
 
 @pytest.mark.asyncio
-async def test_plugin_context_config_autoupdate(etcd, mocker):
+async def test_plugin_context_config_autoupdate(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_plugin = AsyncMock(DummyPlugin)
     mocked_entrypoints = functools.partial(
         mock_entrypoints_with_instance, mocked_plugin=mocked_plugin
@@ -203,7 +207,7 @@ class DummyHookPassingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-p"
 
-    def get_handlers(self):
+    def get_handlers(self) -> list[tuple[str, Callable]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
@@ -218,12 +222,12 @@ class DummyHookPassingPlugin(HookPlugin):
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 
-    async def hook1_handler(self, arg1, arg2):
+    async def hook1_handler(self, arg1: str, arg2: str) -> int:
         assert arg1 == "a"
         assert arg2 == "b"
         return 1
 
-    async def hook2_handler(self, arg1, arg2):
+    async def hook2_handler(self, arg1: str, arg2: str) -> int:
         assert arg1 == "c"
         assert arg2 == "d"
         return 2
@@ -234,7 +238,7 @@ class DummyHookRejectingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-r"
 
-    def get_handlers(self):
+    def get_handlers(self) -> list[tuple[str, Callable]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
@@ -249,12 +253,12 @@ class DummyHookRejectingPlugin(HookPlugin):
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 
-    async def hook1_handler(self, arg1, arg2):
+    async def hook1_handler(self, arg1: str, arg2: str) -> None:
         assert arg1 == "a"
         assert arg2 == "b"
         raise Reject("dummy rejected 1")
 
-    async def hook2_handler(self, arg1, arg2):
+    async def hook2_handler(self, arg1: str, arg2: str) -> int:
         assert arg1 == "c"
         assert arg2 == "d"
         return 3
@@ -265,7 +269,7 @@ class DummyHookErrorPlugin(HookPlugin):
 
     _entrypoint_name = "hook-e"
 
-    def get_handlers(self):
+    def get_handlers(self) -> list[tuple[str, Callable]]:
         return [
             ("HOOK3", self.hook3_handler),
         ]
@@ -279,14 +283,14 @@ class DummyHookErrorPlugin(HookPlugin):
     async def update_plugin_config(self, new_config: Mapping[str, Any]) -> None:
         pass
 
-    async def hook3_handler(self, arg1, arg2):
+    async def hook3_handler(self, arg1: str, arg2: str) -> None:
         assert arg1 == "e"
         assert arg2 == "f"
         raise ZeroDivisionError("oops")
 
 
 @pytest.mark.asyncio
-async def test_hook_dispatch(etcd, mocker):
+async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(
         mock_entrypoints_with_class,
         plugin_cls=[DummyHookPassingPlugin, DummyHookRejectingPlugin, DummyHookErrorPlugin],
@@ -344,7 +348,7 @@ async def test_hook_dispatch(etcd, mocker):
 
 
 @pytest.mark.asyncio
-async def test_hook_notify(etcd, mocker):
+async def test_hook_notify(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     mocked_entrypoints = functools.partial(
         mock_entrypoints_with_class,
         plugin_cls=[DummyHookPassingPlugin, DummyHookRejectingPlugin, DummyHookErrorPlugin],

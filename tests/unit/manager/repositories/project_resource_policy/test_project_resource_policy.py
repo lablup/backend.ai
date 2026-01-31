@@ -4,6 +4,7 @@ Tests the repository layer with mocked database operations.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -95,7 +96,7 @@ class TestProjectResourcePolicyRepository:
             yield database_connection
 
     @pytest.fixture
-    def project_resource_policy_repository(self, mock_db_engine) -> ProjectResourcePolicyRepository:
+    def project_resource_policy_repository(self, mock_db_engine: Any)-> ProjectResourcePolicyRepository:
         """Create ProjectResourcePolicyRepository instance with mocked database"""
         return ProjectResourcePolicyRepository(db=mock_db_engine)
 
@@ -132,7 +133,10 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_success(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        new_policy_creator: Creator[ProjectResourcePolicyRow],
     ) -> None:
         """Test successful project resource policy creation"""
         # Mock database session
@@ -172,7 +176,10 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        new_policy_creator: Creator[ProjectResourcePolicyRow],
     ) -> None:
         """Test project resource policy creation with duplicate name"""
         # Mock database session
@@ -191,10 +198,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_get_by_name_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy retrieval by name"""
         # Mock database session
@@ -216,7 +223,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_name_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy retrieval when policy not found"""
         # Mock database session
@@ -238,10 +247,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy update"""
         # Mock database session
@@ -274,7 +283,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_update_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy update when policy not found"""
         # Mock database session
@@ -301,10 +312,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_partial_fields(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test partial update of policy fields"""
         # Mock database session
@@ -336,10 +347,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_delete_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy deletion"""
         # Mock database session
@@ -363,7 +374,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_delete_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy deletion when policy not found"""
         # Mock database session
@@ -384,7 +397,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_with_all_fields(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test creating policy with all possible fields"""
         # Mock database session
@@ -427,7 +442,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_repository_with_transaction_rollback(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test repository handles transaction rollback properly"""
         # Mock database session

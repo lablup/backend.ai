@@ -1,9 +1,11 @@
 """Integration tests for the complete scheduling controller flow."""
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timedelta
 from pathlib import PurePosixPath
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,7 +42,7 @@ from ai.backend.manager.types import UserScope
 
 
 @pytest.fixture
-async def mock_repository():
+async def mock_repository() -> None:
     """Create a mock repository."""
     repo = AsyncMock()
     repo.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
@@ -58,7 +60,7 @@ async def mock_repository():
 
 
 @pytest.fixture
-async def mock_config_provider():
+async def mock_config_provider() -> None:
     """Create a mock config provider."""
     provider = MagicMock()
     provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
@@ -72,9 +74,9 @@ async def mock_config_provider():
 
 @pytest.fixture
 async def scheduling_controller(
-    mock_repository,
-    mock_config_provider,
-):
+    mock_repository: Any,
+    mock_config_provider: Any,
+) -> Any:
     """Create a SchedulingController instance with mocks."""
     hook_result = HookResult(status=HookResults.PASSED)
     hook_plugin_ctx = AsyncMock()
@@ -96,7 +98,7 @@ class TestSingleKernelSession:
     """Test cases for single kernel sessions."""
 
     async def test_basic_single_kernel_session(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test creating a basic single kernel session."""
         spec = SessionCreationSpec(
@@ -187,7 +189,7 @@ class TestSingleKernelSession:
         assert session_data.kernels[0].gids == [100, 200]
 
     async def test_single_kernel_batch_session(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test creating a batch session with startup_command."""
         session_name = "batch-session-test"
@@ -284,7 +286,7 @@ class TestMultiContainerSession:
     """Test cases for multi-container sessions."""
 
     async def test_multi_container_replication(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test multi-container session with single spec replication."""
         spec = SessionCreationSpec(
@@ -372,7 +374,7 @@ class TestMultiContainerSession:
         assert session_data.batch_timeout == 30 * 60  # 30 minutes in seconds
 
     async def test_multi_container_different_images(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test multi-container session with different images per kernel."""
         spec = SessionCreationSpec(
@@ -483,7 +485,7 @@ class TestMultiContainerSession:
 class TestEdgeCases:
     """Test edge cases and error scenarios."""
 
-    async def test_agent_preassignment(self, scheduling_controller, mock_repository) -> None:
+    async def test_agent_preassignment(self, scheduling_controller: Any, mock_repository: Any) -> None:
         """Test session with pre-assigned agents."""
         spec = SessionCreationSpec(
             session_creation_id="test-preassigned",
@@ -547,7 +549,7 @@ class TestEdgeCases:
             "agent-003",
         ]
 
-    async def test_network_types(self, scheduling_controller, mock_repository) -> None:
+    async def test_network_types(self, scheduling_controller: Any, mock_repository: Any) -> None:
         """Test different network type configurations."""
         # Test VOLATILE network (default)
         spec_volatile = SessionCreationSpec(
@@ -654,7 +656,7 @@ class TestEdgeCases:
         session_data = mock_repository.enqueue_session.call_args[0][0]
         assert session_data.network_type == NetworkType.HOST
 
-    async def test_session_dependencies(self, scheduling_controller, mock_repository) -> None:
+    async def test_session_dependencies(self, scheduling_controller: Any, mock_repository: Any) -> None:
         """Test session with dependencies."""
         dependency_ids = [SessionId(uuid.uuid4()) for _ in range(3)]
 
@@ -714,7 +716,7 @@ class TestMultiClusterScenarios:
     """Test cases for multi-cluster (MULTI_NODE) scenarios."""
 
     async def test_multi_cluster_single_kernel_replication(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test MULTI_NODE cluster with single kernel spec being replicated across nodes."""
         spec = SessionCreationSpec(
@@ -807,7 +809,7 @@ class TestMultiClusterScenarios:
             assert session_data.kernels[i].cluster_hostname == f"sub{i}"
 
     async def test_multi_cluster_heterogeneous_config(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test MULTI_NODE cluster with different configurations per node."""
         spec = SessionCreationSpec(
@@ -937,7 +939,7 @@ class TestMultiClusterScenarios:
         assert session_data.batch_timeout == 2 * 60 * 60  # 2 hours in seconds
 
     async def test_multi_cluster_with_agent_assignment(
-        self, scheduling_controller, mock_repository
+        self, scheduling_controller: Any, mock_repository: Any
     ) -> None:
         """Test MULTI_NODE cluster with pre-assigned agents for each node."""
         spec = SessionCreationSpec(

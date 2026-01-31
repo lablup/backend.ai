@@ -8,6 +8,7 @@ from collections.abc import Callable, Generator, Iterator, Sequence
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Any
 
 import pexpect
 import pytest
@@ -48,7 +49,7 @@ def make_run_fixture(profile_env: str) -> Callable[[Path], Iterator[ClientRunner
     ) -> Iterator[ClientRunnerFunc]:
         env_from_file = get_env_from_profile(profile_env)
 
-        def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
+        def run_impl(cmdargs: Sequence[str | Path], *args: Any, **kwargs: Any) -> pexpect.spawn:
             return run([client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file})
 
         yield run_impl

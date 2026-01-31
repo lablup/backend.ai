@@ -43,7 +43,7 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
 class HTTPBackend(BaseBackend):
     routes: list[RouteInfo]
 
-    def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
+    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
         client_timeout = aiohttp.ClientTimeout(

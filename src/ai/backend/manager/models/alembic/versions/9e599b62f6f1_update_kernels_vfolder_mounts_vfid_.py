@@ -49,7 +49,7 @@ vfolders = sa.Table(
 )
 
 
-def list_chunk(lst, n):
+def list_chunk(lst: list, n: int) -> list:
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 

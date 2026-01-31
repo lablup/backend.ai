@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import tempfile
 from pathlib import Path
@@ -5,7 +7,7 @@ from pathlib import Path
 from ai.backend.agent.docker.files import diff_file_stats, scandir
 
 
-def test_scandir():
+def test_scandir() -> None:
     # Create two files.
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
@@ -21,7 +23,7 @@ def test_scandir():
     assert int(file_stats[second]) == int(file_stats[first]) + 5
 
 
-def test_scandir_skip_hidden_files():
+def test_scandir_skip_hidden_files() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         file = Path(tmpdir) / ".hidden_file"
         file.write_text("dark templar")
@@ -30,7 +32,7 @@ def test_scandir_skip_hidden_files():
     assert len(file_stats) == 0
 
 
-def test_scandir_skip_large_files():
+def test_scandir_skip_large_files() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         file = Path(tmpdir) / "file.jpg"
         file.write_text("large file")
@@ -39,7 +41,7 @@ def test_scandir_skip_large_files():
     assert len(file_stats) == 0
 
 
-def test_scandir_returns_files_in_sub_folder():
+def test_scandir_returns_files_in_sub_folder() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         sub_folder = Path(tmpdir) / "sub"
         sub_folder.mkdir()
@@ -51,7 +53,7 @@ def test_scandir_returns_files_in_sub_folder():
     assert len(file_stats) == 1
 
 
-def test_get_new_file_diff_stats():
+def test_get_new_file_diff_stats() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
         first.write_text("first")
@@ -67,7 +69,7 @@ def test_get_new_file_diff_stats():
     assert second in diff_stats
 
 
-def test_get_modified_file_diff_stats():
+def test_get_modified_file_diff_stats() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
         first.write_text("first")
@@ -85,7 +87,7 @@ def test_get_modified_file_diff_stats():
     assert second in diff_stats
 
 
-def test_get_both_new_and_modified_files_stat():
+def test_get_both_new_and_modified_files_stat() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
         first.write_text("first")

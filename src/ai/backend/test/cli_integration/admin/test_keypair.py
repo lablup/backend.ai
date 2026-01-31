@@ -7,7 +7,7 @@ from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 def test_add_keypair(
     run_admin: ClientRunnerFunc, users: tuple[User], keypair_options: tuple[KeypairOption]
-):
+) -> None:
     """
     Test add keypair.
     This test should be execued first in test_keypair.py.
@@ -113,7 +113,7 @@ def test_add_keypair(
 
 def test_update_keypair(
     run_admin: ClientRunnerFunc, users: tuple[User], new_keypair_options: tuple[KeypairOption]
-):
+) -> None:
     """
     Test update keypair.
     This test must be executed after test_add_keypair.
@@ -176,7 +176,7 @@ def test_update_keypair(
         )
 
 
-def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]):
+def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]) -> None:
     """
     Test delete keypair.
     This test must be executed after test_add_keypair.
@@ -208,7 +208,7 @@ def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]):
             assert response.get("ok") is True, f"Account deletion failed: {user.username}"
 
 
-def test_list_keypair(run_admin: ClientRunnerFunc):
+def test_list_keypair(run_admin: ClientRunnerFunc) -> None:
     """
     Test list keypair.
     """
@@ -220,7 +220,7 @@ def test_list_keypair(run_admin: ClientRunnerFunc):
         assert isinstance(keypair_list, list), "List not printed properly!"
 
 
-def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
+def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc) -> None:
     admin_find_command = [
         "--output=json",
         "admin",

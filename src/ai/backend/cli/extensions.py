@@ -19,7 +19,7 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     continuing the shell/batch script.
     """
 
-    def main(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def main(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         try:
             _interrupted = False
             kwargs.pop("standalone_mode", None)
@@ -75,18 +75,18 @@ class AliasGroupMixin(click.Group):
     ref) https://github.com/click-contrib/click-aliases
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._commands: dict[str, click.Command] = {}
         self._aliases: dict[str, str] = {}
 
-    def command(self, *args, **kwargs) -> Any:
+    def command(self, *args: Any, **kwargs: Any) -> Any:
         aliases = kwargs.pop("aliases", [])
         decorator = super().command(*args, **kwargs)
         if not aliases:
             return decorator
 
-        def _decorator(f: Callable) -> click.Command:
+        def _decorator(f: Callable[..., Any]) -> click.Command:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases
@@ -96,7 +96,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
-    def group(self, *args, **kwargs) -> Any:
+    def group(self, *args: Any, **kwargs: Any) -> Any:
         aliases = kwargs.pop("aliases", [])
         # keep the same class type unless explicitly specified
         if "cls" not in kwargs:
@@ -105,7 +105,7 @@ class AliasGroupMixin(click.Group):
         if not aliases:
             return decorator
 
-        def _decorator(f: Callable) -> click.Group:
+        def _decorator(f: Callable[..., Any]) -> click.Group:
             cmd = decorator(f)
             if aliases:
                 self._commands[cmd.name] = aliases

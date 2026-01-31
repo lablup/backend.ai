@@ -4,8 +4,9 @@ import secrets
 import shutil
 import subprocess
 from collections import defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import aiodocker
@@ -31,12 +32,12 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 
 @pytest.fixture(scope="session")
-def test_id():
+def test_id() -> str:
     return f"testing-{secrets.token_urlsafe(8)}"
 
 
 @pytest.fixture(scope="session")
-def logging_config():
+def logging_config() -> LoggingConfig:
     config = LoggingConfig(
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
@@ -60,7 +61,12 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
-def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
+def local_config(
+    test_id: str,
+    logging_config: LoggingConfig,
+    etcd_container: tuple[object, object],
+    redis_container: tuple[object, object],
+) -> AgentUnifiedConfig:  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -150,7 +156,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(session_mocker, test_id):
+def test_local_instance_id(session_mocker: object, test_id: str) -> None:
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )
@@ -159,8 +165,8 @@ def test_local_instance_id(session_mocker, test_id):
 
 
 @pytest.fixture(scope="session")
-def prepare_images():
-    async def pull():
+def prepare_images() -> None:
+    async def pull() -> None:
         docker = aiodocker.Docker()
         images_to_pull = [
             "alpine:3.8",
@@ -192,7 +198,7 @@ def prepare_images():
 
 
 @pytest.fixture(scope="session")
-def socket_relay_image():
+def socket_relay_image() -> None:
     # Since pulling all LFS files takes too much GitHub storage bandwidth in CI,
     # we fetch the only required image for tests on demand.
     build_root = os.environ.get("BACKEND_BUILD_ROOT", os.getcwd())
@@ -220,7 +226,7 @@ def socket_relay_image():
 
 
 @pytest.fixture
-async def docker():
+async def docker() -> AsyncIterator[aiodocker.Docker]:
     docker = aiodocker.Docker()
     try:
         yield docker
@@ -229,11 +235,13 @@ async def docker():
 
 
 @pytest.fixture
-async def create_container(test_id, docker):
+async def create_container(
+    test_id: str, docker: aiodocker.Docker
+) -> AsyncIterator[Callable[[dict[str, Any]], Any]]:
     container = None
     cont_id = secrets.token_urlsafe(4)
 
-    async def _create_container(config):
+    async def _create_container(config: dict[str, Any]) -> Any:
         nonlocal container
         container = await docker.containers.create_or_replace(
             config=config,
@@ -251,7 +259,7 @@ async def create_container(test_id, docker):
 @pytest.fixture
 async def agent_runtime(
     local_config: AgentUnifiedConfig,
-    mocker,
+    mocker: object,
 ) -> AsyncIterator[AgentRuntime]:
     """
     Create a mocked AgentRuntime instance for unit testing.

@@ -92,25 +92,25 @@ class ProgressReportingReader(io.BufferedReader):
             self.tqdm.close()
         self.close()
 
-    def read(self, *args, **kwargs) -> bytes:
+    def read(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
-    def read1(self, *args, **kwargs) -> bytes:
+    def read1(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
-    def readinto(self, *args, **kwargs) -> int:
+    def readinto(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)
         return count
 
-    def readinto1(self, *args, **kwargs) -> int:
+    def readinto1(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)

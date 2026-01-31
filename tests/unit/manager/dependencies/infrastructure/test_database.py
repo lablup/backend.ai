@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, patch
@@ -37,7 +38,7 @@ class TestDatabaseDependency:
         mock_engine = MagicMock()
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig):
+        async def mock_context(config: ManagerUnifiedConfig) -> None:
             yield mock_engine
 
         mock_connect_db.return_value = mock_context(mock_config)
@@ -61,7 +62,7 @@ class TestDatabaseDependency:
         cleanup_called = False
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig):
+        async def mock_context(config: ManagerUnifiedConfig) -> None:
             nonlocal cleanup_called
             try:
                 yield mock_engine

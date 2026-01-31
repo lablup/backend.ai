@@ -20,7 +20,7 @@ from ai.backend.common.docker import (
 
 
 @pytest.mark.asyncio
-async def test_get_docker_connector(monkeypatch):
+async def test_get_docker_connector(monkeypatch: pytest.MonkeyPatch) -> None:
     get_docker_context_host.cache_clear()
     _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
@@ -120,7 +120,7 @@ async def test_get_docker_connector(monkeypatch):
             get_docker_connector()
 
 
-def test_image_ref_typing():
+def test_image_ref_typing() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -132,7 +132,7 @@ def test_image_ref_typing():
     assert isinstance(ref, collections.abc.Hashable)
 
 
-def test_image_ref_parsing():
+def test_image_ref_parsing() -> None:
     result = ImageRef.parse_image_str("c")
     assert result.project_and_image_name == f"{default_repository}/c"
     assert result.tag == "latest"
@@ -300,7 +300,7 @@ def test_image_ref_parsing():
         )
 
 
-def test_image_ref_formats():
+def test_image_ref_formats() -> None:
     result = ImageRef.parse_image_str("python:3.6-cuda9-ubuntu")
     assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
     assert result.short == "lablup/python:3.6-cuda9-ubuntu"
@@ -354,7 +354,7 @@ def test_image_ref_formats():
     assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
 
 
-def test_image_ref_generate_aliases():
+def test_image_ref_generate_aliases() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -378,7 +378,7 @@ def test_image_ref_generate_aliases():
         assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
-def test_image_ref_generate_aliases_with_accelerator():
+def test_image_ref_generate_aliases_with_accelerator() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -402,7 +402,7 @@ def test_image_ref_generate_aliases_with_accelerator():
         assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
-def test_image_ref_generate_aliases_of_names():
+def test_image_ref_generate_aliases_of_names() -> None:
     # an alias may include only last framework name in the name.
     ref = ImageRef(
         name="python-tensorflow",
@@ -418,7 +418,7 @@ def test_image_ref_generate_aliases_of_names():
     assert "python" not in aliases
 
 
-def test_image_ref_generate_aliases_disallowed():
+def test_image_ref_generate_aliases_disallowed() -> None:
     # an alias must include the main platform version tag
     ref = ImageRef(
         name="python-tensorflow",
@@ -438,7 +438,7 @@ def test_image_ref_generate_aliases_disallowed():
     assert "python-tensorflow:cuda10.0" not in aliases
 
 
-def test_image_ref_ordering():
+def test_image_ref_ordering() -> None:
     # ordering is defined as the tuple-ordering of platform tags.
     # (tag components that come first have higher priority when comparing.)
     r1 = ImageRef.from_image_str(
@@ -484,7 +484,7 @@ def test_image_ref_ordering():
     assert not r5 > r4
 
 
-def test_image_ref_merge_aliases():
+def test_image_ref_merge_aliases() -> None:
     # After merging, aliases that indicates two or more references should
     # indicate most recent versions.
     refs = [
@@ -529,7 +529,7 @@ def test_image_ref_merge_aliases():
     assert aliases["python"] is refs[0]
 
 
-def test_platform_tag_set_typing():
+def test_platform_tag_set_typing() -> None:
     tags = PlatformTagSet(["py36", "cuda9"])
     assert isinstance(tags, collections.abc.Mapping)
     assert isinstance(tags, typing.Mapping)
@@ -537,7 +537,7 @@ def test_platform_tag_set_typing():
     assert not isinstance(tags, typing.MutableMapping)
 
 
-def test_platform_tag_set():
+def test_platform_tag_set() -> None:
     tags = PlatformTagSet(["py36", "cuda9", "ubuntu16.04", "mkl2018.3"])
     assert "py" in tags
     assert "cuda" in tags
@@ -561,5 +561,5 @@ def test_platform_tag_set():
         tags = PlatformTagSet(["1234"])
 
 
-def test_platform_tag_set_abbreviations():
+def test_platform_tag_set_abbreviations() -> None:
     pass

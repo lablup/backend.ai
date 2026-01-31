@@ -48,7 +48,7 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         raise NotImplementedError
 
 
@@ -135,7 +135,7 @@ class FileLock(AbstractDistributedLock):
         await self.acquire()
         return self
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         self.release()
         return None
 
@@ -196,7 +196,7 @@ class EtcdLock(AbstractDistributedLock):
 
         return etcd_communicator
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._etcd_client is None:
             raise RuntimeError("Etcd client is not initialized")
         await self._etcd_client.__aexit__(*exc_info)
@@ -261,7 +261,7 @@ class RedisLock(AbstractDistributedLock):
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._lock is None:
             raise RuntimeError("Lock is not initialized")
         try:

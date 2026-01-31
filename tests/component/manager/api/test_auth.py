@@ -7,6 +7,8 @@ import pytest
 from aiohttp import web
 from dateutil.tz import gettz, tzutc
 
+from typing import Any
+
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.server import (
@@ -25,7 +27,7 @@ from ai.backend.manager.server import (
 )
 
 
-def test_extract_auth_params():
+def test_extract_auth_params() -> None:
     request = MagicMock(spec=web.Request)
 
     request.headers = {}
@@ -51,7 +53,7 @@ def test_extract_auth_params():
     assert ret[2] == "fake-sig"
 
 
-def test_check_date():
+def test_check_date() -> None:
     # UserDict allows attribute assignment like types.SimpleNamespace
     # but also works like a plain dict.
     request = MagicMock(spec=web.Request)
@@ -98,13 +100,13 @@ def test_check_date():
 
 @pytest.mark.asyncio
 async def test_authorize(
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    etcd_fixture: None,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     # The auth module requires config_server and database to be set up.
     app, client = await create_app_and_client(
         [
@@ -126,7 +128,7 @@ async def test_authorize(
         [".auth"],
     )
 
-    async def do_authorize(hash_type, api_version):
+    async def do_authorize(hash_type: str, api_version: str) -> None:
         url = "/auth/test"
         req_data = {"echo": str(uuid.uuid4())}
         req_bytes = json.dumps(req_data).encode()

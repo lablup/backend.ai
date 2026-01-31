@@ -207,7 +207,7 @@ def get_redis_object(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Legacy function kept for external code that depends on the common package.
@@ -294,7 +294,7 @@ def get_redis_object_for_lock(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Create a Redis connection using BlockingConnectionPool for distributed locking.

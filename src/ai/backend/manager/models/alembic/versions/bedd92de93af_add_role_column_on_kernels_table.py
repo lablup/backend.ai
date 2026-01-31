@@ -48,7 +48,7 @@ kernelrole_choices = list(map(lambda v: v.name, KernelRole))
 kernelrole = postgresql.ENUM(*kernelrole_choices, name="kernelrole")
 
 
-def upgrade():
+def upgrade() -> None:
     connection = op.get_bind()
     kernelrole.create(connection)
     op.add_column("kernels", sa.Column("role", EnumType(KernelRole), nullable=True))
@@ -115,6 +115,6 @@ def upgrade():
     op.alter_column("kernels", column_name="role", nullable=False)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "role")
     kernelrole.drop(op.get_bind())

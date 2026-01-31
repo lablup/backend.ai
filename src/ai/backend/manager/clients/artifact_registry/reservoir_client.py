@@ -70,7 +70,7 @@ class ReservoirRegistryClient:
             **hdrs,
         }
 
-    async def _request(self, method: str, rel_url: str, **kwargs) -> Any:
+    async def _request(self, method: str, rel_url: str, **kwargs: Any) -> Any:
         header = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
         async with aiohttp.ClientSession() as session:

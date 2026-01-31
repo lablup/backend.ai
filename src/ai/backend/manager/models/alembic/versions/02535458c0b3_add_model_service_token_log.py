@@ -31,7 +31,7 @@ endpointlifecycle_choices = [v.value for v in EndpointLifecycle]
 endpointlifecycle = postgresql.ENUM(*endpointlifecycle_choices, name="endpointlifecycle")
 
 
-def upgrade():
+def upgrade() -> None:
     endpointlifecycle.create(op.get_bind())
     op.create_table(
         "endpoint_tokens",
@@ -72,7 +72,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("endpoints", "created_at")
     op.drop_column("endpoints", "destroyed_at")
     op.drop_column("endpoints", "lifecycle_stage")

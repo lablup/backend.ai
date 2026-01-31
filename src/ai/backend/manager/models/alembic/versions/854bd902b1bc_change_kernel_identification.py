@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint(
         "fk_vfolder_attachment_vfolder_vfolders", "vfolder_attachment", type_="foreignkey"
     )
@@ -65,7 +65,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(
         "fk_vfolder_attachment_vfolder_vfolders", "vfolder_attachment", type_="foreignkey"
     )

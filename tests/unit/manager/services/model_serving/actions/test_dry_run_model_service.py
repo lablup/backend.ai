@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -148,7 +148,7 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id_dry_run(self, mocker, mock_repositories) -> MagicMock:
+    def mock_get_vfolder_by_id_dry_run(self, mocker: Any, mock_repositories: Any)-> MagicMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
             "get_vfolder_by_id",
@@ -158,7 +158,7 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
-    def mock_get_user_with_keypair(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_user_with_keypair(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "get_user_with_keypair",
@@ -167,7 +167,7 @@ class TestDryRunModelService:
 
     @pytest.fixture
     def mock_resolve_image_for_endpoint_creation_dry_run(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
@@ -178,7 +178,7 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
-    def mock_background_task_manager_start(self, mocker, mock_background_task_manager) -> AsyncMock:
+    def mock_background_task_manager_start(self, mocker: Any, mock_background_task_manager: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_background_task_manager,
             "start",
@@ -242,12 +242,13 @@ class TestDryRunModelService:
     async def test_dry_run_model_service(
         self,
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id_dry_run,
-        mock_get_user_with_keypair,
-        mock_resolve_image_for_endpoint_creation_dry_run,
-        mock_background_task_manager_start,
-    ):
+        mock_get_vfolder_by_id_dry_run: MagicMock,
+        mock_get_user_with_keypair: AsyncMock,
+        mock_resolve_image_for_endpoint_creation_dry_run: AsyncMock,
+        mock_background_task_manager_start: AsyncMock,
+    ) -> None:
         mock_get_user_with_keypair.return_value = MagicMock(
             uuid=scenario.input.model_service_prepare_ctx.owner_uuid,
             role=scenario.input.model_service_prepare_ctx.owner_role,
@@ -256,7 +257,7 @@ class TestDryRunModelService:
         expected = cast(DryRunModelServiceActionResult, scenario.expected)
         mock_background_task_manager_start.return_value = expected.task_id
 
-        async def dry_run_model_service(action: DryRunModelServiceAction):
+        async def dry_run_model_service(action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
             return await model_serving_processors.dry_run_model_service.wait_for_complete(action)
 
         await scenario.test(dry_run_model_service)

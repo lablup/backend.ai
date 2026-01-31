@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 
 from click import unstyle
@@ -5,7 +7,7 @@ from click import unstyle
 from ai.backend.client.cli.pretty import PrintStatus, bold, inverse, italic, print_pretty, underline
 
 
-def test_pretty_output():
+def test_pretty_output() -> None:
     # Currently this is a graphical test -- you should show the output
     # using "-s" option in pytest and check it manually with your eyes.
 
@@ -28,7 +30,7 @@ def test_pretty_output():
     print("normal print")
 
 
-def test_unstyle():
+def test_unstyle() -> None:
     print(unstyle(underline("non-underline")))
     print(unstyle(italic("non-italic")))
 

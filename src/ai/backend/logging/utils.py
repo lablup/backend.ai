@@ -68,12 +68,12 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
         self,
         level: int,
         msg: object,
-        *args,
+        *args: Any,
         exc_info: _ExcInfoType = None,
         stack_info: bool = False,
         stacklevel: int = 1,
         extra: Mapping[str, object] | None = None,
-        **user_kwargs,
+        **user_kwargs: Any,
     ) -> None:
         if self.isEnabledFor(level):
             context_kwargs: ContextKWArgs = {
@@ -104,12 +104,12 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
     def trace(
         self,
         msg: LiteralString,
-        *args,
+        *args: Any,
         exc_info: _ExcInfoType = None,
         stack_info: bool = False,
         stacklevel: int = 1,
         extra: Mapping[str, object] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.log(
             _TRACE_LEVEL,

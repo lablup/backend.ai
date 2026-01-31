@@ -308,7 +308,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         return type_cache[objtype_name]
 
     def get_loader(
-        self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
+        self, context: GraphQueryContext, objtype_name: str, *args: Any, **kwargs: Any
     ) -> DataLoader:
         k = self._get_key(objtype_name, args, kwargs)
         loader = self.cache.get(k)
@@ -332,7 +332,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
             Concatenate[TContext, Sequence[TLoaderKey], ...],
             Awaitable[Sequence[TLoaderResult]],
         ],
-        **kwargs,
+        **kwargs: Any,
     ) -> int:
         func_and_kwargs = (func, *[(k, kwargs[k]) for k in sorted(kwargs.keys())])
         return hash(func_and_kwargs)
@@ -346,7 +346,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         ],
         # Using kwargs-only to prevent argument position confusion
         # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
-        **kwargs,
+        **kwargs: Any,
     ) -> DataLoader[TLoaderKey, TLoaderResult]:
         async def batch_load_wrapper(keys: Sequence[TLoaderKey]) -> list[TLoaderResult]:
             # aiodataloader always converts the result via list(),
@@ -529,8 +529,8 @@ def privileged_query(required_role: UserRole) -> Callable:
         async def wrapped(
             root: Any,
             info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> Any:
             from ai.backend.manager.models.user import UserRole
 
@@ -565,8 +565,8 @@ def scoped_query(
         async def wrapped(
             root: Any,
             info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> Any:
             from ai.backend.manager.models.user import UserRole
 
@@ -625,7 +625,7 @@ def scoped_query(
 def privileged_mutation(required_role: UserRole, target_func: Callable | None = None) -> Callable:
     def wrap(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapped(cls: type, root: Any, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
+        async def wrapped(cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
@@ -870,7 +870,7 @@ class InferenceSessionError(graphene.ObjectType):
 
 
 class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type: type | str, *args, **kwargs) -> None:
+    def __init__(self, type: type | str, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())

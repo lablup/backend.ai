@@ -306,7 +306,7 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         name: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
         await self._event_producer.broadcast_event_with_cache(
@@ -363,7 +363,7 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
-        **kwargs,
+        **kwargs: Any,
     ) -> BaseBgtaskDoneEvent:
         reporter = ProgressReporter(self._event_producer, task_id)
         bgtask_result = await func(reporter, **kwargs)
@@ -374,7 +374,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: str | None,
-        **kwargs,
+        **kwargs: Any,
     ) -> BaseBgtaskDoneEvent:
         self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
         start_time = time.perf_counter()
@@ -428,7 +428,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: str | None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         try:
             bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)

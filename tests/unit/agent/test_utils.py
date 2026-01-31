@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tempfile
 from typing import Any, cast
 
@@ -6,7 +8,7 @@ import pytest
 from ai.backend.agent import utils
 
 
-def test_read_sysfs():
+def test_read_sysfs() -> None:
     with tempfile.NamedTemporaryFile("w") as f:
         f.write("10")
         f.flush()
@@ -48,7 +50,7 @@ def test_read_sysfs():
         val = utils.read_sysfs("/tmp/xxxxx-non-existent-file", object, -1)
 
 
-def test_update_nested_dict():
+def test_update_nested_dict() -> None:
     o = {
         "a": 1,
         "b": 2,

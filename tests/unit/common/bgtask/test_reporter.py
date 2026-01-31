@@ -144,7 +144,7 @@ class TestProgressReporter:
 
     @pytest.mark.asyncio
     async def test_concurrent_updates(self, progress_reporter: ProgressReporter) -> None:
-        async def update_task(increment: int, message: str):
+        async def update_task(increment: int, message: str) -> None:
             await progress_reporter.update(increment=increment, message=message)
 
         tasks = [

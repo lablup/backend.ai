@@ -104,7 +104,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], **opts: Any) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
         self._enum_cls = enum_cls
@@ -123,7 +123,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     ) -> T_StrEnum | None:
         return self._enum_cls(value) if value is not None else None
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **kw: Any) -> Self:
         return StrEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property

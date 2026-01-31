@@ -1,5 +1,6 @@
 import asyncio
 import random
+from collections.abc import AsyncGenerator
 
 import pytest
 
@@ -7,6 +8,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.message_queue.types import MQMessage
+from ai.backend.common.redis_helper import Redis
 from ai.backend.common.types import (
     RedisHelperConfig,
     RedisTarget,
@@ -14,7 +16,7 @@ from ai.backend.common.types import (
 
 
 @pytest.fixture
-async def redis_conn(redis_container):
+async def redis_conn(redis_container: tuple[str, str]) -> AsyncGenerator[Redis, None]:
     # Configure test Redis connection
     conn = redis_helper.get_redis_object(
         RedisTarget(
@@ -53,7 +55,9 @@ def queue_args() -> RedisMQArgs:
 
 
 @pytest.fixture(scope="function")
-async def redis_queue(redis_container, queue_args: RedisMQArgs):
+async def redis_queue(
+    redis_container: tuple[str, str], queue_args: RedisMQArgs
+) -> AsyncGenerator[RedisQueue, None]:
     # Create consumer group if not exists
     redis_target = RedisTarget(
         addr=redis_container[1],
@@ -72,7 +76,7 @@ async def redis_queue(redis_container, queue_args: RedisMQArgs):
     await queue.close()
 
 
-async def test_send_and_consume(redis_queue: RedisQueue):
+async def test_send_and_consume(redis_queue: RedisQueue) -> None:
     # Test message sending and consuming
     test_payload = {b"key": b"value", b"key2": b"value2"}
 
@@ -87,14 +91,14 @@ async def test_send_and_consume(redis_queue: RedisQueue):
         break
 
 
-async def test_subscribe(redis_queue: RedisQueue):
+async def test_subscribe(redis_queue: RedisQueue) -> None:
     # Test message subscription
     test_payload = {"key": "value", "key2": "value2"}
 
     # Create task to subscribe
     received_messages: list[MQMessage] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
             received_messages.append(message)
             if len(received_messages) >= 1:
@@ -115,14 +119,14 @@ async def test_subscribe(redis_queue: RedisQueue):
     }
 
 
-async def test_broadcast_with_cache(redis_queue: RedisQueue):
+async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     # Test broadcasting with cache
     test_payload = {"key": "value", "key2": "value2"}
     cache_id = f"test-cache-id-{random.randint(1000, 9999)}"
 
     received_messages: list[MQMessage] = []
 
-    async def subscriber():
+    async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
             received_messages.append(message)
             if len(received_messages) >= 1:
@@ -148,7 +152,7 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue):
     assert cached_message == test_payload
 
 
-async def test_done(redis_queue: RedisQueue):
+async def test_done(redis_queue: RedisQueue) -> None:
     # Test message acknowledgment
     test_payload = {b"key": b"value"}
 

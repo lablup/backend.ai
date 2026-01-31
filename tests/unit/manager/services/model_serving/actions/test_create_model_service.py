@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -155,7 +155,7 @@ class TestCreateModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_vfolder_by_id(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
             "get_vfolder_by_id",
@@ -168,7 +168,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_fetch_file_from_storage_proxy(self, mocker, model_serving_service) -> AsyncMock:
+    def mock_fetch_file_from_storage_proxy(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
         mock = mocker.patch.object(
             model_serving_service,
             "_fetch_file_from_storage_proxy",
@@ -178,7 +178,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_resolve_image_for_endpoint_creation(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
             "resolve_image_for_endpoint_creation",
@@ -188,7 +188,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_resolve_group_id(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_resolve_group_id(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
             "resolve_group_id",
@@ -198,7 +198,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_create_session(self, mocker, mock_agent_registry) -> AsyncMock:
+    def mock_create_session(self, mocker: Any, mock_agent_registry: Any)-> AsyncMock:
         mock = mocker.patch.object(
             mock_agent_registry,
             "create_session",
@@ -208,7 +208,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_check_endpoint_name_uniqueness(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_check_endpoint_name_uniqueness(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         mock = mocker.patch.object(
             mock_repositories.repository,
             "check_endpoint_name_uniqueness",
@@ -218,7 +218,7 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_create_endpoint_validated(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_create_endpoint_validated(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "create_endpoint_validated",
@@ -431,18 +431,7 @@ class TestCreateModelService:
         ],
     )
     @pytest.mark.asyncio
-    async def test_create_model_service(
-        self,
-        scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
-        model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id,
-        mock_fetch_file_from_storage_proxy,
-        mock_resolve_image_for_endpoint_creation,
-        mock_resolve_group_id,
-        mock_create_session,
-        mock_check_endpoint_name_uniqueness,
-        mock_create_endpoint_validated,
-    ):
+    async def test_create_model_service() -> None:
         expected = cast(CreateModelServiceActionResult, scenario.expected)
 
         if scenario.description == "Successful model deployment":
@@ -459,7 +448,7 @@ class TestCreateModelService:
             mock_endpoint_data = MagicMock(id=expected.data.endpoint_id)
             mock_create_endpoint_validated.return_value = mock_endpoint_data
 
-        async def create_model_service(action: CreateModelServiceAction):
+        async def create_model_service(action: CreateModelServiceAction) -> None:
             return await model_serving_processors.create_model_service.wait_for_complete(action)
 
         await scenario.test(create_model_service)

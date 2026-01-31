@@ -115,7 +115,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts: Any) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
         self._use_name = use_name
@@ -143,7 +143,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **kw) -> StrEnumType[T_StrEnum]:
+    def copy(self, **kw: Any) -> StrEnumType[T_StrEnum]:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property

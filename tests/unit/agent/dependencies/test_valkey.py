@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from ai.backend.agent.dependencies.infrastructure.redis import AgentValkeyDependency
@@ -9,7 +11,7 @@ from ai.backend.common.typed_validators import HostPortPair
 
 class TestValkeyDependency:
     @pytest.fixture
-    async def redis_config(self, redis_container) -> RedisConfig:
+    async def redis_config(self, redis_container: Any) -> RedisConfig:
         """Redis config fixture using testcontainer."""
         redis_addr = redis_container[1]
         return RedisConfig(  # type: ignore[call-arg]

@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import io
 import json
+from collections.abc import Iterator
 from http import HTTPStatus
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -14,9 +18,12 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import AttachedFile, Request, Response
 from ai.backend.client.session import AsyncSession, Session
 
+if TYPE_CHECKING:
+    from ai.backend.client.config import APIConfig
+
 
 @pytest.fixture(scope="module", autouse=True)
-def api_version():
+def api_version() -> Iterator[None]:
     mock_nego_func = AsyncMock()
     mock_nego_func.return_value = API_VERSION
     with mock.patch("ai.backend.client.session._negotiate_api_version", mock_nego_func):
@@ -24,14 +31,14 @@ def api_version():
 
 
 @pytest.fixture
-def session(defconfig):
+def session(defconfig: APIConfig) -> Iterator[Session]:
     with Session(config=defconfig) as session:
         yield session
 
 
 @pytest.fixture
-def mock_request_params(session):
-    yield {
+def mock_request_params(session: Session) -> dict[str, Any]:
+    return {
         "method": "GET",
         "path": "/function/item/",
         "params": {"app": "999"},
@@ -40,7 +47,7 @@ def mock_request_params(session):
     }
 
 
-def test_request_initialization(mock_request_params):
+def test_request_initialization(mock_request_params: dict[str, Any]) -> None:
     rqst = Request(**mock_request_params)
 
     assert rqst.method == mock_request_params["method"]
@@ -50,7 +57,7 @@ def test_request_initialization(mock_request_params):
     assert "X-BackendAI-Version" in rqst.headers
 
 
-def test_request_set_content_none(mock_request_params):
+def test_request_set_content_none(mock_request_params: dict[str, Any]) -> None:
     mock_request_params = mock_request_params.copy()
     mock_request_params["content"] = None
     rqst = Request(**mock_request_params)
@@ -58,7 +65,7 @@ def test_request_set_content_none(mock_request_params):
     assert rqst._pack_content() is rqst.content
 
 
-def test_request_set_content(mock_request_params):
+def test_request_set_content(mock_request_params: dict[str, Any]) -> None:
     rqst = Request(**mock_request_params)
     assert rqst.content == mock_request_params["content"]
     assert rqst.content_type == "application/json"
@@ -79,7 +86,7 @@ def test_request_set_content(mock_request_params):
     assert rqst._pack_content() is rqst.content
 
 
-def test_request_attach_files(mock_request_params):
+def test_request_attach_files(mock_request_params: dict[str, Any]) -> None:
     files = [
         AttachedFile("test1.txt", io.BytesIO(), "application/octet-stream"),
         AttachedFile("test2.txt", io.BytesIO(), "application/octet-stream"),
@@ -100,7 +107,7 @@ def test_request_attach_files(mock_request_params):
     assert packed_content.is_multipart
 
 
-def test_build_correct_url(mock_request_params):
+def test_build_correct_url(mock_request_params: dict[str, Any]) -> None:
     config = get_config()
     canonical_url = str(config.endpoint).rstrip("/") + "/function?app=999"
 
@@ -114,7 +121,7 @@ def test_build_correct_url(mock_request_params):
 
 
 @pytest.mark.asyncio
-async def test_fetch_invalid_method(mock_request_params):
+async def test_fetch_invalid_method(mock_request_params: dict[str, Any]) -> None:
     mock_request_params["method"] = "STRANGE"
     rqst = Request(**mock_request_params)
 
@@ -124,7 +131,7 @@ async def test_fetch_invalid_method(mock_request_params):
 
 
 @pytest.mark.asyncio
-async def test_fetch(dummy_endpoint):
+async def test_fetch(dummy_endpoint: str) -> None:
     with aioresponses() as m, Session():
         body = b"hello world"
         m.post(
@@ -163,7 +170,7 @@ async def test_fetch(dummy_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_streaming_fetch(dummy_endpoint):
+async def test_streaming_fetch(dummy_endpoint: str) -> None:
     # Read content by chunks.
     with aioresponses() as m, Session():
         body = b"hello world"
@@ -185,7 +192,7 @@ async def test_streaming_fetch(dummy_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_invalid_requests(dummy_endpoint):
+async def test_invalid_requests(dummy_endpoint: str) -> None:
     with aioresponses() as m, Session():
         body = json.dumps({
             "type": "https://api.backend.ai/probs/kernel-not-found",
@@ -210,7 +217,7 @@ async def test_invalid_requests(dummy_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_fetch_invalid_method_async():
+async def test_fetch_invalid_method_async() -> None:
     async with AsyncSession():
         rqst = Request("STRANGE", "/")
         with pytest.raises(ValueError):
@@ -219,7 +226,7 @@ async def test_fetch_invalid_method_async():
 
 
 @pytest.mark.asyncio
-async def test_fetch_client_error_async(dummy_endpoint):
+async def test_fetch_client_error_async(dummy_endpoint: str) -> None:
     with aioresponses() as m:
         async with AsyncSession():
             m.post(dummy_endpoint, exception=aiohttp.ClientConnectionError())
@@ -231,7 +238,7 @@ async def test_fetch_client_error_async(dummy_endpoint):
 
 @pytest.mark.xfail
 @pytest.mark.asyncio
-async def test_fetch_cancellation_async(dummy_endpoint):
+async def test_fetch_cancellation_async(dummy_endpoint: str) -> None:
     # It seems that aiohttp swallows asyncio.CancelledError
     with aioresponses() as m:
         async with AsyncSession():
@@ -243,7 +250,7 @@ async def test_fetch_cancellation_async(dummy_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_fetch_timeout_async(dummy_endpoint):
+async def test_fetch_timeout_async(dummy_endpoint: str) -> None:
     with aioresponses() as m:
         async with AsyncSession():
             m.post(dummy_endpoint, exception=TimeoutError())
@@ -254,7 +261,7 @@ async def test_fetch_timeout_async(dummy_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_response_async(defconfig, dummy_endpoint):
+async def test_response_async(defconfig: APIConfig, dummy_endpoint: str) -> None:
     body = b'{"test": 5678}'
     with aioresponses() as m:
         m.post(

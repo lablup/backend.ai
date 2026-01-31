@@ -15,7 +15,7 @@ from ai.backend.common.leader.valkey_leader_election import (
 
 
 @pytest.fixture
-async def mock_leader_client():
+async def mock_leader_client() -> AsyncMock:
     """Create a mock ValkeyLeaderClient."""
     client = AsyncMock(spec=ValkeyLeaderClient)
     client.acquire_or_renew_leadership = AsyncMock(return_value=False)
@@ -25,7 +25,7 @@ async def mock_leader_client():
 
 
 @pytest.fixture
-async def config_with_threshold():
+async def config_with_threshold() -> ValkeyLeaderElectionConfig:
     """Create a config with specific failure threshold."""
     return ValkeyLeaderElectionConfig(
         server_id="test-server-001",
@@ -37,7 +37,9 @@ async def config_with_threshold():
 
 
 @pytest.fixture
-async def leader_election_with_threshold(mock_leader_client, config_with_threshold):
+async def leader_election_with_threshold(
+    mock_leader_client: AsyncMock, config_with_threshold: ValkeyLeaderElectionConfig
+) -> ValkeyLeaderElection:
     """Create a ValkeyLeaderElection instance with failure threshold."""
     return ValkeyLeaderElection(
         leader_client=mock_leader_client,
@@ -49,8 +51,8 @@ class TestFailureThreshold:
     """Test cases for failure threshold behavior."""
 
     async def test_maintains_leadership_within_threshold(
-        self, leader_election_with_threshold, mock_leader_client
-    ):
+        self, leader_election_with_threshold: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that leadership is maintained when failures are within threshold."""
         # First call succeeds (become leader), then 2 failures, then success
         mock_leader_client.acquire_or_renew_leadership.side_effect = [
@@ -83,8 +85,8 @@ class TestFailureThreshold:
         await leader_election_with_threshold.stop()
 
     async def test_loses_leadership_at_threshold(
-        self, leader_election_with_threshold, mock_leader_client
-    ):
+        self, leader_election_with_threshold: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that leadership is lost when failures reach threshold."""
         # First call succeeds (become leader), then 3 consecutive failures
         mock_leader_client.acquire_or_renew_leadership.side_effect = [
@@ -111,8 +113,8 @@ class TestFailureThreshold:
         await leader_election_with_threshold.stop()
 
     async def test_no_false_positives_when_not_leader(
-        self, leader_election_with_threshold, mock_leader_client
-    ):
+        self, leader_election_with_threshold: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that failures don't affect non-leader status."""
         # All calls fail (never become leader)
         mock_leader_client.acquire_or_renew_leadership.side_effect = Exception("Network error")
@@ -130,8 +132,8 @@ class TestFailureThreshold:
         await leader_election_with_threshold.stop()
 
     async def test_counter_reset_on_success(
-        self, leader_election_with_threshold, mock_leader_client
-    ):
+        self, leader_election_with_threshold: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that failure counter resets on successful renewal."""
         # Pattern: success, 2 failures, success (should reset), 2 failures
         mock_leader_client.acquire_or_renew_leadership.side_effect = [

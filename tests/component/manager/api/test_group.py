@@ -1,5 +1,6 @@
 import json
 from http import HTTPStatus
+from typing import Any
 from urllib.parse import urlencode
 
 import pytest
@@ -50,14 +51,14 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
     ids=["Normal case", "Project Quota already exist"],
 )
 async def test_harbor_create_project_quota(
-    test_case,
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    test_case: dict[str, Any],
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -138,14 +139,14 @@ async def test_harbor_create_project_quota(
     ids=["Normal case", "Project Quota doesn't exist"],
 )
 async def test_harbor_read_project_quota(
-    test_case,
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    test_case: dict[str, Any],
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -219,14 +220,14 @@ async def test_harbor_read_project_quota(
     ids=["Normal case", "Project Quota not found"],
 )
 async def test_harbor_update_project_quota(
-    test_case,
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    test_case: dict[str, Any],
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -307,14 +308,14 @@ async def test_harbor_update_project_quota(
     ids=["Normal case", "Project Quota not found"],
 )
 async def test_harbor_delete_project_quota(
-    test_case,
-    etcd_fixture,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-    get_headers,
-):
+    test_case: dict[str, Any],
+    etcd_fixture: None,
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+    get_headers: Any,
+) -> None:
     app, client = await create_app_and_client(
         [
             mock_etcd_ctx,

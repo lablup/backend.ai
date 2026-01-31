@@ -67,7 +67,7 @@ TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
 
 def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
     @functools.wraps(func)
-    def wrapped(*args, **kwargs) -> T:
+    def wrapped(*args: Any, **kwargs: Any) -> T:
         try:
             return func(*args, **kwargs)
         except ValidationError as e:

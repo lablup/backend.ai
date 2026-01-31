@@ -10,6 +10,7 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
+from pytest_mock import MockerFixture
 
 from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.agent import resources
@@ -21,7 +22,7 @@ from ai.backend.agent.vendor import linux
 from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
 
 
-def test_parse_cpuset():
+def test_parse_cpuset() -> None:
     assert {*linux.parse_cpuset("0")} == {0}
     assert {*linux.parse_cpuset("2-5")} == {2, 3, 4, 5}
     assert {*linux.parse_cpuset("1-1")} == {1}
@@ -49,7 +50,7 @@ def test_parse_cpuset():
         {*linux.parse_cpuset("-99")}
 
 
-def test_node_of_cpu():
+def test_node_of_cpu() -> None:
     numa = linux.libnuma()
 
     # When NUMA is not supported.
@@ -66,7 +67,7 @@ def test_node_of_cpu():
     linux._numa_supported = original_numa_supported
 
 
-def test_num_nodes():
+def test_num_nodes() -> None:
     numa = linux.libnuma()
 
     # When NUMA is not supported.
@@ -85,11 +86,11 @@ def test_num_nodes():
 
 @pytest.mark.skip(reason="aioresponses 0.7 is incompatible with aiohttp 3.7+")
 @pytest.mark.asyncio
-async def test_get_available_cores_without_docker(monkeypatch):
-    def mock_sched_getaffinity(pid):
+async def test_get_available_cores_without_docker(monkeypatch: Any) -> None:
+    def mock_sched_getaffinity(pid: Any) -> None:
         raise AttributeError
 
-    def mock_sched_getaffinity2(pid):
+    def mock_sched_getaffinity2(pid: Any) -> set[int]:
         return {0, 1}
 
     numa = linux.libnuma()
@@ -112,7 +113,7 @@ async def test_get_available_cores_without_docker(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_get_core_topology(mocker):
+async def test_get_core_topology(mocker: MockerFixture) -> None:
     mocker.patch.object(linux.libnuma, "num_nodes", return_value=2)
     mocker.patch.object(
         linux.libnuma, "get_available_cores", new=mock.AsyncMock(return_value={0, 1, 2, 3})
@@ -124,7 +125,7 @@ async def test_get_core_topology(mocker):
 
 
 @pytest.mark.asyncio
-async def test_scan_resource_usage_per_slot():
+async def test_scan_resource_usage_per_slot() -> None:
     with tempfile.TemporaryDirectory() as tmpdir_name:
         tmpdir = Path(tmpdir_name)
         random_kernel_id = KernelId(uuid.uuid4())
@@ -192,8 +193,8 @@ async def test_scan_resource_usage_per_slot():
 
 
 @pytest.mark.asyncio
-async def test_allow_fractional_resource_fragmentation(monkeypatch):
-    def mock_read_from_file(path, daemon_name):
+async def test_allow_fractional_resource_fragmentation(monkeypatch: Any) -> None:
+    def mock_read_from_file(path: Any, daemon_name: Any) -> dict[str, Any]:
         return {
             "slot_name": "cuda",
             "device_plugin_name": "CUDADevice",
@@ -380,7 +381,7 @@ async def test_allow_fractional_resource_fragmentation(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_allocate_rollback(monkeypatch) -> None:
+async def test_allocate_rollback(monkeypatch: Any) -> None:
     local_config: dict[str, Any] = {}
     cpu_plugin = CPUPlugin(
         {},
@@ -501,7 +502,7 @@ async def test_allocate_rollback(monkeypatch) -> None:
     ] == Decimal(512)  # this is rolled back because it failed to allocate the mem slot.
 
 
-def test_align_memory():
+def test_align_memory() -> None:
     align = 10
     reserved = 1000
     print(f"{align=} {reserved=}")

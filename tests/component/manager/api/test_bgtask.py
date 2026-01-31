@@ -24,6 +24,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, RedisTarget, ValkeyTarget
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class ContextSentinel(enum.Enum):
@@ -32,7 +33,7 @@ class ContextSentinel(enum.Enum):
 
 @pytest.fixture
 async def message_queue(
-    redis_container,
+    redis_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[RedisQueue]:
     _, redis_addr = redis_container
     redis_target = RedisTarget(addr=redis_addr, redis_helper_config={})
@@ -92,7 +93,7 @@ async def event_dispatcher(
 
 @pytest.fixture
 async def valkey_bgtask_client(
-    redis_container,
+    redis_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[ValkeyBgtaskClient]:
     _, redis_addr = redis_container
     redis_target = RedisTarget(addr=redis_addr, redis_helper_config={})
@@ -175,7 +176,7 @@ async def test_background_task(
         update_body = asdict(event)
         done_handler_ctx.update(**update_body)
 
-    async def _mock_task(reporter):
+    async def _mock_task(reporter: Any) -> str:
         reporter.total_progress = 2
         await asyncio.sleep(0.1)
         await reporter.update(1, message="BGTask ex1")
@@ -232,7 +233,7 @@ async def test_background_task_fail(
         update_body = asdict(event)
         fail_handler_ctx.update(**update_body)
 
-    async def _mock_task(reporter):
+    async def _mock_task(reporter: Any) -> None:
         reporter.total_progress = 2
         await asyncio.sleep(0.1)
         await reporter.update(1, message="BGTask ex1")

@@ -23,7 +23,7 @@ from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 class DummyDevice(AbstractComputeDevice):
     extra_prop1: str
 
-    def __init__(self, *args, extra_prop1: str = "zzz", **kwargs):
+    def __init__(self, *args: Any, extra_prop1: str = "zzz", **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 
@@ -38,7 +38,7 @@ class DummyDevice(AbstractComputeDevice):
 class CPUDevice(AbstractComputeDevice):
     extra_prop1: str
 
-    def __init__(self, *args, extra_prop1: str = "yyy", **kwargs):
+    def __init__(self, *args: Any, extra_prop1: str = "yyy", **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 

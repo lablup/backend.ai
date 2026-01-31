@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .color import Colors
 
@@ -9,32 +9,32 @@ if TYPE_CHECKING:
     from .canvas import Canvas
 
 
-class Vec2D(tuple):
+class Vec2D(tuple[float, float]):
     """A helper class taken from Python stdlib's Turtle package."""
 
-    def __new__(cls, x: float | int, y: float | int):
+    def __new__(cls, x: float | int, y: float | int) -> Vec2D:
         return tuple.__new__(cls, (x, y))
 
-    def __add__(self, other: Vec2D):  # type: ignore[override]
+    def __add__(self, other: Vec2D) -> Vec2D:  # type: ignore[override]
         return Vec2D(self[0] + other[0], self[1] + other[1])
 
-    def __mul__(self, other: Vec2D | float | int):  # type: ignore[override]
+    def __mul__(self, other: Vec2D | float | int) -> Vec2D | float:  # type: ignore[override]
         if isinstance(other, Vec2D):
             return self[0] * other[0] + self[1] * other[1]
         return Vec2D(self[0] * other, self[1] * other)
 
-    def __rmul__(self, other: float | int):  # type: ignore[override]
+    def __rmul__(self, other: float | int) -> Vec2D | None:  # type: ignore[override]
         if isinstance(other, (int, float)):
             return Vec2D(self[0] * other, self[1] * other)
         return None
 
-    def __sub__(self, other: Vec2D):  # type: ignore[override]
+    def __sub__(self, other: Vec2D) -> Vec2D:  # type: ignore[override]
         return Vec2D(self[0] - other[0], self[1] - other[1])
 
-    def __neg__(self):
+    def __neg__(self) -> Vec2D:
         return Vec2D(-self[0], -self[1])
 
-    def __abs__(self):
+    def __abs__(self) -> float:
         return (self[0] ** 2 + self[1] ** 2) ** 0.5
 
     def rotate(self, angle: float | int) -> Vec2D:
@@ -44,7 +44,7 @@ class Vec2D(tuple):
         c, s = math.cos(angle), math.sin(angle)
         return Vec2D(self[0] * c + perp[0] * s, self[1] * c + perp[1] * s)
 
-    def __getnewargs__(self):
+    def __getnewargs__(self) -> tuple[float, float]:
         return (self[0], self[1])
 
     def __repr__(self) -> str:

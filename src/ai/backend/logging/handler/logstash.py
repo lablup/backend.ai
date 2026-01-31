@@ -6,7 +6,7 @@ import socket
 import ssl
 from collections import OrderedDict
 from datetime import UTC, datetime
-from typing import override
+from typing import Any, override
 
 import zmq
 
@@ -14,9 +14,9 @@ from ai.backend.logging.exceptions import ConfigurationError
 
 
 class LogstashHandler(logging.Handler):
-    _sock: socket.socket | zmq.Socket | None
+    _sock: socket.socket | zmq.Socket[Any] | None
     _sslctx: ssl.SSLContext | None
-    _zmqctx: zmq.Context | None
+    _zmqctx: zmq.Context[Any] | None
 
     def __init__(
         self,

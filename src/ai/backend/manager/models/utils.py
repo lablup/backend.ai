@@ -59,7 +59,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
@@ -392,10 +392,10 @@ async def execute_with_txn_retry(
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
     _lock_conn_timeout: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)

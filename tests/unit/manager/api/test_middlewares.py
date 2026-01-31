@@ -1,14 +1,17 @@
+from __future__ import annotations
+
+from typing import Any
 from aiohttp import web
 
 from ai.backend.manager.api.utils import method_placeholder
 from ai.backend.manager.server import api_middleware
 
 
-async def test_api_method_override(aiohttp_client):
+async def test_api_method_override() -> None:
     observed_method = None
     app = web.Application()
 
-    async def service_handler(request):
+    async def service_handler(request: Any) -> None:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"test")
@@ -49,16 +52,16 @@ async def test_api_method_override(aiohttp_client):
     assert observed_method is None
 
 
-async def test_api_method_override_with_different_ops(aiohttp_client):
+async def test_api_method_override_with_different_ops() -> None:
     observed_method = None
     app = web.Application()
 
-    async def op1_handler(request):
+    async def op1_handler(request: Any) -> None:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op1")
 
-    async def op2_handler(request):
+    async def op2_handler(request: Any) -> None:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op2")
@@ -108,7 +111,7 @@ async def test_api_method_override_with_different_ops(aiohttp_client):
     assert observed_method == "REPORT"
 
 
-async def test_api_ver(aiohttp_client) -> None:
+async def test_api_ver(aiohttp_client: Any) -> None:
     inner_request: web.Request | None = None
     app = web.Application()
 

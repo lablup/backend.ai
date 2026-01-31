@@ -6,7 +6,7 @@ from ai.backend.test.cli_integration.conftest import User
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
+def test_add_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]) -> None:
     """
     Testcase for user addition.
     """
@@ -64,7 +64,7 @@ def test_update_user(
     users: tuple[User, ...],
     gen_username: Callable[[], str],
     gen_fullname: Callable[[], str],
-):
+) -> None:
     """
     Run this testcase after test_add_user.
     Testcase for user update.
@@ -137,7 +137,7 @@ def test_update_user(
         )
 
 
-def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
+def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]) -> None:
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.
@@ -153,7 +153,7 @@ def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]):
             assert response.get("ok") is True, f"Account deletion failed: Account#{i + 1}"
 
 
-def test_list_user(run_admin: ClientRunnerFunc):
+def test_list_user(run_admin: ClientRunnerFunc) -> None:
     """
     Testcase for user listing.
     """

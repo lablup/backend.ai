@@ -4,6 +4,7 @@ Tests the batch termination of sessions marked with TERMINATING status.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import asyncio
 import time
@@ -321,7 +322,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = sessions
 
         # Add delay to agent calls to verify concurrency
-        async def delayed_destroy(*args, **kwargs):
+        async def delayed_destroy(*args: Any, **kwargs: Any) -> None:
             await asyncio.sleep(0.1)
             return
 

@@ -18,13 +18,13 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.cluster import (
 
 
 @pytest.fixture
-def cluster_rule():
+def cluster_rule() -> None:
     """Create a ClusterConfigurationRule instance."""
     return ClusterConfigurationRule()
 
 
 @pytest.fixture
-def basic_context():
+def basic_context() -> None:
     """Create a basic SessionCreationContext."""
     return SessionCreationContext(
         scaling_group_network=None,
@@ -39,7 +39,7 @@ def basic_context():
 class TestClusterConfigurationRule:
     """Test cases for ClusterConfigurationRule."""
 
-    def test_single_kernel_session(self, cluster_rule, basic_context):
+    def test_single_kernel_session() -> None:
         """Test single kernel session configuration."""
         spec = SessionCreationSpec(
             session_creation_id="test-001",
@@ -62,7 +62,7 @@ class TestClusterConfigurationRule:
         assert len(kernel_configs) == 1
         assert kernel_configs[0]["cluster_role"] == DEFAULT_ROLE
 
-    def test_multi_container_single_spec_replication(self, cluster_rule, basic_context):
+    def test_multi_container_single_spec_replication() -> None:
         """Test multi-container session with single kernel spec (replication mode)."""
         spec = SessionCreationSpec(
             session_creation_id="test-002",
@@ -97,7 +97,7 @@ class TestClusterConfigurationRule:
             assert kernel_configs[i]["local_rank"] == i
             assert kernel_configs[i]["cluster_hostname"] == f"sub{i}"
 
-    def test_multi_container_multiple_specs(self, cluster_rule, basic_context):
+    def test_multi_container_multiple_specs() -> None:
         """Test multi-container session with multiple kernel specs."""
         spec = SessionCreationSpec(
             session_creation_id="test-003",
@@ -137,7 +137,7 @@ class TestClusterConfigurationRule:
         assert kernel_configs[2]["cluster_idx"] == 2
         assert kernel_configs[2]["cluster_hostname"] == "sub2"
 
-    def test_predefined_cluster_roles(self, cluster_rule, basic_context):
+    def test_predefined_cluster_roles() -> None:
         """Test handling of predefined cluster roles in kernel specs."""
         spec = SessionCreationSpec(
             session_creation_id="test-004",
@@ -188,7 +188,7 @@ class TestClusterConfigurationRule:
         assert kernel_configs[2]["cluster_idx"] == 2
         assert kernel_configs[2]["cluster_hostname"] == "sub2"
 
-    def test_custom_cluster_hostnames(self, cluster_rule, basic_context):
+    def test_custom_cluster_hostnames() -> None:
         """Test preservation of custom cluster hostnames."""
         spec = SessionCreationSpec(
             session_creation_id="test-005",
@@ -217,7 +217,7 @@ class TestClusterConfigurationRule:
         assert kernel_configs[0]["cluster_hostname"] == "master"
         assert kernel_configs[1]["cluster_hostname"] == "worker1"
 
-    def test_mixed_predefined_and_auto_assignment(self, cluster_rule, basic_context):
+    def test_mixed_predefined_and_auto_assignment() -> None:
         """Test mixed scenario with some predefined roles and some auto-assigned."""
         spec = SessionCreationSpec(
             session_creation_id="test-006",
@@ -267,7 +267,7 @@ class TestClusterConfigurationRule:
         assert kernel_configs[3]["cluster_role"] == "sub"
         assert kernel_configs[3]["cluster_idx"] == 5  # Custom idx preserved
 
-    def test_large_cluster(self, cluster_rule, basic_context):
+    def test_large_cluster() -> None:
         """Test large cluster configuration."""
         cluster_size = 10
         spec = SessionCreationSpec(

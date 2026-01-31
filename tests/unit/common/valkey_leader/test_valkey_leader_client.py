@@ -14,7 +14,7 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 
 
 @pytest.fixture
-async def mock_valkey_client():
+async def mock_valkey_client() -> AsyncMock:
     """Create a mock Valkey client."""
     client_mock = AsyncMock()
     client_mock.client = AsyncMock()
@@ -22,7 +22,7 @@ async def mock_valkey_client():
 
 
 @pytest.fixture
-async def leader_client(mock_valkey_client):
+async def leader_client(mock_valkey_client: AsyncMock) -> ValkeyLeaderClient:
     """Create a ValkeyLeaderClient instance with mocked dependencies."""
     return ValkeyLeaderClient(
         client=mock_valkey_client,
@@ -32,12 +32,14 @@ async def leader_client(mock_valkey_client):
 class TestValkeyLeaderClient:
     """Test cases for ValkeyLeaderClient."""
 
-    async def test_initialization(self, leader_client):
+    async def test_initialization(self, leader_client: ValkeyLeaderClient) -> None:
         """Test that ValkeyLeaderClient is initialized correctly."""
         assert isinstance(leader_client._leader_script, Script)
         assert isinstance(leader_client._release_script, Script)
 
-    async def test_acquire_leadership_when_no_leader(self, leader_client, mock_valkey_client):
+    async def test_acquire_leadership_when_no_leader(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test acquiring leadership when no current leader exists."""
         # Mock the Lua script to return 1 (successfully acquired)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=1)
@@ -56,7 +58,9 @@ class TestValkeyLeaderClient:
         assert call_args.kwargs["keys"] == ["test:leader"]
         assert call_args.kwargs["args"] == ["test-server-001", "10"]
 
-    async def test_renew_leadership_when_already_leader(self, leader_client, mock_valkey_client):
+    async def test_renew_leadership_when_already_leader(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test renewing leadership when already the leader."""
         # Mock the Lua script to return 1 (successfully renewed)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=1)
@@ -76,8 +80,8 @@ class TestValkeyLeaderClient:
         assert call_args.kwargs["args"] == ["test-server-001", "15"]
 
     async def test_fail_to_acquire_when_another_leader_exists(
-        self, leader_client, mock_valkey_client
-    ):
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test failing to acquire leadership when another server is leader."""
         # Mock the Lua script to return 0 (failed to acquire)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=0)
@@ -91,7 +95,9 @@ class TestValkeyLeaderClient:
         assert result is False
         mock_valkey_client.client.invoke_script.assert_called_once()
 
-    async def test_handle_exception_during_acquire(self, leader_client, mock_valkey_client):
+    async def test_handle_exception_during_acquire(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test that exceptions are propagated during acquire_or_renew_leadership."""
 
         # Mock the Lua script to raise an exception
@@ -114,7 +120,9 @@ class TestValkeyLeaderClient:
         # The decorator with retry_count=1 means no retries (try once)
         assert mock_valkey_client.client.invoke_script.call_count == 1
 
-    async def test_release_leadership_when_leader(self, leader_client, mock_valkey_client):
+    async def test_release_leadership_when_leader(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test releasing leadership when this server is the leader."""
         # Mock the Lua script to return 1 (successfully released)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=1)
@@ -131,7 +139,9 @@ class TestValkeyLeaderClient:
         assert call_args.kwargs["keys"] == ["test:leader"]
         assert call_args.kwargs["args"] == ["test-server-001"]
 
-    async def test_release_leadership_when_not_leader(self, leader_client, mock_valkey_client):
+    async def test_release_leadership_when_not_leader(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test releasing leadership when another server is the leader."""
         # Mock the Lua script to return 0 (not the leader)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=0)
@@ -143,7 +153,9 @@ class TestValkeyLeaderClient:
         assert result is False
         mock_valkey_client.client.invoke_script.assert_called_once()
 
-    async def test_release_leadership_when_no_leader(self, leader_client, mock_valkey_client):
+    async def test_release_leadership_when_no_leader(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test releasing leadership when no leader exists."""
         # Mock the Lua script to return 0 (no leader to release)
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=0)
@@ -155,7 +167,9 @@ class TestValkeyLeaderClient:
         assert result is False
         mock_valkey_client.client.invoke_script.assert_called_once()
 
-    async def test_release_leadership_with_exception(self, leader_client, mock_valkey_client):
+    async def test_release_leadership_with_exception(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test that exceptions are propagated during release_leadership."""
         # Mock the Lua script to raise an exception
         mock_valkey_client.client.invoke_script = AsyncMock(
@@ -170,7 +184,9 @@ class TestValkeyLeaderClient:
         # The decorator retries 3 times by default
         assert mock_valkey_client.client.invoke_script.call_count == 3
 
-    async def test_close(self, leader_client, mock_valkey_client):
+    async def test_close(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock
+    ) -> None:
         """Test closing the ValkeyLeaderClient."""
         mock_valkey_client.disconnect = AsyncMock()
 
@@ -180,8 +196,8 @@ class TestValkeyLeaderClient:
 
     @pytest.mark.parametrize("lease_duration", [5, 10, 30, 60])
     async def test_different_lease_durations(
-        self, leader_client, mock_valkey_client, lease_duration
-    ):
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock, lease_duration: int
+    ) -> None:
         """Test acquire_or_renew_leadership with different lease durations."""
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=1)
 
@@ -204,7 +220,9 @@ class TestValkeyLeaderClient:
             "test:leader:custom",
         ],
     )
-    async def test_different_leader_keys(self, leader_client, mock_valkey_client, leader_key):
+    async def test_different_leader_keys(
+        self, leader_client: ValkeyLeaderClient, mock_valkey_client: AsyncMock, leader_key: str
+    ) -> None:
         """Test acquire_or_renew_leadership with different leader keys."""
         mock_valkey_client.client.invoke_script = AsyncMock(return_value=1)
 

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 import uuid
 from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
@@ -72,7 +75,7 @@ class TestDeleteAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_check_user_access_delete_rule(self, mocker, auto_scaling_service) -> AsyncMock:
+    def mock_check_user_access_delete_rule(self, mocker: Any, auto_scaling_service: Any)-> AsyncMock:
         mock = mocker.patch.object(
             auto_scaling_service,
             "check_user_access",
@@ -82,7 +85,7 @@ class TestDeleteAutoScalingRule:
         return mock
 
     @pytest.fixture
-    def mock_get_auto_scaling_rule_by_id_delete_rule(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_auto_scaling_rule_by_id_delete_rule(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "get_auto_scaling_rule_by_id",
@@ -91,7 +94,7 @@ class TestDeleteAutoScalingRule:
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_delete_rule(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
@@ -100,7 +103,7 @@ class TestDeleteAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_delete_auto_scaling_rule(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_delete_auto_scaling_rule(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "delete_auto_scaling_rule",
@@ -136,10 +139,10 @@ class TestDeleteAutoScalingRule:
         ],
         user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_user_access_delete_rule,
-        mock_get_auto_scaling_rule_by_id_delete_rule,
-        mock_get_endpoint_access_validation_data_delete_rule,
-        mock_delete_auto_scaling_rule,
+        mock_check_user_access_delete_rule: AsyncMock,
+        mock_get_auto_scaling_rule_by_id_delete_rule: AsyncMock,
+        mock_get_endpoint_access_validation_data_delete_rule: AsyncMock,
+        mock_delete_auto_scaling_rule: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -164,7 +167,7 @@ class TestDeleteAutoScalingRule:
             mock_get_auto_scaling_rule_by_id_delete_rule.return_value = None
             mock_delete_auto_scaling_rule.return_value = False
 
-        async def delete_auto_scaling_rule(action: DeleteEndpointAutoScalingRuleAction):
+        async def delete_auto_scaling_rule(action: DeleteEndpointAutoScalingRuleAction) -> DeleteEndpointAutoScalingRuleActionResult:
             return (
                 await auto_scaling_processors.delete_endpoint_auto_scaling_rule.wait_for_complete(
                     action

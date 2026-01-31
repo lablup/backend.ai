@@ -3,7 +3,7 @@ import pytest
 from ai.backend.common.service_ports import parse_service_ports
 
 
-def test_parse_service_ports():
+def test_parse_service_ports() -> None:
     result = parse_service_ports("", "")
     assert len(result) == 0
 
@@ -61,7 +61,7 @@ def test_parse_service_ports():
     }
 
 
-def test_parse_service_ports_invalid_values():
+def test_parse_service_ports_invalid_values() -> None:
     with pytest.raises(ValueError, match="Unsupported"):
         parse_service_ports("x:unsupported:1234", "")
 
@@ -90,12 +90,12 @@ def test_parse_service_ports_invalid_values():
         parse_service_ports("y:tcp:7711,x:tcp:2200", "")
 
 
-def test_parse_service_ports_custom_exception():
+def test_parse_service_ports_custom_exception() -> None:
     with pytest.raises(ZeroDivisionError):
         parse_service_ports("x:unsupported:1234", [], ZeroDivisionError)
 
 
-def test_parse_service_ports_ignore_pty():
+def test_parse_service_ports_ignore_pty() -> None:
     result = parse_service_ports("x:pty:1234,y:tcp:1235", "")
     assert len(result) == 1
     assert result[0]["name"] == "y"

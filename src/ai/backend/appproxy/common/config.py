@@ -93,7 +93,7 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: object) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:

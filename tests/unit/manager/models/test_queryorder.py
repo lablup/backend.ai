@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
@@ -7,7 +12,7 @@ from ai.backend.manager.models.utils import agg_to_array
 
 
 @pytest.fixture
-async def virtual_grid_db(database_connection):
+async def virtual_grid_db(database_connection: Any) -> AsyncGenerator[tuple[Any, Any, Any], None]:
     base = declarative_base()
     metadata = base.metadata
     grid = sa.Table(
@@ -26,10 +31,10 @@ async def virtual_grid_db(database_connection):
         sa.Column("name", sa.String(10)),
     )
 
-    def _create_tables(conn, *args, **kwargs):
+    def _create_tables(conn: Any, *args: Any, **kwargs: Any) -> None:
         return metadata.create_all(conn, [grid, foreign_grid])
 
-    def _drop_tables(conn, *args, **kwargs):
+    def _drop_tables(conn: Any, *args: Any, **kwargs: Any) -> None:
         return metadata.drop_all(conn, [grid, foreign_grid])
 
     async with database_connection.begin() as conn:
@@ -58,7 +63,7 @@ async def virtual_grid_db(database_connection):
             await conn.run_sync(_drop_tables)
 
 
-async def test_select_queries(virtual_grid_db) -> None:
+async def test_select_queries(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     conn, grid, _ = virtual_grid_db
     parser = QueryOrderParser()
 
@@ -120,7 +125,7 @@ async def test_select_queries(virtual_grid_db) -> None:
         )
 
 
-async def test_column_map(virtual_grid_db) -> None:
+async def test_column_map(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     conn, grid, _ = virtual_grid_db
     parser = QueryOrderParser({
         "v1": ("data1", None),
@@ -144,7 +149,7 @@ async def test_column_map(virtual_grid_db) -> None:
         )
 
 
-async def test_aggregated_foreign_fields(virtual_grid_db) -> None:
+async def test_aggregated_foreign_fields(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     conn, grid, foreign_grid = virtual_grid_db
     parser = QueryOrderParser({
         "dogs_name": ("test_query_order_dogs_name", agg_to_array),

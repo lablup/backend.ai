@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -116,8 +117,8 @@ class TestAgentConfigReading:
     async def test_read_agent_config_container(
         self,
         agent_rpc_server: AgentRPCServer,
-        mocker,
-        etcd_response: dict,
+        mocker: Any,
+        etcd_response: dict[str, Any],
         expected_gid: int,
         expected_uid: int,
     ) -> None:
@@ -181,7 +182,7 @@ addr = { host = "127.0.0.1", port = 2379 }
         runtime = Mock()
         runtime._default_agent_id = AgentId("test-agent")
 
-        def get_agent_impl(agent_id=None):
+        def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
             return runtime.agents[agent_id]
@@ -239,7 +240,7 @@ scaling-group = "default"
         runtime = Mock()
         runtime._default_agent_id = AgentId("agent-1")
 
-        def get_agent_impl(agent_id=None):
+        def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
             return runtime.agents[agent_id]

@@ -18,7 +18,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 def auth_required(handler: Handler) -> Handler:
     @functools.wraps(handler)
-    async def wrapped(request: web.Request, *args, **kwargs) -> web.StreamResponse:
+    async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
@@ -127,8 +127,8 @@ def pydantic_api_response_handler(
     @functools.wraps(handler)
     async def wrapped(
         request: web.Request,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> web.StreamResponse:
         response = await handler(request, *args, **kwargs)
         return ensure_stream_response_type(response)
@@ -149,8 +149,8 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""

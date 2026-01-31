@@ -665,7 +665,7 @@ ModelRevisionEdge = Edge[ModelRevision]
 class ModelRevisionConnection(Connection[ModelRevision]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

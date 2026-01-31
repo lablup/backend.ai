@@ -24,7 +24,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     # previous table def used for migration
@@ -163,7 +163,7 @@ def upgrade():
     op.drop_column("kernels", "cpu_used")
 
 
-def downgrade():
+def downgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     kernels = sa.Table(

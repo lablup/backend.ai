@@ -33,7 +33,7 @@ endpoint = sa.Table(
 )
 
 
-def upgrade():
+def upgrade() -> None:
     # Create endpoints table
     op.create_table(
         "endpoints",
@@ -67,6 +67,6 @@ def upgrade():
     op.execute(query)
 
 
-def downgrade():
+def downgrade() -> None:
     # Drop endpoints table
     op.drop_table("endpoints")

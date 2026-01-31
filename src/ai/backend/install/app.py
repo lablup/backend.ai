@@ -4,6 +4,7 @@ import asyncio
 import json
 import textwrap
 from pathlib import Path
+from typing import Any
 from weakref import WeakSet
 
 from rich.text import Text
@@ -45,11 +46,13 @@ from .types import (
     PrerequisiteError,
 )
 
-top_tasks: WeakSet[asyncio.Task] = WeakSet()
+from typing import Any
+
+top_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
 
 
 class DevSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -109,7 +112,7 @@ class DevSetup(Static):
 
 
 class PackageSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -189,7 +192,7 @@ class Configure(Static):
     install_variable: InstallVariable | None
     public_facing_address: str | None
 
-    def __init__(self, id: str, **kwargs) -> None:
+    def __init__(self, id: str, **kwargs: Any) -> None:
         super().__init__(**kwargs, id=id)
         self.public_facing_address = None
         self.install_variable = None
@@ -238,7 +241,7 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
 
@@ -524,7 +527,7 @@ class ModeMenu(Static):
         self.app.call_later(configure.feed_variables, self.install_variable)
 
 
-class InstallerApp(App):
+class InstallerApp(App[None]):
     BINDINGS = [
         Binding("q", "shutdown", "Interrupt ongoing tasks / Quit the installer"),
         Binding(

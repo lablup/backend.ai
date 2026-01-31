@@ -23,7 +23,7 @@ class TestValkeyArtifactRegistryClient:
     @pytest.fixture
     async def valkey_artifact_registry_client(
         self,
-        redis_container,
+        redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyArtifactRegistryClient, None]:
         """Valkey client that auto-cleans cache after each test"""
         hostport_pair: HostPortPairModel = redis_container[1]

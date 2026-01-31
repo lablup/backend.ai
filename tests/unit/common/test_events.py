@@ -16,6 +16,7 @@ from ai.backend.common.events.types import (
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
+from ai.backend.common.message_queue.redis_queue import RedisQueue
 from ai.backend.common.types import AgentId
 
 
@@ -27,11 +28,11 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
         return (self.value + 1,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple) -> DummyBroadcastEvent:
         return cls(value[0] + 1)
 
     @classmethod
-    def event_domain(self) -> EventDomain:
+    def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
     def domain_id(self) -> str | None:
@@ -41,7 +42,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
         return None
 
     @classmethod
-    def event_name(self) -> str:
+    def event_name(cls) -> str:
         return "testing"
 
 
@@ -49,7 +50,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
 @pytest.mark.asyncio
-async def test_dispatch(test_valkey_stream_mq, test_node_id) -> None:
+async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) -> None:
     app = object()
 
     dispatcher = EventDispatcher(
@@ -91,7 +92,7 @@ async def test_dispatch(test_valkey_stream_mq, test_node_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_error_on_dispatch(test_valkey_stream_mq, test_node_id) -> None:
+async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) -> None:
     app = object()
     exception_log: list[str] = []
 
@@ -137,7 +138,7 @@ async def test_error_on_dispatch(test_valkey_stream_mq, test_node_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_event_dispatcher_rate_control():
+async def test_event_dispatcher_rate_control() -> None:
     opts = CoalescingOptions(max_wait=0.1, max_batch_size=5)
     state = CoalescingState()
     assert await state.rate_control(None) is True

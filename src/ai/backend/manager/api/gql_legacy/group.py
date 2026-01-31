@@ -311,7 +311,7 @@ class GroupNode(graphene.ObjectType):
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> GroupNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> GroupNode:
         return await GroupNode.get_node(info, self.id)
 
 

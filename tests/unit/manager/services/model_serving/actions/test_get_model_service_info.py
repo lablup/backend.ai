@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -149,7 +149,7 @@ class TestGetModelServiceInfo:
         )
 
     @pytest.fixture
-    def mock_check_user_access_get_info(self, mocker, model_serving_service) -> AsyncMock:
+    def mock_check_user_access_get_info(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
         mock = mocker.patch.object(
             model_serving_service,
             "check_user_access",
@@ -159,7 +159,7 @@ class TestGetModelServiceInfo:
         return mock
 
     @pytest.fixture
-    def mock_get_endpoint_by_id_get_info(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_get_endpoint_by_id_get_info(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "get_endpoint_by_id",
@@ -168,7 +168,7 @@ class TestGetModelServiceInfo:
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_get_info(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
@@ -210,9 +210,9 @@ class TestGetModelServiceInfo:
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_get_info,
-        mock_get_endpoint_by_id_get_info,
-        mock_get_endpoint_access_validation_data_get_info,
+        mock_check_user_access_get_info: AsyncMock,
+        mock_get_endpoint_by_id_get_info: AsyncMock,
+        mock_get_endpoint_access_validation_data_get_info: AsyncMock,
     ) -> None:
         # Mock repository responses
         expected = cast(GetModelServiceInfoActionResult, scenario.expected)
@@ -252,7 +252,7 @@ class TestGetModelServiceInfo:
         # Now uses single repository for all roles
         mock_get_endpoint_by_id_get_info.return_value = mock_endpoint
 
-        async def get_model_service_info(action: GetModelServiceInfoAction):
+        async def get_model_service_info(action: GetModelServiceInfoAction) -> GetModelServiceInfoActionResult:
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)
 
         await scenario.test(get_model_service_info)

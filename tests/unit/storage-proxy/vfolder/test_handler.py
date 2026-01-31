@@ -27,7 +27,7 @@ UUID2 = uuid.UUID("123e4567-e89b-12d3-a456-426614174002")
 
 class MockVFolderService(VFolderServiceProtocol):
     @override
-    async def get_volume(self, volume_id) -> VolumeMeta:
+    async def get_volume(self, volume_id: uuid.UUID) -> VolumeMeta:
         return VolumeMeta(
             volume_id=volume_id,
             backend="vfs",
@@ -105,7 +105,7 @@ def mock_vfolder_service() -> MockVFolderService:
 
 
 @pytest.mark.asyncio
-async def test_get_volume(mock_vfolder_service) -> None:
+async def test_get_volume(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -121,7 +121,7 @@ async def test_get_volume(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_volumes(mock_vfolder_service) -> None:
+async def test_get_volumes(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -135,7 +135,7 @@ async def test_get_volumes(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_quota_scope(mock_vfolder_service) -> None:
+async def test_create_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -153,7 +153,7 @@ async def test_create_quota_scope(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_quota_scope(mock_vfolder_service) -> None:
+async def test_get_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -174,7 +174,7 @@ async def test_get_quota_scope(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_quota_scope(mock_vfolder_service) -> None:
+async def test_update_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -192,7 +192,7 @@ async def test_update_quota_scope(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_quota_scope(mock_vfolder_service) -> None:
+async def test_delete_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -209,7 +209,7 @@ async def test_delete_quota_scope(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_vfolder(mock_vfolder_service) -> None:
+async def test_create_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -227,7 +227,7 @@ async def test_create_vfolder(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clone_vfolder(mock_vfolder_service) -> None:
+async def test_clone_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -251,7 +251,7 @@ async def test_clone_vfolder(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_vfolder_info(mock_vfolder_service) -> None:
+async def test_get_vfolder_info(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)
@@ -277,7 +277,7 @@ async def test_get_vfolder_info(mock_vfolder_service) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_vfolder(mock_vfolder_service) -> None:
+async def test_delete_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
     mock_request = AsyncMock(web.Request)

@@ -21,7 +21,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     keypairs = sa.Table(
         "keypairs",
@@ -76,5 +76,5 @@ def upgrade():
             )
 
 
-def downgrade():
+def downgrade() -> None:
     op.alter_column("keypairs", "user_id", existing_type=sa.Integer(), type_=sa.String(length=256))

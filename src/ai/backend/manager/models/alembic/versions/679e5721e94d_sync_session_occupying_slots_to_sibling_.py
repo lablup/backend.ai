@@ -64,7 +64,7 @@ class KernelRow(Base):
     )
 
 
-def _sync_single_kernel_cluster_session():
+def _sync_single_kernel_cluster_session() -> None:
     conn = op.get_bind()
     sync_stmt = textwrap.dedent(
         """
@@ -78,7 +78,7 @@ def _sync_single_kernel_cluster_session():
     conn.execute(text(sync_stmt))
 
 
-def _sync_multi_kernel_cluster_session():
+def _sync_multi_kernel_cluster_session() -> None:
     db_sess = Session(op.get_bind())
 
     while True:
@@ -108,10 +108,10 @@ def _sync_multi_kernel_cluster_session():
         db_sess.execute(update_stmt, data)
 
 
-def upgrade():
+def upgrade() -> None:
     _sync_single_kernel_cluster_session()
     _sync_multi_kernel_cluster_session()
 
 
-def downgrade():
+def downgrade() -> None:
     pass

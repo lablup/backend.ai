@@ -97,7 +97,7 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
         self,
         extra_msg: str | None = None,
         extra_data: dict[str, Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [

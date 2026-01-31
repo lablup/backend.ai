@@ -82,7 +82,7 @@ SessionSchedulingHistoryEdge = Edge[SessionSchedulingHistory]
 class SessionSchedulingHistoryConnection(Connection[SessionSchedulingHistory]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -94,7 +94,7 @@ DeploymentHistoryEdge = Edge[DeploymentHistory]
 class DeploymentHistoryConnection(Connection[DeploymentHistory]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -106,7 +106,7 @@ RouteHistoryEdge = Edge[RouteHistory]
 class RouteHistoryConnection(Connection[RouteHistory]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

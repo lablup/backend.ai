@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console, ConsoleRenderable
 from rich.text import Text
@@ -31,7 +32,7 @@ class DirectoryPathValidator(Validator):
 
 
 class ProgressItem(Static):
-    def __init__(self, label: str, *args, **kwargs) -> None:
+    def __init__(self, label: str, *args: Any, **kwargs: Any) -> None:
         kwargs["classes"] = " ".join((kwargs.get("classes", ""), "progress-item"))
         super().__init__(*args, **kwargs)
         self._label = label
@@ -48,8 +49,8 @@ class SetupLog(RichLog):
 
     def __init__(
         self,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._continue = asyncio.Event()
@@ -154,7 +155,7 @@ class InputDialog(Static):
         *,
         allow_cancel: bool = True,
         validator: Validator | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._label = label

@@ -42,7 +42,7 @@ async def etcd_discovery(etcd: AsyncEtcd) -> AsyncIterator[ETCDServiceDiscovery]
 
 
 @pytest.fixture
-async def redis_conn(redis_container) -> AsyncIterator[RedisConnectionInfo]:
+async def redis_conn(redis_container: tuple[str, HostPortPairModel]) -> AsyncIterator[RedisConnectionInfo]:
     # Configure test Redis connection
     conn = redis_helper.get_redis_object(
         RedisTarget(
@@ -64,7 +64,7 @@ async def redis_conn(redis_container) -> AsyncIterator[RedisConnectionInfo]:
 
 
 @pytest.fixture
-async def redis_discovery(redis_container) -> AsyncIterator[RedisServiceDiscovery]:
+async def redis_discovery(redis_container: tuple[str, HostPortPairModel]) -> AsyncIterator[RedisServiceDiscovery]:
     # Create a proper RedisTarget for the service discovery
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(

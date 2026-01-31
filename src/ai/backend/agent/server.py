@@ -145,7 +145,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 def collect_error(meth: Callable) -> Callable:
     @functools.wraps(meth)
-    async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+    async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
@@ -235,7 +235,7 @@ class RPCFunctionRegistryV2:
 def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
-        async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+        async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
             try:
                 res = await meth(self, *args, **kwargs)
@@ -575,7 +575,7 @@ class AgentRPCServer(aobject):
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self.runtime.mark_stop_signal(stop_signal)
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
         self.debug_server_task.cancel()

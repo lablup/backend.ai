@@ -14,7 +14,7 @@ class DummyResource:
 
 
 @pytest.mark.asyncio
-async def test_provisionstage_success():
+async def test_provisionstage_success() -> None:
     spec_gen = AsyncMock(spec=SpecGenerator)
     spec = DummySpec()
     spec_gen.wait_for_spec.return_value = spec
@@ -30,7 +30,7 @@ async def test_provisionstage_success():
 
 
 @pytest.mark.asyncio
-async def test_provisionstage_setup_failure():
+async def test_provisionstage_setup_failure() -> None:
     spec_gen = AsyncMock(spec=SpecGenerator)
     spec_gen.wait_for_spec.return_value = DummySpec()
 
@@ -44,7 +44,7 @@ async def test_provisionstage_setup_failure():
 
 
 @pytest.mark.asyncio
-async def test_provisionstage_teardown():
+async def test_provisionstage_teardown() -> None:
     spec_gen = AsyncMock(spec=SpecGenerator)
     spec = DummySpec()
     spec_gen.wait_for_spec.return_value = spec
@@ -62,7 +62,7 @@ async def test_provisionstage_teardown():
 
 
 @pytest.mark.asyncio
-async def test_provisionstage_teardown_without_resource():
+async def test_provisionstage_teardown_without_resource() -> None:
     provisioner = AsyncMock(spec=Provisioner)
     stage: ProvisionStage = ProvisionStage(provisioner)
     await stage.teardown()

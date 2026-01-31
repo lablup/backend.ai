@@ -18,7 +18,7 @@ class Runner(BaseRunner):
     log_prefix = "app-kernel"
     default_runtime_path = "/opt/backend.ai/bin/python"
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     async def init_with_loop(self) -> None:

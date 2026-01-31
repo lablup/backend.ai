@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -79,7 +80,7 @@ def client() -> Client:
 
 @pytest.fixture
 def container_registry_processor(
-    extra_fixtures, database_fixture, database_engine
+    extra_fixtures: dict[str, Any], database_fixture: None, database_engine: ExtendedAsyncSAEngine
 ) -> ContainerRegistryProcessors:
     repository = ContainerRegistryRepository(
         db=database_engine,
@@ -92,7 +93,7 @@ def container_registry_processor(
 
 
 @pytest.fixture
-def processors(container_registry_processor) -> Processors:
+def processors(container_registry_processor: ContainerRegistryProcessors) -> Processors:
     mock_processors = MagicMock(spec=Processors)
     mock_processors.container_registry = container_registry_processor
     return mock_processors
@@ -133,7 +134,7 @@ def get_graphquery_context(
 @pytest.mark.asyncio
 async def test_create_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
-):
+) -> None:
     context = get_graphquery_context(database_engine, processors)
 
     query = """
@@ -184,7 +185,7 @@ async def test_create_container_registry(
 @pytest.mark.asyncio
 async def test_modify_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
-):
+) -> None:
     context = get_graphquery_context(database_engine, processors)
 
     query = """
@@ -272,7 +273,7 @@ async def test_modify_container_registry(
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
-):
+) -> None:
     context = get_graphquery_context(database_engine, processors)
 
     query = """
@@ -339,7 +340,7 @@ async def test_modify_container_registry_allows_empty_string(
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
-):
+) -> None:
     context = get_graphquery_context(database_engine, processors)
 
     query = """
@@ -406,7 +407,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 @pytest.mark.asyncio
 async def test_delete_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, processors: Processors
-):
+) -> None:
     context = get_graphquery_context(database_engine, processors)
 
     query = """
@@ -495,14 +496,14 @@ async def test_delete_container_registry(
 )
 async def test_associate_container_registry_with_group(
     client: Client,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    extra_fixtures,
-    test_case,
-    create_app_and_client,
-    processors,
-):
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    extra_fixtures: dict[str, Any],
+    test_case: dict[str, Any],
+    create_app_and_client: Any,
+    processors: Processors,
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -568,14 +569,14 @@ async def test_associate_container_registry_with_group(
 )
 async def test_disassociate_container_registry_with_group(
     client: Client,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    extra_fixtures,
-    test_case,
-    create_app_and_client,
-    processors,
-):
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    extra_fixtures: dict[str, Any],
+    test_case: dict[str, Any],
+    create_app_and_client: Any,
+    processors: Processors,
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,

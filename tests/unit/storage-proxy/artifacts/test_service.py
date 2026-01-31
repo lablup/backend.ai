@@ -1,6 +1,7 @@
 """Tests for DownloadStep implementations."""
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -533,7 +534,7 @@ class TestHuggingFaceDownloadStep:
         mock_client_session.return_value = mock_session
 
         # Create an async generator for iter_chunked
-        async def mock_iter_chunked(chunk_size):
+        async def mock_iter_chunked(chunk_size: int) -> AsyncIterator[bytes]:
             yield b"chunk1"
             yield b"chunk2"
 
@@ -542,7 +543,7 @@ class TestHuggingFaceDownloadStep:
         mock_response.content.iter_chunked = mock_iter_chunked
 
         # Mock headers.get to return different values for different headers
-        def mock_headers_get(key, default=None):
+        def mock_headers_get(key: str, default: str | None = None) -> str | None:
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
             if key == "ETag" or key == "Accept-Ranges":
@@ -605,7 +606,7 @@ class TestHuggingFaceDownloadStep:
         mock_client_session.return_value = mock_session
 
         # Create an async generator that immediately raises a non-retriable error
-        async def mock_iter_chunked_error(chunk_size):
+        async def mock_iter_chunked_error(chunk_size: int) -> AsyncIterator[bytes]:
             raise RuntimeError("HTTP 404 Not Found")
             yield  # Never reached, but needed for generator syntax
 
@@ -614,7 +615,7 @@ class TestHuggingFaceDownloadStep:
         mock_response.content.iter_chunked = mock_iter_chunked_error
 
         # Mock headers.get to return valid Content-Length for HEAD probe, but defaults for others
-        def mock_headers_get(key, default=None):
+        def mock_headers_get(key: str, default: str | None = None) -> str | None:
             if key == "Content-Length":
                 return "100"  # Valid content length for HEAD probe
             return default
@@ -843,7 +844,7 @@ class TestReservoirDownloadStep:
         """Test S3 client creation with storage not found."""
 
         # Configure mock to raise KeyError for unknown storage
-        def mock_get_storage(name: str):
+        def mock_get_storage(name: str) -> object:
             if name == "test_storage":
                 return mock_storage_pool.get_storage("test_storage")
             raise KeyError(name)
@@ -953,7 +954,7 @@ class TestReservoirDownloadStep:
             mock_s3_client_class.return_value = mock_src_client
 
             # Mock download stream
-            async def mock_download_stream(key, chunk_size):
+            async def mock_download_stream(key: str, chunk_size: int) -> AsyncIterator[bytes]:
                 yield b"chunk1"
                 yield b"chunk2"
 

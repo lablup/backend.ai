@@ -22,7 +22,7 @@ class PgAdvisoryLock(AbstractDistributedLock):
         self._lock_ctx = self.db.advisory_lock(self.lock_id)
         await self._lock_ctx.__aenter__()
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: object) -> bool | None:
         if self._lock_ctx is None:
             raise LockContextNotInitializedError("Lock context is not initialized")
         try:

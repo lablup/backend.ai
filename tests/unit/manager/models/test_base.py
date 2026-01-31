@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -9,19 +12,19 @@ from ai.backend.manager.models.base import DecimalType
 
 
 @pytest.mark.asyncio
-async def test_batch_result_in_scalar_stream():
+async def test_batch_result_in_scalar_stream() -> None:
     key_list = [1, 2, 3]
 
     mock_rows = [SimpleNamespace(id=1, data="data1"), SimpleNamespace(id=3, data="data3")]
 
-    async def mock_stream_scalars(query):
+    async def mock_stream_scalars(query: Any) -> None:
         for row in mock_rows:
             yield row
 
     mock_db_sess = MagicMock()
     mock_db_sess.stream_scalars = AsyncMock(side_effect=mock_stream_scalars)
 
-    def mock_from_row(graph_ctx, row):
+    def mock_from_row(graph_ctx: Any, row: Any) -> None:
         return {"id": row.id, "data": row.data}
 
     mock_obj_type = MagicMock()

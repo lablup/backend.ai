@@ -26,7 +26,7 @@ class DummyEtcd:
 
 
 @pytest.fixture
-async def agent(local_config, test_id, mocker, socket_relay_image):
+async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image: Any) -> Any:
     dummy_etcd = DummyEtcd()
     mocked_etcd_get_prefix = AsyncMock(return_value={})
     mocker.patch.object(dummy_etcd, "get_prefix", new=mocked_etcd_get_prefix)
@@ -52,7 +52,7 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
 
 
 @pytest.mark.asyncio
-async def test_init(agent, mocker):
+async def test_init(agent: DockerAgent, mocker: Any) -> None:
     print(agent)
 
 
@@ -80,7 +80,7 @@ digest_mismatching_image_info = {
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_digest_when_digest_matching(agent, mocker):
+async def test_auto_pull_digest_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -94,7 +94,7 @@ async def test_auto_pull_digest_when_digest_matching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_digest_when_digest_mismatching(agent, mocker):
+async def test_auto_pull_digest_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -108,7 +108,7 @@ async def test_auto_pull_digest_when_digest_mismatching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_digest_when_missing(agent, mocker):
+async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.DIGEST
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -127,7 +127,7 @@ async def test_auto_pull_digest_when_missing(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_tag_when_digest_matching(agent, mocker):
+async def test_auto_pull_tag_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -141,7 +141,7 @@ async def test_auto_pull_tag_when_digest_matching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_tag_when_digest_mismatching(agent, mocker):
+async def test_auto_pull_tag_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -155,7 +155,7 @@ async def test_auto_pull_tag_when_digest_mismatching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_tag_when_missing(agent, mocker):
+async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.TAG
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -174,7 +174,7 @@ async def test_auto_pull_tag_when_missing(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_none_when_digest_matching(agent, mocker):
+async def test_auto_pull_none_when_digest_matching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -188,7 +188,7 @@ async def test_auto_pull_none_when_digest_matching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_none_when_digest_mismatching(agent, mocker):
+async def test_auto_pull_none_when_digest_mismatching(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -202,7 +202,7 @@ async def test_auto_pull_none_when_digest_mismatching(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_auto_pull_none_when_missing(agent, mocker):
+async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> None:
     behavior = AutoPullBehavior.NONE
     docker_mock = MagicMock()
     docker_mock.close = AsyncMock()
@@ -222,7 +222,7 @@ async def test_auto_pull_none_when_missing(agent, mocker):
 
 
 @pytest.mark.asyncio
-async def test_save_last_registry_exception(agent, mocker):
+async def test_save_last_registry_exception(agent: DockerAgent, mocker: Any) -> None:
     agent.latest_registry_written_time = MagicMock(return_value=0)
     mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)
     registry_state_path = (

@@ -5,7 +5,7 @@ import uuid
 from ai.backend.common.json import ExtendedJSONEncoder
 
 
-def test_encode():
+def test_encode() -> None:
     ret = json.dumps(
         {"x": uuid.UUID("78bd79c7-214b-4ec6-9a22-3461785bced6")},
         cls=ExtendedJSONEncoder,

@@ -87,7 +87,7 @@ class AliasedKey(t.Key):
 
     names: Sequence[str]
 
-    def __init__(self, names: Sequence[str], **kwargs) -> None:
+    def __init__(self, names: Sequence[str], **kwargs: Any) -> None:
         super().__init__(names[0], **kwargs)
         self.names = names
 

@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     # partial table to be preserved and referred
     keypairs = sa.Table(
@@ -109,7 +109,7 @@ def upgrade():
     op.drop_column("vfolder_permissions", "access_key")
 
 
-def downgrade():
+def downgrade() -> None:
     #######################################################################
     # CAUTION: group vfolders will be lost by downgrading this migration!
     #######################################################################

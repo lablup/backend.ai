@@ -48,10 +48,10 @@ def toml_set(filepath: str, key: str, value: str) -> None:
         while True:
             k = keytree.pop(0)
             if len(keytree) > 0:
-                table[k] = tomlkit.table()  # type: ignore
-                table = table[k]  # type: ignore
+                table[k] = tomlkit.table()
+                table = table[k]
             else:
-                table[k] = value  # type: ignore
+                table[k] = value
                 break
     else:
         if filepath == "-":
@@ -72,12 +72,12 @@ def toml_set(filepath: str, key: str, value: str) -> None:
                     if (match_index := rx_index.search(k)) and (
                         (index := match_index.group("index")) is not None
                     ):
-                        table = table[match_index.group("key")][int(index)]  # type: ignore
+                        table = table[match_index.group("key")][int(index)]
                     else:
-                        table = table[k]  # type: ignore
+                        table = table[k]
                 except NonExistentKey:
-                    table[k] = tomlkit.table()  # type: ignore
-                    table = table[k]  # type: ignore
+                    table[k] = tomlkit.table()
+                    table = table[k]
             last_key = keytree[-1]
             if not isinstance(table, AbstractTable):
                 raise ValueError(

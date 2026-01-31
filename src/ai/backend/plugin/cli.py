@@ -40,7 +40,7 @@ class CLIContext:
         self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         self._logger.__exit__()
 
 

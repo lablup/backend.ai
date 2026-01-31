@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import enum
 import secrets
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -17,7 +21,7 @@ class UserTypes(enum.Enum):
 
 
 @pytest.fixture
-async def virtual_user_db(postgres_container):  # noqa
+async def virtual_user_db(postgres_container: Any) -> AsyncGenerator[tuple[Any, Any], None]:  # noqa
     pgsql_addr = postgres_container[1]
     host = pgsql_addr.host
     port = pgsql_addr.port
@@ -43,10 +47,10 @@ async def virtual_user_db(postgres_container):  # noqa
         sa.Column("tags", sa.ARRAY(sa.Text())),
     )
 
-    def _create_all_sync(conn, engine):
+    def _create_all_sync(conn: Any, engine: Any) -> None:
         metadata.create_all(engine, checkfirst=False)
 
-    def _drop_all_sync(conn, engine):
+    def _drop_all_sync(conn: Any, engine: Any) -> None:
         metadata.drop_all(engine, checkfirst=False)
 
     async with async_engine.begin() as conn:
@@ -107,7 +111,7 @@ async def virtual_user_db(postgres_container):  # noqa
 
 
 @pytest.mark.asyncio
-async def test_select_queries(virtual_user_db) -> None:
+async def test_select_queries(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser()
 
@@ -267,7 +271,7 @@ async def test_select_queries(virtual_user_db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_modification_queries(virtual_user_db) -> None:
+async def test_modification_queries(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser()
 
@@ -287,7 +291,7 @@ async def test_modification_queries(virtual_user_db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_fieldspec(virtual_user_db) -> None:
+async def test_fieldspec(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser({
         "n1": ("name", None),

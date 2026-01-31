@@ -41,7 +41,7 @@ class PeerInvoker(Peer):
             if f := self._cached_funcs.get(name, None):
                 return f
 
-            async def _wrapped(*args, **kwargs) -> Any:
+            async def _wrapped(*args: Any, **kwargs: Any) -> Any:
                 request_body = {
                     "args": args,
                     "kwargs": kwargs,
@@ -57,7 +57,7 @@ class PeerInvoker(Peer):
     call: _CallStub
     last_used: float
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.call = self._CallStub(self)
         self.last_used = time.monotonic()

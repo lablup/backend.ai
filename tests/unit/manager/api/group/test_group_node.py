@@ -5,8 +5,10 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -97,10 +99,10 @@ class TestCreateGroupMutation:
     @pytest.fixture
     async def graphql_client(
         self,
-        aiohttp_client,
+        aiohttp_client: Any,
         mutation_schema: graphene.Schema,
         mock_graph_ctx: MagicMock,
-    ) -> TestClient:
+    ) -> AsyncGenerator[TestClient, None]:
         """Create test client with GraphQL endpoint."""
 
         async def graphql_handler(request: web.Request) -> web.Response:
@@ -221,9 +223,9 @@ class TestGroupNodeQuery:
     @pytest.fixture
     async def graphql_client(
         self,
-        aiohttp_client,
+        aiohttp_client: Any,
         query_schema: graphene.Schema,
-    ) -> TestClient:
+    ) -> AsyncGenerator[TestClient, None]:
         """Create test client with GraphQL endpoint."""
         mock_ctx = MagicMock()
 

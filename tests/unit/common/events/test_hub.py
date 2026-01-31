@@ -67,7 +67,7 @@ class DummyEventPropagator(EventPropagator):
 
 
 @pytest.mark.asyncio
-async def test_hub_normal_aliases():
+async def test_hub_normal_aliases() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, "s001"),
@@ -111,7 +111,7 @@ async def test_hub_normal_aliases():
 
 
 @pytest.mark.asyncio
-async def test_hub_wildcard_aliases():
+async def test_hub_wildcard_aliases() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
@@ -154,7 +154,7 @@ async def test_hub_wildcard_aliases():
 
 
 @pytest.mark.asyncio
-async def test_hub_close_by_alias():
+async def test_hub_close_by_alias() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
@@ -184,7 +184,7 @@ async def test_hub_close_by_alias():
 
 
 @pytest.mark.asyncio
-async def test_hub_shutdown():
+async def test_hub_shutdown() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),

@@ -817,7 +817,7 @@ class TestDefinitionFileRequirement:
         return uuid4()
 
     @pytest.fixture
-    def custom_generator(self, mock_deployment_repository: MagicMock):
+    def custom_generator(self, mock_deployment_repository: MagicMock) -> None:
         return CustomRevisionGenerator(mock_deployment_repository)
 
     @pytest.mark.asyncio

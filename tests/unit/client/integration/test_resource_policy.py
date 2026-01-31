@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 
@@ -11,7 +12,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_manipulate_resource_policy(self):
+async def test_manipulate_resource_policy(self: Any) -> None:
     access_key = get_config().access_key
     rpname = "testrp-" + uuid.uuid4().hex
     with Session() as sess:
@@ -67,7 +68,7 @@ async def test_manipulate_resource_policy(self):
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_create_resource_policy(self, userconfig):
+async def test_user_cannot_create_resource_policy(self: Any, userconfig: Any) -> None:
     rpname = "testrp-" + uuid.uuid4().hex
     with Session() as sess, pytest.raises(BackendAPIError):
         sess.ResourcePolicy.create(

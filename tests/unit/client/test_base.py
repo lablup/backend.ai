@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import asyncio
+from collections.abc import Iterator
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -10,11 +13,11 @@ from ai.backend.client.session import AsyncSession, Session
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api_version():
+def api_version() -> Iterator[tuple[int, str]]:
     mock_nego_func = AsyncMock()
     mock_nego_func.return_value = API_VERSION
     with mock.patch("ai.backend.client.session._negotiate_api_version", mock_nego_func):
-        yield
+        yield API_VERSION
 
 
 class DummyFunction:
@@ -22,17 +25,17 @@ class DummyFunction:
 
     @api_function
     @classmethod
-    async def get_or_create(cls):
+    async def get_or_create(cls) -> str:
         await asyncio.sleep(0)
         return "created"
 
     @api_function
-    async def calculate(self):
+    async def calculate(self) -> str:
         await asyncio.sleep(0)
         return "done"
 
 
-def test_api_function_metaclass():
+def test_api_function_metaclass() -> None:
     # Here, we repeat intentionally the same stuffs
     # to check if our metaclass works across multiple
     # re-definition and re-instantiation scenarios.
@@ -75,7 +78,7 @@ def test_api_function_metaclass():
 
 
 @pytest.mark.asyncio
-async def test_api_function_metaclass_async():
+async def test_api_function_metaclass_async() -> None:
     async with AsyncSession() as session:
         Dummy = type(
             "DummyFunction",

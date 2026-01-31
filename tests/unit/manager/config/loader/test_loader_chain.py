@@ -12,7 +12,7 @@ class DummyLoader(AbstractConfigLoader):
         return self.payload
 
 
-async def test_loader_chain():
+async def test_loader_chain() -> None:
     l1 = DummyLoader({"a": 1, "nested": {"x": 1}})
     l2 = DummyLoader({"b": 2, "nested": {"x": 99}})
 

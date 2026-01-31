@@ -111,7 +111,7 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs) -> None:
+    def __init__(self, container_id: str, message: str | None = None, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.container_id = container_id
         self.message = message
@@ -132,7 +132,7 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: str | None = None) -> None:
+    def __init__(self, *args: Any, exc_repr: str | None = None) -> None:
         super().__init__(*args)
         self.exc_repr = exc_repr
 

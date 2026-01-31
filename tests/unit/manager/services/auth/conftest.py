@@ -12,12 +12,12 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
+def mock_hook_plugin_ctx() -> None:
     return MagicMock(spec=HookPluginContext)
 
 
 @pytest.fixture
-def mock_config_provider():
+def mock_config_provider() -> None:
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_provider.config = MagicMock(spec=ManagerConfig)
     mock_provider.config.auth = AuthConfig(

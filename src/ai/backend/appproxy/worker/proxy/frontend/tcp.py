@@ -30,7 +30,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     root_context: RootContext
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.servers = []

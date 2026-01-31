@@ -72,8 +72,8 @@ class CustomJsonFormatter(JsonFormatter):
             log_record["level"] = record.levelname.upper()
 
 
-class ColorizedFormatter(coloredlogs.ColoredFormatter):
-    def __init__(self, *args, **kwargs) -> None:
+class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
 

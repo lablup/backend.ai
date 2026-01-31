@@ -21,7 +21,7 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
         ca_certs: str | None = None,
         certfile: str | None = None,
         keyfile: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize the GELFTLSHandler
 

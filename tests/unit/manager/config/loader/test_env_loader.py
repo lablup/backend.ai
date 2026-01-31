@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import Any
 
 import pytest
 
@@ -7,13 +10,13 @@ from ai.backend.manager.config.loader.loader_chain import merge_configs
 
 
 @pytest.fixture
-def env_vars(monkeypatch) -> None:
+def env_vars(monkeypatch: Any) -> None:
     monkeypatch.setenv("TEST_DB_USER", "admin")
     monkeypatch.setenv("TEST_DB_PASSWORD", "secret")
     monkeypatch.setenv("TEST_MANAGER_NPROC", "4")
 
 
-def test_deep_merge_overrides():
+def test_deep_merge_overrides() -> None:
     base = {"db": {"host": "localhost", "port": 5432}, "log_level": "INFO"}
     overlay = {"db": {"port": 6543}, "extra": True}
 
@@ -26,7 +29,7 @@ def test_deep_merge_overrides():
     }
 
 
-async def test_env_loader(env_vars):
+async def test_env_loader() -> None:
     env_map = [
         (["db", "user"], "TEST_DB_USER"),
         (["db", "password"], "TEST_DB_PASSWORD"),

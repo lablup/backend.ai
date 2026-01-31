@@ -166,7 +166,7 @@ class AgentRuntime:
             aiotools.create_timer(self._collect_node_stat, UTILIZATION_METRIC_INTERVAL),
         ]
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await aiotools.cancel_and_wait(self._timer_tasks)
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)

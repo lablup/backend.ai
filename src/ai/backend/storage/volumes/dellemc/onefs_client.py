@@ -62,7 +62,7 @@ class OneFSClient:
         self,
         method: str,
         path: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         async with self._session.request(
             method,

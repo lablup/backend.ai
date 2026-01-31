@@ -52,7 +52,7 @@ _T = TypeVar("_T")
 def error_handler[T](
     inner: Callable[..., Coroutine[Any, Any, T]],
 ) -> Callable[..., Coroutine[Any, Any, T]]:
-    async def outer(*args, **kwargs) -> T:
+    async def outer(*args: Any, **kwargs: Any) -> T:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:

@@ -573,7 +573,7 @@ class ResourceAllocator(aobject):
 
         self._ensure_slots_are_not_overallocated()
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         for _, computer in self.computers.items():
             try:
                 await computer.instance.cleanup()

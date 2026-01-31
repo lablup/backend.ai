@@ -250,7 +250,7 @@ class ProxyRunnerContext:
             await self.api_session.__aexit__(*sys.exc_info())
             raise
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         if self.local_server is not None:
             print_info("Shutting down....")
             self.local_server.close()

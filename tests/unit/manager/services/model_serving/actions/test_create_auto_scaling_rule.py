@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 import uuid
 from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
@@ -77,7 +80,7 @@ class TestCreateEndpointAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_check_user_access_create(self, mocker, auto_scaling_service) -> AsyncMock:
+    def mock_check_user_access_create(self, mocker: Any, auto_scaling_service: Any)-> AsyncMock:
         mock = mocker.patch.object(
             auto_scaling_service,
             "check_user_access",
@@ -88,7 +91,7 @@ class TestCreateEndpointAutoScalingRule:
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_create(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
@@ -97,7 +100,7 @@ class TestCreateEndpointAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_create_auto_scaling_rule(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_create_auto_scaling_rule(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "create_auto_scaling_rule",
@@ -214,9 +217,9 @@ class TestCreateEndpointAutoScalingRule:
         ],
         user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_user_access_create,
-        mock_get_endpoint_access_validation_data_create,
-        mock_create_auto_scaling_rule,
+        mock_check_user_access_create: AsyncMock,
+        mock_get_endpoint_access_validation_data_create: AsyncMock,
+        mock_create_auto_scaling_rule: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -255,7 +258,7 @@ class TestCreateEndpointAutoScalingRule:
             mock_get_endpoint_access_validation_data_create.return_value = None
             mock_create_auto_scaling_rule.return_value = None
 
-        async def create_auto_scaling_rule(action: CreateEndpointAutoScalingRuleAction):
+        async def create_auto_scaling_rule(action: CreateEndpointAutoScalingRuleAction) -> CreateEndpointAutoScalingRuleActionResult:
             return (
                 await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
                     action

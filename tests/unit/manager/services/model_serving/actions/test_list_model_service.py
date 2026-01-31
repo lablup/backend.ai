@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import cast, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -149,7 +149,9 @@ class TestListModelService:
         )
 
     @pytest.fixture
-    def mock_list_endpoints_by_owner_validated(self, mocker, mock_repositories) -> AsyncMock:
+    def mock_list_endpoints_by_owner_validated(
+        self, mocker: Any, mock_repositories: MagicMock
+    ) -> AsyncMock:
         return mocker.patch.object(
             mock_repositories.repository,
             "list_endpoints_by_owner_validated",
@@ -219,10 +221,10 @@ class TestListModelService:
     @pytest.mark.asyncio
     async def test_list_model_service(
         self,
-        scenario: ScenarioBase[ListModelServiceAction, ListModelServiceActionResult],
+        scenario: ScenarioBase,
         model_serving_processors: ModelServingProcessors,
-        mock_list_endpoints_by_owner_validated,
-    ):
+        mock_list_endpoints_by_owner_validated: AsyncMock,
+    ) -> None:
         # Mock repository responses
         mock_endpoints = []
         expected = cast(ListModelServiceActionResult, scenario.expected)
@@ -245,7 +247,7 @@ class TestListModelService:
 
         mock_list_endpoints_by_owner_validated.return_value = mock_endpoints
 
-        async def list_model_service(action: ListModelServiceAction):
+        async def list_model_service(action: ListModelServiceAction) -> ListModelServiceActionResult:
             return await model_serving_processors.list_model_service.wait_for_complete(action)
 
         await scenario.test(list_model_service)

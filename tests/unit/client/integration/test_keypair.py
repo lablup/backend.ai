@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 
@@ -10,7 +11,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_keypair_manipulation_operations():
+async def test_keypair_manipulation_operations() -> None:
     email = "testion" + uuid.uuid4().hex + "@test.mars"
     access_key = None
     with Session() as sess:
@@ -56,7 +57,7 @@ async def test_keypair_manipulation_operations():
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_create_keypair(userconfig):
+async def test_user_cannot_create_keypair(userconfig: Any) -> None:
     email = "testion" + uuid.uuid4().hex + "@test.mars"
     with Session() as sess, pytest.raises(BackendAPIError):
         sess.KeyPair.create(  # type: ignore[unused-coroutine]
@@ -69,7 +70,7 @@ async def test_user_cannot_create_keypair(userconfig):
 
 
 @pytest.mark.asyncio
-async def test_keypair_info():
+async def test_keypair_info() -> None:
     current_config = get_config()
     with Session() as sess:
         result = sess.KeyPair(current_config.access_key).info()  # type: ignore[unused-coroutine]

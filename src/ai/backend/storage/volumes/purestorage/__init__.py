@@ -36,7 +36,7 @@ class FlashBladeVolume(BaseVolume):
     name = "purestorage"
     _toolkit_version: int | None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self._toolkit_version = None

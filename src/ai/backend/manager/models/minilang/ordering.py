@@ -1,6 +1,6 @@
 import enum
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -70,7 +70,7 @@ class QueryOrderTransformer(Transformer):
         except KeyError as e:
             raise ValueError("Unknown/unsupported field name", col_name) from e
 
-    def col(self, *args) -> OrderingItem:
+    def col(self, *args: Any) -> OrderingItem:
         children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value

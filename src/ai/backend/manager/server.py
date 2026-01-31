@@ -1336,7 +1336,7 @@ class background_task_ctx:
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         pass
 
     async def shutdown(self) -> None:

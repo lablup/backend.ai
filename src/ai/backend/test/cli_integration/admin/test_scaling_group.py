@@ -5,7 +5,7 @@ from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_scaling_group(run_admin: ClientRunnerFunc):
+def test_add_scaling_group(run_admin: ClientRunnerFunc) -> None:
     # Create scaling group
     with closing(
         run_admin([
@@ -67,7 +67,7 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_update_scaling_group(run_admin: ClientRunnerFunc):
+def test_update_scaling_group(run_admin: ClientRunnerFunc) -> None:
     # Update scaling group
     with closing(
         run_admin([
@@ -119,7 +119,7 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_delete_scaling_group(run_admin: ClientRunnerFunc):
+def test_delete_scaling_group(run_admin: ClientRunnerFunc) -> None:
     with closing(
         run_admin(["--output=json", "admin", "scaling-group", "delete", "test_group1"])
     ) as p:
@@ -128,7 +128,7 @@ def test_delete_scaling_group(run_admin: ClientRunnerFunc):
         assert response.get("ok") is True, "Test scaling group deletion unsuccessful"
 
 
-def test_list_scaling_group(run_admin: ClientRunnerFunc):
+def test_list_scaling_group(run_admin: ClientRunnerFunc) -> None:
     with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
         decoded = decode(p.before)

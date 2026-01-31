@@ -23,7 +23,7 @@ def parse_service_ports(
     else:
         inference_apps = endpoint_ports_label
 
-    def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match]:
+    def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match[str]]:
         if isinstance(s, Sequence) and not isinstance(s, str):
             s = list(s)
             while s:

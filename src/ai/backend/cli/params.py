@@ -233,11 +233,11 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
                 case int():
                     return arg
                 case str():
-                    return [self.type_(elem) for elem in arg.split(",")]  # type: ignore[call-arg]
+                    return [self.type_(elem) for elem in arg.split(",")]
                 case _:
-                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)  # type: ignore[call-arg]
+                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)
         except ValueError as e:
-            self.fail(repr(e), param, ctx)  # type: ignore[call-arg]
+            self.fail(repr(e), param, ctx)
 
 
 class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.ParamType):

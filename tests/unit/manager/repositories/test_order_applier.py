@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -47,11 +50,11 @@ class MockOrderingApplier(BaseOrderingApplier[MockOrderingOptions]):
 class TestBaseOrderingApplier:
     """Test cases for BaseOrderingApplier"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.ordering_applier = MockOrderingApplier()
         self.base_stmt = sa.select(MockModel)
 
-    def test_no_ordering(self):
+    def test_no_ordering() -> None:
         """Test with default ordering"""
         ordering = MockOrderingOptions()  # Uses default: name ASC
 
@@ -66,7 +69,7 @@ class TestBaseOrderingApplier:
         assert order_clauses[0][0] == MockModel.name
         assert not order_clauses[0][1]  # ASC
 
-    def test_single_field_asc(self):
+    def test_single_field_asc() -> None:
         """Test ordering by single field ascending"""
         ordering = MockOrderingOptions(order_by=[(MockOrderField.NAME, False)])
 
@@ -79,7 +82,7 @@ class TestBaseOrderingApplier:
         assert len(order_clauses) == 1
         assert not order_clauses[0][1]  # ASC
 
-    def test_single_field_desc(self):
+    def test_single_field_desc() -> None:
         """Test ordering by single field descending"""
         ordering = MockOrderingOptions(order_by=[(MockOrderField.STATUS, True)])
 
@@ -92,7 +95,7 @@ class TestBaseOrderingApplier:
         assert order_clauses[0][0] == MockModel.status
         assert order_clauses[0][1]  # DESC
 
-    def test_multiple_fields_ordering(self):
+    def test_multiple_fields_ordering() -> None:
         """Test ordering by multiple fields"""
         ordering = MockOrderingOptions(
             order_by=[
@@ -112,7 +115,7 @@ class TestBaseOrderingApplier:
         assert order_clauses[1][0] == MockModel.name
         assert not order_clauses[1][1]  # ASC
 
-    def test_multiple_fields_mixed_ordering(self):
+    def test_multiple_fields_mixed_ordering() -> None:
         """Test ordering by multiple fields with mixed ASC/DESC"""
         ordering = MockOrderingOptions(
             order_by=[
@@ -135,7 +138,7 @@ class TestBaseOrderingApplier:
         assert order_clauses[1][1]  # status DESC
         assert not order_clauses[2][1]  # id ASC
 
-    def test_empty_ordering(self):
+    def test_empty_ordering() -> None:
         """Test with empty ordering list"""
         ordering = MockOrderingOptions(order_by=[])
 
@@ -148,7 +151,7 @@ class TestBaseOrderingApplier:
         # Should return empty order_clauses
         assert len(order_clauses) == 0
 
-    def test_nonexistent_field_fallback(self):
+    def test_nonexistent_field_fallback() -> None:
         """Test fallback behavior for nonexistent fields"""
 
         # Create a custom applier that has fallback behavior
@@ -171,7 +174,7 @@ class TestBaseOrderingApplier:
         order_clause = str(result_stmt.compile())
         assert "ORDER BY test_table.name DESC" in order_clause
 
-    def test_order_clauses_return_format(self):
+    def test_order_clauses_return_format() -> None:
         """Test that order_clauses return the correct format for pagination"""
         ordering = MockOrderingOptions(
             order_by=[(MockOrderField.STATUS, True), (MockOrderField.NAME, False)]
@@ -194,7 +197,7 @@ class TestBaseOrderingApplier:
         assert order_clauses[1][0].name == "name"
         assert not order_clauses[1][1]
 
-    def test_sql_generation_integration(self):
+    def test_sql_generation_integration() -> None:
         """Test that the generated SQL is valid and executable (syntax check)"""
         ordering = MockOrderingOptions(
             order_by=[(MockOrderField.NAME, False), (MockOrderField.STATUS, True)]
