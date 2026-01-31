@@ -2,6 +2,7 @@ import enum
 import functools
 import inspect
 import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import StreamReader
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import (
     InvalidAPIHandlerDefinition,
@@ -29,6 +31,8 @@ from .exception import (
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class Sentinel(enum.Enum):
@@ -511,10 +515,15 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
                 reason=f"Failed to send first chunk from stream: {e!r}"
             ) from e
 
-        async for chunk in body_iter:
-            await resp.write(chunk)
+        try:
+            async for chunk in body_iter:
+                await resp.write(chunk)
+            # Normal completion - send chunked transfer encoding terminator
+            await resp.write_eof()
+        except Exception:
+            log.exception("Error during streaming response body iteration")
+            resp.force_close()
 
-        await resp.write_eof()
         return resp
 
     return wrapped
