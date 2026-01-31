@@ -333,7 +333,7 @@ class AsyncEtcd(AbstractKVStore):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool | None:
-        return await self.etcd.__aexit__(exc_type, exc_val, exc_tb)
+        return cast(bool | None, await self.etcd.__aexit__(exc_type, exc_val, exc_tb))
 
     async def ping(self) -> None:
         """
@@ -627,7 +627,7 @@ class AsyncEtcd(AbstractKVStore):
                 .or_else([])
             )
 
-            return result.succeeded()
+            return cast(bool, result.succeeded())
 
     async def delete(
         self,

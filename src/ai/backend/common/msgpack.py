@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import PosixPath, PurePosixPath
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import msgpack as _msgpack
 import temporenc
@@ -126,7 +126,7 @@ def packb(data: Any, **kwargs: Any) -> bytes:
     ret = _msgpack.packb(data, **opts)
     if ret is None:
         return b""
-    return ret
+    return cast(bytes, ret)
 
 
 def unpackb(packed: bytes, ext_hook_mapping: Mapping[int, ExtFunc] | None = None, **kwargs: Any) -> Any:

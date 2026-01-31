@@ -1319,13 +1319,19 @@ class VFolderMount(JSONSerializableMixin):
 
 
 class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerializableMixin):
-    def __or__(self, other: Any) -> VFolderHostPermissionMap:
-        if self is other:
+    @overload
+    def __or__(self, value: dict[str, set[VFolderHostPermission]], /) -> dict[str, set[VFolderHostPermission]]: ...
+
+    @overload
+    def __or__[_T1, _T2](self, value: dict[_T1, _T2], /) -> dict[str | _T1, set[VFolderHostPermission] | _T2]: ...
+
+    def __or__(self, value: dict[Any, Any], /) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
+        if self is value:
             return self
-        if not isinstance(other, dict):
-            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
+        if not isinstance(value, dict):
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(value)} type")
         union_map: dict[str, set[VFolderHostPermission]] = defaultdict(set)
-        for host, perms in [*self.items(), *other.items()]:
+        for host, perms in [*self.items(), *value.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
             except ValueError as e:

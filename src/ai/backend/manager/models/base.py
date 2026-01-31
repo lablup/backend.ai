@@ -226,7 +226,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
             return None
         if self._use_name:
             return value.name
-        return value.value
+        return cast(str, value.value)
 
     def process_result_value(
         self,
@@ -267,7 +267,7 @@ class CurvePublicKeyColumn(TypeDecorator[bytes]):
 
     def process_bind_param(
         self,
-        value: PublicKey | None,
+        value: bytes | None,
         dialect: Dialect,
     ) -> str | None:
         return value.decode("ascii") if value else None
@@ -556,7 +556,7 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
                 cidr = value.address
         except InvalidIpAddressValue as e:
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
-        return cidr
+        return str(cidr)
 
     def process_result_value(self, value: str | None, _dialect: Dialect) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
         if value is None:
@@ -576,24 +576,13 @@ class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
         super().__init__(sa.String)
         self._perm_type = perm_type
 
-    @overload
-    def process_bind_param(
-        self, value: Sequence[AbstractPermission], dialect: Dialect
-    ) -> list[str]: ...
-
-    @overload
-    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> list[str]: ...
-
-    @overload
-    def process_bind_param(self, value: None, dialect: Dialect) -> list[str]: ...
-
     def process_bind_param(
         self,
-        value: Sequence[AbstractPermission] | Sequence[str] | None,
+        value: set[AbstractPermission] | None,
         dialect: Dialect,
-    ) -> list[str]:
+    ) -> list[str] | None:
         if value is None:
-            return []
+            return None
         try:
             return [self._perm_type(perm).value for perm in value]
         except ValueError as e:
@@ -727,7 +716,7 @@ class SlugType(TypeDecorator[str]):
             self._tx_slug.check(value)
         except t.DataError as e:
             raise ValueError(e.error, value) from e
-        return value
+        return cast(str, value)
 
 
 class EndpointIDColumnType(GUID[EndpointId]):

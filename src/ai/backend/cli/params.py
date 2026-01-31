@@ -6,6 +6,7 @@ from typing import (
     Any,
     Protocol,
     TypeVar,
+    cast,
     override,
 )
 
@@ -234,7 +235,15 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
                 case int():
                     return arg
                 case str():
-                    return [self.type_(elem) for elem in arg.split(",")]
+                    result = []
+                    for elem in arg.split(","):
+                        if isinstance(self.type_, type) and issubclass(self.type_, click.ParamType):
+                            param_type_cls = cast(type[click.ParamType], self.type_)
+                            result.append(param_type_cls().convert(elem, param, ctx))
+                        else:
+                            constructor = cast(type[SingleValueConstructorType], self.type_)
+                            result.append(constructor(elem))
+                    return result
                 case _:
                     self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)
         except ValueError as e:

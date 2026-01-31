@@ -18,6 +18,7 @@ from typing import (
     Literal,
     NamedTuple,
     Self,
+    cast,
 )
 
 import aiohttp
@@ -173,7 +174,7 @@ def get_docker_context_host() -> str | None:
     for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
         context_data = json.loads(meta_path.read_bytes())
         if context_data["Name"] == current_context_name:
-            return context_data["Endpoints"]["docker"]["Host"]
+            return cast(str | None, context_data["Endpoints"]["docker"]["Host"])
     return None
 
 
@@ -357,7 +358,7 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
             common_labels.update(inference_labels)
         case _:
             pass
-    return common_labels
+    return cast(dict[str, str], common_labels)
 
 
 class PlatformTagSet(Mapping[str, str]):
@@ -404,7 +405,7 @@ class PlatformTagSet(Mapping[str, str]):
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
-        return self._data == other
+        return cast(bool, self._data == other)
 
 
 class ParsedImageStr(NamedTuple):

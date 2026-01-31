@@ -76,7 +76,7 @@ class StringLengthMeta(TrafaretMeta):
     """
 
     def __getitem__(cls, slice_: slice) -> t.Trafaret:
-        return cls(min_length=slice_.start, max_length=slice_.stop)
+        return cast(t.Trafaret, cls(min_length=slice_.start, max_length=slice_.stop))
 
 
 class AliasedKey(t.Key):
@@ -176,7 +176,7 @@ class DelimiterSeperatedList[TItem](t.Trafaret):
                 f"the number of items should be greater than {self.min_length}",
                 value=value,
             )
-        return [self.trafaret.check_and_return(x) for x in splited]
+        return [self.trafaret.check(x) for x in splited]
 
 
 class StringList(DelimiterSeperatedList[str]):

@@ -88,7 +88,7 @@ class AliasGroupMixin(click.Group):
 
         def _decorator(f: Callable[..., Any]) -> click.Command:
             cmd: click.Command = decorator(f)
-            if aliases:
+            if aliases and cmd.name is not None:
                 self._commands[cmd.name] = aliases
                 for alias in aliases:
                     self._aliases[alias] = cmd.name
@@ -107,7 +107,7 @@ class AliasGroupMixin(click.Group):
 
         def _decorator(f: Callable[..., Any]) -> click.Group:
             cmd: click.Group = decorator(f)
-            if aliases:
+            if aliases and cmd.name is not None:
                 self._commands[cmd.name] = aliases
                 for alias in aliases:
                     self._aliases[alias] = cmd.name
