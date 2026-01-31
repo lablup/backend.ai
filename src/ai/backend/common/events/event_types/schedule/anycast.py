@@ -1,4 +1,4 @@
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -6,12 +6,12 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 class BaseScheduleEvent(AbstractAnycastEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -37,12 +37,12 @@ class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
         self.schedule_type = schedule_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.schedule_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(schedule_type=value[0])
 
     @classmethod
@@ -71,12 +71,12 @@ class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
         self.schedule_type = schedule_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.schedule_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(schedule_type=value[0])
 
     @classmethod
@@ -107,12 +107,12 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -143,12 +143,12 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -179,12 +179,12 @@ class DoRouteLifecycleIfNeededEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -215,12 +215,12 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod

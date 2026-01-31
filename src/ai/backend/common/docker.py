@@ -275,8 +275,8 @@ def get_docker_connector() -> DockerConnector:
 
 
 async def login(
-    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict, scope: str
-) -> dict:
+    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict[str, Any], scope: str
+) -> dict[str, Any]:
     """
     Authorize to the docker registry using the given credentials and token scope, and returns a set
     of required aiohttp.ClientSession.request() keyword arguments for further API requests.

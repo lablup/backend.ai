@@ -67,7 +67,7 @@ __all__ = (
 )
 
 
-class KernelNode(graphene.ObjectType):
+class KernelNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -202,13 +202,13 @@ class KernelNode(graphene.ObjectType):
         return await ctx.valkey_stat.get_session_statistics_batch(kernel_ids_str)
 
 
-class KernelConnection(Connection):
+class KernelConnection(Connection):  # type: ignore[misc]
     class Meta:
         node = KernelNode
         description = "Added in 24.09.0."
 
 
-class ComputeContainer(graphene.ObjectType):
+class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -523,7 +523,7 @@ class ComputeContainer(graphene.ObjectType):
             )
 
 
-class ComputeContainerList(graphene.ObjectType):
+class ComputeContainerList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
@@ -535,7 +535,7 @@ class ComputeContainerList(graphene.ObjectType):
 MetricValueType = TypeVar("MetricValueType", int, float)
 
 
-class LegacyComputeSession(graphene.ObjectType):
+class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
     """
     Represents a main session.
     """
@@ -916,7 +916,7 @@ class LegacyComputeSession(graphene.ObjectType):
             )
 
 
-class LegacyComputeSessionList(graphene.ObjectType):
+class LegacyComputeSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

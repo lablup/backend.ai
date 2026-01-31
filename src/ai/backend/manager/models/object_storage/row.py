@@ -39,7 +39,7 @@ def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-class ObjectStorageRow(Base):
+class ObjectStorageRow(Base):  # type: ignore[misc]
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services

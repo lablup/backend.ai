@@ -44,7 +44,7 @@ class ServiceAutoScalingRule(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> RelayPaginatedResult[dict]:
+    ) -> RelayPaginatedResult[dict[str, Any]]:
         return await execute_paginated_relay_query(
             "endpoint_auto_scaling_rule_nodes",
             {
@@ -130,7 +130,7 @@ class ServiceAutoScalingRule(BaseFunction):
     async def get(
         self,
         fields: Sequence[FieldSpec] | None = None,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = textwrap.dedent(
             """\
             query($rule_id: String!) {

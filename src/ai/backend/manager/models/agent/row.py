@@ -61,7 +61,7 @@ __all__: Sequence[str] = (
 )
 
 
-class AgentRow(Base):
+class AgentRow(Base):  # type: ignore[misc]
     __tablename__ = "agents"
 
     id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)

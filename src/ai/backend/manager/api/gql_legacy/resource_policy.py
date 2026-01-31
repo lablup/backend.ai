@@ -122,7 +122,7 @@ __all__ = (
 )
 
 
-class KeyPairResourcePolicy(graphene.ObjectType):
+class KeyPairResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
     name = graphene.String()
     created_at = GQLDateTime()
     default_for_unspecified = graphene.String()
@@ -287,7 +287,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             ]
 
 
-class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
+class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     default_for_unspecified = graphene.String(required=True)
     total_resource_slots = graphene.JSONString(required=False, default_value={})
     max_session_lifetime = graphene.Int(required=False, default_value=0)
@@ -338,7 +338,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
+class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     default_for_unspecified = graphene.String(required=False)
     total_resource_slots = graphene.JSONString(required=False)
     max_session_lifetime = graphene.Int(required=False)
@@ -401,7 +401,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class CreateKeyPairResourcePolicy(graphene.Mutation):
+class CreateKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -435,7 +435,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
         )
 
 
-class ModifyKeyPairResourcePolicy(graphene.Mutation):
+class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -468,7 +468,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         )
 
 
-class DeleteKeyPairResourcePolicy(graphene.Mutation):
+class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -498,7 +498,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
         )
 
 
-class UserResourcePolicy(graphene.ObjectType):
+class UserResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
@@ -587,7 +587,7 @@ class UserResourcePolicy(graphene.ObjectType):
             ]
 
 
-class CreateUserResourcePolicyInput(graphene.InputObjectType):
+class CreateUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     max_vfolder_count = graphene.Int(
         description="Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders."
     )  # Added in (24.03.1, 23.09.6)
@@ -620,7 +620,7 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class ModifyUserResourcePolicyInput(graphene.InputObjectType):
+class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     max_vfolder_count = graphene.Int(
         description="Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders."
     )  # Added in (24.03.1, 23.09.6)
@@ -651,7 +651,7 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class CreateUserResourcePolicy(graphene.Mutation):
+class CreateUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -687,7 +687,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
         )
 
 
-class ModifyUserResourcePolicy(graphene.Mutation):
+class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -722,7 +722,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         )
 
 
-class DeleteUserResourcePolicy(graphene.Mutation):
+class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -755,7 +755,7 @@ class DeleteUserResourcePolicy(graphene.Mutation):
         )
 
 
-class ProjectResourcePolicy(graphene.ObjectType):
+class ProjectResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -846,7 +846,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             ]
 
 
-class CreateProjectResourcePolicyInput(graphene.InputObjectType):
+class CreateProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     max_vfolder_count = graphene.Int(
         description="Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders."
     )  #  Added in (24.03.1, 23.09.6)
@@ -873,7 +873,7 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
+class ModifyProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignore[misc]
     max_vfolder_count = graphene.Int(
         description="Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders."
     )  #  Added in (24.03.1, 23.09.6)
@@ -898,7 +898,7 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         )
 
 
-class CreateProjectResourcePolicy(graphene.Mutation):
+class CreateProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -932,7 +932,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         )
 
 
-class ModifyProjectResourcePolicy(graphene.Mutation):
+class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -965,7 +965,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         )
 
 
-class DeleteProjectResourcePolicy(graphene.Mutation):
+class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

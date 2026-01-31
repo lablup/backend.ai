@@ -297,7 +297,7 @@ class ValkeyStatClient:
         )
 
     @valkey_stat_resilience.apply()
-    async def get_session_statistics_batch(self, session_ids: list[str]) -> list[dict | None]:
+    async def get_session_statistics_batch(self, session_ids: list[str]) -> list[dict[str, Any] | None]:
         """
         Get statistics for multiple sessions efficiently.
 
@@ -308,7 +308,7 @@ class ValkeyStatClient:
             return []
 
         results = await self._get_multiple_keys(session_ids)
-        stats: list[dict | None] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -339,7 +339,7 @@ class ValkeyStatClient:
         return await self._get_multiple_keys(kernel_ids)
 
     @valkey_stat_resilience.apply()
-    async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[dict | None]:
+    async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[dict[str, Any] | None]:
         """
         Get agent statistics for multiple agents.
 
@@ -347,7 +347,7 @@ class ValkeyStatClient:
         :return: List of agent statistics, with None for non-existent agents.
         """
         results = await self._get_multiple_keys(agent_ids)
-        stats: list[dict | None] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -438,7 +438,7 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def get_inference_app_statistics_batch(
         self, endpoint_ids: list[str]
-    ) -> list[dict | None]:
+    ) -> list[dict[str, Any] | None]:
         """
         Get inference app statistics for multiple endpoints.
 
@@ -451,7 +451,7 @@ class ValkeyStatClient:
         keys = [self._get_inference_app_key(endpoint_id) for endpoint_id in endpoint_ids]
         results = await self._get_multiple_keys(keys)
 
-        stats: list[dict | None] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -484,7 +484,7 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def get_inference_replica_statistics_batch(
         self, endpoint_replica_pairs: list[tuple[str, str]]
-    ) -> list[dict | None]:
+    ) -> list[dict[str, Any] | None]:
         """
         Get inference replica statistics for multiple endpoint-replica pairs.
 
@@ -500,7 +500,7 @@ class ValkeyStatClient:
         ]
         results = await self._get_multiple_keys(keys)
 
-        stats: list[dict | None] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)

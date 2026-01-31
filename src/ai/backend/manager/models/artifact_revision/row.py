@@ -46,7 +46,7 @@ def _get_association_artifacts_storages_join_cond() -> sa.ColumnElement[bool]:
     return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
-class ArtifactRevisionRow(Base):
+class ArtifactRevisionRow(Base):  # type: ignore[misc]
     __tablename__ = "artifact_revisions"
     __table_args__ = (
         # constraint

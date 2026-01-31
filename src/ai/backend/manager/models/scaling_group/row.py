@@ -151,7 +151,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 # each domain, group, and keypair.
 
 
-class ScalingGroupForDomainRow(Base):
+class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_domains"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -186,7 +186,7 @@ class ScalingGroupForDomainRow(Base):
 sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 
-class ScalingGroupForProjectRow(Base):
+class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_groups"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -222,7 +222,7 @@ class ScalingGroupForProjectRow(Base):
 sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 
-class ScalingGroupForKeypairsRow(Base):
+class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_keypairs"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -263,7 +263,7 @@ def _get_resource_preset_join_condition() -> Any:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ScalingGroupRow(Base):
+class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))

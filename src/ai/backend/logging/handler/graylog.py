@@ -10,7 +10,7 @@ import graypy
 from ai.backend.logging.config import LoggingConfig
 
 
-class GELFTLSHandler(graypy.GELFTLSHandler):
+class GELFTLSHandler(graypy.GELFTLSHandler):  # type: ignore[misc]
     ssl_ctx: ssl.SSLContext
 
     def __init__(

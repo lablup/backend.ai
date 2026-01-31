@@ -144,7 +144,7 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(Base):
+class UserRow(Base):  # type: ignore[misc]
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(

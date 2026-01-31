@@ -1,4 +1,5 @@
 import sys
+from typing import Any
 
 import click
 
@@ -42,7 +43,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
     """
     with Session() as session:
         try:
-            fields: tuple
+            fields: tuple[Any, ...]
             if customized:
                 fields = (
                     image_fields["id"],

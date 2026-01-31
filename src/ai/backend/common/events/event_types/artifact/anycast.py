@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
@@ -49,11 +49,11 @@ class ModelVerifyingEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_verifying"
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.model_id, self.revision, self.registry_type, self.registry_name)
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             model_id=value[0],
             revision=value[1],
@@ -85,7 +85,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_import_done"
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         verification_result = None
         if self.verification_result is not None:
             verification_result = self.verification_result.model_dump()
@@ -101,7 +101,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         verification_result = None
         if value[6] is not None:
             verification_result = VerificationStepResult.model_validate(value[6])
@@ -134,7 +134,7 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "models_metadata_fetch_done"
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.model.model_id,
             self.model.revision,
@@ -145,7 +145,7 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             model=ModelMetadataInfo(
                 model_id=value[0],

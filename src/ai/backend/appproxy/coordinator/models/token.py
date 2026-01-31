@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-class Token(Base, BaseMixin):
+class Token(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "tokens"
 
     id: Mapped[UUID] = mapped_column(

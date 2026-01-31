@@ -472,7 +472,7 @@ def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamRes
     return deprecated_stub_impl
 
 
-def chunked(iterable: Iterable, n: int) -> Generator[tuple, None, None]:
+def chunked(iterable: Iterable, n: int) -> Generator[tuple[Any, ...], None, None]:
     it = iter(iterable)
     while True:
         chunk = tuple(itertools.islice(it, n))

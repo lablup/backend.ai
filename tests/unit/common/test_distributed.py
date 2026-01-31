@@ -75,11 +75,11 @@ def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
 class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.test_case_ns,)
 
     @classmethod
-    def deserialize(cls, value: tuple) -> NoopAnycastEvent:
+    def deserialize(cls, value: tuple[Any, ...]) -> NoopAnycastEvent:
         return cls(value[0])
 
     @classmethod

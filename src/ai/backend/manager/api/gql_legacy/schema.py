@@ -329,7 +329,7 @@ class GraphQueryContext:
     agent_repository: AgentRepository
 
 
-class Mutation(graphene.ObjectType):
+class Mutation(graphene.ObjectType):  # type: ignore[misc]
     """
     All available GraphQL mutations.
     Type name changed from 'Mutations' to 'Mutation' in 25.13.0
@@ -505,7 +505,7 @@ class Mutation(graphene.ObjectType):
     delete_network = DeleteNetwork.Field()
 
 
-class Query(graphene.ObjectType):
+class Query(graphene.ObjectType):  # type: ignore[misc]
     """
     All available GraphQL queries.
     Type name changed from 'Queries' to 'Query' in 25.14.0

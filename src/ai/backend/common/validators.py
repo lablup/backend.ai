@@ -91,7 +91,7 @@ class AliasedKey(t.Key):
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data: Any, context: Any = None) -> Generator[tuple, None, None]:  # type: ignore[override]
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:  # type: ignore[override]
         for name in self.names:
             if name in data:
                 key = name
@@ -213,7 +213,7 @@ class Enum[T_enum: enum.Enum](t.Trafaret):
 
 
 class JSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> dict:
+    def check_and_return(self, value: Any) -> dict[str, Any]:
         try:
             return json.loads(value)
         except (KeyError, ValueError):

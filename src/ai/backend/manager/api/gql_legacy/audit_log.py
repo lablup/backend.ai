@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 
-class AuditLogSchema(graphene.ObjectType):
+class AuditLogSchema(graphene.ObjectType):  # type: ignore[misc]
     """
     A schema that contains metadata related to the AuditLogNode.
     It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
@@ -49,7 +49,7 @@ class AuditLogSchema(graphene.ObjectType):
         return list(OperationStatus.__members__.values())
 
 
-class AuditLogNode(graphene.ObjectType):
+class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -166,7 +166,7 @@ class AuditLogNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class AuditLogConnection(Connection):
+class AuditLogConnection(Connection):  # type: ignore[misc]
     """Added in 25.6.0."""
 
     class Meta:

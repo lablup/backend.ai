@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
+from typing import Any
 
 import aiotools
 import pytest
@@ -24,11 +25,11 @@ from ai.backend.common.types import AgentId
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.value + 1,)
 
     @classmethod
-    def deserialize(cls, value: tuple) -> DummyBroadcastEvent:
+    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
         return cls(value[0] + 1)
 
     @classmethod

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
-class MetricResultValue(graphene.ObjectType):
+class MetricResultValue(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0. A pair of timestamp and value."
 
@@ -19,7 +19,7 @@ class MetricResultValue(graphene.ObjectType):
     value = graphene.String()
 
 
-class ContainerUtilizationMetricMetadata(graphene.ObjectType):
+class ContainerUtilizationMetricMetadata(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -39,7 +39,7 @@ class ContainerUtilizationMetricMetadata(graphene.ObjectType):
         )
 
 
-class ContainerUtilizationMetric(graphene.ObjectType):
+class ContainerUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 

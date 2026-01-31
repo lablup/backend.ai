@@ -55,7 +55,7 @@ from .base import (
 )
 
 
-class UserInfo(graphene.ObjectType):
+class UserInfo(graphene.ObjectType):  # type: ignore[misc]
     email = graphene.String()
     full_name = graphene.String()
 
@@ -93,7 +93,7 @@ class UserInfo(graphene.ObjectType):
             )
 
 
-class KeyPair(graphene.ObjectType):
+class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -454,14 +454,14 @@ class KeyPair(graphene.ObjectType):
             )
 
 
-class KeyPairList(graphene.ObjectType):
+class KeyPairList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(KeyPair, required=True)
 
 
-class KeyPairInput(graphene.InputObjectType):
+class KeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False, default_value=True)
     is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
@@ -480,7 +480,7 @@ class KeyPairInput(graphene.InputObjectType):
         )
 
 
-class ModifyKeyPairInput(graphene.InputObjectType):
+class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False)
     is_admin = graphene.Boolean(required=False)
     resource_policy = graphene.String(required=False)
@@ -488,7 +488,7 @@ class ModifyKeyPairInput(graphene.InputObjectType):
     rate_limit = graphene.Int(required=False)
 
 
-class CreateKeyPair(graphene.Mutation):
+class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -518,7 +518,7 @@ class CreateKeyPair(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
 
-class ModifyKeyPair(graphene.Mutation):
+class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -547,7 +547,7 @@ class ModifyKeyPair(graphene.Mutation):
         return await simple_db_mutate(cls, ctx, update_query)
 
 
-class DeleteKeyPair(graphene.Mutation):
+class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

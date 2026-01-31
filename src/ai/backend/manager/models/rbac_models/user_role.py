@@ -41,7 +41,7 @@ def _get_user_row_join_condition() -> sa.ColumnElement[bool]:
     return UserRow.uuid == foreign(UserRoleRow.user_id)
 
 
-class UserRoleRow(Base):
+class UserRoleRow(Base):  # type: ignore[misc]
     __tablename__ = "user_roles"
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 

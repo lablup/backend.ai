@@ -227,7 +227,7 @@ class BackendAgentError(BackendAIError):
             return f"<{type(self).__name__}: {self.agent_error_title} ({self.agent_exception})>"
         return f"<{type(self).__name__}: {self.agent_error_title}>"
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[BackendAgentError], tuple[Any, ...]]:
         return (type(self), (self.agent_error_type, self.agent_details))
 
 

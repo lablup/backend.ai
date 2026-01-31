@@ -111,7 +111,7 @@ def _get_association_join_condition() -> sa.ColumnElement[bool]:
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-class ContainerRegistryRow(Base):
+class ContainerRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "container_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(

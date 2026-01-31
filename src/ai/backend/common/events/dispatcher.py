@@ -82,7 +82,7 @@ class EventHandler[TContext, TEvent: "AbstractEvent"]:
     handler_type: _EventHandlerType
     coalescing_opts: CoalescingOptions | None
     coalescing_state: CoalescingState
-    args_matcher: Callable[[tuple], bool] | None
+    args_matcher: Callable[[tuple[Any, ...]], bool] | None
     event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
     event_complete_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
 
@@ -215,7 +215,7 @@ class EventDispatcherGroup(ABC):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
@@ -229,7 +229,7 @@ class EventDispatcherGroup(ABC):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
@@ -271,7 +271,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
@@ -294,7 +294,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
@@ -409,7 +409,7 @@ class EventDispatcher(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TConsumedEvent]:
@@ -457,7 +457,7 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TSubscirbedEvent]:
@@ -502,7 +502,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         evh: EventHandler,
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
     ) -> None:
@@ -576,7 +576,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         event_name: str,
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
     ) -> None:
@@ -598,7 +598,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         event_name: str,
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         metadata: MessageMetadata | None = None,
     ) -> None:
         if self._log_events:

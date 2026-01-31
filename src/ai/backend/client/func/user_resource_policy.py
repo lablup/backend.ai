@@ -45,7 +45,7 @@ class UserResourcePolicy(BaseFunction):
         max_quota_scope_size: int,
         max_session_count_per_model_session: int,
         max_customized_image_count: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Create a new user resource policy.
 
@@ -92,7 +92,7 @@ class UserResourcePolicy(BaseFunction):
         max_quota_scope_size: int | None = None,
         max_session_count_per_model_session: int | None = None,
         max_customized_image_count: int | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update an existing user resource policy with the given options.
 
@@ -127,7 +127,7 @@ class UserResourcePolicy(BaseFunction):
         return result["modify_user_resource_policy"]
 
     @api_function
-    async def delete(self) -> dict:
+    async def delete(self) -> dict[str, Any]:
         """
         Delete an existing user resource policy.
         :return: Result of the deletion operation.
@@ -149,7 +149,7 @@ class UserResourcePolicy(BaseFunction):
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists all user resource policies.
 
@@ -165,7 +165,7 @@ class UserResourcePolicy(BaseFunction):
     async def get_info(
         self,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Get information about a specific user resource policy.
 

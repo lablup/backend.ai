@@ -87,7 +87,7 @@ class Agent(BaseFunction):
         cls,
         agent_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = _d("""
             query($agent_id: String!) {
                 agent(agent_id: $agent_id) {$fields}
@@ -112,7 +112,7 @@ class AgentWatcher(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_status(cls, agent_id: str) -> dict:
+    async def get_status(cls, agent_id: str) -> dict[str, Any]:
         """
         Get agent and watcher status.
         """
@@ -125,7 +125,7 @@ class AgentWatcher(BaseFunction):
 
     @api_function
     @classmethod
-    async def agent_start(cls, agent_id: str) -> dict:
+    async def agent_start(cls, agent_id: str) -> dict[str, Any]:
         """
         Start agent.
         """
@@ -139,7 +139,7 @@ class AgentWatcher(BaseFunction):
 
     @api_function
     @classmethod
-    async def agent_stop(cls, agent_id: str) -> dict:
+    async def agent_stop(cls, agent_id: str) -> dict[str, Any]:
         """
         Stop agent.
         """
@@ -153,7 +153,7 @@ class AgentWatcher(BaseFunction):
 
     @api_function
     @classmethod
-    async def agent_restart(cls, agent_id: str) -> dict:
+    async def agent_restart(cls, agent_id: str) -> dict[str, Any]:
         """
         Restart agent.
         """

@@ -79,7 +79,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ContainerRegistryTypeField(graphene.Scalar):
+class ContainerRegistryTypeField(graphene.Scalar):  # type: ignore[misc]
     """Added in 24.09.0."""
 
     allowed_values = tuple(t.value for t in ContainerRegistryType)
@@ -101,7 +101,7 @@ class ContainerRegistryTypeField(graphene.Scalar):
         return ContainerRegistryType(value)
 
 
-class ContainerRegistryNode(graphene.ObjectType):
+class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -253,7 +253,7 @@ class ContainerRegistryNode(graphene.ObjectType):
         )
 
 
-class ContainerRegistryConnection(Connection):
+class ContainerRegistryConnection(Connection):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     class Meta:
@@ -261,7 +261,7 @@ class ContainerRegistryConnection(Connection):
         description = "Added in 24.09.0."
 
 
-class ContainerRegistryScopeField(graphene.Scalar):
+class ContainerRegistryScopeField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.3.0."
 
@@ -290,7 +290,7 @@ class ContainerRegistryScopeField(graphene.Scalar):
         return None
 
 
-class AllowedGroups(graphene.InputObjectType):
+class AllowedGroups(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -307,7 +307,7 @@ class AllowedGroups(graphene.InputObjectType):
     )
 
 
-class CreateContainerRegistryNode(graphene.Mutation):
+class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `CreateContainerRegistryNodeV2` instead
     """
@@ -386,7 +386,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
             )
 
 
-class ModifyContainerRegistryNode(graphene.Mutation):
+class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `ModifyContainerRegistryNodeV2` instead
     """
@@ -463,7 +463,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class DeleteContainerRegistryNode(graphene.Mutation):
+class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `DeleteContainerRegistryNodeV2` instead
     """
@@ -502,7 +502,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class CreateContainerRegistryQuota(graphene.Mutation):
+class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -542,7 +542,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
             return cls(ok=False, msg=str(e))
 
 
-class UpdateContainerRegistryQuota(graphene.Mutation):
+class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -582,7 +582,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
             return cls(ok=False, msg=str(e))
 
 
-class DeleteContainerRegistryQuota(graphene.Mutation):
+class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -626,7 +626,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
 # ================================================================================
 
 
-class CreateContainerRegistryInput(graphene.InputObjectType):
+class CreateContainerRegistryInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -640,7 +640,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ModifyContainerRegistryInput(graphene.InputObjectType):
+class ModifyContainerRegistryInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -654,7 +654,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ContainerRegistryConfig(graphene.ObjectType):
+class ContainerRegistryConfig(graphene.ObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -668,7 +668,7 @@ class ContainerRegistryConfig(graphene.ObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ContainerRegistry(graphene.ObjectType):
+class ContainerRegistry(graphene.ObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `ContainerRegistryNode` instead
     """
@@ -718,7 +718,7 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
 
-class CreateContainerRegistry(graphene.Mutation):
+class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead
     """
@@ -765,7 +765,7 @@ class CreateContainerRegistry(graphene.Mutation):
             )
 
 
-class ModifyContainerRegistry(graphene.Mutation):
+class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead
     """
@@ -817,7 +817,7 @@ class ModifyContainerRegistry(graphene.Mutation):
             return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
 
 
-class DeleteContainerRegistry(graphene.Mutation):
+class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead
     """

@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import (
 )
 
 
-class AssociationScopesEntitiesRow(Base):
+class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         # constraint

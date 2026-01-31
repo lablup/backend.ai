@@ -26,7 +26,7 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
-    async def login(cls, user_id: str, password: str, otp: str | None = None) -> dict:
+    async def login(cls, user_id: str, password: str, otp: str | None = None) -> dict[str, Any]:
         """
         Log-in into the endpoint with the given user ID and password.
         It creates a server-side web session and return
@@ -71,7 +71,7 @@ class Auth(BaseFunction):
     @classmethod
     async def update_password(
         cls, old_password: str, new_password: str, new_password2: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This API works only for account owner.
         """
@@ -89,7 +89,7 @@ class Auth(BaseFunction):
     @classmethod
     async def update_password_no_auth(
         cls, domain: str, user_id: str, current_password: str, new_password: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This is used to update `EXPIRED` password only.
         This function fetch a request to manager.
@@ -110,7 +110,7 @@ class Auth(BaseFunction):
     @classmethod
     async def update_password_no_auth_in_session(
         cls, user_id: str, current_password: str, new_password: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This is used to update `EXPIRED` password only.
         This function fetch a request to webserver.

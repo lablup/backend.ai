@@ -76,7 +76,7 @@ DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 @shareable
-class ResourceLimit(graphene.ObjectType):
+class ResourceLimit(graphene.ObjectType):  # type: ignore[misc]
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
@@ -85,12 +85,12 @@ class ResourceLimit(graphene.ObjectType):
 
 
 @shareable
-class KVPair(graphene.ObjectType):
+class KVPair(graphene.ObjectType):  # type: ignore[misc]
     key = graphene.String()
     value = graphene.String()
 
 
-class ResourceLimitInput(graphene.InputObjectType):
+class ResourceLimitInput(graphene.InputObjectType):  # type: ignore[misc]
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
@@ -98,12 +98,12 @@ class ResourceLimitInput(graphene.InputObjectType):
     )
 
 
-class KVPairInput(graphene.InputObjectType):
+class KVPairInput(graphene.InputObjectType):  # type: ignore[misc]
     key = graphene.String()
     value = graphene.String()
 
 
-class BigInt(Scalar):
+class BigInt(Scalar):  # type: ignore[misc]
     """
     BigInt is an extension of the regular graphene.Int scalar type
     to support integers outside the range of a signed 32-bit integer.
@@ -135,7 +135,7 @@ class BigInt(Scalar):
         return None
 
 
-class Bytes(Scalar):
+class Bytes(Scalar):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.09.1."
 
@@ -154,13 +154,13 @@ class Bytes(Scalar):
         return bytes.fromhex(value)
 
 
-class ImageRefType(graphene.InputObjectType):
+class ImageRefType(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=True)
     registry = graphene.String()
     architecture = graphene.String()
 
 
-class UUIDFloatMap(Scalar):
+class UUIDFloatMap(Scalar):  # type: ignore[misc]
     """
     Added in 25.4.0.
     Verifies that the key is a UUID (represented as a string) and the value is a float.
@@ -364,11 +364,11 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         return loader
 
 
-class Item(graphene.Interface):
+class Item(graphene.Interface):  # type: ignore[misc]
     id = graphene.ID()
 
 
-class PaginatedList(graphene.Interface):
+class PaginatedList(graphene.Interface):  # type: ignore[misc]
     items = graphene.List(Item, required=True)
     total_count = graphene.Int(required=True)
 
@@ -858,8 +858,8 @@ def filter_gql_undefined[T](val: T, *, default_value: T | None = None) -> T | No
     return val
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
+class InferenceSessionError(graphene.ObjectType):  # type: ignore[misc]
+    class InferenceSessionErrorInfo(graphene.ObjectType):  # type: ignore[misc]
         src = graphene.String(required=True)
         name = graphene.String(required=True)
         repr = graphene.String(required=True)
@@ -869,7 +869,7 @@ class InferenceSessionError(graphene.ObjectType):
     errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
 
 
-class AsyncPaginatedConnectionField(AsyncListConnectionField):
+class AsyncPaginatedConnectionField(AsyncListConnectionField):  # type: ignore[misc]
     def __init__(self, type: type | str, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())

@@ -17,7 +17,7 @@ class EtcdConfig(BaseFunction):
 
     @api_function
     @classmethod
-    async def get(cls, key: str, prefix: bool = False) -> dict:
+    async def get(cls, key: str, prefix: bool = False) -> dict[str, Any]:
         """
         Get configuration from ETCD with given key.
 
@@ -35,7 +35,7 @@ class EtcdConfig(BaseFunction):
 
     @api_function
     @classmethod
-    async def set(cls, key: str, value: str) -> dict:
+    async def set(cls, key: str, value: str) -> dict[str, Any]:
         """
         Set configuration into ETCD with given key and value.
 
@@ -52,7 +52,7 @@ class EtcdConfig(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, key: str, prefix: bool = False) -> dict:
+    async def delete(cls, key: str, prefix: bool = False) -> dict[str, Any]:
         """
         Delete configuration from ETCD with given key.
 

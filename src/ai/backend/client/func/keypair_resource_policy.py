@@ -66,7 +66,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_pending_session_count: int | Undefined = undefined,
         max_pending_session_resource_slots: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
@@ -118,7 +118,7 @@ class KeypairResourcePolicy(BaseFunction):
         vfolder_host_perms: str | Undefined = undefined,
         max_pending_session_count: int | Undefined = undefined,
         max_pending_session_resource_slots: str | Undefined = undefined,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Updates an existing keypair resource policy with the given options.
         You need an admin privilege for this operation.
@@ -150,7 +150,7 @@ class KeypairResourcePolicy(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, name: str) -> dict:
+    async def delete(cls, name: str) -> dict[str, Any]:
         """
         Deletes an existing keypair resource policy with given name.
         You need an admin privilege for this operation.
@@ -173,7 +173,7 @@ class KeypairResourcePolicy(BaseFunction):
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists the keypair resource policies.
         You need an admin privilege for this operation.
@@ -188,7 +188,7 @@ class KeypairResourcePolicy(BaseFunction):
         self,
         name: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Returns the resource policy's information.
 

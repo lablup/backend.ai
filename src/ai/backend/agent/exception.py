@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from aiohttp import web
 
@@ -62,7 +63,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[InsufficientResource], tuple[Any, ...]]:
         return (
             self.__class__,
             (
@@ -91,7 +92,7 @@ class FractionalResourceFragmented(ResourceError):
             + f"allocating {self.requested_alloc} from {self.dev_allocs})"
         )
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[FractionalResourceFragmented], tuple[Any, ...]]:
         return (
             self.__class__,
             (

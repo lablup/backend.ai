@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import (
 __all__ = ("EventLogRow",)
 
 
-class EventLogRow(Base):
+class EventLogRow(Base):  # type: ignore[misc]
     __tablename__ = "event_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(

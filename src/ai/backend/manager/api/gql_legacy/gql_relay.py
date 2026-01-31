@@ -182,7 +182,7 @@ class AsyncNode(Node):
         raise Exception(f'ObjectType "{_type}" does not implement `get_node` method.')
 
 
-class Connection(graphene.ObjectType):
+class Connection(graphene.ObjectType):  # type: ignore[misc]
     """
     This GraphQL Relay Connection has been implemented to have additional fields, such as `count`.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
@@ -280,7 +280,7 @@ Resolver = (
 )
 
 
-class AsyncListConnectionField(IterableConnectionField):
+class AsyncListConnectionField(IterableConnectionField):  # type: ignore[misc]
     """
     This GraphQL Relay Connection field extension is for getting paginated list data from asynchronous resolvers.
     The resolver function of graphene.relay.Connection is implemented
@@ -398,7 +398,7 @@ def _from_str(value: str) -> ResolvedGlobalID:
     return type_, id_
 
 
-class GlobalIDField(graphene.Scalar):
+class GlobalIDField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = (
             "Added in 24.09.0. Global ID of GQL relay spec. "

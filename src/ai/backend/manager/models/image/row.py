@@ -315,7 +315,7 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement:
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-class ImageRow(Base):
+class ImageRow(Base):  # type: ignore[misc]
     __tablename__ = "images"
     __table_args__ = (
         sa.UniqueConstraint(
@@ -1001,7 +1001,7 @@ async def bulk_get_image_configs(
     return result
 
 
-class ImageAliasRow(Base):
+class ImageAliasRow(Base):  # type: ignore[misc]
     __tablename__ = "image_aliases"
     id: Mapped[UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")

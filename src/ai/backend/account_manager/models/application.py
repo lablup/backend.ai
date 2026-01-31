@@ -9,7 +9,7 @@ __all__: tuple[str, ...] = (
 )
 
 
-class ApplicationRow(Base):
+class ApplicationRow(Base):  # type: ignore[misc]
     __tablename__ = "applications"
     id = IDColumn()
     name = sa.Column("name", sa.String(length=64), unique=True, nullable=False)
@@ -23,7 +23,7 @@ class ApplicationRow(Base):
     )
 
 
-class AssociationApplicationUserRow(Base):
+class AssociationApplicationUserRow(Base):  # type: ignore[misc]
     __tablename__ = "association_applications_users"
     __table_args__ = (
         sa.Index(

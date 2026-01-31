@@ -51,7 +51,7 @@ def _get_scaling_group_join_condition() -> sa.ColumnElement[bool]:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ResourcePresetRow(Base):
+class ResourcePresetRow(Base):  # type: ignore[misc]
     __tablename__ = "resource_presets"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")

@@ -32,7 +32,7 @@ def _get_group_join_condition() -> sa.ColumnElement[bool]:
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
-class AssociationContainerRegistriesGroupsRow(Base):
+class AssociationContainerRegistriesGroupsRow(Base):  # type: ignore[misc]
     __tablename__ = "association_container_registries_groups"
     __table_args__ = (
         # constraint

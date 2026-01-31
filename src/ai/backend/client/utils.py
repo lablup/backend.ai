@@ -28,7 +28,7 @@ def create_connection_field(field_name: str, node_fields: FieldSet) -> FieldSpec
     )
 
 
-def flatten_connection(connection_data: dict) -> list[dict]:
+def flatten_connection(connection_data: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Flattens a GraphQL Connection structure into a list of node dictionaries.
     Args:
@@ -41,7 +41,7 @@ def flatten_connection(connection_data: dict) -> list[dict]:
     return [edge["node"] for edge in connection_data["edges"]]
 
 
-def flatten_connections_in_data(data: dict) -> dict:
+def flatten_connections_in_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     Flattens all connection fields in a nested dictionary.
     If a value is a dictionary containing an 'edges' key, it is flattened using flatten_connection().

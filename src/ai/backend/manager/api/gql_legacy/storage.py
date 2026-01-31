@@ -28,7 +28,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-class StorageVolume(graphene.ObjectType):
+class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -136,7 +136,7 @@ class StorageVolume(graphene.ObjectType):
                 )
 
 
-class StorageVolumeList(graphene.ObjectType):
+class StorageVolumeList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

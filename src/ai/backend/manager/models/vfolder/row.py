@@ -285,7 +285,7 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-class VFolderRow(Base):
+class VFolderRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolders"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -466,7 +466,7 @@ vfolder_attachment = sa.Table(
 )
 
 
-class VFolderInvitationRow(Base):
+class VFolderInvitationRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -505,7 +505,7 @@ class VFolderInvitationRow(Base):
 vfolder_invitations = VFolderInvitationRow.__table__
 
 
-class VFolderPermissionRow(Base):
+class VFolderPermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolder_permissions"
 
     id: Mapped[uuid.UUID] = mapped_column(

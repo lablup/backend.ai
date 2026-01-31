@@ -36,7 +36,7 @@ def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
-class ArtifactRow(Base):
+class ArtifactRow(Base):  # type: ignore[misc]
     """
     Represents an artifact in the system.
     Artifacts can be models, packages, or images.

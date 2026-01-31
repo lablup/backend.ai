@@ -52,7 +52,7 @@ class WorkerStatus(StrEnum):
     TERMINATED = "TERMINATED"
 
 
-class Worker(Base, BaseMixin):
+class Worker(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "workers"
 
     id: Mapped[UUID] = mapped_column(
@@ -289,7 +289,7 @@ class Worker(Base, BaseMixin):
         return slots
 
 
-class WorkerAppFilter(Base, BaseMixin):
+class WorkerAppFilter(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "worker_app_filters"
 
     id: Mapped[UUID] = mapped_column(

@@ -120,7 +120,7 @@ class VFSStorageService:
         storage = self._resolve_storage(storage_name)
         await storage.create_directory(directory)
 
-    async def get_disk_usage(self, storage_name: str) -> dict:
+    async def get_disk_usage(self, storage_name: str) -> dict[str, Any]:
         """
         Get disk usage information for the storage.
 

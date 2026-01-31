@@ -36,7 +36,7 @@ def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class HuggingFaceRegistryRow(Base):
+class HuggingFaceRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "huggingface_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(

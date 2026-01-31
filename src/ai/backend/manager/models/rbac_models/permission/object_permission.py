@@ -52,7 +52,7 @@ def _get_permission_group_join_condition() -> sa.ColumnElement[bool]:
     return PermissionGroupRow.id == foreign(ObjectPermissionRow.permission_group_id)
 
 
-class ObjectPermissionRow(Base):
+class ObjectPermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "object_permissions"
     __table_args__ = (
         sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),

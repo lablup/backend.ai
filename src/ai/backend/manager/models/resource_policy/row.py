@@ -40,7 +40,7 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(Base):
+class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     __tablename__ = "keypair_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -112,7 +112,7 @@ class KeyPairResourcePolicyRow(Base):
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(Base):
+class UserResourcePolicyRow(Base):  # type: ignore[misc]
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -173,7 +173,7 @@ class UserResourcePolicyRow(Base):
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(Base):
+class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
@@ -11,11 +11,11 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 class DoLogCleanupEvent(AbstractAnycastEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:  # noqa: ARG003
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod

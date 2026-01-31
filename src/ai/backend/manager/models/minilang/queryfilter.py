@@ -191,7 +191,7 @@ class QueryFilterTransformer(Transformer):
             raise ValueError("Unknown/unsupported field name", col_name) from e
         return expr
 
-    def unary_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple:
+    def unary_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple[Any, ...]:
         children = args[0]
         op = children[0].value
         expr = children[1]
@@ -199,7 +199,7 @@ class QueryFilterTransformer(Transformer):
             return sa.not_(expr)
         return args
 
-    def combine_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple:
+    def combine_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple[Any, ...]:
         children = args[0]
         op = children[1].value
         expr1 = children[0]

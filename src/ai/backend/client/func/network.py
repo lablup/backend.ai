@@ -31,7 +31,7 @@ class Network(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> RelayPaginatedResult[dict]:
+    ) -> RelayPaginatedResult[dict[str, Any]]:
         """
         Fetches the list of created networks in this cluster.
         """
@@ -99,7 +99,7 @@ class Network(BaseFunction):
     async def get(
         self,
         fields: Sequence[FieldSpec] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetches the information of the network.
         """

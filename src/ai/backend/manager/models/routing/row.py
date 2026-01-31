@@ -44,7 +44,7 @@ def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
     return RoutingRow.revision == DeploymentRevisionRow.id
 
 
-class RoutingRow(Base):
+class RoutingRow(Base):  # type: ignore[misc]
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),

@@ -46,7 +46,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 
 
-class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
+class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -63,7 +63,7 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
 
-class CreateContainerRegistryNodeV2(graphene.Mutation):
+class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.3.0."
 
@@ -130,7 +130,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
             raise GraphQLError(str(e)) from e
 
 
-class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
+class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -175,7 +175,7 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
         )
 
 
-class ModifyContainerRegistryNodeV2(graphene.Mutation):
+class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
@@ -211,7 +211,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class DeleteContainerRegistryNodeV2(graphene.Mutation):
+class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:

@@ -20,7 +20,7 @@ class ServerLog(BaseFunction):
         mark_read: bool = False,
         page_size: int = 20,
         page_no: int = 1,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches server (error) logs.
 

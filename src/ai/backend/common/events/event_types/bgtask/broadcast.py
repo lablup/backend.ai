@@ -4,7 +4,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Never, Self, override
+from typing import Any, Never, Self, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
@@ -45,7 +45,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     total_progress: float
     message: str | None = None
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.task_id),
             self.current_progress,
@@ -54,7 +54,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],
@@ -90,7 +90,7 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
     message: str | None = None
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.task_id),
             self.message,
@@ -98,7 +98,7 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],
@@ -141,12 +141,12 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     total: str = "0"
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         raise UnreachableError("BgtaskAlreadyDoneEvent should not be serialized.")
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Never:
+    def deserialize(cls, value: tuple[Any, ...]) -> Never:
         raise UnreachableError("BgtaskAlreadyDoneEvent should not be deserialized.")
 
     @classmethod
@@ -229,7 +229,7 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
     errors: list[str] = field(default_factory=list)
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.task_id),
             self.message,
@@ -238,7 +238,7 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             uuid.UUID(value[0]),
             value[1],

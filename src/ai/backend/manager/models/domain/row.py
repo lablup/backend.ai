@@ -87,7 +87,7 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class DomainRow(Base):
+class DomainRow(Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
     name: Mapped[str] = mapped_column(

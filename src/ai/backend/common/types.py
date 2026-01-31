@@ -287,7 +287,7 @@ def check_typed_tuple[T1, T2, T3, T4](
 ) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple[Any, ...]:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -1315,13 +1315,13 @@ class VFolderMount(JSONSerializableMixin):
         })
 
 
-class VFolderHostPermissionMap(dict, JSONSerializableMixin):
+class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerializableMixin):
     def __or__(self, other: Any) -> VFolderHostPermissionMap:
         if self is other:
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: dict[str, set] = defaultdict(set)
+        union_map: dict[str, set[VFolderHostPermission]] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
@@ -1560,7 +1560,7 @@ class KernelCreationConfig(TypedDict):
 
 
 class SessionEnqueueingConfig(TypedDict):
-    creation_config: dict
+    creation_config: dict[str, Any]
     kernel_configs: list[KernelEnqueueingConfig]
 
 
@@ -1570,7 +1570,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_idx: int
     local_rank: int
     cluster_hostname: str
-    creation_config: dict
+    creation_config: dict[str, Any]
     bootstrap_script: str
     startup_command: str | None
     uid: int | None

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -26,11 +26,11 @@ class VFolderEvent(AbstractAnycastEvent):
 
 @dataclass
 class VFolderDeletionSuccessEvent(VFolderEvent):
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (str(self.vfid),)
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             VFolderID.from_str(value[0]),
         )
@@ -44,14 +44,14 @@ class VFolderDeletionSuccessEvent(VFolderEvent):
 class VFolderDeletionFailureEvent(VFolderEvent):
     message: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.vfid),
             self.message,
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             VFolderID.from_str(value[0]),
             value[1],
@@ -66,14 +66,14 @@ class VFolderDeletionFailureEvent(VFolderEvent):
 class VFolderCloneSuccessEvent(VFolderEvent):
     dst_vfid: VFolderID
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.vfid),
             str(self.dst_vfid),
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             VFolderID.from_str(value[0]),
             VFolderID.from_str(value[1]),
@@ -89,7 +89,7 @@ class VFolderCloneFailureEvent(VFolderEvent):
     dst_vfid: VFolderID
     message: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.vfid),
             str(self.dst_vfid),
@@ -97,7 +97,7 @@ class VFolderCloneFailureEvent(VFolderEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             VFolderID.from_str(value[0]),
             VFolderID.from_str(value[1]),

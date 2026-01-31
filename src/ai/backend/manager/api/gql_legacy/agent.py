@@ -114,7 +114,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     return {}
 
 
-class AgentNode(graphene.ObjectType):
+class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.12.0."
@@ -315,7 +315,7 @@ class AgentNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class AgentConnection(Connection):
+class AgentConnection(Connection):  # type: ignore[misc]
     class Meta:
         node = AgentNode
         description = "Added in 24.12.0."
@@ -324,7 +324,7 @@ class AgentConnection(Connection):
 ### Legacy
 
 
-class Agent(graphene.ObjectType):
+class Agent(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -669,14 +669,14 @@ async def _append_sgroup_from_clause(
     return query
 
 
-class AgentList(graphene.ObjectType):
+class AgentList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(Agent, required=True)
 
 
-class AgentSummary(graphene.ObjectType):
+class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     """
     A schema for normal users.
     """
@@ -838,19 +838,19 @@ class AgentSummary(graphene.ObjectType):
         ]
 
 
-class AgentSummaryList(graphene.ObjectType):
+class AgentSummaryList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(AgentSummary, required=True)
 
 
-class ModifyAgentInput(graphene.InputObjectType):
+class ModifyAgentInput(graphene.InputObjectType):  # type: ignore[misc]
     schedulable = graphene.Boolean(required=False, default=True)
     scaling_group = graphene.String(required=False)
 
 
-class ModifyAgent(graphene.Mutation):
+class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -884,7 +884,7 @@ class ModifyAgent(graphene.Mutation):
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
-class RescanGPUAllocMaps(graphene.Mutation):
+class RescanGPUAllocMaps(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:

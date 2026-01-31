@@ -515,7 +515,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ports: list[int],
         command: list[str],
         labels: Mapping[str, Any] = {},
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "apiVersion": "apps/v1",
             "kind": "Deployment",

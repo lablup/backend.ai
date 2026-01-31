@@ -363,7 +363,7 @@ def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
     )
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel

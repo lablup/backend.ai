@@ -667,7 +667,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -1878,7 +1878,7 @@ class SessionLifecycleManager:
         return ret
 
 
-class SessionDependencyRow(Base):
+class SessionDependencyRow(Base):  # type: ignore[misc]
     __tablename__ = "session_dependencies"
     session_id: Mapped[UUID] = mapped_column(
         "session_id",

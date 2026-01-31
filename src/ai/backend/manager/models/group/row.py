@@ -122,7 +122,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):
+class AssocGroupUserRow(Base):  # type: ignore[misc]
     __tablename__ = "association_groups_users"
     __table_args__ = (
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
@@ -153,7 +153,7 @@ class AssocGroupUserRow(Base):
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(Base):
+class GroupRow(Base):  # type: ignore[misc]
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),

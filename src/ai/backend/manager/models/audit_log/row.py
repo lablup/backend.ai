@@ -38,7 +38,7 @@ class AuditLogEntityType(enum.StrEnum):
     VFOLDER_INVITATION = "vfolder_invitation"
 
 
-class AuditLogRow(Base):
+class AuditLogRow(Base):  # type: ignore[misc]
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(

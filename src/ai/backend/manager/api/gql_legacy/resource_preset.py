@@ -42,7 +42,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ResourcePreset(graphene.ObjectType):
+class ResourcePreset(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID(description="Added in 25.4.0. ID of the resource preset.")
     name = graphene.String()
     resource_slots = graphene.JSONString()
@@ -170,7 +170,7 @@ class ResourcePreset(graphene.ObjectType):
             )
 
 
-class CreateResourcePresetInput(graphene.InputObjectType):
+class CreateResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
     resource_slots = graphene.JSONString(required=True)
     shared_memory = graphene.String(required=False)
     scaling_group_name = graphene.String(
@@ -191,7 +191,7 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         )
 
 
-class ModifyResourcePresetInput(graphene.InputObjectType):
+class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(
         required=False,
         description=("Added in 25.4.0. A name of resource preset."),
@@ -226,7 +226,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         )
 
 
-class CreateResourcePreset(graphene.Mutation):
+class CreateResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -258,7 +258,7 @@ class CreateResourcePreset(graphene.Mutation):
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))
 
 
-class ModifyResourcePreset(graphene.Mutation):
+class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -297,7 +297,7 @@ class ModifyResourcePreset(graphene.Mutation):
         return cls(True, "success")
 
 
-class DeleteResourcePreset(graphene.Mutation):
+class DeleteResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

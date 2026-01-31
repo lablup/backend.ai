@@ -73,7 +73,7 @@ class BackendError(web.HTTPError):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[BackendError], tuple[Any, ...], dict[str, Any]]:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 __all__ = ("Routing", "RoutingList")
 
 
-class Routing(graphene.ObjectType):
+class Routing(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -201,7 +201,7 @@ class Routing(graphene.ObjectType):
         return await loader.load((self._endpoint_row.id, self.routing_id))
 
 
-class RoutingList(graphene.ObjectType):
+class RoutingList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

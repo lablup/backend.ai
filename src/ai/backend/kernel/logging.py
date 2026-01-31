@@ -4,7 +4,7 @@ import logging
 from contextlib import closing
 from io import StringIO
 from logging.handlers import QueueHandler
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from janus import _SyncQueueProxy
@@ -19,7 +19,7 @@ class RelativeCreatedFormatter(logging.Formatter):
 class BraceMessage:
     __slots__ = ("args", "fmt")
 
-    def __init__(self, fmt: str, args: tuple) -> None:
+    def __init__(self, fmt: str, args: tuple[Any, ...]) -> None:
         self.fmt = fmt
         self.args = args
 

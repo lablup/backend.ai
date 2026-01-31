@@ -41,7 +41,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
     creation_info: Mapping[str, Any] = field(default_factory=dict)
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -51,7 +51,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -97,7 +97,7 @@ class KernelStartedAnycastEvent(KernelCreationEvent):
 
 class KernelCancelledAnycastEvent(KernelLifecycleEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -106,7 +106,7 @@ class KernelCancelledAnycastEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -126,7 +126,7 @@ class KernelTerminationEvent(BaseKernelEvent):
     exit_code: int = -1
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -136,7 +136,7 @@ class KernelTerminationEvent(BaseKernelEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -171,14 +171,14 @@ class KernelTerminatedAnycastEvent(KernelTerminationEvent):
 class DoSyncKernelLogsEvent(BaseKernelEvent):
     container_id: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             self.container_id,
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],

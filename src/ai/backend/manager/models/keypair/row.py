@@ -55,7 +55,7 @@ def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-class KeyPairRow(Base):
+class KeyPairRow(Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)

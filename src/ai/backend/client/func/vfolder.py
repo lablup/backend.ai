@@ -113,7 +113,7 @@ class VFolderByName(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
 
@@ -142,7 +142,7 @@ class VFolderByName(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of own vfolders.
 
@@ -169,7 +169,7 @@ class VFolderByName(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of invited vfolders.
 
@@ -196,7 +196,7 @@ class VFolderByName(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of invited vfolders.
 

@@ -50,7 +50,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-class NetworkNode(graphene.ObjectType):
+class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     class Meta:
@@ -205,7 +205,7 @@ class NetworkNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class CreateNetwork(graphene.Mutation):
+class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -290,13 +290,13 @@ class CreateNetwork(graphene.Mutation):
         return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
 
 
-class ModifyNetworkInput(graphene.InputObjectType):
+class ModifyNetworkInput(graphene.InputObjectType):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     name = graphene.String(required=True)
 
 
-class ModifyNetwork(graphene.Mutation):
+class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -350,7 +350,7 @@ class ModifyNetwork(graphene.Mutation):
             return await gql_mutation_wrapper(ModifyNetwork, _do_mutate)
 
 
-class DeleteNetwork(graphene.Mutation):
+class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -400,7 +400,7 @@ class DeleteNetwork(graphene.Mutation):
             return await gql_mutation_wrapper(DeleteNetwork, _do_mutate)
 
 
-class NetworkConnection(Connection):
+class NetworkConnection(Connection):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     class Meta:

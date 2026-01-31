@@ -12,7 +12,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
-class ScopeField(graphene.Scalar):
+class ScopeField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = (
             "Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. "
@@ -36,7 +36,7 @@ class ScopeField(graphene.Scalar):
         return deserialize_scope(value)
 
 
-class AgentPermissionField(graphene.Scalar):
+class AgentPermissionField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.12.0. One of {[val.value for val in AgentPermission]}."
 

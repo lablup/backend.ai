@@ -33,7 +33,7 @@ def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentAutoScalingPolicyRow(Base):
+class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
     """
     Represents an auto-scaling policy for a deployment (K8s HPA equivalent).
 

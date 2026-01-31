@@ -127,7 +127,7 @@ class User(BaseFunction):
         status: str | None = None,
         group: str | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of users. Domain admins can only get domain users.
 
@@ -161,7 +161,7 @@ class User(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of users. Domain admins can only get domain users.
 
@@ -189,7 +189,7 @@ class User(BaseFunction):
         cls,
         email: str | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetch information of a user. If email is not specified,
         requester's information will be returned.
@@ -220,7 +220,7 @@ class User(BaseFunction):
         cls,
         user_uuid: str | uuid.UUID | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetch information of a user by user's uuid. If user_uuid is not specified,
         requester's information will be returned.
@@ -269,7 +269,7 @@ class User(BaseFunction):
         container_main_gid: int | Undefined = undefined,
         container_gids: Iterable[int] | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
@@ -336,7 +336,7 @@ class User(BaseFunction):
         container_main_gid: int | None | Undefined = undefined,
         container_gids: Iterable[int] | None | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update existing user.
         You need an admin privilege for this operation.
@@ -374,7 +374,7 @@ class User(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, email: str) -> dict:
+    async def delete(cls, email: str) -> dict[str, Any]:
         """
         Inactivates an existing user.
         """
@@ -396,7 +396,7 @@ class User(BaseFunction):
         email: str,
         purge_shared_vfolders: bool = False,
         delegate_endpoint_ownership: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Deletes an existing user.
 

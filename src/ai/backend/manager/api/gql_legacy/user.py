@@ -95,7 +95,7 @@ __all__ = (
 
 
 @graphene_federation.key("id")
-class UserNode(graphene.ObjectType):
+class UserNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -467,13 +467,13 @@ class UserNode(graphene.ObjectType):
         return await UserNode.get_node(info, self.id)
 
 
-class UserConnection(Connection):
+class UserConnection(Connection):  # type: ignore[misc]
     class Meta:
         node = UserNode
         description = "Added in 24.03.0"
 
 
-class UserGroup(graphene.ObjectType):
+class UserGroup(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String()
 
@@ -507,7 +507,7 @@ class UserGroup(graphene.ObjectType):
             )
 
 
-class User(graphene.ObjectType):
+class User(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -850,14 +850,14 @@ class User(graphene.ObjectType):
             )
 
 
-class UserList(graphene.ObjectType):
+class UserList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(User, required=True)
 
 
-class UserInput(graphene.InputObjectType):
+class UserInput(graphene.InputObjectType):  # type: ignore[misc]
     username = graphene.String(required=True)
     password = graphene.String(required=True)
     need_password_change = graphene.Boolean(required=True)
@@ -926,7 +926,7 @@ class UserInput(graphene.InputObjectType):
         )
 
 
-class ModifyUserInput(graphene.InputObjectType):
+class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
     username = graphene.String(required=False)
     password = graphene.String(required=False)
     need_password_change = graphene.Boolean(required=False)
@@ -1032,7 +1032,7 @@ class ModifyUserInput(graphene.InputObjectType):
         )
 
 
-class PurgeUserInput(graphene.InputObjectType):
+class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
     purge_shared_vfolders = graphene.Boolean(required=False, default=False)
     delegate_endpoint_ownership = graphene.Boolean(
         required=False,
@@ -1056,7 +1056,7 @@ class PurgeUserInput(graphene.InputObjectType):
         )
 
 
-class CreateUser(graphene.Mutation):
+class CreateUser(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1096,7 +1096,7 @@ class CreateUser(graphene.Mutation):
         )
 
 
-class ModifyUser(graphene.Mutation):
+class ModifyUser(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1131,7 +1131,7 @@ class ModifyUser(graphene.Mutation):
         )
 
 
-class DeleteUser(graphene.Mutation):
+class DeleteUser(graphene.Mutation):  # type: ignore[misc]
     """
     Instead of really deleting user, just mark the account as deleted status.
 
@@ -1162,7 +1162,7 @@ class DeleteUser(graphene.Mutation):
         )
 
 
-class PurgeUser(graphene.Mutation):
+class PurgeUser(graphene.Mutation):  # type: ignore[misc]
     """
     Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
 

@@ -786,8 +786,8 @@ class AgentRPCServer(aobject):
         self,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
-        raw_configs: Sequence[dict],
-        raw_cluster_info: dict,
+        raw_configs: Sequence[dict[str, Any]],
+        raw_cluster_info: dict[str, Any],
         kernel_image_refs: dict[KernelId, ImageRef],
         agent_id: AgentId | None = None,
     ) -> Any:
@@ -889,7 +889,7 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         text: str,
-        opts: dict,
+        opts: dict[str, Any],
         agent_id: AgentId | None = None,
     ) -> CodeCompletionResp:
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
@@ -914,7 +914,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         kernel_image: ImageRef,
-        updated_config: dict,
+        updated_config: dict[str, Any],
         agent_id: AgentId | None = None,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)

@@ -36,7 +36,7 @@ class Image(BaseFunction):
         cls,
         operation: bool = False,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of registered images in this cluster.
         """
@@ -61,7 +61,7 @@ class Image(BaseFunction):
         reference: str,
         architecture: str,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the information about registered image in this cluster.
         """
@@ -86,7 +86,7 @@ class Image(BaseFunction):
         cls,
         id: str,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the information about registered image in this cluster.
         """
@@ -109,7 +109,7 @@ class Image(BaseFunction):
     async def list_customized(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of customized images in this cluster.
         """
@@ -229,7 +229,7 @@ class Image(BaseFunction):
         alias: str,
         target: str,
         arch: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         q = _d("""
             mutation($alias: String!, $target: String!) {
                 alias_image(alias: $alias, target: $target) {
@@ -248,7 +248,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def dealias_image(cls, alias: str) -> dict:
+    async def dealias_image(cls, alias: str) -> dict[str, Any]:
         q = _d("""
             mutation($alias: String!) {
                 dealias_image(alias: $alias) {

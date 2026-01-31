@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 
@@ -31,7 +32,7 @@ class TestStreamReader(StreamReader):
 
 
 @pytest.fixture
-def storage_config(minio_container: tuple) -> ObjectStorageConfig:
+def storage_config(minio_container: tuple[Any, ...]) -> ObjectStorageConfig:
     container_id, host_port = minio_container
     return ObjectStorageConfig(  # type: ignore[call-arg]
         buckets=[_BUCKET_FIXTURE_NAME],
@@ -53,7 +54,7 @@ def storages_service(storage_config: ObjectStorageConfig) -> ObjectStorageServic
 
 
 @pytest.fixture
-def reservoir_config(minio_container: tuple) -> ReservoirConfig:
+def reservoir_config(minio_container: tuple[Any, ...]) -> ReservoirConfig:
     container_id, host_port = minio_container
     return ReservoirConfig(  # type: ignore[call-arg]
         endpoint=f"http://{host_port.host}:{host_port.port}",

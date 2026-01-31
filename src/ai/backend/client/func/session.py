@@ -136,7 +136,7 @@ class ComputeSession(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of sessions.
 
@@ -755,7 +755,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -812,7 +812,7 @@ class ComputeSession(BaseFunction):
     @api_function
     async def detail(
         self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieves a detailed information about the compute session.
         This is similar to :func:`get_info`, but includes more information
@@ -915,7 +915,7 @@ class ComputeSession(BaseFunction):
         run_id: str | None = None,
         code: str | None = None,
         mode: str = "query",
-        opts: dict | None = None,
+        opts: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -1274,7 +1274,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict | None = None
+        self, code: str = "", *, mode: str = "query", opts: dict[str, Any] | None = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1342,7 +1342,7 @@ class InferenceSession(BaseFunction):
         page_size: int = 20,
         _filter: str | None = None,
         _order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of inference sessions.
         """
@@ -1513,7 +1513,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if an user has passed the tab key just after the code in

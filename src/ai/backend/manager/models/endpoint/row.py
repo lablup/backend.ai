@@ -168,7 +168,7 @@ def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):
+class EndpointRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -901,7 +901,7 @@ class EndpointRow(Base):
         )
 
 
-class EndpointTokenRow(Base):
+class EndpointTokenRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -1017,7 +1017,7 @@ class EndpointTokenRow(Base):
         )
 
 
-class EndpointAutoScalingRuleRow(Base):
+class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(

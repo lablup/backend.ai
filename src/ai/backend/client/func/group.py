@@ -55,7 +55,7 @@ class Group(BaseFunction):
         *,
         fields: Iterable[FieldSpec | str] | None = None,
         domain_name: str | None = None,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Find the group(s) by its name.
         It may return multiple groups when there are groups with the same name
@@ -85,7 +85,7 @@ class Group(BaseFunction):
         cls,
         domain_name: str,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of groups.
 
@@ -110,7 +110,7 @@ class Group(BaseFunction):
         cls,
         gid: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetch information of a group with group ID.
 
@@ -142,7 +142,7 @@ class Group(BaseFunction):
         allowed_vfolder_hosts: str | None = None,
         integration_id: str | None = None,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new group with the given options.
         You need an admin privilege for this operation.
@@ -188,7 +188,7 @@ class Group(BaseFunction):
         allowed_vfolder_hosts: str | None | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update existing group.
         You need an admin privilege for this operation.
@@ -216,7 +216,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, gid: str) -> dict:
+    async def delete(cls, gid: str) -> dict[str, Any]:
         """
         Inactivates the existing group. Does not actually delete it for safety.
         """
@@ -233,7 +233,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def purge(cls, gid: str) -> dict:
+    async def purge(cls, gid: str) -> dict[str, Any]:
         """
         Delete the existing group. This action cannot be undone.
         """
@@ -255,7 +255,7 @@ class Group(BaseFunction):
         gid: str,
         user_uuids: Iterable[str],
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Add users to a group.
         You need an admin privilege for this operation.
@@ -284,7 +284,7 @@ class Group(BaseFunction):
         gid: str,
         user_uuids: Iterable[str],
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Remove users from a group.
         You need an admin privilege for this operation.
@@ -331,7 +331,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+    async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict[str, Any]:
         """
         Create Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
@@ -356,7 +356,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+    async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict[str, Any]:
         """
         Update Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
@@ -381,7 +381,7 @@ class Group(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete_container_registry_quota(cls, group_id: str) -> dict:
+    async def delete_container_registry_quota(cls, group_id: str) -> dict[str, Any]:
         """
         Delete Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.

@@ -56,7 +56,7 @@ class KeyPair(BaseFunction):
         resource_policy: str | Undefined = undefined,
         rate_limit: int | Undefined = undefined,
         fields: Sequence[FieldSpec] = _default_result_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair with the given options.
         You need an admin privilege for this operation.
@@ -94,7 +94,7 @@ class KeyPair(BaseFunction):
         is_admin: bool | Undefined = undefined,
         resource_policy: str | Undefined = undefined,
         rate_limit: int | Undefined = undefined,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair with the given options.
         You need an admin privilege for this operation.
@@ -120,7 +120,7 @@ class KeyPair(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, access_key: str) -> dict:
+    async def delete(cls, access_key: str) -> dict[str, Any]:
         """
         Deletes an existing keypair with given ACCESSKEY.
         """
@@ -144,7 +144,7 @@ class KeyPair(BaseFunction):
         user_id: int | str | None = None,
         is_active: bool | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -190,7 +190,7 @@ class KeyPair(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -212,7 +212,7 @@ class KeyPair(BaseFunction):
         )
 
     @api_function
-    async def info(self, fields: Sequence[FieldSpec] = _default_detail_fields) -> dict:
+    async def info(self, fields: Sequence[FieldSpec] = _default_detail_fields) -> dict[str, Any]:
         """
         Returns the keypair's information such as resource limits.
 
@@ -227,7 +227,7 @@ class KeyPair(BaseFunction):
 
     @api_function
     @classmethod
-    async def activate(cls, access_key: str) -> dict:
+    async def activate(cls, access_key: str) -> dict[str, Any]:
         """
         Activates this keypair.
         You need an admin privilege for this operation.
@@ -250,7 +250,7 @@ class KeyPair(BaseFunction):
 
     @api_function
     @classmethod
-    async def deactivate(cls, access_key: str) -> dict:
+    async def deactivate(cls, access_key: str) -> dict[str, Any]:
         """
         Deactivates this keypair.
         Deactivated keypairs cannot make any API requests

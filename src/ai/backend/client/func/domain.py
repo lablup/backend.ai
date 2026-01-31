@@ -54,7 +54,7 @@ class Domain(BaseFunction):
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of domains.
 
@@ -75,7 +75,7 @@ class Domain(BaseFunction):
         cls,
         name: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieves the detail of a domain with name.
 
@@ -105,7 +105,7 @@ class Domain(BaseFunction):
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new domain with the given options.
 
@@ -149,7 +149,7 @@ class Domain(BaseFunction):
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Updates an existing domain.
 
@@ -179,7 +179,7 @@ class Domain(BaseFunction):
 
     @api_function
     @classmethod
-    async def delete(cls, name: str) -> dict:
+    async def delete(cls, name: str) -> dict[str, Any]:
         """
         Deletes an existing domain.
 
@@ -200,7 +200,7 @@ class Domain(BaseFunction):
 
     @api_function
     @classmethod
-    async def purge(cls, name: str) -> dict:
+    async def purge(cls, name: str) -> dict[str, Any]:
         """
         Purges an existing domain.
 
