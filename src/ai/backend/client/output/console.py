@@ -199,7 +199,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         item: _Item,
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["ok", item["ok"]],
@@ -223,7 +223,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         msg: str = "Failed",
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["Message", msg],

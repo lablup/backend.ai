@@ -440,7 +440,7 @@ class CompositePKFieldPurgerTestRow(Base):
 class CompositePKFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[CompositePKFieldPurgerTestRow]):
     """Batch purger spec for composite PK testing."""
 
-    def build_subquery(self) -> sa.Select:
+    def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKFieldPurgerTestRow)
 
     def field_type(self) -> FieldType:

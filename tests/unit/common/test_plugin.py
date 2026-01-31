@@ -2,7 +2,7 @@ import asyncio
 import functools
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, Callable, overload
 from unittest.mock import AsyncMock
 
 import pytest
@@ -116,7 +116,7 @@ async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixtur
         mock_entrypoints_with_instance, mocked_plugin=mocked_plugin
     )
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-    ctx: BasePluginContext = BasePluginContext(etcd, {})
+    ctx: BasePluginContext[AbstractPlugin] = BasePluginContext(etcd, {})
     try:
         assert not ctx.plugins
         await ctx.init()
@@ -132,7 +132,7 @@ async def test_plugin_context_config_allow_and_block_list(
     etcd: AsyncEtcd, allow_and_block_list: tuple[set[str], set[str]]
 ) -> None:
     allowlist, blocklist = allow_and_block_list
-    ctx: BasePluginContext = BasePluginContext(
+    ctx: BasePluginContext[AbstractPlugin] = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -145,7 +145,7 @@ async def test_plugin_context_config_allow_and_block_list_has_union(
     etcd: AsyncEtcd, allow_and_block_list_has_union: tuple[set[str], set[str]]
 ) -> None:
     allowlist, blocklist = allow_and_block_list_has_union
-    ctx: BasePluginContext = BasePluginContext(
+    ctx: BasePluginContext[AbstractPlugin] = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -159,7 +159,7 @@ async def test_plugin_context_config(etcd: AsyncEtcd, mocker: MockerFixture) -> 
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
     await etcd.put("config/plugins/XXX/dummy/etcd-key", "etcd-value")
-    ctx: BasePluginContext = BasePluginContext(
+    ctx: BasePluginContext[AbstractPlugin] = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -182,7 +182,7 @@ async def test_plugin_context_config_autoupdate(etcd: AsyncEtcd, mocker: MockerF
     )
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
     await etcd.put_prefix("config/plugins/XXX/dummy", {"a": "1", "b": "2"})
-    ctx: BasePluginContext = BasePluginContext(
+    ctx: BasePluginContext[AbstractPlugin] = BasePluginContext(
         etcd,
         {"local-key": "local-value"},
     )
@@ -207,7 +207,7 @@ class DummyHookPassingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-p"
 
-    def get_handlers(self) -> list[tuple[str, Callable]]:
+    def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
@@ -238,7 +238,7 @@ class DummyHookRejectingPlugin(HookPlugin):
 
     _entrypoint_name = "hook-r"
 
-    def get_handlers(self) -> list[tuple[str, Callable]]:
+    def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK1", self.hook1_handler),
             ("HOOK2", self.hook2_handler),
@@ -269,7 +269,7 @@ class DummyHookErrorPlugin(HookPlugin):
 
     _entrypoint_name = "hook-e"
 
-    def get_handlers(self) -> list[tuple[str, Callable]]:
+    def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
         return [
             ("HOOK3", self.hook3_handler),
         ]

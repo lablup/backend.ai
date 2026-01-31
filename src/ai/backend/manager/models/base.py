@@ -118,7 +118,7 @@ T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
+class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -159,7 +159,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
         return self._enum_cls
 
 
-class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
+class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -200,7 +200,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
         return self._enum_cls
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -438,7 +438,7 @@ class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]])
         return [self._schema.to_json(item) for item in value] if value is not None else []
 
     def process_result_value(
-        self, value: list | None, _dialect: Dialect
+        self, value: list[Any] | None, _dialect: Dialect
     ) -> list[JSONSerializableMixin]:
         if value is None:
             return []
@@ -448,7 +448,7 @@ class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]])
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
+class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     """
     A column type for storing a single Pydantic model in JSONB.
     Handles nullable columns - returns None for null values.
@@ -485,7 +485,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
+class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
     """
     A column type for storing a list of Pydantic models in JSONB.
     Always returns empty list instead of None for null values.
@@ -649,7 +649,7 @@ class CurrencyTypes(enum.Enum):
 TUUIDSubType = TypeVar("TUUIDSubType", bound=uuid.UUID)
 
 
-class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
+class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -659,7 +659,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
@@ -744,29 +744,29 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def EndpointIDColumn(name: str = "id") -> sa.Column:
+def EndpointIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def SessionIDColumn(name: str = "id") -> sa.Column:
+def SessionIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def KernelIDColumn(name: str = "id") -> sa.Column:
+def KernelIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column[Any]:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
@@ -854,7 +854,7 @@ async def populate_fixture(
                     # (Therefore a fixture dataset for a single table in the udpate mode should
                     # have consistent set of attributes!)
                     try:
-                        datacols: list[sa.Column] = [
+                        datacols: list[sa.Column[Any]] = [
                             getattr(table.columns, name)
                             for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
                         ]

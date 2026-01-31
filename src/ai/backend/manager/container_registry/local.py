@@ -66,7 +66,7 @@ class LocalRegistry(BaseContainerRegistry):
     ) -> None:
         async def _read_image_info(
             _tag: str,
-        ) -> tuple[dict[str, dict], str | None]:
+        ) -> tuple[dict[str, dict[str, Any]], str | None]:
             async with sess.get(
                 self.registry_url / "images" / f"{image}:{tag}" / "json"
             ) as response:

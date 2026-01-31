@@ -742,7 +742,7 @@ class UserRepository:
     async def get_admin_time_binned_monthly_stats(
         self,
         valkey_stat_client: ValkeyStatClient,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get time-binned monthly statistics for all users."""
         return await self._get_time_binned_monthly_stats(None, valkey_stat_client)
 

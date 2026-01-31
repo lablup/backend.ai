@@ -545,7 +545,7 @@ class AbstractPermissionContext[PermissionType, ObjectType, ObjectIDType](metacl
         return self
 
     @abstractmethod
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         pass
 
     @abstractmethod

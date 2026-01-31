@@ -155,24 +155,24 @@ class DummyKernel(AbstractKernel):
         }
 
     @override
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         delay = self.dummy_kernel_cfg["delay"]["accept-file"]
         await asyncio.sleep(delay)
 
     @override
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-file"]
         await asyncio.sleep(delay)
         return b""
 
     @override
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-single"]
         await asyncio.sleep(delay)
         return b""
 
     @override
-    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}

@@ -139,11 +139,11 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(VFolderRow.user)
 
 
-def _get_group_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_group_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return GroupRow.id == foreign(VFolderRow.group)
 
 
@@ -359,7 +359,7 @@ class VFolderRow(Base):  # type: ignore[misc]
     #   "delete-pending": "2022-10-22T11:40:30",
     #   "delete-ongoing": "2022-10-25T10:22:30"
     # }
-    status_history: Mapped[dict | None] = mapped_column(
+    status_history: Mapped[dict[str, Any] | None] = mapped_column(
         "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
     )
     status_changed: Mapped[datetime | None] = mapped_column(
@@ -629,7 +629,7 @@ async def query_accessible_vfolders(
                 "cur_size": row.vfolders_cur_size,
             })
 
-    entries: list[dict] = []
+    entries: list[dict[str, Any]] = []
     # User vfolders.
     if "user" in allowed_vfolder_types:
         # Scan vfolders on requester's behalf.
@@ -1407,7 +1407,7 @@ async def get_sessions_by_mounted_folder(
 # UnsetQuotaScope) have been moved to api/gql_legacy/vfolder.py
 
 # RBAC
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
@@ -1506,7 +1506,7 @@ class VFolderPermissionContext(
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1538,7 +1538,7 @@ class VFolderPermissionContext(
     def apply_host_permission_ctx(self, host_permission_ctx: StorageHostPermissionContext) -> None:
         self.host_permission_ctx = host_permission_ctx
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

@@ -97,7 +97,7 @@ class CoalescingState:
     batch_size: int = 0
     last_added: float = 0.0
     last_handle: asyncio.TimerHandle | None = None
-    fut_sync: asyncio.Future | None = None
+    fut_sync: asyncio.Future[Any] | None = None
 
     def proceed(self) -> None:
         if self.fut_sync is not None and not self.fut_sync.done():

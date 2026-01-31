@@ -69,7 +69,7 @@ class ResourcePreset(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: ResourcePresetRow | ResourcePresetData | Row | None,
+        row: ResourcePresetRow | ResourcePresetData | Row[Any] | None,
     ) -> ResourcePreset | None:
         match row:
             case ResourcePresetRow():

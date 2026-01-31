@@ -153,7 +153,7 @@ class JsonOutputHandler(BaseOutputHandler):
         item: Mapping[str, Any],
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         data = {
             "ok": item.get("ok", False),
@@ -178,7 +178,7 @@ class JsonOutputHandler(BaseOutputHandler):
         msg: str = "Failed",
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         data = {
             "ok": False,

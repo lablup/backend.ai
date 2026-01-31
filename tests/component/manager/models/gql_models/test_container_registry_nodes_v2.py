@@ -201,7 +201,7 @@ async def test_modify_container_registry(
         }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    variables: dict[str, dict | str] = {
+    variables: dict[str, dict[str, Any] | str] = {
         "filter": 'registry_name == "cr.example.com"',
     }
 
@@ -289,7 +289,7 @@ async def test_modify_container_registry_allows_empty_string(
         }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    variables: dict[str, dict | str] = {
+    variables: dict[str, dict[str, Any] | str] = {
         "filter": 'registry_name == "cr.example.com"',
     }
 
@@ -356,7 +356,7 @@ async def test_modify_container_registry_allows_null_for_unset(
         }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    variables: dict[str, dict | str] = {
+    variables: dict[str, dict[str, Any] | str] = {
         "filter": 'registry_name == "cr.example.com"',
     }
 

@@ -66,7 +66,7 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-def row_to_data(row: DomainRow | Row) -> DomainData:
+def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
     return DomainData(
         name=row.name,
         description=row.description,
@@ -245,7 +245,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.READ_ATTRIBUTE])
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 @dataclass
@@ -256,7 +256,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -270,7 +270,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

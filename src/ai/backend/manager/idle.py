@@ -276,7 +276,7 @@ class IdleCheckerHost:
 
     async def do_idle_check(self) -> None:
         log.debug("do_idle_check(): triggered")
-        policy_cache: dict[AccessKey, Row] = {}
+        policy_cache: dict[AccessKey, Row[Any]] = {}
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (

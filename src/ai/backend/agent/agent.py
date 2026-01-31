@@ -785,14 +785,14 @@ class RestartTracker:
 def _observe_stat_task(
     stat_scope: StatScope,
 ) -> Callable[
-    [Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]],
-    Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
+    [Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]],
+    Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]],
 ]:
     stat_task_observer = StatTaskObserver.instance()
 
     def decorator(
-        func: Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
-    ) -> Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]:
+        func: Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]],
+    ) -> Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]:
         async def wrapper(self: AbstractAgent[Any, Any], *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
             try:
@@ -1721,7 +1721,7 @@ class AbstractAgent[
         *,
         container_id: ContainerId | None = None,
         exit_code: int | None = None,
-        done_future: asyncio.Future | None = None,
+        done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
     ) -> None:
         cid: ContainerId | None = None

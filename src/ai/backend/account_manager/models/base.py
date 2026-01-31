@@ -45,7 +45,7 @@ pgsql_connect_opts = {
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -96,7 +96,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """

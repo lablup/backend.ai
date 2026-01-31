@@ -2397,7 +2397,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
@@ -2515,7 +2515,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
@@ -2643,7 +2643,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
@@ -2824,7 +2824,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

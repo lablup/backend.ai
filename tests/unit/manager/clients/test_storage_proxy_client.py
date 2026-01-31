@@ -39,7 +39,7 @@ def storage_proxy_client_factory(
     ) -> StorageProxyHTTPClient:
         app = web.Application()
         app.router.add_get(f"/{endpoint_path}", handler)
-        client: TestClient = await aiohttp_client(app)
+        client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
 
         return StorageProxyHTTPClient(
             client_session=client.session,

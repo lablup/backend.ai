@@ -2840,7 +2840,7 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
+        session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 
         for row in rows:
@@ -3621,7 +3621,7 @@ class ScheduleDBSource:
         rows = result.fetchall()
 
         # Group rows by session
-        session_data: dict[SessionId, dict] = defaultdict(lambda: {"kernels": []})
+        session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
         user_uuids = set()
 
         for row in rows:
@@ -3938,7 +3938,7 @@ class ScheduleDBSource:
 
             # Build session info map and collect user UUIDs
             session_ids: list[SessionId] = []
-            session_info_map: dict[SessionId, dict] = {}
+            session_info_map: dict[SessionId, dict[str, Any]] = {}
             user_uuids: set[UUID] = set()
 
             for row in session_result.rows:

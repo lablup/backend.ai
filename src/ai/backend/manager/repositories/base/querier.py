@@ -178,7 +178,7 @@ async def execute_batch_querier(
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
     scope: SearchScope | None = None,
-) -> BatchQuerierResult[Row]:
+) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
     For offset pagination, uses count().over() window function for efficient counting.
@@ -238,7 +238,7 @@ async def execute_batch_querier(
         total_count = count_result.scalar() or 0
 
     # Calculate pagination info
-    page_info: PageInfoResult[Row] = querier.pagination.compute_page_info(rows, total_count)
+    page_info: PageInfoResult[Row[Any]] = querier.pagination.compute_page_info(rows, total_count)
 
     return BatchQuerierResult(
         rows=page_info.rows,

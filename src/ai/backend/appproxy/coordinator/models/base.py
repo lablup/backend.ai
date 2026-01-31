@@ -106,7 +106,7 @@ class EnumType(TypeDecorator[enum.Enum], SchemaType):
         return self._enum_class
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -218,7 +218,7 @@ class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
+class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
     """
     A column type to convert JSON values back and forth using BaseModel,
     but store and load a list of the objects.
@@ -294,7 +294,7 @@ class IPColumn(TypeDecorator[ReadableCIDR]):
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator[UUID_SubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -337,9 +337,9 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column[Any]:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)

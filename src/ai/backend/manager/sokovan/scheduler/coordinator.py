@@ -1190,7 +1190,7 @@ class ScheduleCoordinator:
     async def _apply_transition(
         self,
         handler_name: str,
-        session_infos: list,
+        session_infos: list[Any],
         transition: TransitionStatus,
         scheduling_result: SchedulingResult,
         records: Mapping[SessionId, ExecutionRecord],

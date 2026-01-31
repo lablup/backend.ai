@@ -5,7 +5,6 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -102,7 +101,7 @@ class TestCreateGroupMutation:
         aiohttp_client: Any,
         mutation_schema: graphene.Schema,
         mock_graph_ctx: MagicMock,
-    ) -> AsyncGenerator[TestClient, None]:
+    ) -> TestClient[Any]:  # type: ignore[type-arg]
         """Create test client with GraphQL endpoint."""
 
         async def graphql_handler(request: web.Request) -> web.Response:
@@ -130,11 +129,12 @@ class TestCreateGroupMutation:
         app = web.Application()
         app.router.add_post("/graphql", graphql_handler)
 
-        return await aiohttp_client(app)
+        client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
+        return client
 
     async def test_create_group_response_is_json_serializable(
         self,
-        graphql_client: TestClient,
+        graphql_client: TestClient[Any],  # type: ignore[type-arg]
     ) -> None:
         """CreateGroup mutation response should have JSON-serializable allowed_vfolder_hosts."""
         # Act: Make HTTP POST request to GraphQL endpoint
@@ -225,7 +225,7 @@ class TestGroupNodeQuery:
         self,
         aiohttp_client: Any,
         query_schema: graphene.Schema,
-    ) -> AsyncGenerator[TestClient, None]:
+    ) -> TestClient[Any]:  # type: ignore[type-arg]
         """Create test client with GraphQL endpoint."""
         mock_ctx = MagicMock()
 
@@ -251,11 +251,12 @@ class TestGroupNodeQuery:
         app = web.Application()
         app.router.add_post("/graphql", graphql_handler)
 
-        return await aiohttp_client(app)
+        client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
+        return client
 
     async def test_group_node_response_is_json_serializable(
         self,
-        graphql_client: TestClient,
+        graphql_client: TestClient[Any],  # type: ignore[type-arg]
     ) -> None:
         """GroupNode query response should have JSON-serializable allowed_vfolder_hosts."""
         # Act: Make HTTP POST request to GraphQL endpoint

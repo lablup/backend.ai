@@ -68,7 +68,7 @@ def downgrade() -> None:
         extend_existing=True,
     )
 
-    def _delete(table: sa.Table, null_field: sa.Column) -> None:
+    def _delete(table: sa.Table, null_field: sa.Column[Any]) -> None:
         while True:
             subq = sa.select([table.c.id]).where(null_field.is_(sa.null())).limit(BATCH_SIZE)
             delete_stmt = sa.delete(table).where(table.c.id.in_(subq))

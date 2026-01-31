@@ -177,7 +177,7 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select = (
+        stmt: sa.sql.Select[Any] = (
             sa.select(AgentRow)
             .select_from(
                 sa.join(

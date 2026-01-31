@@ -115,7 +115,7 @@ def to_str(val: Any) -> str | None:
 @attrs.define(slots=True)
 class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
-    child_usage_group: dict = attrs.field(factory=dict)
+    child_usage_group: dict[str, Any] = attrs.field(factory=dict)
 
     project_row: GroupRow | None = attrs.field(default=None)
     session_row: SessionRow | None = attrs.field(default=None)
@@ -593,7 +593,7 @@ def _parse_query(
     kernel_cond: ColumnElement[bool] | None = None,
     session_cond: ColumnElement[bool] | None = None,
     project_cond: ColumnElement[bool] | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     session_load = joinedload(KernelRow.session)
     if session_cond is not None:
         session_load = joinedload(KernelRow.session.and_(session_cond))

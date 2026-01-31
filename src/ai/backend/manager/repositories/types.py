@@ -67,7 +67,7 @@ class OrderingApplier(Protocol):
 
     def apply_ordering(
         self, stmt: Select[Any], ordering: Any
-    ) -> tuple[Select[Any], list[tuple[sa.Column, bool]]]:
+    ) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         ...
 
@@ -101,7 +101,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
 
     def build_lexicographic_cursor_conditions(
         self,
-        order_clauses: list[tuple[sa.Column, bool]],
+        order_clauses: list[tuple[sa.Column[Any], bool]],
         cursor_uuid: uuid.UUID,
         pagination_order: ConnectionPaginationOrder | None,
     ) -> list[ColumnElement[bool]]:
@@ -183,7 +183,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
         pagination: PaginationOptions,
         ordering: TOrdering | None = None,
         filters: TFilters | None = None,
-        select_options: list | None = None,
+        select_options: list[Any] | None = None,
     ) -> PaginationQueryResult:
         """
         Returns:
@@ -242,7 +242,7 @@ class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering
             page_size = connection_args.requested_page_size
 
             # Apply ordering for cursor-based pagination
-            order_clauses: list[tuple[sa.Column, bool]] = []
+            order_clauses: list[tuple[sa.Column[Any], bool]] = []
             if ordering is not None:
                 stmt, order_clauses = self.ordering_applier.apply_ordering(stmt, ordering)
 
@@ -424,7 +424,7 @@ class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
 
     def apply_ordering(
         self, stmt: Select[Any], ordering: TOrderingOptions
-    ) -> tuple[Select[Any], list[tuple[sa.Column, bool]]]:
+    ) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         order_clauses = []
         sql_order_clauses = []
@@ -444,6 +444,6 @@ class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
         return stmt, order_clauses
 
     @abstractmethod
-    def get_order_column(self, field: Any) -> sa.Column:
+    def get_order_column(self, field: Any) -> sa.Column[Any]:
         """Get the SQLAlchemy column for the given field"""
         ...

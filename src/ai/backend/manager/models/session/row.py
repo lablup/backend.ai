@@ -518,7 +518,7 @@ def _build_session_fetch_query(
     do_ordering: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     cond = base_cond
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
@@ -655,13 +655,13 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
@@ -1611,7 +1611,7 @@ class SessionRow(Base):  # type: ignore[misc]
     @classmethod
     def get_status_elapsed_time(
         cls, status: SessionStatus, until: datetime
-    ) -> sa.sql.elements.BinaryExpression:
+    ) -> sa.sql.elements.BinaryExpression[Any]:
         return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
 
 
@@ -1944,7 +1944,7 @@ MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 class ComputeSessionPermissionContext(
@@ -1956,7 +1956,7 @@ class ComputeSessionPermissionContext(
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1982,7 +1982,7 @@ class ComputeSessionPermissionContext(
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

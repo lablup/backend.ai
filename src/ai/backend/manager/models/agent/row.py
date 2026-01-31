@@ -312,7 +312,7 @@ async def recalc_agent_resource_occupancy_using_orm(
     agent_row.occupied_slots = occupied_slots
 
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])
@@ -343,7 +343,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -367,7 +367,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

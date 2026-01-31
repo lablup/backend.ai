@@ -591,7 +591,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

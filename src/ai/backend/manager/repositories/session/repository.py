@@ -121,7 +121,7 @@ class SessionRepository:
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates.c.template)
@@ -136,7 +136,7 @@ class SessionRepository:
     async def get_template_info_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates)
@@ -395,7 +395,7 @@ class SessionRepository:
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID, dict]:
+    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
@@ -521,7 +521,7 @@ class SessionRepository:
         self,
         session_name_or_id: uuid.UUID | str,
         access_key: AccessKey,
-    ) -> dict[str, list | str]:
+    ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,

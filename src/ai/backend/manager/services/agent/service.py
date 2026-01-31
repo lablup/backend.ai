@@ -123,7 +123,7 @@ class AgentService:
         self._event_producer = event_producer
         self._agent_cache = agent_cache
 
-    async def _get_watcher_info(self, agent_id: AgentId) -> dict:
+    async def _get_watcher_info(self, agent_id: AgentId) -> dict[str, Any]:
         """
         Get watcher information.
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
@@ -158,7 +158,7 @@ class AgentService:
         agent_id: AgentId,
         method: Literal["GET", "POST"],
         endpoint: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         watcher_info = await self._get_watcher_info(agent_id)
         connector = aiohttp.TCPConnector()
 

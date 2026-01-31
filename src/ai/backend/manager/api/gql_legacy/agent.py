@@ -655,7 +655,7 @@ async def _append_sgroup_from_clause(
     access_key: str,
     domain_name: str | None,
     scaling_group: str | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 
     if scaling_group is not None:

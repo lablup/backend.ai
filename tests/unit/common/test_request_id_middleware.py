@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from aiohttp import web
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from aiohttp.test_utils import TestClient
 
 
-async def test_request_id_middleware_with_custom_request_id(aiohttp_client: pytest.fixture) -> None:
+async def test_request_id_middleware_with_custom_request_id(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
         assert current_request_id() == request.headers.get(REQUEST_ID_HEADER)
         return web.Response(text="ok")
@@ -30,7 +30,7 @@ async def test_request_id_middleware_with_custom_request_id(aiohttp_client: pyte
     assert resp.status == 200
 
 
-async def test_request_id_middleware_without_request_id(aiohttp_client: pytest.fixture) -> None:
+async def test_request_id_middleware_without_request_id(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
         assert current_request_id() is not None
         return web.Response(text="ok")

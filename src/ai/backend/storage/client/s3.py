@@ -266,7 +266,7 @@ class S3Client:
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
-            conditions: list = []
+            conditions: list[Any] = []
 
             if content_length_range:
                 conditions.append([

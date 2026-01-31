@@ -108,7 +108,7 @@ class ObjectPermissionRow(Base):  # type: ignore[misc]
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
     @classmethod
-    def from_sa_row(cls, row: sa.engine.Row) -> Self:
+    def from_sa_row(cls, row: sa.engine.Row[Any]) -> Self:
         return cls(
             id=row.id,
             role_id=row.role_id,

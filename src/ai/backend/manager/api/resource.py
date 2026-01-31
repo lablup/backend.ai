@@ -261,7 +261,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
 
 # TODO: get_watcher_info overlaps with service-side method.
 # Keeping it because it's used by vfolder.
-async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
+async def get_watcher_info(request: web.Request, agent_id: str) -> dict[str, Any]:
     """
     Get watcher information.
 

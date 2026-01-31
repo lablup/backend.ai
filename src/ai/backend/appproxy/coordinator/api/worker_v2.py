@@ -198,7 +198,7 @@ async def update_worker(
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         try:
             worker = await Worker.find_by_authority(sess, params.authority)
             worker.frontend_mode = params.frontend_mode
@@ -288,7 +288,7 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         worker = await Worker.get(sess, worker_id)
         worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE

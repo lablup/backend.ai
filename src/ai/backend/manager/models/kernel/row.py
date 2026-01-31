@@ -348,13 +348,13 @@ async def handle_kernel_exception(
 
 
 # Defined for avoiding circular import
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return sa.and_(

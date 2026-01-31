@@ -385,7 +385,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
             return list((await db_session.scalars(stmt)).all())
 
 
-def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
+def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
     return lambda query_stmt: query_stmt.where(ScalingGroupRow.name.in_(names))
 
 
@@ -442,7 +442,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -451,7 +451,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -460,7 +460,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: str,
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -469,7 +469,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[str],
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 async def query_allowed_sgroups(
@@ -477,7 +477,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
+) -> Sequence[Row[Any]]:
     query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row.scaling_group for row in result}
@@ -554,7 +554,7 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
 
 ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 @dataclass
@@ -569,7 +569,7 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -583,7 +583,7 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None

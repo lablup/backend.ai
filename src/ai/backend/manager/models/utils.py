@@ -598,7 +598,7 @@ def sql_json_increment(
     return expr
 
 
-def _populate_column(column: sa.Column) -> sa.Column:
+def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:
     column_attrs = dict(column.__dict__)
     name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
@@ -619,14 +619,14 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
 
 
 def agg_to_str(
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute,
 ) -> sa.sql.functions.Function:
     # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
     return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
 
 
 def agg_to_array(
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute,
 ) -> sa.sql.functions.Function:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 

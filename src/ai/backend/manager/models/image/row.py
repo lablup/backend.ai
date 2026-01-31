@@ -300,13 +300,13 @@ type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
-def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return ImageRow.id == foreign(EndpointRow.image)
 
 
-def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
@@ -1040,7 +1040,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         return ImageAliasData(id=self.id, alias=self.alias or "")
 
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])
@@ -1071,7 +1071,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1085,7 +1085,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -1431,7 +1431,7 @@ class ImagePermissionContextBuilder(
     ) -> ImagePermissionContext:
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def global_registry_condition(_project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
+        def global_registry_condition(_project_ids: list[Any]) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(
@@ -1448,7 +1448,7 @@ class ImagePermissionContextBuilder(
         )
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def non_global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement:
+        def non_global_registry_condition(project_ids: list[Any]) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
                 AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )

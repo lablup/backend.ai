@@ -42,7 +42,7 @@ class MockOrderingOptions:
 class MockOrderingApplier(BaseOrderingApplier[MockOrderingOptions]):
     """Test implementation of BaseOrderingApplier"""
 
-    def get_order_column(self, field: MockOrderField) -> sa.Column:
+    def get_order_column(self, field: MockOrderField) -> sa.Column[Any]:
         """Get the SQLAlchemy column for the given mock field"""
         return getattr(MockModel, field.value, MockModel.name)
 
@@ -156,7 +156,7 @@ class TestBaseOrderingApplier:
 
         # Create a custom applier that has fallback behavior
         class FallbackOrderingApplier(BaseOrderingApplier[MockOrderingOptions]):
-            def get_order_column(self, field: MockOrderField) -> sa.Column:
+            def get_order_column(self, field: MockOrderField) -> sa.Column[Any]:
                 return getattr(MockModel, field.value, MockModel.name)  # Fallback to name
 
         applier = FallbackOrderingApplier()

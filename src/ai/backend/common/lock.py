@@ -210,7 +210,7 @@ class EtcdLock(AbstractDistributedLock):
 
 class RedisLock(AbstractDistributedLock):
     debug: bool
-    _redis: Redis
+    _redis: Redis[Any]
     _timeout: float | None
     _lock: AsyncRedisLock | None
 

@@ -897,7 +897,7 @@ async def scan_resource_usage_per_slot(
             slot_name = SlotName(raw_slot_name)
             slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])
 
-    async def _wrap_future(fut: asyncio.Future) -> None:
+    async def _wrap_future(fut: asyncio.Future[Any]) -> None:
         # avoid type check failures when a future is directly consumed by a taskgroup
         await fut
 

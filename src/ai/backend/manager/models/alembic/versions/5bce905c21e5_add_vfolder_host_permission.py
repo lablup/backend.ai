@@ -129,7 +129,7 @@ def upgrade() -> None:
         extend_existing=True,
     )
 
-    def update_vfolder_host_col(table: sa.Table, cond: sa.ColumnElement, row_list: list[dict[str, object]]) -> None:
+    def update_vfolder_host_col(table: sa.Table, cond: sa.ColumnElement[Any], row_list: list[dict[str, object]]) -> None:
         query = (
             sa.update(table)
             .values({"allowed_vfolder_hosts": bindparam("allowed_vfolder_hosts")})
@@ -241,7 +241,7 @@ def downgrade() -> None:
         extend_existing=True,
     )
 
-    def update_vfolder_host_col(table: sa.Table, cond: sa.ColumnElement, row_list: list[dict[str, object]]) -> None:
+    def update_vfolder_host_col(table: sa.Table, cond: sa.ColumnElement[Any], row_list: list[dict[str, object]]) -> None:
         query = (
             sa.update(table)
             .values({"allowed_vfolder_hosts": bindparam("allowed_vfolder_hosts")})

@@ -189,7 +189,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     data: dict[Any, Any]
     last_used: float
     termination_reason: KernelLifecycleEventReason | None
-    clean_event: asyncio.Future | None
+    clean_event: asyncio.Future[Any] | None
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
@@ -364,7 +364,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -377,7 +377,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file or an entire directory) as a tar archive.
         The path should be inside /home/work of the container.
@@ -390,7 +390,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file) as a tar archive.
         The path should be inside /home/work of the container.
@@ -402,7 +402,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         """
         List the directory entries of the designated path.
         The path should be inside /home/work of the container.

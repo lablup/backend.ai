@@ -127,7 +127,7 @@ class AgentRuntime:
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
-    ) -> AbstractAgent:
+    ) -> AbstractAgent[Any, Any]:
         agent_kwargs = {
             "kernel_registry": kernel_registry,
             "stats_monitor": stats_monitor,
@@ -174,10 +174,10 @@ class AgentRuntime:
             await self._metadata_server.cleanup()
         await self._resource_allocator.__aexit__(*exc_info)
 
-    def get_agents(self) -> list[AbstractAgent]:
+    def get_agents(self) -> list[AbstractAgent[Any, Any]]:
         return list(self._agents.values())
 
-    def get_agent(self, agent_id: AgentId | None) -> AbstractAgent:
+    def get_agent(self, agent_id: AgentId | None) -> AbstractAgent[Any, Any]:
         if agent_id is None:
             return self._primary_agent
         if agent_id not in self._agents:

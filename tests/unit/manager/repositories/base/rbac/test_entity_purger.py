@@ -1692,7 +1692,7 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
 class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTestRow]):
     """Batch purger spec for composite PK testing."""
 
-    def build_subquery(self) -> sa.Select:
+    def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKPurgerTestRow)
 
     def entity_type(self) -> EntityType:

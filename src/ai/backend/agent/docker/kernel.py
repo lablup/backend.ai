@@ -295,7 +295,7 @@ class DockerKernel(AbstractKernel):
             log.warning("Session is already being committed.")
 
     @override
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         loop = current_loop()
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
@@ -316,7 +316,7 @@ class DockerKernel(AbstractKernel):
             ) from e
 
     @override
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -345,7 +345,7 @@ class DockerKernel(AbstractKernel):
         return tarbytes
 
     @override
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -385,7 +385,7 @@ class DockerKernel(AbstractKernel):
         return content_bytes
 
     @override
-    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory

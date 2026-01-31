@@ -13,7 +13,7 @@ class AgentStatusModifier(PartialModifier):
     lost_at: OptionalState[datetime] = field(default_factory=lambda: OptionalState.nop())
 
     @override
-    def fields_to_update(self) -> dict:
+    def fields_to_update(self) -> dict[str, Any]:
         to_update = {
             "status": self.status,
             "status_changed": self.status_changed,

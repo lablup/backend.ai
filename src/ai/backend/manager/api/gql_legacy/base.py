@@ -548,7 +548,7 @@ def scoped_query(
     *,
     autofill_user: bool = False,
     user_key: str = "access_key",
-) -> Callable:
+) -> Callable[..., Any]:
     """
     Prepends checks for domain/group/user access rights depending
     on the client's user and keypair information.
@@ -937,7 +937,7 @@ def validate_connection_args(
 
 @dataclass
 class _StmtWithConditions:
-    stmt: sa.sql.Select
+    stmt: sa.sql.Select[Any]
     conditions: list[WhereClauseType]
 
 
@@ -946,7 +946,7 @@ def _apply_ordering(
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     pagination_order: ConnectionPaginationOrder | None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     """
     Apply ORDER BY clauses for cursor-based pagination with deterministic ordering.
     This function applies the user-specified ordering columns first, then adds the id column
@@ -1090,7 +1090,7 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select[Any], sa.sql.Select[Any], list[WhereClauseType]]:
     stmt = sa.select(orm_class)
     count_stmt = sa.select(sa.func.count()).select_from(orm_class)
 
@@ -1138,7 +1138,7 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select[Any], sa.sql.Select[Any], list[WhereClauseType]]:
     stmt = sa.select(orm_class)
     count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
@@ -1166,8 +1166,8 @@ def _build_sql_stmt_from_sql_arg(
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
-    sql_stmt: sa.sql.Select
-    sql_count_stmt: sa.sql.Select
+    sql_stmt: sa.sql.Select[Any]
+    sql_count_stmt: sa.sql.Select[Any]
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None

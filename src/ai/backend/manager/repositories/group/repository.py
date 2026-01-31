@@ -230,7 +230,7 @@ class GroupRepository:
         start_date: datetime,
         end_date: datetime,
         group_ids: Sequence[UUID] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get container statistics for groups within a time period."""
         async with self._db.begin_readonly() as conn:
             j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(

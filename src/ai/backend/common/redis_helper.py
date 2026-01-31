@@ -78,7 +78,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis | Any], Awaitable[Any]],
+    func: Callable[[Redis[Any] | Any], Awaitable[Any]],
     *,
     service_name: str | None = None,
     encoding: str | None = None,

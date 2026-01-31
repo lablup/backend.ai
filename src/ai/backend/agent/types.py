@@ -42,7 +42,7 @@ class AgentBackend(enum.StrEnum):
 
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
-    def get_agent_cls(self) -> type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """
@@ -173,7 +173,7 @@ class ContainerLifecycleEvent:
     container_id: ContainerId | None
     event: LifecycleEvent
     reason: KernelLifecycleEventReason
-    done_future: asyncio.Future | None = None
+    done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
 

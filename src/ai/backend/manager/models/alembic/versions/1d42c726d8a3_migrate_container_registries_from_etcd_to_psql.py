@@ -153,7 +153,7 @@ def get_async_etcd() -> AsyncEtcd:
 
 
 def delete_old_etcd_container_registries() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
@@ -168,7 +168,7 @@ def delete_old_etcd_container_registries() -> None:
 
 
 def migrate_data_etcd_to_psql() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
@@ -180,7 +180,7 @@ def migrate_data_etcd_to_psql() -> None:
 
         # If there are no container registries, it returns an empty list.
         # If an error occurs while saving backup, it returns error.
-        def get_etcd_container_registries(queue: Queue) -> None:
+        def get_etcd_container_registries(queue: Queue[Any]) -> None:
             async def _get_container_registries() -> Mapping[str, Any] | Exception:
                 etcd = get_async_etcd()
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
@@ -313,7 +313,7 @@ def revert_data_psql_to_etcd() -> None:
 
     merged_items = [merge_items(items) for items in grouped_items.values()]
 
-    def put_etcd_container_registries(merged_items: list[Any], queue: Queue) -> None:
+    def put_etcd_container_registries(merged_items: list[Any], queue: Queue[Any]) -> None:
         etcd = get_async_etcd()
         for item in merged_items:
             hostname = item.pop("hostname")
@@ -321,7 +321,7 @@ def revert_data_psql_to_etcd() -> None:
 
         queue.put(True)
 
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
         executor.submit(put_etcd_container_registries, merged_items, queue)

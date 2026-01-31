@@ -1343,7 +1343,7 @@ class TestGetContainerLogs:
         assert isinstance(result, GetContainerLogsActionResult)
         assert result.session_data == sample_session_data
         # Result is wrapped as {"result": {"logs": <agent_logs>}}
-        assert cast(dict, result.result)["result"]["logs"] == agent_logs
+        assert cast(dict[str, Any], result.result)["result"]["logs"] == agent_logs
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.get_logs_from_agent.assert_called_once()
 

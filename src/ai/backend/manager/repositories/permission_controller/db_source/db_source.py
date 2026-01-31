@@ -680,7 +680,7 @@ class PermissionDBSource:
         self,
         user_id: uuid.UUID,
         object_ids: Iterable[ObjectId],
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
         return (
             sa.select(RoleRow)
@@ -718,7 +718,7 @@ class PermissionDBSource:
         user_id: uuid.UUID,
         object_ids: Iterable[ObjectId],
         operation: OperationType,
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
         return (
             sa.select(RoleRow)

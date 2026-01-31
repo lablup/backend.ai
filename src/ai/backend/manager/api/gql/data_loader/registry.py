@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class DataLoaderRegistry:
-    _loader: dict[Callable, DataLoader]
+    _loader: dict[Callable[..., Any], DataLoader]
 
     def __init__(self) -> None:
         self._loader = {}

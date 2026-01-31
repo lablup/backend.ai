@@ -89,5 +89,5 @@ def test_update_nested_dict() -> None:
         "b": 3,
     }
     utils.update_nested_dict(o, {"a": [4, 5], "b": 6})
-    assert cast(list, o["a"]) == [1, 2, 4, 5]
+    assert cast(list[Any], o["a"]) == [1, 2, 4, 5]
     assert o["b"] == 6
