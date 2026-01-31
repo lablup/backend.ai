@@ -134,7 +134,7 @@ def local_config(
     }
     server_config = AgentUnifiedConfig.model_validate(raw_server_config)
 
-    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
+    def _override_if_exists(src: dict[str, Any], dst: dict[str, Any], key: str) -> None:
         sentinel = object()
         if (val := src.get(key, sentinel)) is not sentinel:
             dst[key] = val

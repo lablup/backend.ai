@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -8,7 +9,7 @@ class BaseInferenceRuntimeConfig(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel)
 
     @classmethod
-    def to_json_schema(cls) -> dict:
+    def to_json_schema(cls) -> dict[str, Any]:
         return cls.model_json_schema()
 
 

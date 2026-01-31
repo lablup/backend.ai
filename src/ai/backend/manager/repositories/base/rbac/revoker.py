@@ -158,7 +158,7 @@ async def _delete_object_permissions(
     result = await db_sess.execute(
         sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids))
     )
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 async def _delete_orphan_permission_groups(
@@ -190,7 +190,7 @@ async def _delete_orphan_permission_groups(
             )
         )
     )
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 # =============================================================================

@@ -187,7 +187,7 @@ class OneFSClient:
 
     async def create_quota(
         self,
-        path: os.PathLike,
+        path: os.PathLike[str],
         type_: QuotaTypes,
         thresholds: QuotaThresholds,
     ) -> Mapping[str, Any]:

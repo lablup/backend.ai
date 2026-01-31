@@ -191,4 +191,4 @@ async def execute_bulk_upserter[TRow: Base](
     )
 
     result = await db_sess.execute(stmt)
-    return BulkUpserterResult(upserted_count=cast(CursorResult, result).rowcount)
+    return BulkUpserterResult(upserted_count=cast(CursorResult[Any], result).rowcount)

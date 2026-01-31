@@ -211,7 +211,7 @@ class GroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=ProjectType.GENERAL,
     )
-    container_registry: Mapped[dict | None] = mapped_column(
+    container_registry: Mapped[dict[str, Any] | None] = mapped_column(
         "container_registry",
         StructuredJSONColumn(container_registry_iv),
         nullable=True,
@@ -414,7 +414,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict | None:
+    def container_registry(self) -> dict[str, Any] | None:
         return self._container_registry
 
     @classmethod

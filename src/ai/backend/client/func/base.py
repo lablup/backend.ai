@@ -16,7 +16,7 @@ __all__ = (
 )
 
 
-def _wrap_method(cls: type, orig_name: str, meth: Callable) -> Callable:
+def _wrap_method(cls: type, orig_name: str, meth: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(meth)
     def _method(*args: Any, **kwargs: Any) -> Any:
         # We need to keep the original attributes so that they could be correctly
@@ -63,8 +63,8 @@ def resolve_fields(
 def field_resolver(
     base_field_set: FieldSet,
     default_fields: Iterable[FieldSpec],
-) -> Callable:
-    def decorator(meth: Callable) -> Callable:
+) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             if fields := kwargs.get("fields", default_fields):
                 resolved_fields = tuple(

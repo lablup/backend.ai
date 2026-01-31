@@ -143,7 +143,7 @@ from .utils import get_subnet_ip
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def collect_error(meth: Callable) -> Callable:
+def collect_error(meth: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(meth)
     async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
         try:
@@ -232,8 +232,8 @@ class RPCFunctionRegistryV2:
         return _inner
 
 
-def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
-    def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
         async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
@@ -622,7 +622,7 @@ class AgentRPCServer(aobject):
         self,
         config_data: tomlkit.TOMLDocument,
         scaling_group: str,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         if "agents" not in config_data:
             raise InvalidAgentConfigError("Missing 'agents' section in configuration data.")

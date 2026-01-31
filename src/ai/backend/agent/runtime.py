@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 class AgentRuntime:
     _local_config: AgentUnifiedConfig
     _etcd_views: Mapping[AgentId, AgentEtcdClientView]
-    _agents: Mapping[AgentId, AbstractAgent]
-    _primary_agent: AbstractAgent
+    _agents: Mapping[AgentId, AbstractAgent[Any, Any]]
+    _primary_agent: AbstractAgent[Any, Any]
     _kernel_registry: KernelRegistry
     _resource_allocator: ResourceAllocator
     _metadata_server: MetadataServer | None
@@ -146,8 +146,8 @@ class AgentRuntime:
         self,
         local_config: AgentUnifiedConfig,
         etcd_views: Mapping[AgentId, AgentEtcdClientView],
-        agents: dict[AgentId, AbstractAgent],
-        primary_agent: AbstractAgent,
+        agents: dict[AgentId, AbstractAgent[Any, Any]],
+        primary_agent: AbstractAgent[Any, Any],
         kernel_registry: KernelRegistry,
         resource_allocator: ResourceAllocator,
         metadata_server: MetadataServer | None = None,

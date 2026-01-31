@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -104,7 +105,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
         frontend_mode = local_config.proxy_worker.traefik.frontend_mode
     else:
         frontend_mode = local_config.proxy_worker.frontend_mode
-    body: dict = {
+    body: dict[str, Any] = {
         "authority": local_config.proxy_worker.authority,
         "frontend_mode": frontend_mode,
         "protocol": local_config.proxy_worker.protocol,

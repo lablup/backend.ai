@@ -106,7 +106,7 @@ class DomainPermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> DomainPermission | None:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> DomainPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return DomainPermission(node.value)
         return None

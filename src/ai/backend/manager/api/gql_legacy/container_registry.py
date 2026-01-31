@@ -90,7 +90,7 @@ class ContainerRegistryTypeField(graphene.Scalar):  # type: ignore[misc]
 
     @staticmethod
     def parse_literal(
-        node: graphql.language.ast.Node, _variables: dict | None = None
+        node: graphql.language.ast.Node, _variables: dict[str, Any] | None = None
     ) -> ContainerRegistryType | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ContainerRegistryType(node.value)

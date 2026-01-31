@@ -152,7 +152,7 @@ class ModelServicePrepareCtx:
     owner_uuid: uuid.UUID
     owner_role: UserRole
     group_id: uuid.UUID
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
 

@@ -28,7 +28,7 @@ def auth_required(handler: Handler) -> Handler:
     return wrapped
 
 
-def set_handler_attr(func: Callable, key: str, value: Any) -> None:
+def set_handler_attr(func: Callable[..., Any], key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}

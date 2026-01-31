@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -47,7 +48,7 @@ class SchedulingPredicate:
     name: str
     msg: str
 
-    def serialize(self) -> dict:
+    def serialize(self) -> dict[str, Any]:
         """Serialize the predicate for storage."""
         return {"name": self.name, "msg": self.msg}
 
@@ -99,7 +100,7 @@ class SchedulingFailure:
     # Timestamp of the last scheduling attempt
     last_try: datetime | None = None
 
-    def to_status_data(self, current_retries: int) -> dict:
+    def to_status_data(self, current_retries: int) -> dict[str, Any]:
         """Convert failure to status data dictionary for storage."""
         return {
             "passed_predicates": [p.serialize() for p in self.passed_phases],

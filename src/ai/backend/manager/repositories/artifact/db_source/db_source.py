@@ -622,7 +622,7 @@ class ArtifactDBSource:
                 )
             )
 
-            if cast(CursorResult, delete_result).rowcount == 0:
+            if cast(CursorResult[Any], delete_result).rowcount == 0:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
             return association_data

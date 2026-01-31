@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot
@@ -262,7 +262,7 @@ class FairShareFactorCalculator:
         raw_buckets: RawUsageBucketsByLevel,
         today: date,
         half_life_days: int,
-    ) -> dict[str, dict]:
+    ) -> dict[str, dict[str, Any]]:
         """Aggregate raw usage buckets with time decay applied.
 
         Args:

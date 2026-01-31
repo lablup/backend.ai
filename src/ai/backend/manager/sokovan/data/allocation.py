@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -173,7 +173,7 @@ class SchedulingFailure:
     last_try: datetime | None = None
     msg: str | None = None
 
-    def to_status_data(self, current_retries: int) -> dict:
+    def to_status_data(self, current_retries: int) -> dict[str, Any]:
         """Convert failure to status data dictionary for storage."""
         return {
             "passed_predicates": [p.serialize() for p in self.passed_phases],

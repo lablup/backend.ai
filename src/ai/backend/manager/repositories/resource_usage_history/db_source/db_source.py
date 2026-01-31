@@ -128,7 +128,7 @@ class ResourceUsageHistoryDBSource:
                         .values(last_observed_at=observed_at)
                     )
                     update_result = await db_sess.execute(update_stmt)
-                    updated_count += cast(CursorResult, update_result).rowcount
+                    updated_count += cast(CursorResult[Any], update_result).rowcount
 
             return records, updated_count
 
@@ -190,7 +190,7 @@ class ResourceUsageHistoryDBSource:
                         .values(last_observed_at=observed_at)
                     )
                     update_result = await db_sess.execute(update_stmt)
-                    updated_count += cast(CursorResult, update_result).rowcount
+                    updated_count += cast(CursorResult[Any], update_result).rowcount
 
             log.debug("[DBSource] Updated last_observed_at for {} kernels", updated_count)
 

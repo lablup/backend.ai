@@ -127,7 +127,7 @@ class Request:
         *,
         content_type: str | None = None,
         params: Mapping[str, str | int] | None = None,
-        reporthook: Callable | None = None,
+        reporthook: Callable[..., Any] | None = None,
         override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
@@ -727,7 +727,7 @@ class WebSocketContextManager:
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Callable | None = None,
+        on_enter: Callable[..., Any] | None = None,
         response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session

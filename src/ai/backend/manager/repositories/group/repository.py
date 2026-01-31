@@ -220,7 +220,7 @@ class GroupRepository:
                 )
                 .where(groups.c.id == group_id)
             )
-            if cast(CursorResult, result).rowcount > 0:
+            if cast(CursorResult[Any], result).rowcount > 0:
                 return
             raise ProjectNotFound(f"Group not found: {group_id}")
 

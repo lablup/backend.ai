@@ -48,7 +48,7 @@ class CreateFromTemplateAction(SessionAction):
     user_role: UserRole
     sudo_session_enabled: bool
     requester_access_key: AccessKey
-    keypair_resource_policy: dict | None
+    keypair_resource_policy: dict[str, Any] | None
 
     @override
     def entity_id(self) -> str | None:

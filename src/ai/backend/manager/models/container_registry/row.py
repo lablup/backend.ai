@@ -169,7 +169,7 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
         password: str | None = None,
         ssl_verify: bool | None = None,
         is_global: bool | None = None,
-        extra: dict | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         self.id = id
         self.url = url
@@ -213,7 +213,7 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
     @classmethod
     async def get_container_registry_info(
         cls, session: AsyncSession, registry_id: uuid.UUID
-    ) -> tuple[yarl.URL, dict]:
+    ) -> tuple[yarl.URL, dict[str, Any]]:
         query_stmt = (
             sa.select(ContainerRegistryRow)
             .where(ContainerRegistryRow.id == registry_id)

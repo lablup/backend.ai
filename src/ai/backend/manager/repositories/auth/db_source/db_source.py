@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -87,8 +88,8 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_data: dict[str, Any],
+        keypair_data: dict[str, Any],
         group_name: str,
         domain_name: str,
     ) -> UserData:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -322,7 +322,7 @@ class SchedulerRepository:
         user_scope: UserScope,
         access_key: AccessKey,
         vfolder_mounts: list[VFolderMount],
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Prepare dotfile data for the session.
         """

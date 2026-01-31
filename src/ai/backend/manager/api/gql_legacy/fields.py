@@ -26,7 +26,7 @@ class ScopeField(graphene.Scalar):  # type: ignore[misc]
         return val.serialize()
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ScopeType | None:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ScopeType | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return deserialize_scope(node.value)
         return None
@@ -45,7 +45,7 @@ class AgentPermissionField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> AgentPermission | None:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> AgentPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return AgentPermission(node.value)
         return None

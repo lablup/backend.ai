@@ -230,4 +230,4 @@ async def execute_batch_updater[TRow: Base](
         stmt = stmt.where(condition())
 
     result = await db_sess.execute(stmt)
-    return BatchUpdaterResult(updated_count=cast(CursorResult, result).rowcount)
+    return BatchUpdaterResult(updated_count=cast(CursorResult[Any], result).rowcount)

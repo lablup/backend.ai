@@ -330,7 +330,7 @@ class GroupPermissionField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ProjectPermission | None:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ProjectPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ProjectPermission(node.value)
         return None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Self
+from typing import Any, Self
 
 import pytest
 from aiohttp import web
@@ -64,8 +64,8 @@ class TestSearchParamsModel(BaseRequestModel):
 
 
 class TestCombinedResponseModel(BaseResponseModel):
-    user_info: dict
-    search_info: dict
+    user_info: dict[str, Any]
+    search_info: dict[str, Any]
     timestamp: str
 
 

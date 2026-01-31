@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -102,7 +102,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     model_definition_path: Mapped[str | None] = mapped_column(
         "model_definition_path", sa.String(length=128), nullable=True
     )
-    model_definition: Mapped[dict | None] = mapped_column(
+    model_definition: Mapped[dict[str, Any] | None] = mapped_column(
         "model_definition", pgsql.JSONB(), nullable=True
     )
 
@@ -113,7 +113,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     resource_slots: Mapped[ResourceSlot] = mapped_column(
         "resource_slots", ResourceSlotColumn(), nullable=False
     )
-    resource_opts: Mapped[dict] = mapped_column(
+    resource_opts: Mapped[dict[str, Any]] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
 
@@ -134,7 +134,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     bootstrap_script: Mapped[str | None] = mapped_column(
         "bootstrap_script", sa.String(length=16 * 1024), nullable=True
     )
-    environ: Mapped[dict] = mapped_column(
+    environ: Mapped[dict[str, Any]] = mapped_column(
         "environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
     callback_url: Mapped[str | None] = mapped_column(

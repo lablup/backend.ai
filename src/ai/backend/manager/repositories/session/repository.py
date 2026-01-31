@@ -391,7 +391,7 @@ class SessionRepository:
         requester_access_key: AccessKey,
         user_role: UserRole,
         domain_name: str,
-        keypair_resource_policy: dict | None,
+        keypair_resource_policy: dict[str, Any] | None,
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,

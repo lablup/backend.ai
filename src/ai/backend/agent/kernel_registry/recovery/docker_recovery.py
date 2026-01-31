@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
@@ -26,7 +26,7 @@ class DockerKernelRegistryRecoveryArgs:
     local_instance_id: str
 
     # To allow scratch-based loader to list containers
-    agent: AbstractAgent
+    agent: AbstractAgent[Any, Any]
 
 
 class DockerKernelRegistryRecovery(BaseKernelRegistryRecovery):

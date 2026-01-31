@@ -119,7 +119,7 @@ class TestCreateGroupMutation:
                 context_value=mock_graph_ctx,
             )
 
-            response_data: dict = {}
+            response_data: dict[str, Any] = {}
             if result.data:
                 response_data["data"] = result.data
             if result.errors:
@@ -240,7 +240,7 @@ class TestGroupNodeQuery:
                 context_value=mock_ctx,
             )
 
-            response_data: dict = {}
+            response_data: dict[str, Any] = {}
             if result.data:
                 response_data["data"] = result.data
             if result.errors:

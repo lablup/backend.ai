@@ -426,7 +426,7 @@ async def _batch_delete_object_permissions(
     result = await db_sess.execute(
         sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids))
     )
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 async def _batch_delete_orphan_permission_groups(
@@ -459,7 +459,7 @@ async def _batch_delete_orphan_permission_groups(
             )
         )
     )
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 async def _batch_delete_scope_associations(
@@ -481,7 +481,7 @@ async def _batch_delete_scope_associations(
     result = await db_sess.execute(
         sa.delete(AssociationScopesEntitiesRow).where(sa.or_(*conditions))
     )
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 # =============================================================================

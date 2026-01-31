@@ -188,7 +188,7 @@ async def execute_batch_purger[TRow: Base](
         stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
         result = await db_sess.execute(stmt)
 
-        batch_deleted = cast(CursorResult, result).rowcount
+        batch_deleted = cast(CursorResult[Any], result).rowcount
         total_deleted += batch_deleted
 
         if batch_deleted < purger.batch_size:

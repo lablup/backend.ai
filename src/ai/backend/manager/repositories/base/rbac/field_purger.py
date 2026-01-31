@@ -130,7 +130,7 @@ async def _batch_delete_entity_fields(
     ]
 
     result = await db_sess.execute(sa.delete(EntityFieldRow).where(sa.or_(*conditions)))
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 # =============================================================================

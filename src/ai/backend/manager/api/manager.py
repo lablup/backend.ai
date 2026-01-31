@@ -85,7 +85,7 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+    def resolve(self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if (
             info.operation.operation == "mutation"

@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -89,7 +89,7 @@ class RoutingRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    error_data: Mapped[dict | None] = mapped_column(
+    error_data: Mapped[dict[str, Any] | None] = mapped_column(
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
 

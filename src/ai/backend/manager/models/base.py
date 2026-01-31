@@ -406,7 +406,7 @@ class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
         return self._schema.to_json(value)  # type: ignore[arg-type]
 
     def process_result_value(
-        self, value: dict | None, _dialect: Dialect
+        self, value: dict[str, Any] | None, dialect: Dialect
     ) -> JSONSerializableMixin | None:
         if value is None:
             return None
@@ -520,7 +520,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
-class URLColumn(TypeDecorator):
+class URLColumn(TypeDecorator[yarl.URL]):
     """
     A column type for URL strings
     """
@@ -537,7 +537,7 @@ class URLColumn(TypeDecorator):
         return yarl.URL(value)
 
 
-class IPColumn(TypeDecorator):
+class IPColumn(TypeDecorator[ReadableCIDR]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -563,7 +563,7 @@ class IPColumn(TypeDecorator):
         return ReadableCIDR(value)
 
 
-class PermissionListColumn(TypeDecorator):
+class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
     """
     A column type to convert Permission values back and forth.
     """
@@ -608,7 +608,7 @@ class PermissionListColumn(TypeDecorator):
         return {self._perm_type(perm) for perm in value}
 
 
-class VFolderHostPermissionColumn(TypeDecorator):
+class VFolderHostPermissionColumn(TypeDecorator[VFolderHostPermissionMap]):
     """
     A column type to convert vfolder host permission back and forth.
     """
@@ -692,7 +692,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
         return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-class SlugType(TypeDecorator):
+class SlugType(TypeDecorator[str]):
     """
     A type wrapper for slug type string
     """
@@ -888,7 +888,7 @@ async def populate_fixture(
                     await conn.execute(update_stmt, update_data)
 
 
-class DecimalType(TypeDecorator, Decimal):
+class DecimalType(TypeDecorator[Decimal], Decimal):
     """
     Database type adaptor for Decimal
     """

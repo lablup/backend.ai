@@ -404,7 +404,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     wsproxy_addr: str | None
     wsproxy_api_token: str | None
     driver: str
-    driver_opts: dict
+    driver_opts: dict[str, Any]
     scheduler: str
     use_host_network: bool
     scheduler_opts: ScalingGroupOpts

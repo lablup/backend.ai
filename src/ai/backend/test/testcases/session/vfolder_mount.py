@@ -2,7 +2,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import Any, override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.session import CreatedSessionMetaContext
@@ -64,7 +64,7 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
             f"Original: {original_content}, Downloaded: {downloaded_content}"
         )
 
-    def _verify_file_exists(self, files_result: dict, original_filename: str) -> None:
+    def _verify_file_exists(self, files_result: dict[str, Any], original_filename: str) -> None:
         files_str = files_result.get("files", "")
 
         filename_pattern = r'"filename":\s*"([^"]+)"'

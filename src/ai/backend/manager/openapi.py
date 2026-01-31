@@ -29,7 +29,7 @@ class ParseError(Exception):
     pass
 
 
-def get_path_parameters(resource: AbstractResource) -> list[dict]:
+def get_path_parameters(resource: AbstractResource) -> list[dict[str, Any]]:
     params = []
     if isinstance(resource, DynamicResource):
         if groupindex := resource._pattern.groupindex:
@@ -55,7 +55,7 @@ def flatten_or(scheme: t.Trafaret) -> list[t.Trafaret]:
     return items
 
 
-def _traverse(scheme: t.Trafaret) -> dict:
+def _traverse(scheme: t.Trafaret) -> dict[str, Any]:
     if isinstance(scheme, t.Or):
         trafarets = flatten_or(scheme)
         valid_trafarets = [x for x in trafarets if not isinstance(x, (t.Null, UndefChecker))]
@@ -167,7 +167,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
     raise ParseError(f"Failed to convert unknown value {scheme} to OpenAPI type")
 
 
-def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
+def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict[str, Any], bool]:
     optional = (
         isinstance(scheme, t.Or)
         and len([
@@ -181,7 +181,7 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
     return _traverse(scheme), optional
 
 
-def parse_trafaret_definition(root: t.Dict) -> list[dict]:
+def parse_trafaret_definition(root: t.Dict) -> list[dict[str, Any]]:
     resp = []
     for key in root.keys:  # type: ignore[attr-defined]
         names: list[str] = []

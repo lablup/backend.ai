@@ -396,7 +396,7 @@ class TestWatcher:
 
     @pytest.fixture
     def _setup_http_mock(self, mock_etcd: AsyncMock) -> None:
-        def _setup(agent_id: AgentId, status: int, data: dict | str) -> None:
+        def _setup(agent_id: AgentId, status: int, data: dict[str, Any] | str) -> None:
             # Setup etcd
             mock_etcd.get.side_effect = lambda key: {
                 f"nodes/agents/{agent_id}/ip": "192.168.1.100",

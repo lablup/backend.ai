@@ -793,7 +793,7 @@ def _observe_stat_task(
     def decorator(
         func: Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
     ) -> Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]:
-        async def wrapper(self: AbstractAgent, *args: P.args, **kwargs: P.kwargs) -> None:
+        async def wrapper(self: AbstractAgent[Any, Any], *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
             try:
                 await func(self, *args, **kwargs)
@@ -3725,7 +3725,7 @@ class AbstractAgent[
 
 
 async def handle_volume_mount(
-    context: AbstractAgent,
+    context: AbstractAgent[Any, Any],
     _source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
@@ -3773,7 +3773,7 @@ async def handle_volume_mount(
 
 
 async def handle_volume_umount(
-    context: AbstractAgent,
+    context: AbstractAgent[Any, Any],
     _source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:

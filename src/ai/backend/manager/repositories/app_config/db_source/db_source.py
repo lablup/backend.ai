@@ -161,7 +161,7 @@ class AppConfigDBSource:
                 .values(**fields_to_update)
             )
 
-            if cast(CursorResult, result).rowcount > 0:
+            if cast(CursorResult[Any], result).rowcount > 0:
                 # Fetch updated row
                 fetch_result = await db_sess.execute(
                     sa.select(AppConfigRow).where(
@@ -201,4 +201,4 @@ class AppConfigDBSource:
                     )
                 )
             )
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0

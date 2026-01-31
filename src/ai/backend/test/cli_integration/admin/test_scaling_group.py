@@ -1,5 +1,6 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
@@ -137,7 +138,7 @@ def test_list_scaling_group(run_admin: ClientRunnerFunc) -> None:
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
 
 
-def get_scaling_group_from_list(scaling_groups: list[dict], groupname: str) -> dict:
+def get_scaling_group_from_list(scaling_groups: list[dict[str, Any]], groupname: str) -> dict[str, Any]:
     for sg in scaling_groups:
         if sg.get("name") == groupname:
             return sg

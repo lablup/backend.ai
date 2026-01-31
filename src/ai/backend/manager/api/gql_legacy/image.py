@@ -399,7 +399,7 @@ class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ImagePermission | None:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ImagePermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
         return None

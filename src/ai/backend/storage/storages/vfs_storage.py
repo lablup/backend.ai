@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import override
+from typing import Any, override
 
 import aiofiles
 import aiofiles.os
@@ -470,7 +470,7 @@ class VFSStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamUploadError(f"Create directory failed: {e!s}") from e
 
-    async def get_disk_usage(self) -> dict:
+    async def get_disk_usage(self) -> dict[str, Any]:
         """
         Get disk usage information for the base path.
 

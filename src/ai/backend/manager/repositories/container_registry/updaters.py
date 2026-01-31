@@ -65,7 +65,7 @@ async def handle_allowed_groups_update(
             )
         )
         result = await session.execute(delete_query)
-        if cast(CursorResult, result).rowcount == 0:
+        if cast(CursorResult[Any], result).rowcount == 0:
             raise ContainerRegistryGroupsAssociationNotFound(
                 f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
             )

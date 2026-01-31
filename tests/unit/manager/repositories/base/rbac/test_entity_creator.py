@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -73,7 +73,7 @@ class SimpleCreatorSpec(CreatorSpec[RBACEntityCreatorTestRow]):
         self._entity_id = entity_id
 
     def build_row(self) -> RBACEntityCreatorTestRow:
-        row_kwargs: dict = {
+        row_kwargs: dict[str, Any] = {
             "name": self._name,
             "owner_scope_type": self._scope_type.value,
             "owner_scope_id": self._scope_id,

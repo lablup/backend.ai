@@ -117,10 +117,10 @@ class ResourceCalculator:
     async def calculate_kernel_resources(
         self,
         validated_scaling_group: AllowedScalingGroup,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_info: ImageInfo,
         _scaling_group_network: ScalingGroupNetworkInfo,
-    ) -> tuple[ResourceSlot, dict]:
+    ) -> tuple[ResourceSlot, dict[str, Any]]:
         """
         Calculate resource requirements for a kernel.
 
@@ -206,7 +206,7 @@ class ResourceCalculator:
 
     async def _calculate_requested_slots(
         self,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -227,7 +227,7 @@ class ResourceCalculator:
 
     async def _calculate_from_resources(
         self,
-        resources: dict,
+        resources: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -254,7 +254,7 @@ class ResourceCalculator:
 
     async def _calculate_from_legacy(
         self,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -287,9 +287,9 @@ class ResourceCalculator:
         self,
         validated_scaling_group: AllowedScalingGroup,
         resource_opts: dict[str, Any],
-        image_labels: dict,
+        image_labels: dict[str, Any],
         image_min_slots: ResourceSlot,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Apply shared memory adjustments to resource options."""
         resource_opts = resource_opts.copy()
 

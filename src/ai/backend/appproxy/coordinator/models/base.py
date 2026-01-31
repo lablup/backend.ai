@@ -71,8 +71,7 @@ def zero_if_none(val: int | None) -> int:
     return 0 if val is None else val
 
 
-# FIXME: remove type: ignore annotation as soon as possible
-class EnumType(TypeDecorator, SchemaType):  # type: ignore
+class EnumType(TypeDecorator[enum.Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -151,7 +150,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class StructuredJSONColumn(TypeDecorator):
+class StructuredJSONColumn(TypeDecorator[BaseModel]):
     """
     A column type to convert JSON values back and forth using a Trafaret.
     """
@@ -190,7 +189,7 @@ class StructuredJSONColumn(TypeDecorator):
         return StructuredJSONColumn(self._schema)
 
 
-class StructuredJSONObjectColumn(TypeDecorator):
+class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
     """
     A column type to convert JSON values back and forth using BaseModel.
     """
@@ -248,7 +247,7 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
         return StructuredJSONObjectListColumn(self._schema)
 
 
-class URLColumn(TypeDecorator):
+class URLColumn(TypeDecorator[yarl.URL]):
     """
     A column type for URL strings
     """
@@ -269,7 +268,7 @@ class URLColumn(TypeDecorator):
         return None
 
 
-class IPColumn(TypeDecorator):
+class IPColumn(TypeDecorator[ReadableCIDR]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """

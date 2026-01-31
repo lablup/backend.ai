@@ -1659,7 +1659,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_update_query)
 
         # Check if session was actually updated
-        if cast(CursorResult, result).rowcount == 0:
+        if cast(CursorResult[Any], result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping allocation",
                 allocation.session_id,
@@ -1732,7 +1732,7 @@ class ScheduleDBSource:
         result = await db_sess.execute(session_query)
 
         # Check if session was actually updated
-        if cast(CursorResult, result).rowcount == 0:
+        if cast(CursorResult[Any], result).rowcount == 0:
             log.warning(
                 "Session {} was not in PENDING status, skipping failure status update",
                 failure.session_id,
@@ -1884,7 +1884,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def update_kernel_status_creating(self, kernel_id: UUID, reason: str) -> bool:
         """
@@ -1917,7 +1917,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def update_kernel_status_running(
         self, kernel_id: UUID, reason: str, creation_info: KernelCreationInfo
@@ -1984,7 +1984,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            rowcount = cast(CursorResult, result).rowcount
+            rowcount = cast(CursorResult[Any], result).rowcount
             log.debug(
                 "[DBSource] update_kernel_status_running result: kernel_id={}, rowcount={}, "
                 "starts_at_to_set={}",
@@ -2024,7 +2024,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
         """
@@ -2064,7 +2064,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def update_kernel_status_terminated(
         self, kernel_id: UUID, reason: str, exit_code: int | None = None
@@ -2103,7 +2103,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -2152,7 +2152,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount
+            return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_creating_for_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -2192,7 +2192,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount
+            return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
         """
@@ -2225,7 +2225,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount
+            return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_pulling_for_image(
         self, agent_id: AgentId, image: str, image_ref: str | None = None
@@ -2267,7 +2267,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount
+            return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_prepared_for_image(
         self, agent_id: AgentId, image: str, image_ref: str | None = None
@@ -2312,7 +2312,7 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount
+            return cast(CursorResult[Any], result).rowcount
 
     async def cancel_kernels_for_failed_image(
         self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
@@ -2407,7 +2407,7 @@ class ScheduleDBSource:
                     )
                 )
                 result = await db_sess.execute(stmt)
-                return cast(CursorResult, result).rowcount > 0
+                return cast(CursorResult[Any], result).rowcount > 0
         return False
 
     async def check_available_image(
@@ -4185,7 +4185,7 @@ class ScheduleDBSource:
                     .values(last_observed_at=observed_at)
                 )
                 result = await db_sess.execute(update_stmt)
-                total_updated += cast(CursorResult, result).rowcount
+                total_updated += cast(CursorResult[Any], result).rowcount
 
             return total_updated
 

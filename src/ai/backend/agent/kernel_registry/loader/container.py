@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.agent.kernel_registry.exception import KernelRegistryNotFound
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
@@ -24,7 +24,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     def __init__(
         self,
         scratch_root: Path,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         self._scratch_root = scratch_root
         self._agent = agent

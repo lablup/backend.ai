@@ -92,7 +92,7 @@ def create_test_config(
     if num_agents > 1:
         agents_list = []
         for i in range(num_agents):
-            agent_override: dict = {
+            agent_override: dict[str, Any] = {
                 "agent": {"id": f"agent{i + 1}"},
             }
             # In MANUAL mode, each agent needs allocation config

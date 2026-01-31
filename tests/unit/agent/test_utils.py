@@ -78,7 +78,7 @@ def test_update_nested_dict() -> None:
         "b": 2,
     }
     utils.update_nested_dict(o, {"a": {"x": 3, "y": 4}, "b": 5})
-    assert cast(dict, o["a"]) == {
+    assert cast(dict[str, Any], o["a"]) == {
         "x": 3,
         "y": 4,
     }

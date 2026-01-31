@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -37,7 +37,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
 
     def __init__(
         self,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
         valkey_schedule_client: ValkeyScheduleClient,
     ) -> None:
         self._agent = agent

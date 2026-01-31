@@ -16,6 +16,7 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
+    Any,
     cast,
 )
 
@@ -335,7 +336,7 @@ class Metric:
 
 
 class StatContext:
-    agent: AbstractAgent
+    agent: AbstractAgent[Any, Any]
     mode: StatModes
     node_metrics: dict[MetricKey, Metric]
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
@@ -345,7 +346,7 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: AbstractAgent, mode: StatModes | None = None, *, cache_lifespan: int = 120
+        self, agent: AbstractAgent[Any, Any], mode: StatModes | None = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
