@@ -395,7 +395,13 @@ def export_projects(
 
     # Build filter
     project_filter: ProjectExportFilter | None = None
-    if any([filter_name, filter_domain, filter_active is not None, filter_after, filter_before]):
+    if any([
+        filter_name,
+        filter_domain,
+        filter_active is not None,
+        filter_after,
+        filter_before,
+    ]):
         project_filter = ProjectExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,

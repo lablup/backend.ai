@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+import sqlalchemy as sa
+
 from ai.backend.common.dto.manager.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
@@ -29,6 +31,7 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,
+    JoinDef,
     ReportDef,
     StreamingExportQuery,
 )
@@ -126,6 +129,9 @@ class ExportAdapter(BaseFilterAdapter):
     ) -> StreamingExportQuery:
         """Build StreamingExportQuery for project export.
 
+        Dynamically applies JOINs based on selected fields.
+        Fields with joins attribute will trigger LEFT JOIN operations.
+
         Args:
             report: Project report definition
             fields: Field keys to include (None = all fields)
@@ -141,14 +147,66 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_project_conditions(report, filter)
         orders = self._build_project_orders(report, order)
 
+        # Collect all required JOINs from selected fields
+        all_joins = self._collect_joins(selected_fields)
+
+        # Build select_from with dynamic JOINs
+        select_from = self._build_select_from_with_joins(report.select_from, all_joins)
+
         return StreamingExportQuery(
-            select_from=report.select_from,
+            select_from=select_from,
             fields=selected_fields,
             conditions=conditions,
             orders=orders,
             max_rows=max_rows,
             statement_timeout_sec=statement_timeout_sec,
         )
+
+    def _collect_joins(
+        self,
+        fields: list[ExportFieldDef],
+    ) -> list[JoinDef]:
+        """Collect all required JOINs from selected fields.
+
+        Deduplicates JOINs and returns them in a consistent order
+        for deterministic query generation.
+
+        Args:
+            fields: Selected field definitions
+
+        Returns:
+            List of unique JoinDef in deterministic order
+        """
+        seen: set[JoinDef] = set()
+        result: list[JoinDef] = []
+
+        for field in fields:
+            if field.joins:
+                for join_def in field.joins:
+                    if join_def not in seen:
+                        seen.add(join_def)
+                        result.append(join_def)
+
+        return result
+
+    def _build_select_from_with_joins(
+        self,
+        base_table: sa.FromClause,
+        joins: list[JoinDef],
+    ) -> sa.FromClause:
+        """Build select_from clause with dynamic LEFT JOINs.
+
+        Args:
+            base_table: Base table (e.g., GroupRow.__table__)
+            joins: List of JoinDef to apply
+
+        Returns:
+            SQLAlchemy FromClause with all JOINs applied
+        """
+        result: sa.FromClause = base_table
+        for join_def in joins:
+            result = result.outerjoin(join_def.table, join_def.condition)
+        return result
 
     def _select_fields(
         self,

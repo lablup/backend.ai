@@ -7187,7 +7187,7 @@
         "type": "object"
       },
       "ProjectExportFilter": {
-        "description": "Filter conditions specific to project export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported project data to specific criteria.",
+        "description": "Filter conditions specific to project export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported project data to specific criteria.\n\nOnly base project fields are supported for filtering.",
         "properties": {
           "name": {
             "anyOf": [
@@ -7246,7 +7246,7 @@
         "properties": {
           "field": {
             "$ref": "#/components/schemas/ProjectExportOrderField",
-            "description": "The field to sort by. Must be one of the valid project orderable fields: name, domain_name, is_active, created_at, modified_at."
+            "description": "The field to sort by. Only base project fields are supported: name, domain_name, is_active, created_at, modified_at. JOIN fields (resource_policy, scaling_group, container_registry) are not orderable."
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -7261,7 +7261,7 @@
         "type": "object"
       },
       "ProjectExportOrderField": {
-        "description": "Orderable fields for project export.\n\nThese are the fields that can be used for sorting project export results.\nIncludes name and timestamps for flexible ordering options.",
+        "description": "Orderable fields for project export.\n\nThese are the fields that can be used for sorting project export results.\nOnly base project fields are supported for ordering.",
         "enum": [
           "name",
           "domain_name",
