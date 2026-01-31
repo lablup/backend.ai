@@ -39,11 +39,18 @@ def test_id() -> str:
 @pytest.fixture(scope="session")
 def logging_config() -> Generator[LoggingConfig, None, None]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -66,9 +73,9 @@ def patch_dummy_agent_config() -> Generator[None, None, None]:
 
     original_read_from_file = common_config.read_from_file
 
-    def patched_read_from_file(path: Any, filesystem_type: str = "") -> tuple[dict[str, Any], None]:
+    def patched_read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
         # Check if this is the dummy agent config file
-        if "agent.dummy.toml" in str(path):
+        if toml_path and "agent.dummy.toml" in str(toml_path):
             # Return minimal config structure - trafaret will fill in defaults
             return (
                 {
@@ -76,10 +83,10 @@ def patch_dummy_agent_config() -> Generator[None, None, None]:
                     "kernel-creation-ctx": {"delay": {}},
                     "kernel": {"delay": {}},
                 },
-                None,
+                Path(str(toml_path)),
             )
         # Otherwise use original function
-        return original_read_from_file(path, filesystem_type)
+        return original_read_from_file(toml_path, daemon_name)
 
     # Manual patching for session scope
     common_config.read_from_file = patched_read_from_file

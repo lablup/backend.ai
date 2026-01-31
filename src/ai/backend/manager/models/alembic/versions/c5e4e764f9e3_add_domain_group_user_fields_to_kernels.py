@@ -74,10 +74,7 @@ def upgrade() -> None:
     # Create default group in the default domain.
     # Assumption: "default" domain must exist
     connection = op.get_bind()
-    query = sa.insert(groups).values(
-        name="default", description="Default group", is_active=True, domain_name="default"
-    )
-    query = textwrap.dedent(
+    insert_query = textwrap.dedent(
         """\
         INSERT INTO groups (name, description, is_active, domain_name)
         VALUES ('default', 'Default group', True, 'default')
@@ -85,45 +82,48 @@ def upgrade() -> None:
         RETURNING id;
     """
     )
-    result = connection.execute(text(query)).first()
-    gid = result.id if hasattr(result, "id") else None
+    result = connection.execute(text(insert_query)).first()
+    gid = result.id if result is not None else None
     if gid is None:  # group already exists
-        query = textwrap.dedent(
+        select_query = textwrap.dedent(
             """\
             SELECT id FROM groups where name = 'default' and domain_name = 'default';
         """
         )
-        gid = connection.execute(text(query)).first().id
+        result = connection.execute(text(select_query)).first()
+        if result is not None:
+            gid = result.id
 
     # Fill in kernels' domain_name, group_id, and user_uuid.
-    query = sa.select([kernels.c.id, kernels.c.access_key]).select_from(kernels)
-    all_kernels = connection.execute(query).fetchall()
+    select_kernels_query = sa.select(kernels.c.id, kernels.c.access_key).select_from(kernels)
+    all_kernels = connection.execute(select_kernels_query).fetchall()
     for kernel in all_kernels:
         # Get kernel's keypair (access_key).
-        query = (
-            sa.select([keypairs.c.user])
+        select_keypair_query = (
+            sa.select(keypairs.c.user)
             .select_from(keypairs)
             .where(keypairs.c.access_key == kernel.access_key)
         )
-        kp = connection.execute(query).first()
-        # Update kernel information.
-        query = f"""\
-            UPDATE kernels SET domain_name = 'default', group_id = '{gid}', user_uuid = '{kp.user}'
-            WHERE id = '{kernel.id}';
-        """
-        connection.execute(query)
+        kp = connection.execute(select_keypair_query).first()
+        if kp is not None:
+            # Update kernel information.
+            update_query = f"""\
+                UPDATE kernels SET domain_name = 'default', group_id = '{gid}', user_uuid = '{kp.user}'
+                WHERE id = '{kernel.id}';
+            """
+            connection.execute(text(update_query))
 
     # Associate every users with the default group.
     # NOTE: this operation is not undoable unless you drop groups table.
-    query = sa.select([users.c.uuid]).select_from(users)
-    all_users = connection.execute(query).fetchall()
+    select_users_query = sa.select(users.c.uuid).select_from(users)
+    all_users = connection.execute(select_users_query).fetchall()
     for user in all_users:
-        query = f"""\
+        insert_assoc_query = f"""\
             INSERT INTO association_groups_users (group_id, user_id)
             VALUES ('{gid}', '{user.uuid}')
             ON CONFLICT (group_id, user_id) DO NOTHING;
         """
-        connection.execute(text(query))
+        connection.execute(text(insert_assoc_query))
 
     # Make kernel's new fields non-nullable.
     op.alter_column("kernels", column_name="domain_name", nullable=False)

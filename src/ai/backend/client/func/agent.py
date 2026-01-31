@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
@@ -97,7 +97,7 @@ class Agent(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"agent_id": agent_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["agent"]
+        return cast(Sequence[dict[str, Any]], data["agent"])
 
 
 class AgentWatcher(BaseFunction):
@@ -121,8 +121,8 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
@@ -135,8 +135,8 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
@@ -149,8 +149,8 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
@@ -163,5 +163,5 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
