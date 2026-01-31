@@ -352,7 +352,9 @@ def export_sessions(
 @click.option(
     "--filter-access-key", type=str, default=None, help="Filter by access key (contains)."
 )
-@click.option("--filter-user-id", type=str, default=None, help="Filter by user ID/email (contains).")
+@click.option(
+    "--filter-user-id", type=str, default=None, help="Filter by user ID/email (contains)."
+)
 @click.option(
     "--filter-active/--filter-inactive",
     default=None,
@@ -400,8 +402,7 @@ def export_keypairs(
         filter_before,
     ]):
         click.echo(
-            "Warning: Keypair export does not support filtering yet. "
-            "All filters will be ignored.",
+            "Warning: Keypair export does not support filtering yet. All filters will be ignored.",
             err=True,
         )
 

@@ -157,9 +157,7 @@ class TestFieldJoinAssignments:
         """Map of field key to field definition."""
         return {f.key: f for f in KEYPAIR_FIELDS}
 
-    def test_basic_fields_have_no_joins(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_basic_fields_have_no_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Basic fields should not have joins."""
         basic_keys = [
             "access_key",
@@ -226,9 +224,7 @@ class TestFieldJoinAssignments:
             assert field.joins == RESOURCE_GROUP_JOINS
             assert len(field.joins) == 2
 
-    def test_session_fields_have_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_session_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Session fields should have SESSION_JOIN."""
         session_keys = [
             "session_id",

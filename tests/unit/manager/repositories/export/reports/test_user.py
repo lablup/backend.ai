@@ -147,9 +147,7 @@ class TestFieldJoinAssignments:
         field = fields_by_key["resource_policy_name"]
         assert field.joins is None
 
-    def test_main_access_key_has_no_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_main_access_key_has_no_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """main_access_key is in UserRow, so no join needed."""
         field = fields_by_key["main_access_key"]
         assert field.joins is None

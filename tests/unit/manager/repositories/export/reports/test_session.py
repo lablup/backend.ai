@@ -161,9 +161,7 @@ class TestFieldJoinAssignments:
         """Map of field key to field definition."""
         return {f.key: f for f in SESSION_FIELDS}
 
-    def test_basic_fields_have_no_joins(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_basic_fields_have_no_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Basic fields should not have joins."""
         basic_keys = [
             "id",
@@ -177,9 +175,7 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is None
 
-    def test_main_kernel_fields_have_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_main_kernel_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Main kernel fields should have MAIN_KERNEL_JOIN."""
         main_kernel_keys = [
             "main_kernel_image",
@@ -193,9 +189,7 @@ class TestFieldJoinAssignments:
             assert MAIN_KERNEL_JOIN in field.joins
             assert len(field.joins) == 1
 
-    def test_project_fields_have_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_project_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Project fields should have PROJECT_JOIN."""
         project_keys = [
             "project_name",
@@ -239,9 +233,7 @@ class TestFieldJoinAssignments:
             assert USER_JOIN in field.joins
             assert len(field.joins) == 1
 
-    def test_kernel_fields_have_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_kernel_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Kernel fields should have KERNEL_JOIN."""
         kernel_keys = [
             "kernel_id",
