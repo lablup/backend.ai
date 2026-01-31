@@ -7,6 +7,7 @@ import pytest
 from etcd_client import CondVar, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import QueueSentinel
 
 
 @pytest.mark.asyncio
@@ -201,18 +202,20 @@ async def test_watch(etcd: AsyncEtcd) -> None:
     async def _record() -> None:
         recv_count = 0
         async for ev in etcd.watch("wow", ready_event=r_ready):
-            records.append(ev)
-            recv_count += 1
-            if recv_count == 2:
-                return
+            if not isinstance(ev, QueueSentinel):
+                records.append(ev)
+                recv_count += 1
+                if recv_count == 2:
+                    return
 
     async def _record_prefix() -> None:
         recv_count = 0
         async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
-            records_prefix.append(ev)
-            recv_count += 1
-            if recv_count == 4:
-                return
+            if not isinstance(ev, QueueSentinel):
+                records_prefix.append(ev)
+                recv_count += 1
+                if recv_count == 4:
+                    return
 
     async with (
         asyncio.timeout(10),
@@ -260,18 +263,20 @@ async def test_watch_once(etcd: AsyncEtcd) -> None:
     async def _record() -> None:
         recv_count = 0
         async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
-            records.append(ev)
-            recv_count += 1
-            if recv_count == 1:
-                return
+            if not isinstance(ev, QueueSentinel):
+                records.append(ev)
+                recv_count += 1
+                if recv_count == 1:
+                    return
 
     async def _record_prefix() -> None:
         recv_count = 0
         async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
-            records_prefix.append(ev)
-            recv_count += 1
-            if recv_count == 1:
-                return
+            if not isinstance(ev, QueueSentinel):
+                records_prefix.append(ev)
+                recv_count += 1
+                if recv_count == 1:
+                    return
 
     async with (
         asyncio.timeout(10),

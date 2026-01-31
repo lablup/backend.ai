@@ -57,8 +57,10 @@ def test_is_containerized() -> None:
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id(mocker: pytest.fixture, provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_id(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -92,8 +94,10 @@ async def test_get_instance_id(mocker: pytest.fixture, provider: str | None) -> 
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id_failures(mocker: pytest.fixture, provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_id_failures(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -106,8 +110,10 @@ async def test_get_instance_id_failures(mocker: pytest.fixture, provider: str | 
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_ip(mocker: pytest.fixture, provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_ip(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -115,7 +121,7 @@ async def test_get_instance_ip(mocker: pytest.fixture, provider: str | None) -> 
         random_ip = ".".join(str(random.randint(0, 255)) for _ in range(4))
         if provider == "amazon":
             m.get("http://169.254.169.254/latest/meta-data/local-ipv4", body=random_ip)
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider == "azure":
             m.get(
@@ -134,14 +140,14 @@ async def test_get_instance_ip(mocker: pytest.fixture, provider: str | None) -> 
                     },
                 },
             )
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider == "google":
             m.get(
                 "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip",
                 body=random_ip,
             )
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider is None:
             mocked_ares_host_result = MagicMock()
@@ -156,7 +162,7 @@ async def test_get_instance_ip(mocker: pytest.fixture, provider: str | None) -> 
                 patch("aiodns.DNSResolver", return_value=mocked_resolver),
                 patch("socket.gethostname", return_value="myname"),
             ):
-                ret = await ai.backend.common.identity.get_instance_ip()
+                ret = await ai.backend.common.identity.get_instance_ip(None)
                 assert ret == "10.1.2.3"
 
             async def coro_raise_error(*args: Any) -> None:
@@ -168,15 +174,17 @@ async def test_get_instance_ip(mocker: pytest.fixture, provider: str | None) -> 
                 patch("aiodns.DNSResolver", return_value=mocked_resolver),
                 patch("socket.gethostname", return_value="myname"),
             ):
-                ret = await ai.backend.common.identity.get_instance_ip()
+                ret = await ai.backend.common.identity.get_instance_ip(None)
                 assert ret == "127.0.0.1"
 
 
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_type(mocker: pytest.fixture, provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_type(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 

@@ -4,11 +4,14 @@ Tests the core user service actions to verify compatibility with test scenarios.
 """
 
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -35,7 +38,7 @@ class TestUserServiceCompatibility:
     """Test compatibility of user service with test scenarios."""
 
     @pytest.fixture
-    def mock_dependencies(self) -> None:
+    def mock_dependencies(self) -> dict[str, MagicMock]:
         """Create mocked dependencies for testing."""
         storage_manager = MagicMock(spec=StorageSessionManager)
         valkey_client = MagicMock(spec=ValkeyStatClient)
@@ -209,9 +212,9 @@ class TestUserServiceCompatibility:
         action = PurgeUserAction(
             email="user@example.com",
             user_info_ctx=UserInfoContext(
-                uuid="test-uuid",
+                uuid=UUID("00000000-0000-0000-0000-000000000000"),
                 email="user@example.com",
-                main_access_key="test-key",
+                main_access_key=AccessKey("test-key"),
             ),
         )
 
@@ -227,7 +230,7 @@ class TestUserServiceCompatibility:
         )
 
         # Use a valid UUID format instead of "test-user-id"
-        test_user_uuid = str(uuid.uuid4())
+        test_user_uuid = uuid.uuid4()
         action = UserMonthStatsAction(user_id=test_user_uuid)
 
         result = await user_service.user_month_stats(action)
@@ -283,13 +286,15 @@ class TestUserServiceCompatibility:
             )
         )
 
-        assert creator.spec.email == "test@example.com"
-        assert creator.spec.container_uid == 2000
-        assert creator.spec.container_main_gid == 2000
-        assert creator.spec.container_gids == [2000, 2001]
-        assert creator.spec.allowed_client_ip == ["192.168.1.0/24"]
-        assert creator.spec.resource_policy == "default-policy"
-        assert creator.spec.sudo_session_enabled is False
+        # Cast to UserCreatorSpec to access specific fields
+        spec = cast(UserCreatorSpec, creator.spec)
+        assert spec.email == "test@example.com"
+        assert spec.container_uid == 2000
+        assert spec.container_main_gid == 2000
+        assert spec.container_gids == [2000, 2001]
+        assert spec.allowed_client_ip == ["192.168.1.0/24"]
+        assert spec.resource_policy == "default-policy"
+        assert spec.sudo_session_enabled is False
 
     def test_user_updater_spec_fields(self) -> None:
         """Test that UserUpdaterSpec supports expected modification fields."""

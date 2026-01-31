@@ -124,7 +124,11 @@ async def test_authorize_invalid_token_type(
 
 
 @pytest.mark.asyncio
-async def test_authorize_invalid_credentials() -> None:
+async def test_authorize_invalid_credentials(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
@@ -146,7 +150,11 @@ async def test_authorize_invalid_credentials() -> None:
 
 
 @pytest.mark.asyncio
-async def test_authorize_with_hook_authorization() -> None:
+async def test_authorize_with_hook_authorization(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test authorization when hook provides the user"""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
@@ -190,7 +198,11 @@ async def test_authorize_with_hook_authorization() -> None:
 
 
 @pytest.mark.asyncio
-async def test_authorize_with_password_expiry() -> None:
+async def test_authorize_with_password_expiry(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test authorization fails when password is expired"""
     # The mock_config_provider already has max_password_age set to 90 days
 
@@ -226,7 +238,11 @@ async def test_authorize_with_password_expiry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_authorize_with_post_hook_response() -> None:
+async def test_authorize_with_post_hook_response(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test authorization when POST_AUTHORIZE hook returns a stream response"""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,

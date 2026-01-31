@@ -25,6 +25,10 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisTarget, ValkeyTarget
+
+if TYPE_CHECKING:
+    from ai.backend.testutils.bootstrap import EtcdContainerFixture, RedisContainerFixture
+
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -67,7 +71,7 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def test_valkey_live(redis_container: pytest.fixture) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
+async def test_valkey_live(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -84,7 +88,7 @@ async def test_valkey_live(redis_container: pytest.fixture) -> AsyncIterator[Val
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container: pytest.fixture) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
+async def test_valkey_stream(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -102,7 +106,7 @@ async def test_valkey_stream(redis_container: pytest.fixture) -> AsyncIterator[V
 
 
 @pytest.fixture
-async def test_valkey_rate_limit(redis_container: pytest.fixture) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
+async def test_valkey_rate_limit(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -120,7 +124,7 @@ async def test_valkey_rate_limit(redis_container: pytest.fixture) -> AsyncIterat
 
 @pytest.fixture
 async def test_valkey_artifact(
-    redis_container: pytest.fixture,  # noqa: F811
+    redis_container: RedisContainerFixture,  # noqa: F811
 ) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
@@ -138,7 +142,7 @@ async def test_valkey_artifact(
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(redis_container: pytest.fixture, test_node_id: str) -> AsyncIterator[RedisQueue]:  # noqa: F811
+async def test_valkey_stream_mq(redis_container: RedisContainerFixture, test_node_id: str) -> AsyncIterator[RedisQueue]:  # noqa: F811
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
@@ -167,9 +171,14 @@ async def test_valkey_stream_mq(redis_container: pytest.fixture, test_node_id: s
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container: pytest.fixture, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
+def test_ns() -> str:
+    return f"test-{secrets.token_hex(8)}"
+
+
+@pytest.fixture
+async def gateway_etcd(etcd_container: EtcdContainerFixture, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     async with AsyncEtcd(
-        addrs=[etcd_container[1]],
+        addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",

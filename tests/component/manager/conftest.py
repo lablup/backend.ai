@@ -12,14 +12,14 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from unittest.mock import AsyncMock, MagicMock
 
 import aiofiles.os
@@ -63,6 +63,7 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import GroupRow
@@ -108,6 +109,17 @@ def create_test_password_info(password: str = "test_password") -> PasswordInfo:
 here = Path(__file__).parent
 
 log = logging.getLogger("tests.manager.conftest")
+
+
+class AppBuilder(Protocol):
+    """Protocol for the app_builder function returned by create_app_and_client fixture."""
+
+    async def __call__(
+        self,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]] | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
+    ) -> tuple[web.Application, Client]: ...
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -176,11 +188,18 @@ def vfolder_host() -> str:
 @pytest.fixture(scope="session")
 def logging_config() -> Iterator[LoggingConfig]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -524,7 +543,7 @@ def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> N
 
 
 @pytest.fixture()
-async def database_engine(bootstrap_config: BootstrapConfig, database: None) -> AsyncIterator[SAEngine]:
+async def database_engine(bootstrap_config: BootstrapConfig, database: None) -> AsyncIterator[ExtendedAsyncSAEngine]:
     async with connect_database(bootstrap_config.db) as db:
         yield db
 
@@ -713,14 +732,14 @@ async def app(bootstrap_config: BootstrapConfig) -> web.Application:
 
 
 @pytest.fixture
-async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncIterator[Callable[..., tuple[web.Application, Client]]]:
+async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncIterator[AppBuilder]:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
     _outer_ctxs: list[AbstractAsyncContextManager[Any, Any]] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]] | None = None,
         subapp_pkgs: Sequence[str] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
@@ -876,11 +895,15 @@ def get_headers(app: web.Application, default_keypair: dict[str, str], bootstrap
 
 @pytest.fixture
 async def prepare_kernel(
-    request: Any, create_app_and_client: Callable[..., tuple[web.Application, Client]], get_headers: Callable[..., dict[str, str]], default_keypair: dict[str, str]
-) -> AsyncIterator[tuple[web.Application, Client, Callable[..., dict[str, Any]]]]:
+    request: Any,
+    create_app_and_client: AppBuilder,
+    get_headers: Callable[..., dict[str, str]],
+    default_keypair: dict[str, str]
+) -> AsyncIterator[tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]]:
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
-        modules=[
+        cleanup_contexts=None,
+        subapp_pkgs=[
             "etcd",
             "events",
             "auth",
@@ -891,7 +914,7 @@ async def prepare_kernel(
             "stream",
             "manager",
         ],
-        spawn_agent=True,
+        scheduler_opts=None,
     )
     root_ctx: RootContext = app["_root.context"]
 
@@ -1035,7 +1058,7 @@ async def registry_ctx(mocker: Any) -> AsyncIterator[Any]:
 
 
 @pytest.fixture(scope="function")
-async def session_info(database_engine: SAEngine) -> AsyncIterator[dict[str, Any]]:
+async def session_info(database_engine: ExtendedAsyncSAEngine) -> AsyncIterator[tuple[str, Any]]:
     user_uuid = str(uuid.uuid4()).replace("-", "")
     user_password = str(uuid.uuid4()).replace("-", "")
     password_info = create_test_password_info(user_password)

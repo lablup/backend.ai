@@ -10,6 +10,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.sql import Select
 
 from ai.backend.manager.api.gql_legacy.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.repositories.types import (
@@ -25,19 +27,19 @@ from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOpt
 class MockFilterApplier(FilterApplier):
     """Mock filter applier for testing"""
 
-    def apply_filters(self, stmt: Any, filters: Any) -> Any:
+    def apply_filters(self, stmt: Select[Any], filters: Any) -> Select[Any]:
         return stmt
 
 
 class MockOrderingApplier(OrderingApplier):
     """Mock ordering applier for testing"""
 
-    def apply_ordering(self, stmt: Any, ordering: Any) -> tuple[Any, list[tuple[Any, bool]]]:
-        order_clauses = []
+    def apply_ordering(self, stmt: Select[Any], ordering: Any) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
+        order_clauses: list[tuple[sa.Column[Any], bool]] = []
 
         if ordering and hasattr(ordering, "order_by"):
             for field_name, desc in ordering.order_by:
-                mock_column = MagicMock()
+                mock_column = MagicMock(spec=sa.Column)
                 mock_column.name = field_name
                 order_clauses.append((mock_column, desc))
 
@@ -59,14 +61,18 @@ class TestGenericQueryBuilder:
     """Test cases for GenericQueryBuilder"""
 
     @pytest.fixture
-    def mock_model_class(self) -> None:
+    def mock_model_class(self) -> Any:
         """Create mock model class with SQLAlchemy-like attributes"""
         mock_model = MagicMock()
         # Configure id column with comparison operators for cursor conditions
-        mock_id = MagicMock()
-        mock_id.__gt__ = MagicMock(return_value=MagicMock())
-        mock_id.__lt__ = MagicMock(return_value=MagicMock())
-        mock_id.__eq__ = MagicMock(return_value=MagicMock())
+        mock_id = MagicMock(spec=sa.Column)
+        mock_id.configure_mock(
+            **{
+                "__gt__": MagicMock(return_value=MagicMock()),
+                "__lt__": MagicMock(return_value=MagicMock()),
+                "__eq__": MagicMock(return_value=MagicMock()),
+            }
+        )
         mock_model.id = mock_id
         mock_model.name = MagicMock()
         mock_model.created_at = MagicMock()
@@ -197,10 +203,14 @@ class TestGenericQueryBuilder:
     def test_build_lexicographic_cursor_conditions_with_ordering(self, mock_or: Any, mock_and: Any, mock_select: Any, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test cursor condition building with order clauses"""
         # Create mock column for ordering with comparison operators
-        mock_other_column = MagicMock()
-        mock_other_column.__gt__ = MagicMock(return_value=MagicMock())
-        mock_other_column.__lt__ = MagicMock(return_value=MagicMock())
-        mock_other_column.__eq__ = MagicMock(return_value=MagicMock())
+        mock_other_column = MagicMock(spec=sa.Column)
+        mock_other_column.configure_mock(
+            **{
+                "__gt__": MagicMock(return_value=MagicMock()),
+                "__lt__": MagicMock(return_value=MagicMock()),
+                "__eq__": MagicMock(return_value=MagicMock()),
+            }
+        )
 
         # Mock select to return a mock subquery
         mock_select.return_value.where.return_value.scalar_subquery.return_value = MagicMock()
@@ -209,7 +219,9 @@ class TestGenericQueryBuilder:
         mock_and.return_value = MagicMock()
 
         cursor_uuid = uuid.uuid4()
-        order_clauses = [(mock_other_column, False)]  # Order by column ASC
+        # Cast to proper type to satisfy type checker
+        from typing import cast
+        order_clauses = cast(list[tuple[sa.Column[Any], bool]], [(mock_other_column, False)])  # Order by column ASC
 
         # Test forward pagination
         conditions = generic_paginator.build_lexicographic_cursor_conditions(
@@ -434,17 +446,17 @@ class TestGenericQueryBuilderStructure:
 
         # Create specialized appliers
         class SpecialFilterApplier(MockFilterApplier):
-            def apply_filters(self, stmt: Any, filters: Any) -> None:
+            def apply_filters(self, stmt: Select[Any], filters: Any) -> Select[Any]:
                 # Specialized filtering logic
                 return stmt
 
         class SpecialOrderingApplier(MockOrderingApplier):
-            def apply_ordering(self, stmt: Any, ordering: Any) -> None:
+            def apply_ordering(self, stmt: Select[Any], ordering: Any) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
                 # Specialized ordering logic
                 return stmt, []
 
         class SpecialModelConverter(MockModelConverter):
-            def convert_to_data(self, model: Any) -> None:
+            def convert_to_data(self, model: Any) -> Any:
                 # Specialized conversion logic
                 return {"specialized": True, "id": getattr(model, "id", "special-id")}
 

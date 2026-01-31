@@ -30,7 +30,10 @@ def auth_service(
 
 
 @pytest.mark.asyncio
-async def test_signout_successful_with_valid_credentials() -> None:
+async def test_signout_successful_with_valid_credentials(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test successful signout with valid credentials"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -57,7 +60,9 @@ async def test_signout_successful_with_valid_credentials() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signout_fails_when_not_account_owner() -> None:
+async def test_signout_fails_when_not_account_owner(
+    auth_service: AuthService,
+) -> None:
     """Test signout fails when requester is not the account owner"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -72,7 +77,10 @@ async def test_signout_fails_when_not_account_owner() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signout_fails_with_invalid_credentials() -> None:
+async def test_signout_fails_with_invalid_credentials(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test signout fails with invalid credentials"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),

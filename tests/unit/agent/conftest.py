@@ -4,13 +4,14 @@ import secrets
 import shutil
 import subprocess
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Generator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import aiodocker
 import pytest
+from pytest_mock import MockerFixture
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
@@ -37,13 +38,20 @@ def test_id() -> str:
 
 
 @pytest.fixture(scope="session")
-def logging_config() -> LoggingConfig:
+def logging_config() -> Generator[LoggingConfig, None, None]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -66,7 +74,7 @@ def local_config(
     logging_config: LoggingConfig,
     etcd_container: tuple[object, object],
     redis_container: tuple[object, object],
-) -> AgentUnifiedConfig:  # noqa: F811
+) -> Generator[AgentUnifiedConfig, None, None]:  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -156,7 +164,7 @@ def local_config(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(session_mocker: object, test_id: str) -> None:
+def test_local_instance_id(session_mocker: MockerFixture, test_id: str) -> Generator[None, None, None]:
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )

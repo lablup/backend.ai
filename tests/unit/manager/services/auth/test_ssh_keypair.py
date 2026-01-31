@@ -58,7 +58,10 @@ async def test_get_ssh_keypair_existing_key(
 
 
 @pytest.mark.asyncio
-async def test_get_ssh_keypair_nonexistent_key() -> None:
+async def test_get_ssh_keypair_nonexistent_key(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test getting non-existing SSH public key returns empty string"""
     action = GetSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -75,7 +78,10 @@ async def test_get_ssh_keypair_nonexistent_key() -> None:
 
 # Test Generate SSH Keypair
 @pytest.mark.asyncio
-async def test_generate_ssh_keypair() -> None:
+async def test_generate_ssh_keypair(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test SSH keypair generation"""
     action = GenerateSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -105,7 +111,10 @@ async def test_generate_ssh_keypair() -> None:
 
 # Test Upload SSH Keypair
 @pytest.mark.asyncio
-async def test_upload_ssh_keypair_valid_keys() -> None:
+async def test_upload_ssh_keypair_valid_keys(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test uploading valid SSH keypair"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -133,7 +142,10 @@ async def test_upload_ssh_keypair_valid_keys() -> None:
 
 
 @pytest.mark.asyncio
-async def test_upload_ssh_keypair_invalid_keys() -> None:
+async def test_upload_ssh_keypair_invalid_keys(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test uploading invalid SSH keypair"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -157,7 +169,9 @@ async def test_upload_ssh_keypair_invalid_keys() -> None:
 
 
 @pytest.mark.asyncio
-async def test_upload_ssh_keypair_validation_message() -> None:
+async def test_upload_ssh_keypair_validation_message(
+    auth_service: AuthService,
+) -> None:
     """Test that upload SSH keypair passes validation error message correctly"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),

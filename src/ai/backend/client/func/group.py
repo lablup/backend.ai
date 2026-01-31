@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import textwrap
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import group_fields
@@ -77,7 +77,7 @@ class Group(BaseFunction):
             "domain_name": domain_name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups_by_name"]
+        return cast(Sequence[dict[str, Any]], data["groups_by_name"])
 
     @api_function
     @classmethod
@@ -102,7 +102,7 @@ class Group(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups"]
+        return cast(Sequence[dict[str, Any]], data["groups"])
 
     @api_function
     @classmethod
@@ -127,7 +127,7 @@ class Group(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["group"]
+        return cast(dict[str, Any], data["group"])
 
     @api_function
     @classmethod
@@ -173,7 +173,7 @@ class Group(BaseFunction):
             "input": {k: v for k, v in inputs.items() if v is not None},
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_group"]
+        return cast(dict[str, Any], data["create_group"])
 
     @api_function
     @classmethod
@@ -212,7 +212,7 @@ class Group(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
@@ -229,7 +229,7 @@ class Group(BaseFunction):
         """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_group"]
+        return cast(dict[str, Any], data["delete_group"])
 
     @api_function
     @classmethod
@@ -246,7 +246,7 @@ class Group(BaseFunction):
         """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_group"]
+        return cast(dict[str, Any], data["purge_group"])
 
     @api_function
     @classmethod
@@ -275,7 +275,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
@@ -304,7 +304,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
@@ -327,7 +327,7 @@ class Group(BaseFunction):
 
         variables = {"id": b64encode(f"group_node:{group_id}")}
         data = await api_session.get().Admin._query(query, variables)
-        return data["group_node"]["registry_quota"]
+        return cast(int, data["group_node"]["registry_quota"])
 
     @api_function
     @classmethod
@@ -352,7 +352,7 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id, "quota": quota}
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_container_registry_quota"]
+        return cast(dict[str, Any], data["create_container_registry_quota"])
 
     @api_function
     @classmethod
@@ -377,7 +377,7 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id, "quota": quota}
         data = await api_session.get().Admin._query(query, variables)
-        return data["update_container_registry_quota"]
+        return cast(dict[str, Any], data["update_container_registry_quota"])
 
     @api_function
     @classmethod
@@ -402,4 +402,4 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_container_registry_quota"]
+        return cast(dict[str, Any], data["delete_container_registry_quota"])
