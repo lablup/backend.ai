@@ -12,6 +12,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
+from ai.backend.manager.repositories.base.export import ExportFieldDef
 from ai.backend.manager.repositories.export.reports.project import (
     CONTAINER_REGISTRY_ASSOC_JOIN,
     CONTAINER_REGISTRY_JOIN,
@@ -150,24 +151,24 @@ class TestFieldJoinAssignments:
     """Tests for field-join assignments."""
 
     @pytest.fixture
-    def fields_by_key(self) -> dict[str, object]:
+    def fields_by_key(self) -> dict[str, ExportFieldDef]:
         """Map of field key to field definition."""
         return {f.key: f for f in PROJECT_FIELDS}
 
-    def test_basic_fields_have_no_joins(self, fields_by_key: dict[str, object]) -> None:
+    def test_basic_fields_have_no_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Basic fields should not have joins."""
         basic_keys = ["id", "name", "description", "domain_name", "is_active"]
         for key in basic_keys:
             field = fields_by_key[key]
             assert field.joins is None
 
-    def test_resource_policy_name_has_no_join(self, fields_by_key: dict[str, object]) -> None:
+    def test_resource_policy_name_has_no_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """resource_policy_name is in GroupRow, so no join needed."""
         field = fields_by_key["resource_policy_name"]
         assert field.joins is None
 
     def test_resource_policy_detail_fields_have_join(
-        self, fields_by_key: dict[str, object]
+        self, fields_by_key: dict[str, ExportFieldDef]
     ) -> None:
         """Resource policy detail fields should have RESOURCE_POLICY_JOIN."""
         rp_detail_keys = [
@@ -182,7 +183,7 @@ class TestFieldJoinAssignments:
             assert RESOURCE_POLICY_JOIN in field.joins
             assert len(field.joins) == 1
 
-    def test_scaling_group_fields_have_joins(self, fields_by_key: dict[str, object]) -> None:
+    def test_scaling_group_fields_have_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Scaling group fields should have SCALING_GROUP_JOINS."""
         sg_keys = [
             "scaling_group_name",
@@ -199,7 +200,7 @@ class TestFieldJoinAssignments:
             assert field.joins == SCALING_GROUP_JOINS
             assert len(field.joins) == 2
 
-    def test_container_registry_fields_have_joins(self, fields_by_key: dict[str, object]) -> None:
+    def test_container_registry_fields_have_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """Container registry fields should have CONTAINER_REGISTRY_JOINS."""
         cr_keys = [
             "container_registry_id",
