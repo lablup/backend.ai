@@ -84,14 +84,14 @@ async def test_get_volumes(mock_log: AsyncMock, mock_service: VolumeService, moc
     assert len(result) == 2
     assert result[0].volume_id == UUID1
     assert result[0].backend == "backend1"
-    assert result[0].path == "/path1"
-    assert result[0].fsprefix == "fsprefix1"
+    assert str(result[0].path) == "/path1"
+    assert str(result[0].fsprefix) == "fsprefix1"
     assert result[0].capabilities == ["capability1", "capability2"]
 
     assert result[1].volume_id == UUID2
     assert result[1].backend == "backend2"
-    assert result[1].path == "/path2"
-    assert result[1].fsprefix == "fsprefix2"
+    assert str(result[1].path) == "/path2"
+    assert str(result[1].fsprefix) == "fsprefix2"
     assert result[1].capabilities == ["capability3"]
 
 
