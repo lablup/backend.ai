@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, cast
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
+from pytest_mock import MockerFixture
 
-from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant, VFolderUsageMode
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -133,13 +136,13 @@ def sample_image() -> ImageRow:
     image.tag = "latest"
     image.is_local = False
     image.size_bytes = 1073741824  # 1GB
-    image.type = "COMPUTE"
+    image.type = ImageType.COMPUTE
     image.accelerators = ""
     image.labels = {}
     image._resources = {}
     image.created_at = datetime.now(UTC)
     image.config_digest = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-    image.status = "active"
+    image.status = ImageStatus.ALIVE
     return image
 
 
@@ -153,7 +156,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder.group = None
     vfolder.host = "storage-host"
     vfolder.domain_name = "default"
-    vfolder.ownership_type = "user"
+    vfolder.ownership_type = VFolderOwnershipType.USER
     vfolder.max_files = 10000
     vfolder.max_size = 10737418240  # 10GB
     vfolder.num_files = 100
@@ -161,10 +164,10 @@ def sample_vfolder() -> VFolderRow:
     vfolder.created_at = datetime.now(UTC)
     vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
-    vfolder.usage_mode = "model"
-    vfolder.permission = "rw"
+    vfolder.usage_mode = VFolderUsageMode.MODEL
+    vfolder.permission = VFolderMountPermission.READ_WRITE
     vfolder.last_size_update = datetime.now(UTC)
-    vfolder.status = "ready"
+    vfolder.status = VFolderOperationStatus.READY
     return vfolder
 
 
@@ -190,7 +193,7 @@ def sample_endpoint_creator_spec(sample_user: UserRow, sample_image: ImageRow, s
         cluster_size=1,
         extra_mounts=[],
         created_user=sample_user.uuid,
-        project=sample_user.groups if hasattr(sample_user, "groups") else uuid.uuid4(),
+        project=uuid.uuid4(),
         domain="default",
         resource_group="default",
     )
@@ -300,83 +303,62 @@ def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -
 
 
 @pytest.fixture
-def patch_endpoint_get(mocker: Any) -> AsyncMock:
+def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointRow.get method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch(
-            "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
-        ),
+    return mocker.patch(
+        "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
     )
 
 
 @pytest.fixture
-def patch_routing_get(mocker: Any) -> AsyncMock:
+def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
     """Patch RoutingRow.get method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock),
-    )
+    return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_user_get(mocker: Any) -> AsyncMock:
+def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock),
-    )
+    return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_vfolder_get(mocker: Any) -> AsyncMock:
+def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
     """Patch VFolderRow.get method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock),
-    )
+    return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_image_resolve(mocker: Any) -> AsyncMock:
+def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
     """Patch ImageRow.resolve method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock),
-    )
+    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_session_get(mocker: Any) -> AsyncMock:
+def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch(
-            "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
-        ),
+    return mocker.patch(
+        "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
     )
 
 
 @pytest.fixture
-def patch_auto_scaling_rule_get(mocker: Any) -> AsyncMock:
+def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointAutoScalingRuleRow.get method using mocker."""
-    return cast(
-        AsyncMock,
-        mocker.patch(
-            "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
-        ),
+    return mocker.patch(
+        "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
     )
 
 
 @pytest.fixture
-def patch_resolve_group_name_or_id(mocker: Any) -> MagicMock:
+def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
     """Patch resolve_group_name_or_id function using mocker."""
     return mocker.patch(
         "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
     )
 
 
-def setup_db_session_mock(mock_db_engine: Any, mock_session: Any) -> Any:
+def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
     mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
@@ -384,8 +366,8 @@ def setup_db_session_mock(mock_db_engine: Any, mock_session: Any) -> Any:
 
 
 def setup_mock_query_result(
-    mock_session: Any, scalar_result: Any = None, scalars_all_result: Any = None, scalar_one_or_none_result: Any = None
-) -> Any:
+    mock_session: AsyncMock, scalar_result: Any = None, scalars_all_result: Any = None, scalar_one_or_none_result: Any = None
+) -> AsyncMock:
     """Helper function to set up common query result patterns."""
     if scalar_result is not None:
         mock_session.execute.return_value.scalar.return_value = scalar_result
@@ -398,7 +380,7 @@ def setup_mock_query_result(
     return mock_session
 
 
-def assert_update_query_executed(mock_session: Any, expected_field: Any = None) -> None:
+def assert_update_query_executed(mock_session: AsyncMock, expected_field: str | None = None) -> None:
     """Helper function to verify that an update query was executed"""
     mock_session.execute.assert_called()
     if expected_field:
@@ -406,7 +388,7 @@ def assert_update_query_executed(mock_session: Any, expected_field: Any = None) 
         assert expected_field in str(executed_query)
 
 
-def assert_basic_endpoint_result(result: Any, endpoint_row: Any) -> None:
+def assert_basic_endpoint_result(result: EndpointData, endpoint_row: EndpointRow) -> None:
     """Helper function to validate basic endpoint result"""
     assert result is not None
     assert isinstance(result, EndpointData)
@@ -414,7 +396,7 @@ def assert_basic_endpoint_result(result: Any, endpoint_row: Any) -> None:
     assert result.name == endpoint_row.name
 
 
-def assert_endpoint_creation_operations(mock_session: Any, endpoint_row: Any) -> None:
+def assert_endpoint_creation_operations(mock_session: AsyncMock, endpoint_row: EndpointRow) -> None:
     """Helper function to verify database operations related to endpoint creation"""
     mock_session.add.assert_called_once_with(endpoint_row)
     mock_session.flush.assert_called_once()

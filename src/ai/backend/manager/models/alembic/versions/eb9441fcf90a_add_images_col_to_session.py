@@ -6,8 +6,10 @@ Create Date: 2023-07-06 13:51:52.098587
 
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -58,28 +60,30 @@ def upgrade() -> None:
         )
         images: sa.Column[list[str] | None] = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
 
-    kernel_cnt = conn.execute(sa.select([sa.func.count()]).select_from(kernels)).scalar()
+    kernel_cnt_result = conn.execute(sa.select(sa.func.count()).select_from(kernels)).scalar()
+    kernel_cnt = kernel_cnt_result if kernel_cnt_result is not None else 0
 
     for offset in range(0, kernel_cnt, PAGE_SIZE):
         session_agent_ids_map: defaultdict[UUID, list[Any]] = defaultdict(list)
         session_id_query = (
-            sa.select([sa.distinct(kernels.c.session_id)])
+            sa.select(sa.distinct(kernels.c.session_id))
             .where(kernels.c.image.is_not(None))
             .order_by(kernels.c.session_id)
             .offset(offset)
             .limit(PAGE_SIZE)
         )
         session_ids = conn.execute(session_id_query).scalars().all()
-        stmt = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
+        stmt = sa.select(kernels).where(kernels.c.session_id.in_(session_ids))
         kernel_rows = conn.execute(stmt).fetchall()
         for row in kernel_rows:
-            img_list = session_agent_ids_map[row["session_id"]]
-            if row["image"] in img_list:
+            row_dict = cast(dict[str, Any], row._mapping)
+            img_list = session_agent_ids_map[row_dict["session_id"]]
+            if row_dict["image"] in img_list:
                 continue
-            if row["cluster_role"] == DEFAULT_ROLE:
-                img_list.insert(0, row["image"])
+            if row_dict["cluster_role"] == DEFAULT_ROLE:
+                img_list.insert(0, row_dict["image"])
             else:
-                img_list.append(row["image"])
+                img_list.append(row_dict["image"])
         if session_agent_ids_map:
             conn.execute(
                 sa.update(SessionRow)

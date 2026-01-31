@@ -67,7 +67,7 @@ class AgentClient(BackendAIClient):
 
     async def ping(self) -> str:
         """Ping the agent to check connection health."""
-        return await self._peer.call.ping("ping")
+        return cast(str, await self._peer.call.ping("ping"))
 
     # Hardware information methods
     @agent_client_resilience.apply()
@@ -115,7 +115,7 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def assign_port(self) -> int:
         """Assign a host port on the agent."""
-        return await self._peer.call.assign_port(agent_id=self.agent_id)
+        return cast(int, await self._peer.call.assign_port(agent_id=self.agent_id))
 
     # Kernel management methods
     @agent_client_resilience.apply()
@@ -175,23 +175,24 @@ class AgentClient(BackendAIClient):
     async def sync_kernel_registry(self, kernel_tuples: list[tuple[KernelId, SessionId]]) -> None:
         """Sync kernel registry on the agent."""
         raw_tuples = [(str(kid), str(sid)) for kid, sid in kernel_tuples]
-        return await self._peer.call.sync_kernel_registry(raw_tuples, agent_id=self.agent_id)
+        result = await self._peer.call.sync_kernel_registry(raw_tuples, agent_id=self.agent_id)
+        return cast(None, result)
 
     # Health monitoring methods
     @agent_client_resilience.apply()
     async def check_pulling(self, image_name: str) -> bool:
         """Check if an image is being pulled."""
-        return await self._peer.call.check_pulling(image_name, agent_id=self.agent_id)
+        return cast(bool, await self._peer.call.check_pulling(image_name, agent_id=self.agent_id))
 
     @agent_client_resilience.apply()
     async def check_creating(self, kernel_id: KernelId) -> bool:
         """Check if a kernel is being created."""
-        return await self._peer.call.check_creating(str(kernel_id), agent_id=self.agent_id)
+        return cast(bool, await self._peer.call.check_creating(str(kernel_id), agent_id=self.agent_id))
 
     @agent_client_resilience.apply()
     async def check_running(self, kernel_id: KernelId) -> bool:
         """Check if a kernel is running."""
-        return await self._peer.call.check_running(str(kernel_id), agent_id=self.agent_id)
+        return cast(bool, await self._peer.call.check_running(str(kernel_id), agent_id=self.agent_id))
 
     # Code execution methods
     @agent_client_resilience.apply()
@@ -249,9 +250,9 @@ class AgentClient(BackendAIClient):
         opts: Mapping[str, Any],
     ) -> dict[str, Any]:
         """Get code completions from the agent."""
-        return await self._peer.call.get_completions(
+        return cast(dict[str, Any], await self._peer.call.get_completions(
             str(kernel_id), text, opts, agent_id=self.agent_id
-        )
+        ))
 
     # Service management methods
     @agent_client_resilience.apply()
@@ -284,14 +285,14 @@ class AgentClient(BackendAIClient):
     @agent_client_resilience.apply()
     async def download_file(self, kernel_id: KernelId, filepath: str) -> bytes:
         """Download a file from the agent."""
-        return await self._peer.call.download_file(str(kernel_id), filepath, agent_id=self.agent_id)
+        return cast(bytes, await self._peer.call.download_file(str(kernel_id), filepath, agent_id=self.agent_id))
 
     @agent_client_resilience.apply()
     async def download_single(self, kernel_id: KernelId, filepath: str) -> bytes:
         """Download a single file from the agent."""
-        return await self._peer.call.download_single(
+        return cast(bytes, await self._peer.call.download_single(
             str(kernel_id), filepath, agent_id=self.agent_id
-        )
+        ))
 
     @agent_client_resilience.apply()
     async def list_files(self, kernel_id: KernelId, path: str) -> Mapping[str, Any]:

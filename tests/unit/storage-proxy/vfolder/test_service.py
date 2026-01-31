@@ -30,9 +30,7 @@ def mock_volume_pool() -> MagicMock:
 @pytest.fixture
 def mock_service(mock_volume_pool: MagicMock) -> VolumeService:
     service = VolumeService(volume_pool=mock_volume_pool, event_producer=MagicMock())
-    service._get_capabilities = AsyncMock(return_value=["capability1", "capability2"])
-
-    service.log = service_log
+    service._get_capabilities = AsyncMock(return_value=["capability1", "capability2"])  # type: ignore[method-assign]
 
     return service
 
@@ -52,6 +50,7 @@ async def test_get_volume(mock_log: AsyncMock, mock_service: VolumeService, mock
 
     mock_log.assert_called_once_with(service_log, "get_volume", volume_id)
     mock_volume_pool.get_volume_info.assert_called_once_with(volume_id)
+    assert isinstance(mock_service._get_capabilities, AsyncMock)
     mock_service._get_capabilities.assert_called_once_with(volume_id)
 
     assert isinstance(result, VolumeMeta)
@@ -71,6 +70,7 @@ async def test_get_volumes(mock_log: AsyncMock, mock_service: VolumeService, moc
     }
     mock_volume_pool.list_volumes.return_value = mock_volumes
 
+    assert isinstance(mock_service._get_capabilities, AsyncMock)
     mock_service._get_capabilities.side_effect = [
         ["capability1", "capability2"],
         ["capability3"],
@@ -103,9 +103,10 @@ async def test_create_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(
         volume_id=uuid.UUID("12345678-1234-5678-1234-567812345678"),
-        quota_scope_id=UUID,
+        quota_scope_id=quota_scope_id,
     )
     options = QuotaConfig(limit_bytes=1024 * 1024 * 1024)
 
@@ -113,7 +114,7 @@ async def test_create_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
     mock_log.assert_called_once_with(service_log, "create_quota_scope", quota_scope_key)
     mock_volume.quota_model.create_quota_scope.assert_called_once_with(
-        quota_scope_id=UUID, options=options, extra_args=None
+        quota_scope_id=quota_scope_id, options=options, extra_args=None
     )
 
 
@@ -126,12 +127,13 @@ async def test_get_quota_scope(mock_log: AsyncMock, mock_service: VolumeService,
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
 
     result = await mock_service.get_quota_scope(quota_scope_key)
 
     mock_log.assert_called_once_with(service_log, "get_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
 
     assert result.used_bytes == 500
     assert result.limit_bytes == 1000
@@ -147,15 +149,16 @@ async def test_update_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
     options = QuotaConfig(limit_bytes=2000)
 
     await mock_service.update_quota_scope(quota_scope_key, options)
 
     mock_log.assert_called_once_with(service_log, "update_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
     mock_volume.quota_model.update_quota_scope.assert_called_once_with(
-        quota_scope_id=UUID, config=options
+        quota_scope_id=quota_scope_id, config=options
     )
 
 
@@ -170,13 +173,14 @@ async def test_delete_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
 
     await mock_service.delete_quota_scope(quota_scope_key)
 
     mock_log.assert_called_once_with(service_log, "delete_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
-    mock_volume.quota_model.unset_quota.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
+    mock_volume.quota_model.unset_quota.assert_called_once_with(quota_scope_id)
 
 
 @pytest.mark.asyncio

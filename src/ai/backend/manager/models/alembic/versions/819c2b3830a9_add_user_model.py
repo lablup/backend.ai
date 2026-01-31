@@ -6,6 +6,8 @@ Create Date: 2019-05-02 00:21:43.704843
 
 """
 
+from typing import Any, cast
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -89,36 +91,40 @@ def upgrade() -> None:
     # ### Create users based on keypair.user_id & associate keypairs.user to user record ###
     # Get all keypairs
     connection = op.get_bind()
-    query = sa.select([
+    query = sa.select(
         keypairs.c.user_id,
         keypairs.c.access_key,
         keypairs.c.secret_key,
         keypairs.c.is_admin,
-    ]).select_from(keypairs)
+    ).select_from(keypairs)
     results = connection.execute(query).fetchall()
-    for keypair in results:
+    for keypair_row in results:
+        keypair = cast(dict[str, Any], keypair_row._mapping)
         email = keypair["user_id"]
         access_key = keypair["access_key"]
         is_admin = keypair["is_admin"]
         if email in [None, ""]:
             continue
         # Try to get a user whose email matches with current keypair's email
-        query = (
-            sa.select([users.c.uuid, users.c.role]).select_from(users).where(users.c.email == email)
+        query = sa.select(users.c.uuid, users.c.role).select_from(users).where(
+            users.c.email == email
         )
-        user = connection.execute(query).first()
-        if user:
+        user_row = connection.execute(query).first()
+        if user_row:
             # Update user's role if current keypair is admin keypair
-            user_uuid = user["uuid"]
+            user_dict = cast(dict[str, Any], user_row._mapping)
+            user_uuid = user_dict["uuid"]
             role = UserRole.ADMIN if is_admin else UserRole.USER
-            if role == UserRole.ADMIN and user["role"] != UserRole.ADMIN:
-                query = sa.update(users).values(role=UserRole.ADMIN).where(users.c.email == email)
-                connection.execute(query)
+            if role == UserRole.ADMIN and user_dict["role"] != UserRole.ADMIN:
+                update_stmt = sa.update(users).values(role=UserRole.ADMIN).where(
+                    users.c.email == email
+                )
+                connection.execute(update_stmt)
         else:
             # Create new user (set username with email)
             role = UserRole.ADMIN if is_admin else UserRole.USER
             temp_password = keypair["secret_key"][:8]
-            query = (
+            insert_stmt = (
                 sa.insert(users)
                 .returning(users.c.uuid)
                 .values(
@@ -130,14 +136,14 @@ def upgrade() -> None:
                     role=role,
                 )
             )
-            user = connection.execute(query).first()
-            assert user is not None, "User insertion failed"
-            user_uuid = user[0]
+            new_user_row = connection.execute(insert_stmt).first()
+            assert new_user_row is not None, "User insertion failed"
+            user_uuid = new_user_row[0]
         # Update current keypair's `user` field with associated user's uuid.
-        query = (
-            sa.update(keypairs).values(user=user_uuid).where(keypairs.c.access_key == access_key)
+        update_keypair_stmt = sa.update(keypairs).values(user=user_uuid).where(
+            keypairs.c.access_key == access_key
         )
-        connection.execute(query)
+        connection.execute(update_keypair_stmt)
 
     # Make keypairs.user column NOT NULL.
     op.alter_column("keypairs", column_name="user", nullable=False)
