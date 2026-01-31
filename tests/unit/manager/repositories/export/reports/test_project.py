@@ -137,7 +137,9 @@ class TestJoinDefinitions:
 
     def test_container_registry_assoc_join_table(self) -> None:
         """Container registry association JOIN should use correct table."""
-        assert CONTAINER_REGISTRY_ASSOC_JOIN.table is AssociationContainerRegistriesGroupsRow.__table__
+        assert (
+            CONTAINER_REGISTRY_ASSOC_JOIN.table is AssociationContainerRegistriesGroupsRow.__table__
+        )
 
     def test_container_registry_join_table(self) -> None:
         """Container registry JOIN should use correct table."""

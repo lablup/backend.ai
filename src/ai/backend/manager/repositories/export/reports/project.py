@@ -31,7 +31,7 @@ def _serialize_json(value: Any) -> str:
 
     def convert(obj: Any) -> Any:
         if isinstance(obj, set):
-            return sorted(list(obj))
+            return sorted(obj)
         if isinstance(obj, dict):
             return {k: convert(v) for k, v in obj.items()}
         if isinstance(obj, list):
