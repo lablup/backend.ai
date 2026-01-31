@@ -329,7 +329,7 @@ def validate_channel_cmd(
     ctx: CLIContext,
     channel_id: str,
     data: str | None,
-    data_file: IO | None,
+    data_file: IO[str] | None,
 ) -> None:
     """
     Validate a notification channel by sending a test webhook.
@@ -511,7 +511,7 @@ def create_rule_cmd(
     rule_type: str,
     channel_id: str,
     template: str | None,
-    template_file: IO | None,
+    template_file: IO[str] | None,
     description: str | None,
     disabled: bool,
 ) -> None:
@@ -577,7 +577,7 @@ def update_rule_cmd(
     name: str | None,
     description: str | None,
     message_template: str | None,
-    template_file: IO | None,
+    template_file: IO[str] | None,
     enabled: bool | None,
 ) -> None:
     """
@@ -656,7 +656,7 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     help="Path to JSON file with test data (use '-' for stdin)",
 )
 def validate_rule_cmd(
-    ctx: CLIContext, rule_id: str, data: str | None, data_file: IO | None
+    ctx: CLIContext, rule_id: str, data: str | None, data_file: IO[str] | None
 ) -> None:
     """
     Validate a notification rule by rendering its template with test data.

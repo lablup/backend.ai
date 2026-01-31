@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import ipaddress
 import json
 import logging
 import uuid
@@ -537,7 +538,7 @@ class URLColumn(TypeDecorator[yarl.URL]):
         return yarl.URL(value)
 
 
-class IPColumn(TypeDecorator[ReadableCIDR]):
+class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -545,7 +546,7 @@ class IPColumn(TypeDecorator[ReadableCIDR]):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value: str | ReadableCIDR | None, _dialect: Dialect) -> str | None:
+    def process_bind_param(self, value: str | ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None, _dialect: Dialect) -> str | None:
         if value is None:
             return value
         try:
@@ -557,7 +558,7 @@ class IPColumn(TypeDecorator[ReadableCIDR]):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value: str | None, _dialect: Dialect) -> ReadableCIDR | None:
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
         if value is None:
             return None
         return ReadableCIDR(value)

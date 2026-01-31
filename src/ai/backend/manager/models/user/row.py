@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import logging
 import uuid as uuid_mod
 from collections.abc import Sequence
@@ -200,7 +201,7 @@ class UserRow(Base):  # type: ignore[misc]
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )
-    allowed_client_ip: Mapped[list[ReadableCIDR] | None] = mapped_column(
+    allowed_client_ip: Mapped[list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None] = mapped_column(
         "allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True
     )
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)

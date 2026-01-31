@@ -64,7 +64,7 @@ class Agent(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult:
+    ) -> PaginatedResult[Any]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.

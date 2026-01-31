@@ -143,7 +143,7 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[GUID] = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
@@ -172,8 +172,8 @@ def upgrade() -> None:
             nullable=True,
         )
         domain_name = sa.Column("domain_name", sa.String(length=64), nullable=False)
-        group_id: sa.Column[GUID] = sa.Column("group_id", GUID(), nullable=False)
-        user_uuid: sa.Column[GUID] = sa.Column("user_uuid", GUID(), nullable=False)
+        group_id: sa.Column[GUID[UUID]] = sa.Column("group_id", GUID(), nullable=False)
+        user_uuid: sa.Column[GUID[UUID]] = sa.Column("user_uuid", GUID(), nullable=False)
         access_key = sa.Column("access_key", sa.String(length=20), nullable=True)
         # kp_resource_policy = sa.Column(
         #     'kp_resource_policy', sa.String(length=256), nullable=False)
@@ -548,7 +548,7 @@ def downgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[GUID] = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),

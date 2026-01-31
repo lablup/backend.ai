@@ -276,7 +276,7 @@ class ConnectionResolverResult[T_Node: ObjectType](NamedTuple):
 
 
 Resolver = (
-    Callable[..., Awaitable[ConnectionResolverResult]] | Callable[..., ConnectionResolverResult]
+    Callable[..., Awaitable[ConnectionResolverResult[Any]]] | Callable[..., ConnectionResolverResult[Any]]
 )
 
 
@@ -310,7 +310,7 @@ class AsyncListConnectionField(IterableConnectionField):  # type: ignore[misc]
         cls,
         connection_type: Any,
         args: dict[str, Any] | None,
-        resolver_result: ConnectionResolverResult,
+        resolver_result: ConnectionResolverResult[Any],
     ) -> Connection:
         resolved = resolver_result.node_list
         page_size = resolver_result.requested_page_size

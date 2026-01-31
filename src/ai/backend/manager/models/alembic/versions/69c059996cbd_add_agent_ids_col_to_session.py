@@ -6,6 +6,7 @@ Create Date: 2023-07-05 23:39:21.631462
 
 """
 
+import uuid
 from collections import defaultdict
 from typing import Any
 
@@ -44,7 +45,7 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[GUID] = sa.Column(
+        id: sa.Column[GUID[uuid.UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),

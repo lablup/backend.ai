@@ -1423,7 +1423,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[AgentNode]:
         _scope = scope if scope is not None else SystemScope()
         return await AgentNode.get_connection(
             info,
@@ -3082,7 +3082,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[ContainerRegistryNode]:
         return await ContainerRegistryNode.get_connection(
             info,
             filter,
@@ -3115,7 +3115,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[AuditLogNode]:
         return await AuditLogNode.get_connection(
             info,
             filter,
@@ -3158,7 +3158,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[ServiceConfigNode]:
         return await ServiceConfigNode.get_connection(
             info,
             services,
@@ -3222,7 +3222,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[NetworkNode]:
         return await NetworkNode.get_connection(
             info,
             filter,
@@ -3255,7 +3255,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[EndpointAutoScalingRuleNode]:
         return await EndpointAutoScalingRuleNode.get_connection(
             info,
             endpoint,

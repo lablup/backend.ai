@@ -42,7 +42,7 @@ class Model(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult:
+    ) -> PaginatedResult[Any]:
         if filter:
             composed_filter = f'({filter}) & (usage_mode == "MODEL")'
         else:

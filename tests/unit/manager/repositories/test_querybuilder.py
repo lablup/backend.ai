@@ -73,7 +73,7 @@ class TestGenericQueryBuilder:
         return mock_model
 
     @pytest.fixture
-    def generic_paginator(self, mock_model_class: type[Any]) -> GenericQueryBuilder:
+    def generic_paginator(self, mock_model_class: type[Any]) -> GenericQueryBuilder[Any, Any, Any, Any]:
         """Create GenericQueryBuilder instance with mock components"""
         return GenericQueryBuilder(
             model_class=mock_model_class,
@@ -83,7 +83,7 @@ class TestGenericQueryBuilder:
             cursor_type_name="TestModel",
         )
 
-    def test_paginator_initialization(self, generic_paginator: GenericQueryBuilder, mock_model_class: type[Any]) -> None:
+    def test_paginator_initialization(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any], mock_model_class: type[Any]) -> None:
         """Test GenericQueryBuilder initialization"""
         assert generic_paginator.model_class == mock_model_class
         assert isinstance(generic_paginator.filter_applier, MockFilterApplier)
@@ -91,7 +91,7 @@ class TestGenericQueryBuilder:
         assert isinstance(generic_paginator.model_converter, MockModelConverter)
         assert generic_paginator.cursor_type_name == "TestModel"
 
-    def test_protocol_compliance(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_protocol_compliance(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test that the applier classes properly implement the protocols"""
         # Test filter applier
         filter_applier = generic_paginator.filter_applier
@@ -162,7 +162,7 @@ class TestGenericQueryBuilder:
         assert result["name"] == "test-model"
         assert result["converted"]
 
-    def test_build_lexicographic_cursor_conditions_structure(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_build_lexicographic_cursor_conditions_structure(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test that cursor condition building has correct structure without SQLAlchemy operations"""
         # Get the mock id column from the paginator's model class
         mock_id_column = generic_paginator.model_class.id
@@ -194,7 +194,7 @@ class TestGenericQueryBuilder:
     @patch("sqlalchemy.select")
     @patch("sqlalchemy.and_")
     @patch("sqlalchemy.or_")
-    def test_build_lexicographic_cursor_conditions_with_ordering(self, mock_or: Any, mock_and: Any, mock_select: Any, generic_paginator: GenericQueryBuilder) -> None:
+    def test_build_lexicographic_cursor_conditions_with_ordering(self, mock_or: Any, mock_and: Any, mock_select: Any, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test cursor condition building with order clauses"""
         # Create mock column for ordering with comparison operators
         mock_other_column = MagicMock()
@@ -221,7 +221,7 @@ class TestGenericQueryBuilder:
         # Should have 2 conditions: one for column comparison, one for ID comparison
         assert len(conditions) == 2
 
-    def test_paginator_attributes_accessible(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_paginator_attributes_accessible(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test that all paginator attributes are accessible"""
         # Test that we can access all the required attributes
         assert hasattr(generic_paginator, "model_class")
@@ -283,7 +283,7 @@ class TestGenericQueryBuilder:
         assert ConnectionPaginationOrder.FORWARD.value == "forward"
         assert ConnectionPaginationOrder.BACKWARD.value == "backward"
 
-    def test_generic_paginator_type_parameters(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_generic_paginator_type_parameters(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test that generic paginator maintains proper typing structure"""
         # This test verifies that the generic typing structure is preserved
         # Even though we can't fully test the generic types at runtime,
@@ -300,7 +300,7 @@ class TestGenericQueryBuilder:
         assert hasattr(generic_paginator.model_converter, "convert_to_data")
 
     @patch("sqlalchemy.select")
-    def test_build_pagination_queries_offset_based(self, mock_select: Any, generic_paginator: GenericQueryBuilder) -> None:
+    def test_build_pagination_queries_offset_based(self, mock_select: Any, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test query building for offset-based pagination"""
         # Mock SQLAlchemy select
         mock_stmt = MagicMock()
@@ -320,7 +320,7 @@ class TestGenericQueryBuilder:
         # Verify SQLAlchemy methods were called
         mock_select.assert_called()
 
-    def test_convert_rows_to_data_forward(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_convert_rows_to_data_forward(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test row conversion for forward pagination"""
         # Create mock rows
         mock_rows = [MagicMock(), MagicMock(), MagicMock()]
@@ -339,7 +339,7 @@ class TestGenericQueryBuilder:
         assert result[1]["id"] == "id-1"
         assert result[2]["id"] == "id-2"
 
-    def test_convert_rows_to_data_backward(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_convert_rows_to_data_backward(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test row conversion for backward pagination"""
         # Create mock rows
         mock_rows = [MagicMock(), MagicMock(), MagicMock()]
@@ -358,7 +358,7 @@ class TestGenericQueryBuilder:
         assert result[1]["id"] == "id-1"
         assert result[2]["id"] == "id-0"
 
-    def test_pagination_separation_of_concerns(self, generic_paginator: GenericQueryBuilder) -> None:
+    def test_pagination_separation_of_concerns(self, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test that paginator only handles query building, not DB execution"""
         # Verify the paginator doesn't have database-related methods
         assert not hasattr(generic_paginator, "execute")
@@ -371,7 +371,7 @@ class TestGenericQueryBuilder:
         assert hasattr(generic_paginator, "build_lexicographic_cursor_conditions")
 
     @patch("sqlalchemy.select")
-    def test_build_pagination_queries_with_filters(self, mock_select: Any, generic_paginator: GenericQueryBuilder) -> None:
+    def test_build_pagination_queries_with_filters(self, mock_select: Any, generic_paginator: GenericQueryBuilder[Any, Any, Any, Any]) -> None:
         """Test query building with filters applied"""
         mock_stmt = MagicMock()
         mock_select.return_value = mock_stmt
@@ -401,7 +401,7 @@ class TestGenericQueryBuilderStructure:
         ordering_applier = MockOrderingApplier()
         model_converter = MockModelConverter()
 
-        paginator: GenericQueryBuilder = GenericQueryBuilder(
+        paginator: GenericQueryBuilder[Any, Any, Any, Any] = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=filter_applier,
             ordering_applier=ordering_applier,
@@ -450,7 +450,7 @@ class TestGenericQueryBuilderStructure:
 
         # Create paginator with specialized components
         mock_model = MagicMock()
-        paginator: GenericQueryBuilder = GenericQueryBuilder(
+        paginator: GenericQueryBuilder[Any, Any, Any, Any] = GenericQueryBuilder(
             model_class=mock_model,
             filter_applier=SpecialFilterApplier(),
             ordering_applier=SpecialOrderingApplier(),

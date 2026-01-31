@@ -510,7 +510,7 @@ class GroupDotfile(TypedDict):
 
 async def query_group_dotfiles(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
     query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
@@ -522,7 +522,7 @@ async def query_group_dotfiles(
 
 async def query_group_domain(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> str | None:
     query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
