@@ -103,6 +103,9 @@ class ExportAdapter(BaseFilterAdapter):
     ) -> StreamingExportQuery:
         """Build StreamingExportQuery for session export.
 
+        Dynamically applies JOINs based on selected fields.
+        Fields with joins attribute will trigger LEFT JOIN operations.
+
         Args:
             report: Session report definition
             fields: Field keys to include (None = all fields)
@@ -118,8 +121,14 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_session_conditions(report, filter)
         orders = self._build_session_orders(report, order)
 
+        # Collect all required JOINs from selected fields
+        all_joins = self._collect_joins(selected_fields)
+
+        # Build select_from with dynamic JOINs
+        select_from = self._build_select_from_with_joins(report.select_from, all_joins)
+
         return StreamingExportQuery(
-            select_from=report.select_from,
+            select_from=select_from,
             fields=selected_fields,
             conditions=conditions,
             orders=orders,
