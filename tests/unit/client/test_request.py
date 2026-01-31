@@ -104,6 +104,7 @@ def test_request_attach_files(mock_request_params: dict[str, Any]) -> None:
     assert rqst.content_type == "multipart/form-data"
     assert rqst.content == b""
     packed_content = rqst._pack_content()
+    assert isinstance(packed_content, aiohttp.FormData)
     assert packed_content.is_multipart
 
 

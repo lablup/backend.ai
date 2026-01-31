@@ -57,11 +57,11 @@ def test_get_new_file_diff_stats() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
         first.write_text("first")
-        fs1 = scandir(tmpdir, 1000)
+        fs1 = scandir(Path(tmpdir), 1000)
 
         second = Path(tmpdir) / "second.txt"
         second.write_text("second")
-        fs2 = scandir(tmpdir, 1000)
+        fs2 = scandir(Path(tmpdir), 1000)
 
         diff_stats = diff_file_stats(fs1, fs2)
 
@@ -75,11 +75,11 @@ def test_get_modified_file_diff_stats() -> None:
         first.write_text("first")
         second = Path(tmpdir) / "second.txt"
         second.write_text("second")
-        fs1 = scandir(tmpdir, 1000)
+        fs1 = scandir(Path(tmpdir), 1000)
 
         new_time = first.stat().st_mtime + 5
         os.utime(second, (new_time, new_time))
-        fs2 = scandir(tmpdir, 1000)
+        fs2 = scandir(Path(tmpdir), 1000)
 
         diff_stats = diff_file_stats(fs1, fs2)
 
@@ -91,13 +91,13 @@ def test_get_both_new_and_modified_files_stat() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         first = Path(tmpdir) / "first.txt"
         first.write_text("first")
-        fs1 = scandir(tmpdir, 1000)
+        fs1 = scandir(Path(tmpdir), 1000)
 
         new_time = first.stat().st_mtime + 5
         os.utime(first, (new_time, new_time))
         second = Path(tmpdir) / "second.txt"
         second.write_text("second")
-        fs2 = scandir(tmpdir, 1000)
+        fs2 = scandir(Path(tmpdir), 1000)
 
         diff_stats = diff_file_stats(fs1, fs2)
 

@@ -3,24 +3,30 @@ import random
 from collections.abc import AsyncGenerator
 
 import pytest
+from redis.asyncio import Redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.message_queue.types import MQMessage
-from ai.backend.common.redis_helper import Redis
+from ai.backend.common.message_queue.types import BroadcastMessage, MQMessage
 from ai.backend.common.types import (
+    HostPortPair,
+    RedisConnectionInfo,
     RedisHelperConfig,
     RedisTarget,
 )
+from ai.backend.common.utils import addr_to_hostport_pair
 
 
 @pytest.fixture
-async def redis_conn(redis_container: tuple[str, str]) -> AsyncGenerator[Redis[bytes], None]:
+async def redis_conn(
+    redis_container: tuple[str, str],
+) -> AsyncGenerator[RedisConnectionInfo, None]:
     # Configure test Redis connection
+    host, port = addr_to_hostport_pair(redis_container[1])
     conn = redis_helper.get_redis_object(
         RedisTarget(
-            addr=redis_container[1],
+            addr=HostPortPair(host, port),
             redis_helper_config=RedisHelperConfig(
                 socket_timeout=1.0,
                 socket_connect_timeout=1.0,
@@ -59,8 +65,9 @@ async def redis_queue(
     redis_container: tuple[str, str], queue_args: RedisMQArgs
 ) -> AsyncGenerator[RedisQueue, None]:
     # Create consumer group if not exists
+    host, port = addr_to_hostport_pair(redis_container[1])
     redis_target = RedisTarget(
-        addr=redis_container[1],
+        addr=HostPortPair(host, port),
         redis_helper_config={
             "socket_timeout": 5.0,
             "socket_connect_timeout": 2.0,
@@ -96,7 +103,7 @@ async def test_subscribe(redis_queue: RedisQueue) -> None:
     test_payload = {"key": "value", "key2": "value2"}
 
     # Create task to subscribe
-    received_messages: list[MQMessage] = []
+    received_messages: list[BroadcastMessage] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -114,9 +121,7 @@ async def test_subscribe(redis_queue: RedisQueue) -> None:
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == {
-        k.encode(): v.encode() for k, v in test_payload.items()
-    }
+    assert received_messages[0].payload == test_payload
 
 
 async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
@@ -124,7 +129,7 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     test_payload = {"key": "value", "key2": "value2"}
     cache_id = f"test-cache-id-{random.randint(1000, 9999)}"
 
-    received_messages: list[MQMessage] = []
+    received_messages: list[BroadcastMessage] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -142,9 +147,7 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == {
-        k.encode(): v.encode() for k, v in test_payload.items()
-    }
+    assert received_messages[0].payload == test_payload
 
     # Fetch cached message
     cached_message = await redis_queue.fetch_cached_broadcast_message(cache_id)

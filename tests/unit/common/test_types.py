@@ -85,7 +85,9 @@ def test_check_typed_dict() -> None:
 
 def test_binary_size_str_conversion() -> None:
     assert BinarySize.from_str("1 byte") == 1
-    assert BinarySize.from_str(19291991) == 19291991
+    # MyPy doesn't support numbers.Integral for static type checking
+    # The function accepts int which is a numbers.Integral, so we can safely ignore this
+    assert BinarySize.from_str(19291991) == 19291991  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         BinarySize.from_str("1.1")
     assert BinarySize.from_str("1.1k") == 1126
@@ -181,12 +183,13 @@ def test_resource_slot_serialization() -> None:
     # convert human-readable values to raw decimal values,
     # while from_json() treats those values as stringified decimal expressions "as-is".
 
-    st = {"a": "count", "b": "bytes"}
-    r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st)
-    r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st)
-    r3 = ResourceSlot.from_user_input({"a": "1"}, st)
+    # from_user_input expects Mapping[SlotName, SlotTypes]
+    st_user_input: dict[SlotName, SlotTypes] = {SlotName("a"): SlotTypes("count"), SlotName("b"): SlotTypes("bytes")}
+    r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st_user_input)
+    r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st_user_input)
+    r3 = ResourceSlot.from_user_input({"a": "1"}, st_user_input)
     with pytest.raises(ValueError):
-        ResourceSlot.from_user_input({"x": "1"}, st)
+        ResourceSlot.from_user_input({"x": "1"}, st_user_input)
 
     assert r1["a"] == Decimal(1)
     assert r2["a"] == Decimal(2)
@@ -206,29 +209,34 @@ def test_resource_slot_serialization() -> None:
     assert r1.to_json() == {"a": "1", "b": "2147483648"}
     assert r2.to_json() == {"a": "2", "b": "1073741824"}
     assert r3.to_json() == {"a": "1", "b": "0"}
-    assert r1.to_humanized(st) == {"a": "1", "b": "2g"}
-    assert r2.to_humanized(st) == {"a": "2", "b": "1g"}
-    assert r3.to_humanized(st) == {"a": "1", "b": "0"}
+
+    # to_humanized expects Mapping[str, Any] (plain string keys)
+    st_humanized: dict[str, str] = {"a": "count", "b": "bytes"}
+    assert r1.to_humanized(st_humanized) == {"a": "1", "b": "2g"}
+    assert r2.to_humanized(st_humanized) == {"a": "2", "b": "1g"}
+    assert r3.to_humanized(st_humanized) == {"a": "1", "b": "0"}
     assert r1 == ResourceSlot.from_json({"a": "1", "b": "2147483648"})
     assert r2 == ResourceSlot.from_json({"a": "2", "b": "1073741824"})
     assert r3 == ResourceSlot.from_json({"a": "1", "b": "0"})
 
-    r4 = ResourceSlot.from_user_input({"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st)
+    r4 = ResourceSlot.from_user_input({"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st_user_input)
     assert not r4["a"].is_finite()
     assert not r4["b"].is_finite()
     assert r4["a"] > 0
     assert r4["b"] < 0
-    assert r4.to_humanized(st) == {"a": "Infinity", "b": "-Infinity"}
+    assert r4.to_humanized(st_humanized) == {"a": "Infinity", "b": "-Infinity"}
 
     # The result for "unspecified" fields may be different
     # depending on the policy options.
 
+    # from_policy expects Mapping[str, Any] (plain string keys)
+    st_policy: dict[str, str] = {"a": "count", "b": "bytes"}
     r1 = ResourceSlot.from_policy(
         {
             "total_resource_slots": {"a": "10"},
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         },
-        st,
+        st_policy,
     )
     assert r1["a"] == Decimal(10)
     assert r1["b"] == Decimal("Infinity")
@@ -237,7 +245,7 @@ def test_resource_slot_serialization() -> None:
             "total_resource_slots": {"a": "10"},
             "default_for_unspecified": DefaultForUnspecified.LIMITED,
         },
-        st,
+        st_policy,
     )
     assert r2["a"] == Decimal(10)
     assert r2["b"] == Decimal(0)

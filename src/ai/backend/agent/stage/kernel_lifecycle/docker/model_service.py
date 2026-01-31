@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import cast, override
 
 from aiodocker.docker import Docker
 from pydantic import ValidationError
@@ -10,7 +10,7 @@ from ruamel.yaml.error import YAMLError
 
 from ai.backend.agent.exception import InvalidModelConfigurationError
 from ai.backend.common.asyncio import closing_async
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.stage.types import (
     Provisioner,
     SpecGenerator,
@@ -71,7 +71,7 @@ class ModelServiceSpecCheckProvisioner(Provisioner[ModelServiceSpecCheckArgs, Mo
     async def _extract_image_command(self, image_canonical: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image_canonical)
-            return result["Config"].get("Cmd")
+            return cast(str | None, result["Config"].get("Cmd"))
 
     @override
     async def teardown(self, resource: ModelServiceSpec) -> None:
@@ -169,7 +169,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for VLLM: {e}") from e
 
@@ -190,7 +190,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for TGI: {e}") from e
 
@@ -211,7 +211,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for NIM: {e}") from e
 
@@ -232,7 +232,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for SGLang: {e}") from e
 
@@ -253,7 +253,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(
                 f"Invalid model definition for Modular MAX: {e}"
@@ -271,7 +271,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])
+            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for CMD: {e}") from e
 

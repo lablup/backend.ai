@@ -14,7 +14,7 @@ async def test_api_method_override(aiohttp_client: Any) -> None:
     observed_method = None
     app = web.Application()
 
-    async def service_handler(request: Any) -> None:
+    async def service_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"test")
@@ -59,12 +59,12 @@ async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> No
     observed_method = None
     app = web.Application()
 
-    async def op1_handler(request: Any) -> None:
+    async def op1_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op1")
 
-    async def op2_handler(request: Any) -> None:
+    async def op2_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op2")

@@ -195,45 +195,45 @@ class TestEnumConsistency:
     def test_migration_enum_values_match_original_when_same_name(self) -> None:
         """Test that when migration enum and original enum have the same member name, they have the same value."""
         # RoleSource
-        for migration_member in RoleSource:
+        for role_member in RoleSource:
             try:
-                original_member = OriginalRoleSource[migration_member.name]
-                assert migration_member.value == original_member.value, (
-                    f"RoleSource.{migration_member.name} value mismatch: "
-                    f"migration={migration_member.value}, original={original_member.value}"
+                original_role_member = OriginalRoleSource[role_member.name]
+                assert role_member.value == original_role_member.value, (
+                    f"RoleSource.{role_member.name} value mismatch: "
+                    f"migration={role_member.value}, original={original_role_member.value}"
                 )
             except KeyError:
                 pass
 
         # OperationType
-        for migration_member in OperationType:
+        for op_member in OperationType:
             try:
-                original_member = OriginalOperationType[migration_member.name]
-                assert migration_member.value == original_member.value, (
-                    f"OperationType.{migration_member.name} value mismatch: "
-                    f"migration={migration_member.value}, original={original_member.value}"
+                original_op_member = OriginalOperationType[op_member.name]
+                assert op_member.value == original_op_member.value, (
+                    f"OperationType.{op_member.name} value mismatch: "
+                    f"migration={op_member.value}, original={original_op_member.value}"
                 )
             except KeyError:
                 pass
 
         # ScopeType
-        for migration_member in ScopeType:
+        for scope_member in ScopeType:
             try:
-                original_member = OriginalScopeType[migration_member.name]
-                assert migration_member.value == original_member.value, (
-                    f"ScopeType.{migration_member.name} value mismatch: "
-                    f"migration={migration_member.value}, original={original_member.value}"
+                original_scope_member = OriginalScopeType[scope_member.name]
+                assert scope_member.value == original_scope_member.value, (
+                    f"ScopeType.{scope_member.name} value mismatch: "
+                    f"migration={scope_member.value}, original={original_scope_member.value}"
                 )
             except KeyError:
                 pass
 
         # EntityType
-        for migration_member in EntityType:
+        for entity_member in EntityType:
             try:
-                original_member = OriginalEntityType[migration_member.name]
-                assert migration_member.value == original_member.value, (
-                    f"EntityType.{migration_member.name} value mismatch: "
-                    f"migration={migration_member.value}, original={original_member.value}"
+                original_entity_member = OriginalEntityType[entity_member.name]
+                assert entity_member.value == original_entity_member.value, (
+                    f"EntityType.{entity_member.name} value mismatch: "
+                    f"migration={entity_member.value}, original={original_entity_member.value}"
                 )
             except KeyError:
                 pass
