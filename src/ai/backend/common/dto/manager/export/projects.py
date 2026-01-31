@@ -46,7 +46,7 @@ class ProjectExportOrderField(StrEnum):
     Orderable fields for project export.
 
     These are the fields that can be used for sorting project export results.
-    Includes name and timestamps for flexible ordering options.
+    Only base project fields are supported for ordering.
     """
 
     NAME = "name"
@@ -66,8 +66,9 @@ class ProjectExportOrder(BaseRequestModel):
 
     field: ProjectExportOrderField = Field(
         description=(
-            "The field to sort by. Must be one of the valid project orderable fields: "
-            "name, domain_name, is_active, created_at, modified_at."
+            "The field to sort by. Only base project fields are supported: "
+            "name, domain_name, is_active, created_at, modified_at. "
+            "JOIN fields (resource_policy, scaling_group, container_registry) are not orderable."
         )
     )
     direction: OrderDirection = Field(
@@ -86,6 +87,8 @@ class ProjectExportFilter(BaseRequestModel):
     All specified conditions are combined with AND logic.
     Only records matching all specified filters will be exported.
     Use this to narrow down the exported project data to specific criteria.
+
+    Only base project fields are supported for filtering.
     """
 
     name: StringFilter | None = Field(
