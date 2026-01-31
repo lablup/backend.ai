@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 import aiotools

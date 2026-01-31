@@ -2,7 +2,7 @@ import logging
 from collections import ChainMap
 from collections.abc import Mapping
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 from aiohttp import web
 from sqlalchemy import RowMapping

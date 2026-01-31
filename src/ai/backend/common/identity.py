@@ -13,6 +13,7 @@ from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
 from pathlib import Path, PosixPath
+from typing import Any
 
 import aiodns
 import aiohttp

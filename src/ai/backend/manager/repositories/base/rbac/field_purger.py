@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult

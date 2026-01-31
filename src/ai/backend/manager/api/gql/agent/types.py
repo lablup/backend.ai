@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info

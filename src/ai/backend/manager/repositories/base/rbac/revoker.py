@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa

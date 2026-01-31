@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
+from typing import Any
 
 import strawberry
 from strawberry import ID, UNSET, Info

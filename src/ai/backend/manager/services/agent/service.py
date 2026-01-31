@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 import aiohttp
 import yarl

@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError

@@ -1,3 +1,5 @@
+from typing import Any
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.metric.actions.container import (

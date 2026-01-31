@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from typing import Any
 
 import aiohttp_cors
 from aiohttp import web

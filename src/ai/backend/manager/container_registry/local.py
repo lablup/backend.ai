@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import override
+from typing import Any, override
 
 import aiohttp
 import sqlalchemy as sa

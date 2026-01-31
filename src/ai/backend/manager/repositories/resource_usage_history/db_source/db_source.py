@@ -6,7 +6,7 @@ import logging
 import uuid
 from collections.abc import Mapping
 from datetime import date, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
