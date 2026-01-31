@@ -7329,6 +7329,35 @@
         "title": "ProjectExportCSVRequest",
         "type": "object"
       },
+      "KeypairExportCSVRequest": {
+        "description": "Request body for keypair CSV export operations.\n\nThis is the request model for POST /export/keypairs/csv endpoint.\nNote: Filtering and ordering are not yet supported for keypair exports.",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "List of field keys to include in the export. Available basic fields: access_key, user_id, user_uuid, is_active, is_admin, created_at, modified_at, last_used, resource_policy_name. Available JOIN fields: user_*, resource_policy_*, resource_group_*, session_*. If not specified or empty, all available fields will be exported.",
+            "title": "Fields"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "description": "Character encoding for the CSV output. Supported values: 'utf-8' (default, recommended for most uses), 'euc-kr' (for Korean systems requiring legacy encoding).",
+            "title": "Encoding",
+            "type": "string"
+          }
+        },
+        "title": "KeypairExportCSVRequest",
+        "type": "object"
+      },
       "AuditLogExportFilter": {
         "description": "Filter conditions specific to audit log export.\n\nAll specified conditions are combined with AND logic.\nOnly records matching all specified filters will be exported.\nUse this to narrow down the exported audit log data to specific criteria.",
         "properties": {
@@ -17886,9 +17915,38 @@
         "description": "Export project data as CSV.\n\nPOST /export/projects/csv\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/export/audit-logs/csv": {
+    "/export/keypairs/csv": {
       "post": {
         "operationId": "export.export_csv.4",
+        "tags": [
+          "export"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeypairExportCSVRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Export keypair data as CSV.\n\nPOST /export/keypairs/csv\n\nNote: Keypair export does not currently support filtering or ordering.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/export/audit-logs/csv": {
+      "post": {
+        "operationId": "export.export_csv.5",
         "tags": [
           "export"
         ],
