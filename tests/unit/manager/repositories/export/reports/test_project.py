@@ -162,7 +162,9 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is None
 
-    def test_resource_policy_name_has_no_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+    def test_resource_policy_name_has_no_join(
+        self, fields_by_key: dict[str, ExportFieldDef]
+    ) -> None:
         """resource_policy_name is in GroupRow, so no join needed."""
         field = fields_by_key["resource_policy_name"]
         assert field.joins is None
@@ -183,7 +185,9 @@ class TestFieldJoinAssignments:
             assert RESOURCE_POLICY_JOIN in field.joins
             assert len(field.joins) == 1
 
-    def test_scaling_group_fields_have_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+    def test_scaling_group_fields_have_joins(
+        self, fields_by_key: dict[str, ExportFieldDef]
+    ) -> None:
         """Scaling group fields should have SCALING_GROUP_JOINS."""
         sg_keys = [
             "scaling_group_name",
@@ -200,7 +204,9 @@ class TestFieldJoinAssignments:
             assert field.joins == SCALING_GROUP_JOINS
             assert len(field.joins) == 2
 
-    def test_container_registry_fields_have_joins(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+    def test_container_registry_fields_have_joins(
+        self, fields_by_key: dict[str, ExportFieldDef]
+    ) -> None:
         """Container registry fields should have CONTAINER_REGISTRY_JOINS."""
         cr_keys = [
             "container_registry_id",
