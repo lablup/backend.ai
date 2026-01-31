@@ -464,7 +464,7 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
             try:
-                db_session.add(user_role_row)  # type: ignore[arg-type]
+                db_session.add(user_role_row)
                 await db_session.flush()
                 await db_session.refresh(user_role_row)
                 return user_role_row
@@ -699,8 +699,8 @@ class PermissionDBSource:
                     UserRoleRow.user_id == user_id,
                     sa.or_(
                         PermissionGroupRow.scope_type == ScopeType.GLOBAL,
-                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
-                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
+                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                     ),
                 )
             )
@@ -742,11 +742,11 @@ class PermissionDBSource:
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
-                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
-                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                             ObjectPermissionRow.operation == operation,
                         ),
                     ),

@@ -746,7 +746,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class ComputeSessionConnection(Connection):  # type: ignore[misc]
+class ComputeSessionConnection(Connection):
     class Meta:
         node = ComputeSessionNode
         description = "Added in 24.09.0."

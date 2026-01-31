@@ -95,7 +95,11 @@ async def test_update_password_no_auth_successful(
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_fails_when_max_password_age_is_none() -> None:
+async def test_update_password_no_auth_fails_when_max_password_age_is_none(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_config_provider: MagicMock,
+    auth_service: AuthService,
+) -> None:
     """Test update password fails when max_password_age is None"""
     # Set max_password_age to None in the mock
     mock_config_provider.config.auth.max_password_age = None
@@ -120,7 +124,10 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none() -> 
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_fails_with_incorrect_current_password() -> None:
+async def test_update_password_no_auth_fails_with_incorrect_current_password(
+    mock_hook_plugin_ctx: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test update password fails with incorrect current password"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -147,7 +154,12 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password() -
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_fails_when_new_password_same_as_current() -> None:
+async def test_update_password_no_auth_fails_when_new_password_same_as_current(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test update password fails when new password is same as current"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -181,7 +193,12 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current()
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_with_retry() -> None:
+async def test_update_password_no_auth_with_retry(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test that password update uses retry mechanism"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -219,7 +236,12 @@ async def test_update_password_no_auth_with_retry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_hook_rejection() -> None:
+async def test_update_password_no_auth_hook_rejection(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test password update fails when hook rejects"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",

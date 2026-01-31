@@ -66,7 +66,7 @@ class QueryOrderTransformer(Transformer[Any, Any]):
                 col = func(matched_col) if func is not None else matched_col  # type: ignore[arg-type]
             else:
                 col = get_col_from_table(self._sa_table, col_name)
-            return col  # type: ignore[return-value]
+            return col
         except KeyError as e:
             raise ValueError("Unknown/unsupported field name", col_name) from e
 

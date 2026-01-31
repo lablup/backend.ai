@@ -315,7 +315,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         return await GroupNode.get_node(info, self.id)
 
 
-class GroupConnection(Connection):  # type: ignore[misc]
+class GroupConnection(Connection):
     class Meta:
         node = GroupNode
         description = "Added in 24.03.0"

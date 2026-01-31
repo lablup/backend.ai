@@ -22,7 +22,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TCPFrontend(BaseFrontend[TCPBackend, int]):

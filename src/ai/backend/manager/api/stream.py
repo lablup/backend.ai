@@ -705,7 +705,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         # Note: kernel_id is used as session_id key here for connection tracking
                         # The idle checker operates on session granularity
                         await root_ctx.idle_checker_host.update_app_streaming_status(
-                            SessionId(session_id),  # type: ignore[arg-type]
+                            SessionId(session_id),
                             AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
             await asyncio.sleep(10)

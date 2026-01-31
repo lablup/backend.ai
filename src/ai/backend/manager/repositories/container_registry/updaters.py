@@ -98,7 +98,7 @@ class ContainerRegistryUpdaterSpec(UpdaterSpec[ContainerRegistryRow]):
 
     @property
     @override
-    def row_class(self) -> builtins.type[ContainerRegistryRow]:  # type: ignore[name-defined]
+    def row_class(self) -> builtins.type[ContainerRegistryRow]:
         return ContainerRegistryRow
 
     @override

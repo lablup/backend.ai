@@ -261,7 +261,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
             )
 
 
-class ScalingGroupConnection(Connection):  # type: ignore[misc]
+class ScalingGroupConnection(Connection):
     class Meta:
         node = ScalingGroupNode
         description = "Added in 24.12.0."

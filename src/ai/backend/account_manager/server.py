@@ -55,7 +55,7 @@ from .exceptions import (
 from .models.utils import connect_database
 from .types import AppCreator, EventLoopType, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 global_subapp_pkgs: Final[tuple[str, ...]] = (
@@ -74,14 +74,14 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
         raise ex
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
-    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))  # type: ignore[name-defined]
+    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))
     return await _handler(request)
 
 

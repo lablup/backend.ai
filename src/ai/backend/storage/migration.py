@@ -275,7 +275,7 @@ async def check_and_upgrade(
         volume_pool=None,  # type: ignore[arg-type]
         storage_pool=None,  # type: ignore[arg-type]
         background_task_manager=None,  # type: ignore[arg-type]
-        artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
+        artifact_verifier_ctx=ArtifactVerifierContext(),
         metric_registry=CommonMetricRegistry(),
         cors_options={},
         manager_client_pool=manager_client_pool,

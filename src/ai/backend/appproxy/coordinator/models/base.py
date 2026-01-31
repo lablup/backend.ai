@@ -31,7 +31,7 @@ from ai.backend.logging import BraceStyleAdapter
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -166,7 +166,7 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
 
     def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON())  # type: ignore[arg-type]
+            return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
     def process_bind_param(self, value: Any, dialect: sa.Dialect) -> BaseModel:

@@ -166,7 +166,7 @@ class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class AuditLogConnection(Connection):  # type: ignore[misc]
+class AuditLogConnection(Connection):
     """Added in 25.6.0."""
 
     class Meta:

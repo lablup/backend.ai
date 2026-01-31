@@ -94,7 +94,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.COMMIT_SESSION  # type: ignore[return-value]
+        return ManagerBgtaskName.COMMIT_SESSION
 
     @classmethod
     @override

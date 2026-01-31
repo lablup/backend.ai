@@ -11,7 +11,7 @@ from sqlalchemy.sql import Select
 from ai.backend.manager.repositories.types import BaseFilterApplier
 
 # Test models and filters
-Base = declarative_base()  # type: ignore
+Base = declarative_base()
 
 
 class MockModel(Base):  # type: ignore

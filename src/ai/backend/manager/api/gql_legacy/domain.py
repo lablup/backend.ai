@@ -333,7 +333,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         return domain_node
 
 
-class DomainConnection(Connection):  # type: ignore[misc]
+class DomainConnection(Connection):
     class Meta:
         node = DomainNode
         description = "Added in 24.12.0"

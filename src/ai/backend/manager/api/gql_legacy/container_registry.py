@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 from ai.backend.manager.models.user import UserRole
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "AllowedGroups",
@@ -253,7 +253,7 @@ class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
 
-class ContainerRegistryConnection(Connection):  # type: ignore[misc]
+class ContainerRegistryConnection(Connection):
     """Added in 25.3.0."""
 
     class Meta:

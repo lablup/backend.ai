@@ -65,7 +65,7 @@ class SystemdNotifier:
                     await loop.create_datagram_endpoint(
                         asyncudp._SocketProtocol,
                         family=socket.AF_UNIX,
-                        remote_addr=self.address,  # type: ignore
+                        remote_addr=self.address,
                     )
                 ),
             )

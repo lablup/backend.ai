@@ -158,7 +158,7 @@ async def execute_updater[TRow: Base](
             print(result.row.status)  # "terminated"
     """
     row_class = updater.spec.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
     values = updater.spec.build_values()
 
@@ -222,7 +222,7 @@ async def execute_batch_updater[TRow: Base](
     """
     spec = updater.spec
     row_class = spec.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     values = spec.build_values()
 
     stmt = sa.update(table).values(values)

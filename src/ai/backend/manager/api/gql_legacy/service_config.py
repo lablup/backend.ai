@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 _PREFIX: Final[str] = "ai/backend/config"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
@@ -41,7 +41,7 @@ class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
         return ["manager", "common"]
 
 
-class AvailableServiceConnection(Connection):  # type: ignore[misc]
+class AvailableServiceConnection(Connection):
     """Added in 25.8.0."""
 
     class Meta:
@@ -126,7 +126,7 @@ class ServiceConfigNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
 
-class ServiceConfigConnection(Connection):  # type: ignore[misc]
+class ServiceConfigConnection(Connection):
     """Added in 25.8.0."""
 
     class Meta:

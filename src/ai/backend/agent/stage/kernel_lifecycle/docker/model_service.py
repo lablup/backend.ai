@@ -169,7 +169,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for VLLM: {e}") from e
 
@@ -190,7 +190,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for TGI: {e}") from e
 
@@ -211,7 +211,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for NIM: {e}") from e
 
@@ -232,7 +232,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for SGLang: {e}") from e
 
@@ -253,7 +253,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(
                 f"Invalid model definition for Modular MAX: {e}"
@@ -271,7 +271,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             },
         }
         try:
-            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+            return ModelDefinition(models=[_model])
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for CMD: {e}") from e
 

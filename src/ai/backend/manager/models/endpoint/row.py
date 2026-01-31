@@ -117,7 +117,7 @@ __all__ = (
 
 type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_tokens_join_condition() -> Any:

@@ -26,7 +26,7 @@ from .types import (
     RootContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CACHE_LIFESPAN: Final[int] = 120
 

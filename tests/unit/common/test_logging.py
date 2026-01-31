@@ -4,6 +4,7 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 import trafaret as t
 
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS

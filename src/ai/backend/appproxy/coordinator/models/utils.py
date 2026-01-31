@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -261,7 +261,7 @@ async def execute_with_txn_retry(
 # Setting "type ignore" here becuase Mypy deduces all fields and attributes in `sqlalchemy` module to `Any` type
 # including `SASession` and `SAConnection`.
 @overload
-async def execute_with_txn_retry(  # type: ignore[misc]
+async def execute_with_txn_retry(
     txn_func: Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
@@ -297,7 +297,7 @@ async def execute_with_txn_retry(
         ):
             with attempt:
                 try:
-                    async with begin_trx(bind=connection) as session_or_conn:  # type: ignore[arg-type]
+                    async with begin_trx(bind=connection) as session_or_conn:
                         result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):

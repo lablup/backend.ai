@@ -92,7 +92,7 @@ class AliasedKey(t.Key):
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:  # type: ignore[override]
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:
         for name in self.names:
             if name in data:
                 key = name

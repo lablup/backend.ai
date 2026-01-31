@@ -68,7 +68,7 @@ from .utils import check_api_params, get_handler_attr, set_handler_attr
 if TYPE_CHECKING:
     from .context import RootContext
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,

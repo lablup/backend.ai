@@ -202,7 +202,7 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
         return await ctx.valkey_stat.get_session_statistics_batch(kernel_ids_str)
 
 
-class KernelConnection(Connection):  # type: ignore[misc]
+class KernelConnection(Connection):
     class Meta:
         node = KernelNode
         description = "Added in 24.09.0."

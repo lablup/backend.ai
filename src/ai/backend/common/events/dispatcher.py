@@ -532,9 +532,9 @@ class EventDispatcher(EventDispatcherGroup):
                     with metadata.apply_context():
                         if asyncio.iscoroutinefunction(cb):
                             # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                            await cb(evh.context, source, event)  # type: ignore
+                            await cb(evh.context, source, event)
                         else:
-                            cb(evh.context, source, event)  # type: ignore
+                            cb(evh.context, source, event)
                         for post_callback in post_callbacks:
                             await post_callback.done()
                         self._metric_observer.observe_event_success(
@@ -544,9 +544,9 @@ class EventDispatcher(EventDispatcherGroup):
                 else:
                     if asyncio.iscoroutinefunction(cb):
                         # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                        await cb(evh.context, source, event)  # type: ignore
+                        await cb(evh.context, source, event)
                     else:
-                        cb(evh.context, source, event)  # type: ignore
+                        cb(evh.context, source, event)
                     for post_callback in post_callbacks:
                         await post_callback.done()
                     self._metric_observer.observe_event_success(

@@ -17,7 +17,7 @@ async def test_keypair_manipulation_operations() -> None:
     with Session() as sess:
         try:
             # Create keypair
-            result = sess.KeyPair.create(  # type: ignore[unused-coroutine]
+            result = sess.KeyPair.create(
                 user_id=email,
                 is_active=True,
                 is_admin=False,
@@ -73,6 +73,6 @@ async def test_user_cannot_create_keypair(userconfig: Any) -> None:
 async def test_keypair_info() -> None:
     current_config = get_config()
     with Session() as sess:
-        result = sess.KeyPair(current_config.access_key).info()  # type: ignore[unused-coroutine]
+        result = sess.KeyPair(current_config.access_key).info()
     assert result["access_key"] == current_config.access_key
     assert result["secret_key"] == current_config.secret_key

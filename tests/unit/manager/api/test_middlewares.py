@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from typing import Any
+
+import pytest
 from aiohttp import web
+from aiohttp.test_utils import TestClient
 
 from ai.backend.manager.api.utils import method_placeholder
 from ai.backend.manager.server import api_middleware
 
 
-async def test_api_method_override() -> None:
+async def test_api_method_override(aiohttp_client: Any) -> None:
     observed_method = None
     app = web.Application()
 
@@ -52,7 +55,7 @@ async def test_api_method_override() -> None:
     assert observed_method is None
 
 
-async def test_api_method_override_with_different_ops() -> None:
+async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> None:
     observed_method = None
     app = web.Application()
 

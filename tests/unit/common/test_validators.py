@@ -371,16 +371,16 @@ def test_slug_length() -> None:
     assert iv._max_length == 4  # type: ignore[attr-defined]
 
     iv = tx.Slug(max_length=4)
-    assert iv._min_length is None  # type: ignore[attr-defined]
-    assert iv._max_length == 4  # type: ignore[attr-defined]
+    assert iv._min_length is None
+    assert iv._max_length == 4
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
     iv = tx.Slug(min_length=4)
-    assert iv._min_length == 4  # type: ignore[attr-defined]
-    assert iv._max_length is None  # type: ignore[attr-defined]
+    assert iv._min_length == 4
+    assert iv._max_length is None
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"

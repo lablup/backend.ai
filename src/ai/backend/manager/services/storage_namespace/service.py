@@ -23,7 +23,7 @@ from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class StorageNamespaceService:

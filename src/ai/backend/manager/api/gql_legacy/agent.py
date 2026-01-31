@@ -315,7 +315,7 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class AgentConnection(Connection):  # type: ignore[misc]
+class AgentConnection(Connection):
     class Meta:
         node = AgentNode
         description = "Added in 24.12.0."

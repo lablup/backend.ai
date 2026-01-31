@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:

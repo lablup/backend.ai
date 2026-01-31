@@ -85,7 +85,7 @@ def mock_agent_factory() -> Callable[[str, str], Mock]:
                 user=None,
                 password=None,
             ),
-        )  # type: ignore[call-arg]
+        )
 
         # Use the real update_scaling_group method - capture agent in closure properly
         def update_sg(sg: str) -> None:
@@ -148,7 +148,7 @@ class TestScalingGroupUpdates:
                 user=None,
                 password=None,
             ),
-        )  # type: ignore[call-arg]
+        )
 
         AbstractAgent.update_scaling_group(mock_agent, "gpu")
 
@@ -259,7 +259,7 @@ scaling-group = "default"
         with patch("ai.backend.common.config.find_config_file", return_value=config_file):
             await server.update_scaling_group.__wrapped__.__wrapped__(  # type: ignore[attr-defined]
                 server, "gpu", AgentId("agent-2")
-            )  # type: ignore[attr-defined]
+            )
 
         # Verify file was updated
         with open(config_file) as f:

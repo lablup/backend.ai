@@ -112,7 +112,7 @@ async def _generate() -> dict[str, Any]:
     subapps: list[web.Application] = []
     for subapp in global_subapp_pkgs:
         pkg = importlib.import_module("ai.backend.appproxy.coordinator.api" + subapp)
-        app, _ = pkg.create_app(cors_options)  # type: ignore
+        app, _ = pkg.create_app(cors_options)
         subapps.append(app)
     return generate_openapi("Proxy Coordinator", subapps, verbose=True)
 

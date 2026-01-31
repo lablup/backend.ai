@@ -10,7 +10,7 @@ import shutil
 import signal
 import sys
 import uuid
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Coroutine, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path

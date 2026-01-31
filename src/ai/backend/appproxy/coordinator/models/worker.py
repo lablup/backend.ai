@@ -35,7 +35,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = [
     "Worker",

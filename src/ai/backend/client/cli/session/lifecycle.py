@@ -1543,7 +1543,7 @@ def show_dependency_session_table(root_node: OrderedDict[str, Any]) -> None:
 
 
 def get_dependency_session_tree(root_node: OrderedDict[str, Any]) -> treelib.Tree:  # type: ignore[name-defined]
-    dependency_tree = treelib.Tree()  # type: ignore[attr-defined]
+    dependency_tree = treelib.Tree()
 
     root_session_name = root_node["session_name"]
     session_name_counter: defaultdict[str, int] = defaultdict(lambda: 1)

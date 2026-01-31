@@ -20,7 +20,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import StubResponseModel
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @auth_required("worker")

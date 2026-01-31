@@ -76,7 +76,10 @@ async def test_update_password_successful(
 
 
 @pytest.mark.asyncio
-async def test_update_password_fails_when_new_passwords_dont_match() -> None:
+async def test_update_password_fails_when_new_passwords_dont_match(
+    mock_hook_plugin_ctx: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test password update fails when new passwords don't match"""
     action = UpdatePasswordAction(
         request=MagicMock(),
@@ -114,7 +117,11 @@ async def test_update_password_fails_when_new_passwords_dont_match() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_password_fails_with_incorrect_old_password() -> None:
+async def test_update_password_fails_with_incorrect_old_password(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test password update fails with incorrect old password"""
     action = UpdatePasswordAction(
         request=MagicMock(),
@@ -147,7 +154,11 @@ async def test_update_password_fails_with_incorrect_old_password() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_password_with_hook_rejection() -> None:
+async def test_update_password_with_hook_rejection(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test password update fails when hook rejects password format"""
     action = UpdatePasswordAction(
         request=MagicMock(),
@@ -181,7 +192,11 @@ async def test_update_password_with_hook_rejection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_password_repository_call() -> None:
+async def test_update_password_repository_call(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test that password update calls repository with correct parameters"""
     action = UpdatePasswordAction(
         request=MagicMock(),

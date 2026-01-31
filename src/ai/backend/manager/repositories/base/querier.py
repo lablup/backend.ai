@@ -69,7 +69,7 @@ async def execute_querier[TRow: Base](
             print(result.row.id)  # Fetched row
     """
     row_class = querier.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 
 from ai.backend.manager.models.utils import (
+    ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
     retry_txn,
@@ -57,7 +58,9 @@ async def test_execute_with_retry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_with_trx_retry() -> None:
+async def test_execute_with_trx_retry(
+    database_connection: ExtendedAsyncSAEngine,
+) -> None:
     class DummyDBError(Exception):
         def __init__(self, pgcode: str) -> None:
             self.pgcode = pgcode

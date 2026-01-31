@@ -47,7 +47,7 @@ from .defs import LockID
 from .models import Circuit
 from .models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CoordinatorMetricRegistry:

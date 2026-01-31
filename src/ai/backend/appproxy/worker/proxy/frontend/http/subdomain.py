@@ -16,7 +16,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseHTTPFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SubdomainFrontend(BaseHTTPFrontend[str]):

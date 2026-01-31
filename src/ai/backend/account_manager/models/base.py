@@ -19,7 +19,7 @@ from sqlalchemy.types import CHAR, VARCHAR, TypeDecorator
 from ai.backend.account_manager.utils import hash_password
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {

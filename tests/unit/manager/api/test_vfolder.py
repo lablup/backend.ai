@@ -51,7 +51,7 @@ async def test_uuid_or_name_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
         VFolderStatusSet.INACCESSIBLE,
     ],
 )
-async def test_too_many_vfolders() -> None:
+async def test_too_many_vfolders(vfolder_status: VFolderStatusSet) -> None:
     @with_vfolder_status_checked(vfolder_status)
     async def too_many_vfolders_handler(request: Any, row: VFolderRow) -> None:
         return AsyncMock(return_value=web.Response(text="no response"))
@@ -81,7 +81,7 @@ async def test_too_many_vfolders() -> None:
         VFolderStatusSet.INACCESSIBLE,
     ],
 )
-async def test_no_vfolders() -> None:
+async def test_no_vfolders(vfolder_status: VFolderStatusSet) -> None:
     @with_vfolder_status_checked(vfolder_status)
     async def no_vfolders_handler(request: Any, row: VFolderRow) -> None:
         return AsyncMock(return_value=web.Response(text="no response"))

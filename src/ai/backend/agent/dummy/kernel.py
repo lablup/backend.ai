@@ -224,8 +224,8 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     repl_in_port: int
     repl_out_port: int
 
-    input_sock: None  # type: ignore[assignment]
-    output_sock: None  # type: ignore[assignment]
+    input_sock: None
+    output_sock: None
     zctx: None  # type: ignore[assignment]
 
     def __init__(

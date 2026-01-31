@@ -87,7 +87,12 @@ async def test_signup_successful_with_minimal_data(
 
 
 @pytest.mark.asyncio
-async def test_signup_successful_with_full_data() -> None:
+async def test_signup_successful_with_full_data(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test successful user signup with full data"""
     action = SignupAction(
         domain_name="custom",
@@ -128,7 +133,11 @@ async def test_signup_successful_with_full_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signup_fails_when_email_already_exists() -> None:
+async def test_signup_fails_when_email_already_exists(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test signup fails when email already exists"""
     action = SignupAction(
         domain_name="default",
@@ -157,7 +166,12 @@ async def test_signup_fails_when_email_already_exists() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signup_with_hook_override() -> None:
+async def test_signup_with_hook_override(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test signup when PRE_SIGNUP hook overrides user data"""
     action = SignupAction(
         domain_name="default",
@@ -216,7 +230,11 @@ async def test_signup_with_hook_override() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signup_creation_error() -> None:
+async def test_signup_creation_error(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    auth_service: AuthService,
+) -> None:
     """Test signup fails when user creation raises an error"""
     action = SignupAction(
         domain_name="default",
@@ -245,7 +263,12 @@ async def test_signup_creation_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_signup_post_hook_notification() -> None:
+async def test_signup_post_hook_notification(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test that POST_SIGNUP hook is notified after successful signup"""
     request_mock = MagicMock()
     request_mock.headers = {"Accept-Language": "ko-kr,ko;q=0.9,en;q=0.8"}

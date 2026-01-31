@@ -67,7 +67,7 @@ async def execute_purger[TRow: Base](
             print(result.row.id)  # Deleted row
     """
     row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:

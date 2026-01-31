@@ -11,7 +11,7 @@ from sqlalchemy.orm import declarative_base
 from ai.backend.manager.repositories.types import BaseOrderingApplier
 
 # Test models and ordering
-Base = declarative_base()  # type: ignore
+Base = declarative_base()
 
 
 class MockModel(Base):  # type: ignore

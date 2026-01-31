@@ -869,12 +869,12 @@ class InferenceSessionError(graphene.ObjectType):  # type: ignore[misc]
     errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
 
 
-class AsyncPaginatedConnectionField(AsyncListConnectionField):  # type: ignore[misc]
+class AsyncPaginatedConnectionField(AsyncListConnectionField):
     def __init__(self, type: type | str, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())
-        super().__init__(type, *args, **kwargs)  # type: ignore[arg-type]
+        super().__init__(type, *args, **kwargs)
 
 
 PaginatedConnectionField = AsyncPaginatedConnectionField

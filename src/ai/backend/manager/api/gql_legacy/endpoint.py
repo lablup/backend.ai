@@ -301,7 +301,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class EndpointAutoScalingRuleConnection(Connection):  # type: ignore[misc]
+class EndpointAutoScalingRuleConnection(Connection):
     class Meta:
         node = EndpointAutoScalingRuleNode
         description = "Added in 25.1.0."

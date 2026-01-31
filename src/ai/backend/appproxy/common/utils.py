@@ -147,10 +147,10 @@ TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
     [web.Request], Awaitable[PydanticResponse[Any] | TAnyResponse]
-]  # type: ignore[type-arg]
+]
 type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
     [web.Request, TParamModel], Awaitable[PydanticResponse[Any] | TAnyResponse]
-]  # type: ignore[type-arg]
+]
 
 
 def ensure_stream_response_type[TAnyResponse: web.StreamResponse](

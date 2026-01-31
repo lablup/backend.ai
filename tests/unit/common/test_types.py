@@ -119,12 +119,12 @@ def test_binary_size_str_conversion() -> None:
     assert BinarySize.from_str("0.5m") == 524288
     assert BinarySize.from_str("512k") == 524288
     assert f"{BinarySize(930): }" == "930"
-    assert f"{BinarySize(1024):k}" == "1k"  # type: ignore
-    assert f"{BinarySize(524288):k}" == "512k"  # type: ignore
-    assert f"{BinarySize(1048576):k}" == "1024k"  # type: ignore
-    assert f"{BinarySize(524288):m}" == "0.5m"  # type: ignore
-    assert f"{BinarySize(1048576):m}" == "1m"  # type: ignore
-    assert f"{BinarySize(1048576123):m}" == "1000m"  # type: ignore
+    assert f"{BinarySize(1024):k}" == "1k"
+    assert f"{BinarySize(524288):k}" == "512k"
+    assert f"{BinarySize(1048576):k}" == "1024k"
+    assert f"{BinarySize(524288):m}" == "0.5m"
+    assert f"{BinarySize(1048576):m}" == "1m"
+    assert f"{BinarySize(1048576123):m}" == "1000m"
     assert f"{BinarySize(2**30):g}" == "1g"
     with pytest.raises(ValueError):
         f"{BinarySize(1):x}"

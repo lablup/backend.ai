@@ -404,14 +404,14 @@ class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
     ) -> dict[str, Any] | None:
         if value is None:
             return None
-        return self._schema.to_json(value)  # type: ignore[arg-type]
+        return self._schema.to_json(value)
 
     def process_result_value(
         self, value: dict[str, Any] | None, dialect: Dialect
     ) -> JSONSerializableMixin | None:
         if value is None:
             return None
-        return self._schema.from_json(value)  # type: ignore[arg-type]
+        return self._schema.from_json(value)
 
     def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]

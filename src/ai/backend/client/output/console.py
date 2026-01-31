@@ -132,7 +132,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         else:
             if is_scalar:
                 for line in tabulate_items(
-                    map(lambda v: {fields[0].field_name: v}, items),  # type: ignore
+                    map(lambda v: {fields[0].field_name: v}, items),
                     fields,
                 ):
                     print(line, end="")

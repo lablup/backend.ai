@@ -243,7 +243,7 @@ class Connection(graphene.ObjectType):  # type: ignore[misc]
 
         if "edges" not in _meta.fields:
             connection_description = options.get("description")
-            edge_class = get_edge_class(cls, node, base_name, strict_types, connection_description)  # type: ignore
+            edge_class = get_edge_class(cls, node, base_name, strict_types, connection_description)
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
                 graphene.NonNull(
@@ -331,15 +331,15 @@ class AsyncListConnectionField(IterableConnectionField):  # type: ignore[misc]
             resolved = resolved[:page_size]
         if pagination_order == ConnectionPaginationOrder.BACKWARD:
             resolved = resolved[::-1]
-        edge_type = connection_type.Edge  # type: ignore[attr-defined]
+        edge_type = connection_type.Edge
         edges = [
             edge_type(
                 node=value,
-                cursor=AsyncNode.to_global_id(str(connection_type._meta.node), value.id),  # type: ignore[attr-defined]
+                cursor=AsyncNode.to_global_id(str(connection_type._meta.node), value.id),
             )
             for value in resolved
         ]
-        return connection_type(  # type: ignore[operator]
+        return connection_type(
             edges=edges,
             page_info=PageInfo(
                 start_cursor=edges[0].cursor if edges else None,

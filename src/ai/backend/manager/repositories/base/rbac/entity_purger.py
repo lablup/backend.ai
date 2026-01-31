@@ -566,7 +566,7 @@ async def _delete_row_by_pk_returning(
 ) -> TRow | None:
     """Delete a row by primary key and return the deleted row data."""
     row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:

@@ -107,7 +107,7 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
-    stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_static_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
@@ -135,7 +135,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 async def config_ini_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_config_handlers.add(asyncio.current_task())
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -153,7 +153,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 
 async def config_toml_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_config_handlers.add(asyncio.current_task())
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -171,7 +171,7 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
-    stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_webui_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
@@ -277,7 +277,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
     stats: WebStats = request.app["stats"]
-    stats.active_login_check_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_login_check_handlers.add(asyncio.current_task())
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -297,7 +297,7 @@ async def login_check_handler(request: web.Request) -> web.Response:
 async def login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
-    stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_login_handlers.add(asyncio.current_task())
     session = await get_session(request)
     if session.get("authenticated", False):
         raise web.HTTPBadRequest(
@@ -491,7 +491,7 @@ async def login_handler(request: web.Request) -> web.Response:
 
 async def logout_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
-    stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session.invalidate()
     return web.HTTPOk()
@@ -529,7 +529,7 @@ async def check_health(request: web.Request) -> web.Response:
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
-    stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_healthcheck_handlers.add(asyncio.current_task())
     result = {
         "version": __version__,
         "details": "Success",
@@ -540,7 +540,7 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
-    stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
+    stats.active_token_login_handlers.add(asyncio.current_task())
 
     # Check browser session exists.
     session = await get_session(request)

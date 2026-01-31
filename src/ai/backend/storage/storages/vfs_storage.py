@@ -34,7 +34,7 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.utils import normalize_filepath
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFSFileDownloadServerStreamReader(StreamReader):

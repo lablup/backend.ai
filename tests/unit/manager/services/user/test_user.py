@@ -221,7 +221,7 @@ class TestUserServiceCompatibility:
     @pytest.mark.asyncio
     async def test_user_month_stats_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
         """Test that UserMonthStatsAction works as expected."""
-        mock_stats = {"cpu_time": 3600, "memory_usage": 2048}
+        mock_stats = [{"cpu_time": 3600, "memory_usage": 2048}]
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats = AsyncMock(
             return_value=mock_stats
         )
@@ -238,7 +238,7 @@ class TestUserServiceCompatibility:
     @pytest.mark.asyncio
     async def test_admin_month_stats_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
         """Test that AdminMonthStatsAction works as expected."""
-        mock_stats = {"total_users": 100, "total_cpu_time": 360000}
+        mock_stats = [{"total_users": 100, "total_cpu_time": 360000}]
         mock_dependencies["user_repository"].get_admin_time_binned_monthly_stats = AsyncMock(
             return_value=mock_stats
         )

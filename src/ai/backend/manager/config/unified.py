@@ -3271,7 +3271,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "Etcd distributed key-value store configuration. Etcd is used for cluster "
@@ -3333,7 +3333,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration. When enabled, sends profiling "
@@ -3559,7 +3559,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     otel: Annotated[
         OTELConfig,
-        Field(default_factory=OTELConfig),  # type: ignore[arg-type]
+        Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description=(
                 "OpenTelemetry configuration for distributed tracing. When enabled, sends trace "
@@ -3572,7 +3572,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     service_discovery: Annotated[
         ServiceDiscoveryConfig,
-        Field(default_factory=ServiceDiscoveryConfig),  # type: ignore[arg-type]
+        Field(default_factory=ServiceDiscoveryConfig),
         BackendAIConfigMeta(
             description=(
                 "Service discovery configuration. Controls how Backend.AI components discover "

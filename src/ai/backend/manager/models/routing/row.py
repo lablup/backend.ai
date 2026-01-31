@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 __all__ = ("RouteStatus", "RoutingRow")
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:

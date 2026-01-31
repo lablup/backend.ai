@@ -517,7 +517,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         raise NotImplementedError
 
     @cached(
-        cache=LRUCache(maxsize=32),  # type: ignore
+        cache=LRUCache(maxsize=32),
         key=lambda self: (
             self.image_ref,
             self.distro,

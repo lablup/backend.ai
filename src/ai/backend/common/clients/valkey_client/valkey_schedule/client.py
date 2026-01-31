@@ -329,7 +329,7 @@ class ValkeyScheduleClient:
                 result.append(None)
             else:
                 try:
-                    result.append(int(pos))  # type: ignore[arg-type]
+                    result.append(int(pos))
                 except ValueError:
                     result.append(None)
         return result

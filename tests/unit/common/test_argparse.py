@@ -20,18 +20,18 @@ localhost_ipv6 = ipaddress.ip_address("::1")
 
 
 def test_port_no() -> None:
-    assert port_no(1) == 1
-    assert port_no(20) == 20
-    assert port_no(65535) == 65535
+    assert port_no("1") == 1
+    assert port_no("20") == 20
+    assert port_no("65535") == 65535
 
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(-1)
+        port_no("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(0)
+        port_no("0")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(65536)
+        port_no("65536")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(65537)
+        port_no("65537")
 
 
 def test_port_range() -> None:
@@ -58,26 +58,26 @@ def test_port_range() -> None:
 
 
 def test_positive_int() -> None:
-    assert positive_int(1)
-    assert positive_int(100000)
+    assert positive_int("1")
+    assert positive_int("100000")
 
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(0)
+        positive_int("0")
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(-1)
+        positive_int("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(-10)
+        positive_int("-10")
 
 
 def test_non_positive_int() -> None:
-    assert non_negative_int(1)
-    assert non_negative_int(100000)
-    assert non_negative_int(0) == 0
+    assert non_negative_int("1")
+    assert non_negative_int("100000")
+    assert non_negative_int("0") == 0
 
     with pytest.raises(argparse.ArgumentTypeError):
-        non_negative_int(-1)
+        non_negative_int("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        non_negative_int(-10)
+        non_negative_int("-10")
 
 
 def test_host_port_pair_direct_creation() -> None:

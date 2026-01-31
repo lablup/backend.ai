@@ -446,7 +446,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         return vfolder_node
 
 
-class VirtualFolderConnection(Connection):  # type: ignore[misc]
+class VirtualFolderConnection(Connection):
     class Meta:
         node = VirtualFolderNode
         description = "Added in 24.03.4"
@@ -798,7 +798,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class ModelCardConnection(Connection):  # type: ignore[misc]
+class ModelCardConnection(Connection):
     class Meta:
         node = ModelCard
         description = "Added in 24.03.4"

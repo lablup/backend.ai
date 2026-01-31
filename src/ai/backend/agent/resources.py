@@ -256,7 +256,7 @@ class KernelResourceSpec:
 
     @classmethod
     async def aread_from_file(cls, file: AsyncTextIOWrapper) -> Self:
-        text = "\n".join(await file.readlines())  # type: ignore
+        text = "\n".join(await file.readlines())
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:

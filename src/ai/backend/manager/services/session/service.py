@@ -197,7 +197,7 @@ from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySe
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -827,7 +827,7 @@ class SessionService:
 
             return DownloadFilesActionResult(
                 session_data=session.to_dataclass(),
-                result=mpwriter,  # type: ignore
+                result=mpwriter,
             )
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:

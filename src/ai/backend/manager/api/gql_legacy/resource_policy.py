@@ -104,7 +104,7 @@ def _get_user_resource_policy_updater_spec() -> type[UserResourcePolicyUpdaterSp
     return UserResourcePolicyUpdaterSpec
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "CreateKeyPairResourcePolicy",

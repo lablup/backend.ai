@@ -25,7 +25,7 @@ from ai.backend.manager.notification.channels.webhook.channel import WebhookChan
 from .channels.base import AbstractNotificationChannel
 from .types import NotificationMessage, ProcessRuleParams, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationCenter",)
 

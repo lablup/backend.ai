@@ -1,33 +1,52 @@
 """Tests for ClusterConfigurationRule."""
 
+from __future__ import annotations
+
 from typing import Any, cast
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import ClusterMode, KernelEnqueueingConfig
+from ai.backend.common.types import AccessKey, ClusterMode, KernelEnqueueingConfig, SessionTypes
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserInfo,
+    ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.cluster import (
     ClusterConfigurationRule,
 )
+from ai.backend.manager.types import UserScope
 
 
 @pytest.fixture
-def cluster_rule() -> None:
+def cluster_rule() -> ClusterConfigurationRule:
     """Create a ClusterConfigurationRule instance."""
     return ClusterConfigurationRule()
 
 
 @pytest.fixture
-def basic_context() -> None:
+def test_user_scope() -> UserScope:
+    """Create a test UserScope instance."""
+    return UserScope(
+        domain_name="test-domain",
+        group_id=UUID("00000000-0000-0000-0000-000000000001"),
+        user_uuid=UUID("00000000-0000-0000-0000-000000000002"),
+        user_role="user",
+    )
+
+
+@pytest.fixture
+def basic_context() -> SessionCreationContext:
     """Create a basic SessionCreationContext."""
     return SessionCreationContext(
-        scaling_group_network=None,
+        scaling_group_network=ScalingGroupNetworkInfo(
+            use_host_network=False,
+            wsproxy_addr=None,
+        ),
         allowed_scaling_groups=[],
         image_infos={},
         vfolder_mounts=[],
@@ -39,14 +58,19 @@ def basic_context() -> None:
 class TestClusterConfigurationRule:
     """Test cases for ClusterConfigurationRule."""
 
-    def test_single_kernel_session(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_single_kernel_session(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test single kernel session configuration."""
         spec = SessionCreationSpec(
             session_creation_id="test-001",
             session_name="single-kernel",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
@@ -62,14 +86,19 @@ class TestClusterConfigurationRule:
         assert len(kernel_configs) == 1
         assert kernel_configs[0]["cluster_role"] == DEFAULT_ROLE
 
-    def test_multi_container_single_spec_replication(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_multi_container_single_spec_replication(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test multi-container session with single kernel spec (replication mode)."""
         spec = SessionCreationSpec(
             session_creation_id="test-002",
             session_name="multi-container",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=4,
             priority=10,
@@ -97,14 +126,19 @@ class TestClusterConfigurationRule:
             assert kernel_configs[i]["local_rank"] == i
             assert kernel_configs[i]["cluster_hostname"] == f"sub{i}"
 
-    def test_multi_container_multiple_specs(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_multi_container_multiple_specs(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test multi-container session with multiple kernel specs."""
         spec = SessionCreationSpec(
             session_creation_id="test-003",
             session_name="multi-spec",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.MULTI_NODE,
             cluster_size=3,
             priority=10,
@@ -137,14 +171,19 @@ class TestClusterConfigurationRule:
         assert kernel_configs[2]["cluster_idx"] == 2
         assert kernel_configs[2]["cluster_hostname"] == "sub2"
 
-    def test_predefined_cluster_roles(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_predefined_cluster_roles(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test handling of predefined cluster roles in kernel specs."""
         spec = SessionCreationSpec(
             session_creation_id="test-004",
             session_name="predefined-roles",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.MULTI_NODE,
             cluster_size=3,
             priority=10,
@@ -188,14 +227,19 @@ class TestClusterConfigurationRule:
         assert kernel_configs[2]["cluster_idx"] == 2
         assert kernel_configs[2]["cluster_hostname"] == "sub2"
 
-    def test_custom_cluster_hostnames(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_custom_cluster_hostnames(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test preservation of custom cluster hostnames."""
         spec = SessionCreationSpec(
             session_creation_id="test-005",
             session_name="custom-hostnames",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.MULTI_NODE,
             cluster_size=2,
             priority=10,
@@ -217,14 +261,19 @@ class TestClusterConfigurationRule:
         assert kernel_configs[0]["cluster_hostname"] == "master"
         assert kernel_configs[1]["cluster_hostname"] == "worker1"
 
-    def test_mixed_predefined_and_auto_assignment(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_mixed_predefined_and_auto_assignment(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test mixed scenario with some predefined roles and some auto-assigned."""
         spec = SessionCreationSpec(
             session_creation_id="test-006",
             session_name="mixed-roles",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.MULTI_NODE,
             cluster_size=4,
             priority=10,
@@ -267,15 +316,20 @@ class TestClusterConfigurationRule:
         assert kernel_configs[3]["cluster_role"] == "sub"
         assert kernel_configs[3]["cluster_idx"] == 5  # Custom idx preserved
 
-    def test_large_cluster(self, cluster_rule: ClusterConfigurationRule, basic_context: SessionCreationContext) -> None:
+    def test_large_cluster(
+        self,
+        cluster_rule: ClusterConfigurationRule,
+        basic_context: SessionCreationContext,
+        test_user_scope: UserScope,
+    ) -> None:
         """Test large cluster configuration."""
         cluster_size = 10
         spec = SessionCreationSpec(
             session_creation_id="test-007",
             session_name="large-cluster",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
+            access_key=AccessKey("test-key"),
+            user_scope=test_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
             cluster_mode=ClusterMode.MULTI_NODE,
             cluster_size=cluster_size,
             priority=10,

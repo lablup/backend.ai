@@ -210,7 +210,6 @@ def migrate_data_etcd_to_psql() -> None:
     old_format_container_registries = {
         hostname: etcd_container_registry_iv.check(item)
         for hostname, item in registries.items()
-        # type: ignore
     }
 
     input_configs = []

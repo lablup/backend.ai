@@ -187,7 +187,7 @@ def test_string_set_flag() -> None:
     assert {"b"} == MyFlags.A ^ {"a", "b"}
     assert {"a", "b", "c"} == MyFlags.A ^ {"b", "c"}
     with pytest.raises(TypeError):
-        123 & MyFlags.A  # type: ignore[operator]
+        123 & MyFlags.A
 
     assert {"a", "c"} & MyFlags.A
     assert not {"a", "c"} & MyFlags.B
@@ -222,8 +222,8 @@ class TestAsyncBarrier:
 
         assert barrier.count == 1
         # The methods are added at runtime.
-        mock_cond.return_value.notify_all.assert_called_once_with()  # type: ignore
-        mock_cond.return_value.wait.assert_not_called()  # type: ignore
+        mock_cond.return_value.notify_all.assert_called_once_with()
+        mock_cond.return_value.wait.assert_not_called()
 
     def test_async_barrier_reset(self) -> None:
         barrier = AsyncBarrier(num_parties=5)

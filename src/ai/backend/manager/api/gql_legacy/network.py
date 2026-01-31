@@ -47,7 +47,7 @@ __all__ = (
     "NetworkNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
@@ -400,7 +400,7 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
             return await gql_mutation_wrapper(DeleteNetwork, _do_mutate)
 
 
-class NetworkConnection(Connection):  # type: ignore[misc]
+class NetworkConnection(Connection):
     """Added in 24.12.0."""
 
     class Meta:

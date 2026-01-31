@@ -27,7 +27,7 @@ from .types import (
     RootContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_coordinator_session(root_ctx: RootContext) -> aiohttp.ClientSession:

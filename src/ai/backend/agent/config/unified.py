@@ -1962,7 +1962,7 @@ class AgentGlobalConfig(BaseConfigSchema):
     # Local config
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration for the agent. "
@@ -1988,7 +1988,7 @@ class AgentGlobalConfig(BaseConfigSchema):
     ]
     otel: Annotated[
         OTELConfig,
-        Field(default_factory=OTELConfig),  # type: ignore[arg-type]
+        Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description=(
                 "OpenTelemetry (OTEL) configuration for distributed tracing and metrics collection. "
@@ -2002,7 +2002,7 @@ class AgentGlobalConfig(BaseConfigSchema):
     service_discovery: Annotated[
         ServiceDiscoveryConfig,
         Field(
-            default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
+            default_factory=ServiceDiscoveryConfig,
             validation_alias=AliasChoices("service-discovery", "service_discovery"),
             serialization_alias="service-discovery",
         ),

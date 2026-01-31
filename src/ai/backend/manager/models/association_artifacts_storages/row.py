@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
 

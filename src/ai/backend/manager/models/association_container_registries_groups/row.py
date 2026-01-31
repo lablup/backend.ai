@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
     from ai.backend.manager.models.group import GroupRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 

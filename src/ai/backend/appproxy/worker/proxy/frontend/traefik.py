@@ -29,7 +29,7 @@ from .base import BaseFrontend
 if TYPE_CHECKING:
     pass
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 

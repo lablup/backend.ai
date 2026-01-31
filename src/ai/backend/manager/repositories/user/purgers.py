@@ -23,7 +23,7 @@ class UserErrorLogBatchPurgerSpec(BatchPurgerSpec[ErrorLogRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ErrorLogRow]]:
         return sa.select(ErrorLogRow).where(
-            ErrorLogRow.__table__.c.user == self.user_uuid  # type: ignore[attr-defined]
+            ErrorLogRow.__table__.c.user == self.user_uuid
         )
 
 

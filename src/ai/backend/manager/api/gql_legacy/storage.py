@@ -25,7 +25,7 @@ __all__ = (
     "StorageVolumeList",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class StorageVolume(graphene.ObjectType):  # type: ignore[misc]

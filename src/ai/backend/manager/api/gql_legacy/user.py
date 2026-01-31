@@ -467,7 +467,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         return await UserNode.get_node(info, self.id)
 
 
-class UserConnection(Connection):  # type: ignore[misc]
+class UserConnection(Connection):
     class Meta:
         node = UserNode
         description = "Added in 24.03.0"

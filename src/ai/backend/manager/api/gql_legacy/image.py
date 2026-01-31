@@ -743,7 +743,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
         return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 
-class ImageConnection(Connection):  # type: ignore[misc]
+class ImageConnection(Connection):
     class Meta:
         node = ImageNode
         description = "Added in 25.3.0."

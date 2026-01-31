@@ -388,7 +388,7 @@ class ComputeSession(BaseFunction):
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            o = cls(name, owner_access_key)  # type: ignore
+            o = cls(name, owner_access_key)
             if api_session.get().api_version[0] >= 5:
                 o.id = UUID(data["sessionId"])
             o.created = data.get("created", True)  # True is for legacy

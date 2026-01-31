@@ -84,7 +84,7 @@ from ai.backend.manager.services.vfolder.types import (
     VFolderUsageInfo,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def _check_vfolder_status(
