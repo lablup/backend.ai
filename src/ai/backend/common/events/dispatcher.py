@@ -500,7 +500,7 @@ class EventDispatcher(EventDispatcherGroup):
 
     async def _handle(
         self,
-        evh: EventHandler,
+        evh: EventHandler,  # type: ignore[type-arg]
         source: AgentId,
         args: tuple[Any, ...],
         post_callbacks: Sequence[PostCallback] = tuple(),

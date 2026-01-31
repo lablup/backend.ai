@@ -376,7 +376,7 @@ volume_config_iv = t.Dict({
 ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
-class AbstractConfig(UserDict):
+class AbstractConfig(UserDict[str, Any]):
     """
     Deprecated: Use ai.backend.manager.config.unified instead.
     """

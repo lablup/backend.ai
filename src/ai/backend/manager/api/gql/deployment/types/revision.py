@@ -270,7 +270,7 @@ class ModelRevision(Node):
     """
 
     _image_id: strawberry.Private[UUID]
-    id: NodeID
+    id: NodeID[str]
     name: str = strawberry.field(description="The name identifier for this revision.")
     cluster_config: ClusterConfig = strawberry.field(
         description="Cluster configuration for replica distribution."

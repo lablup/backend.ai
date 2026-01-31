@@ -67,12 +67,12 @@ class _TaskDefinition[
 
 
 class BackgroundTaskHandlerRegistry:
-    _executor_registry: dict[str, _TaskDefinition]
+    _executor_registry: dict[str, _TaskDefinition]  # type: ignore[type-arg]
 
     def __init__(self) -> None:
         self._executor_registry = {}
 
-    def register(self, handler: BaseBackgroundTaskHandler) -> None:
+    def register(self, handler: BaseBackgroundTaskHandler) -> None:  # type: ignore[type-arg]
         self._executor_registry[handler.name().value] = _TaskDefinition(
             handler=handler,
         )

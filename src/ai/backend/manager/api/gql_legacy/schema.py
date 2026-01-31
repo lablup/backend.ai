@@ -304,7 +304,7 @@ def _is_legacy_mutation(mutation_cls: Any) -> bool:
 @attrs.define(auto_attribs=True, slots=True)
 class GraphQueryContext:
     schema: graphene.Schema
-    dataloader_manager: DataLoaderManager
+    dataloader_manager: DataLoaderManager[Any, Any, Any]
     config_provider: ManagerConfigProvider
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict

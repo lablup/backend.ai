@@ -130,7 +130,7 @@ class UtilizationExtraInfo(NamedTuple):
     threshold: float
 
 
-class UtilizationResourceReport(UserDict):
+class UtilizationResourceReport(UserDict[str, UtilizationExtraInfo]):
     __slots__ = ("data",)
 
     data: dict[str, UtilizationExtraInfo]

@@ -16,7 +16,7 @@ from ai.backend.common.types import (
 
 
 @pytest.fixture
-async def redis_conn(redis_container: tuple[str, str]) -> AsyncGenerator[Redis, None]:
+async def redis_conn(redis_container: tuple[str, str]) -> AsyncGenerator[Redis[bytes], None]:
     # Configure test Redis connection
     conn = redis_helper.get_redis_object(
         RedisTarget(

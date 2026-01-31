@@ -1002,7 +1002,7 @@ class RescanImages(graphene.Mutation):  # type: ignore[misc]
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult[Any]:
             if registry is None:
                 all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
                     LoadAllContainerRegistriesAction()

@@ -174,7 +174,7 @@ class NextResult(TypedDict):
     console: NotRequired[Sequence[Any]]
 
 
-class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
+class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     version: int
     ownership_data: KernelOwnershipData
     agent_config: Mapping[str, Any]

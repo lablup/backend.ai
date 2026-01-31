@@ -46,7 +46,7 @@ class ResourceGroupUnit(StrEnum):
 
 @attrs.define(slots=True)
 class ResourceUsage:
-    nfs: set = attrs.field(factory=set)
+    nfs: set[Any] = attrs.field(factory=set)
     cpu_allocated: float = attrs.field(default=0.0)
     cpu_used: float = attrs.field(default=0.0)
     mem_allocated: int = attrs.field(default=0)
@@ -56,7 +56,7 @@ class ResourceUsage:
     disk_used: int = attrs.field(default=0)
     io_read: int = attrs.field(default=0)
     io_write: int = attrs.field(default=0)
-    device_type: set = attrs.field(factory=set)
+    device_type: set[str] = attrs.field(factory=set)
     smp: float = attrs.field(default=0.0)
     gpu_mem_allocated: float = attrs.field(default=0.0)
     gpu_allocated: float = attrs.field(default=0.0)

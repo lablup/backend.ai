@@ -1366,7 +1366,7 @@ class SessionRow(Base):  # type: ignore[misc]
         allow_stale: bool = True,
         for_update: bool = False,
         max_matches: int | None = 10,
-        eager_loading_op: Sequence | None = None,
+        eager_loading_op: Sequence[Any] | None = None,
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions

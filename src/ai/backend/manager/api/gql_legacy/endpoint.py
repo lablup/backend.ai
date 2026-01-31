@@ -1011,14 +1011,14 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
 
     def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
-            registry: OptionalState = OptionalState.nop()
+            registry: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.registry is not Undefined
                 and graphene_image_input.registry is not None
             ):
                 registry = OptionalState.update(graphene_image_input.registry)
 
-            architecture: OptionalState = OptionalState.nop()
+            architecture: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.architecture is not Undefined
                 and graphene_image_input.architecture is not None

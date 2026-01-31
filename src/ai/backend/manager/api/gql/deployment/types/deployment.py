@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import override
+from typing import Any, override
 from uuid import UUID, uuid4
 
 import strawberry
@@ -318,7 +318,7 @@ class ModelDeployment(Node):
     and provide auto-scaling capabilities based on configured rules.
     """
 
-    id: NodeID
+    id: NodeID[str]
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     revision: ModelRevision | None = None

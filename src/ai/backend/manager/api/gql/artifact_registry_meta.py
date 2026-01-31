@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from functools import partial
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID

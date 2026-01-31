@@ -124,7 +124,7 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[tuple[AsyncIterator | Coroutine, Context] | Sentinel]
+    work_queue: queue.Queue[tuple[AsyncIterator[Any] | Coroutine[Any, Any, Any], Context] | Sentinel]
     done_queue: queue.Queue[Any | Exception]
     stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
@@ -173,7 +173,7 @@ class _SyncWorkerThread(threading.Thread):
             loop.stop()
             loop.close()
 
-    def execute(self, coro: Coroutine) -> Any:
+    def execute(self, coro: Coroutine[Any, Any, Any]) -> Any:
         ctx = copy_context()  # preserve context for the worker thread
         try:
             self.work_queue.put((coro, ctx))

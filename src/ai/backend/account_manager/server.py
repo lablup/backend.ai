@@ -90,7 +90,7 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    log: LoggerAdapter = request["log"]
+    log: LoggerAdapter[logging.Logger] = request["log"]
 
     try:
         resp = await handler(request)

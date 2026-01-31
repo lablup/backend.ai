@@ -134,7 +134,7 @@ class BgTaskInfo:
 
 
 BackgroundTask = Callable[
-    Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult | None]
+    Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult[Any] | None]
 ]
 
 
@@ -347,7 +347,7 @@ class BackgroundTaskManager:
             pass
 
     def _convert_bgtask_to_event(
-        self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None
+        self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None
     ) -> BaseBgtaskDoneEvent:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):

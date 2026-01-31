@@ -11,7 +11,7 @@ from .models.utils import ExtendedAsyncSAEngine
 
 
 class PgAdvisoryLock(AbstractDistributedLock):
-    _lock_ctx: AbstractAsyncContextManager | None
+    _lock_ctx: AbstractAsyncContextManager[Any, Any] | None
 
     def __init__(self, db: ExtendedAsyncSAEngine, lock_id: LockID) -> None:
         self.db = db

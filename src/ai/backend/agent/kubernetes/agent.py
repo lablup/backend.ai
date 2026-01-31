@@ -737,9 +737,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         async def rollup(
-            functions: list[tuple[functools.partial | None, functools.partial | None]],
+            functions: list[
+                tuple[
+                    functools.partial[Coroutine[Any, Any, None]] | None,
+                    functools.partial[Coroutine[Any, Any, None]] | None,
+                ]
+            ],
         ) -> None:
-            rollback_functions: list[functools.partial | None] = []
+            rollback_functions: list[functools.partial[Coroutine[Any, Any, None]] | None] = []
 
             for rollup_function, future_rollback_function in functions:
                 try:
@@ -753,7 +758,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     log.exception("Error while rollup: {}", e)
                     raise
 
-        arguments: list[tuple[functools.partial | None, functools.partial | None]] = []
+        arguments: list[
+            tuple[
+                functools.partial[Coroutine[Any, Any, None]] | None,
+                functools.partial[Coroutine[Any, Any, None]] | None,
+            ]
+        ] = []
 
         try:
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(

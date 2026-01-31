@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
@@ -55,7 +55,7 @@ RouteTrafficStatusGQL = strawberry.enum(
     description="Added in 25.19.0. Represents a route for a model deployment.",
 )
 class Route(Node):
-    id: NodeID
+    id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     _session_id: strawberry.Private[UUID | None]
     _revision_id: strawberry.Private[UUID | None]

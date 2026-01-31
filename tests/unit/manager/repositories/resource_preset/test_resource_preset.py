@@ -97,7 +97,7 @@ class TestResourcePresetRepository:
         return mock_row
 
     @pytest.fixture
-    def sample_preset_creator(self) -> Creator:
+    def sample_preset_creator(self) -> Creator[ResourcePresetRow]:
         """Create sample resource preset creator for testing"""
         return Creator(
             spec=ResourcePresetCreatorSpec(
@@ -113,7 +113,7 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        sample_preset_creator: Creator,
+        sample_preset_creator: Creator[ResourcePresetRow],
         sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset creation"""
@@ -133,7 +133,7 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        sample_preset_creator: Creator,
+        sample_preset_creator: Creator[ResourcePresetRow],
     ) -> None:
         """Test preset creation with duplicate name"""
         mock_db_source.create_preset = AsyncMock(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 import strawberry

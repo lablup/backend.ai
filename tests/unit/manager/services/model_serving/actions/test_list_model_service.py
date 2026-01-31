@@ -224,7 +224,7 @@ class TestListModelService:
     @pytest.mark.asyncio
     async def test_list_model_service(
         self,
-        scenario: ScenarioBase,
+        scenario: ScenarioBase[ListModelServiceAction, ListModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_list_endpoints_by_owner_validated: AsyncMock,
     ) -> None:

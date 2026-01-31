@@ -643,7 +643,7 @@ class HuggingFaceService:
             HuggingFaceAPIError: If API call fails
         """
 
-        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
+        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult[Any]:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")

@@ -115,7 +115,7 @@ class BatchQuerierResult[TRow: Base]:
 
 async def _validate_scope(
     db_sess: SASession,
-    checks: list[ExistenceCheck],
+    checks: list[ExistenceCheck[Any]],
 ) -> None:
     """Validate scope existence checks in a single query.
 

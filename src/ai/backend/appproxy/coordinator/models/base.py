@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import ipaddress
 import json
 import logging
 import uuid
@@ -268,7 +269,9 @@ class URLColumn(TypeDecorator[yarl.URL]):
         return None
 
 
-class IPColumn(TypeDecorator[ReadableCIDR]):
+class IPColumn(
+    TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]
+):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -285,7 +288,9 @@ class IPColumn(TypeDecorator[ReadableCIDR]):
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return cidr
 
-    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> ReadableCIDR | None:
+    def process_result_value(
+        self, value: str | None, dialect: sa.Dialect
+    ) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
         if value is None:
             return None
         return ReadableCIDR(value)

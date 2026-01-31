@@ -390,7 +390,7 @@ class ScopeValidationTestRow(Base):
 class MockSearchScope(SearchScope):
     """Mock SearchScope for testing."""
 
-    checks: Sequence[ExistenceCheck]
+    checks: Sequence[ExistenceCheck[Any]]
     filter_category: str | None = None
 
     def to_condition(self) -> QueryCondition:
@@ -405,7 +405,7 @@ class MockSearchScope(SearchScope):
         return inner
 
     @property
-    def existence_checks(self) -> Sequence[ExistenceCheck]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         """Return existence checks for scope validation."""
         return self.checks
 

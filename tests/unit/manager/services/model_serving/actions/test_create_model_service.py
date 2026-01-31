@@ -454,7 +454,7 @@ class TestCreateModelService:
     @pytest.mark.asyncio
     async def test_create_model_service(
         self,
-        scenario: ScenarioBase,
+        scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_create_endpoint_validated: AsyncMock,
         mock_check_endpoint_name_uniqueness: AsyncMock,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import strawberry
@@ -148,7 +148,7 @@ class ModelReplica(Node):
     and traffic weight for load balancing.
     """
 
-    id: NodeID
+    id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     _revision_id: strawberry.Private[UUID]
     readiness_status: ReadinessStatus = strawberry.field(

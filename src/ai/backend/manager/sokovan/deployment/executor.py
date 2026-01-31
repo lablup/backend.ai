@@ -27,6 +27,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -533,7 +534,7 @@ class DeploymentExecutor:
     def _verify_deployment_replicas(
         self,
         deployment: DeploymentInfo,
-        route_map: Mapping[UUID, Sequence],
+        route_map: Mapping[UUID, Sequence[RouteInfo]],
     ) -> None:
         """Verify that deployment has the expected number of active routes."""
         pool = DeploymentRecorderContext.current_pool()
@@ -550,7 +551,7 @@ class DeploymentExecutor:
     def _evaluate_deployment_scaling(
         self,
         deployment: DeploymentInfo,
-        route_map: Mapping[UUID, Sequence],
+        route_map: Mapping[UUID, Sequence[RouteInfo]],
     ) -> tuple[list[Creator[RoutingRow]], list[UUID]]:
         """Evaluate scaling action for a deployment and return creators/route IDs."""
         pool = DeploymentRecorderContext.current_pool()

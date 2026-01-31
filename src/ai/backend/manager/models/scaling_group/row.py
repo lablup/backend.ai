@@ -490,7 +490,7 @@ async def query_allowed_sgroups(
             else:
                 group_ids = []
         case list() | tuple() | set():
-            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
+            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable[Any], group))
     from_group: set[str]
     if not group_ids:
         from_group = set()  # empty

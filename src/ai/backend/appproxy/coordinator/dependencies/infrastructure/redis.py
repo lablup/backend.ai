@@ -28,7 +28,7 @@ class CoordinatorValkeyClients:
 
     valkey_live: ValkeyLiveClient
     core_valkey_live: ValkeyLiveClient
-    redis_lock: Redis
+    redis_lock: Redis[bytes]
     valkey_schedule: ValkeyScheduleClient
 
 

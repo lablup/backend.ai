@@ -717,7 +717,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: list[AbstractAsyncContextManager] = []
+    _outer_ctxs: list[AbstractAsyncContextManager[Any, Any]] = []
 
     async def app_builder(
         cleanup_contexts: Sequence[CleanupContext] | None = None,
@@ -730,7 +730,7 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
         if scheduler_opts is None:
             scheduler_opts = {}
         _cleanup_ctxs = []
-        _outer_ctx_classes: list[type[AbstractAsyncContextManager]] = []
+        _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
                 # if isinstance(ctx, AbstractAsyncContextManager):

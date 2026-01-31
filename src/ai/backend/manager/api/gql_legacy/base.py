@@ -309,7 +309,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
 
     def get_loader(
         self, context: GraphQueryContext, objtype_name: str, *args: Any, **kwargs: Any
-    ) -> DataLoader:
+    ) -> DataLoader[Any, Any]:
         k = self._get_key(objtype_name, args, kwargs)
         loader = self.cache.get(k)
         if loader is None:
@@ -721,7 +721,7 @@ async def simple_db_mutate[ResultType: graphene.ObjectType](
     | Callable[[], sa.sql.Update | sa.sql.Insert | sa.sql.Delete],
     *,
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[None]] | None = None,
+    post_func: Callable[[SAConnection, Result[Any]], Awaitable[None]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given
@@ -759,7 +759,7 @@ async def simple_db_mutate_returning_item[
     *,
     item_cls: type[ItemType],
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[Row[Any]]] | None = None,
+    post_func: Callable[[SAConnection, Result[Any]], Awaitable[Row[Any]]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given

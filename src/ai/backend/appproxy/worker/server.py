@@ -363,7 +363,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    handlers: list[EventHandler] = [
+    handlers: list[EventHandler[Any, Any]] = [
         root_ctx.event_dispatcher.subscribe(
             evt, root_ctx, handle_proxy_route_event, name="proxy-worker"
         )

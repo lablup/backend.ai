@@ -115,7 +115,7 @@ class ConnectionConstructor(Protocol):
 
 
 class AsyncNodeField(NodeField):  # type: ignore[misc]
-    def wrap_resolve(self, parent_resolver: Callable[..., Any]) -> functools.partial:
+    def wrap_resolve(self, parent_resolver: Callable[..., Any]) -> functools.partial[Any]:
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 

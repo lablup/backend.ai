@@ -150,7 +150,7 @@ class WebSocketProxy:
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
     # FIXME: use __future__.annotations in Python 3.7+
-    upstream_buffer: asyncio.Queue  # contains: Tuple[Union[bytes, str], web.WSMsgType]
+    upstream_buffer: asyncio.Queue[tuple[bytes | str, web.WSMsgType]]
     upstream_buffer_task: asyncio.Future[None] | None
     downstream_cb: AsyncCallback[str | bytes, None] | None
     upstream_cb: AsyncCallback[str | bytes, None] | None

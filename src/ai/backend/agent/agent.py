@@ -815,7 +815,7 @@ def _observe_stat_task(
 
 class AbstractAgent[
     KernelObjectType: AbstractKernel,
-    KernelCreationContextType: AbstractKernelCreationContext,
+    KernelCreationContextType: AbstractKernelCreationContext[Any],
 ](aobject, metaclass=ABCMeta):
     id: AgentId
     agent_class: AgentClass
@@ -2343,7 +2343,7 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
-    ) -> AbstractKernelCreationContext:
+    ) -> AbstractKernelCreationContext[Any]:
         raise NotImplementedError
 
     async def _iterate_batch_result(

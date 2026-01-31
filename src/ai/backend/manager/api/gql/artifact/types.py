@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from aiotools import apartial

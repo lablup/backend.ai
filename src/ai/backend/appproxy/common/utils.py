@@ -146,15 +146,15 @@ TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
-    [web.Request], Awaitable[PydanticResponse | TAnyResponse]
-]
+    [web.Request], Awaitable[PydanticResponse[Any] | TAnyResponse]
+]  # type: ignore[type-arg]
 type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
-    [web.Request, TParamModel], Awaitable[PydanticResponse | TAnyResponse]
-]
+    [web.Request, TParamModel], Awaitable[PydanticResponse[Any] | TAnyResponse]
+]  # type: ignore[type-arg]
 
 
 def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
-    response: PydanticResponse | TAnyResponse,
+    response: PydanticResponse[Any] | TAnyResponse,
 ) -> web.StreamResponse:
     json_body: Any
     match response:
@@ -174,7 +174,7 @@ def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
 
 
 def pydantic_api_response_handler(
-    handler: THandlerFuncWithoutParam,
+    handler: THandlerFuncWithoutParam,  # type: ignore[type-arg]
     is_deprecated: bool = False,
 ) -> Handler:
     """
@@ -201,9 +201,9 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
     is_deprecated: bool = False,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+) -> Callable[[THandlerFuncWithParam], Handler]:  # type: ignore[type-arg]
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam,  # type: ignore[type-arg]
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(

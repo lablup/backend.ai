@@ -9,7 +9,7 @@ from ai.backend.manager.services.metric.actions.container import (
 from ai.backend.manager.services.metric.container_metric import ContainerUtilizationMetricService
 
 
-class ContainerUtilizationMetricProcessors(ActionProcessor):
+class ContainerUtilizationMetricProcessors(ActionProcessor[Any, Any]):
     query_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
     ]

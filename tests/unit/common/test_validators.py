@@ -70,17 +70,17 @@ def test_multikey() -> None:
         t.Key("y"): t.Int,
     })
 
-    data: multidict.MultiDict = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("x", 2)
-    data.add("y", 3)
+    data: multidict.MultiDict[str] = multidict.MultiDict()
+    data.add("x", "1")
+    data.add("x", "2")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1, 2]
     assert result["y"] == 3
 
     data = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("y", 3)
+    data.add("x", "1")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1]
     assert result["y"] == 3
