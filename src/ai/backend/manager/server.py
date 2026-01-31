@@ -1534,10 +1534,15 @@ def build_root_app(
             raise ServerMisconfiguredError("cleanup_contexts is not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
-                cctx_instance = cctx(root_ctx)
-                if hasattr(cctx_instance, "shutdown"):
-                    shutdown_context_instances.append(cctx_instance)
-                await stack.enter_async_context(cctx_instance)
+                cctx_name = cctx.__name__
+                try:
+                    cctx_instance = cctx(root_ctx)
+                    if hasattr(cctx_instance, "shutdown"):
+                        shutdown_context_instances.append(cctx_instance)
+                    await stack.enter_async_context(cctx_instance)
+                except Exception:
+                    log.exception("Failed to initialize cleanup context: {}", cctx_name)
+                    raise
             yield
 
     async def _trigger_shutdown(_app: web.Application) -> None:
