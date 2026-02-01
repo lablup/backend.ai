@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.metrics.volume_perf import VolumePerfMetricObserver
 from ai.backend.storage.metrics.volume_stats import VolumeStatsMetricObserver
 
 from .types import CachedFSPerfMetricData, VolumeStatsObserverOptions
@@ -31,6 +32,7 @@ class VolumeStatsObserver(AbstractObserver):
     _valkey_client: ValkeyVolumeStatsClient
     _options: VolumeStatsObserverOptions
     _metric_observer: VolumeStatsMetricObserver
+    _perf_metric_observer: VolumePerfMetricObserver
 
     def __init__(
         self,
@@ -42,6 +44,7 @@ class VolumeStatsObserver(AbstractObserver):
         self._valkey_client = valkey_client
         self._options = options
         self._metric_observer = VolumeStatsMetricObserver.instance()
+        self._perf_metric_observer = VolumePerfMetricObserver.instance()
 
     @property
     @override
@@ -93,6 +96,18 @@ class VolumeStatsObserver(AbstractObserver):
 
             # Store in Redis
             await self._store_in_cache(cached)
+
+            # Update Prometheus Gauges
+            self._perf_metric_observer.update(
+                volume=volume_name,
+                iops_read=cached.iops_read,
+                iops_write=cached.iops_write,
+                io_bytes_read=cached.io_bytes_read,
+                io_bytes_write=cached.io_bytes_write,
+                io_usec_read=cached.io_usec_read,
+                io_usec_write=cached.io_usec_write,
+                observed_at=cached.observed_at,
+            )
 
             duration = time.monotonic() - start_time
             self._metric_observer.observe(

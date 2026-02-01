@@ -594,13 +594,13 @@ async def get_performance_metric(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "get_performance_metric", params)
         ctx: RootContext = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            metric = await volume.get_performance_metric()
-            return web.json_response(
-                {
-                    "metric": attr.asdict(cast(attr.AttrsInstance, metric)),
-                },
-            )
+        cached = await ctx.volume_stats_state.get_performance_metric(params["volume"])
+        return web.json_response(
+            {
+                "metric": attr.asdict(cast(attr.AttrsInstance, cached.to_metric())),
+                "observed_at": cached.observed_at.isoformat(),
+            },
+        )
 
 
 async def fetch_file(request: web.Request) -> web.StreamResponse:
