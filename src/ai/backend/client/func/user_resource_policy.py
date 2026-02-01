@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.output.fields import user_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
@@ -81,7 +81,7 @@ class UserResourcePolicy(BaseFunction):
             },
         )
 
-        return result["create_user_resource_policy"]
+        return cast(dict[str, Any], result["create_user_resource_policy"])
 
     @api_function
     @classmethod
@@ -125,7 +125,7 @@ class UserResourcePolicy(BaseFunction):
         }
 
         result = await api_session.get().Admin._query(q, variables)
-        return result["modify_user_resource_policy"]
+        return cast(dict[str, Any], result["modify_user_resource_policy"])
 
     @api_function
     async def delete(self) -> dict[str, Any]:
@@ -143,7 +143,7 @@ class UserResourcePolicy(BaseFunction):
         """)
 
         result = await api_session.get().Admin._query(q, {"name": self._name})
-        return result["delete_user_resource_policy"]
+        return cast(dict[str, Any], result["delete_user_resource_policy"])
 
     @api_function
     @classmethod
@@ -160,7 +160,7 @@ class UserResourcePolicy(BaseFunction):
         q = "query { user_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["user_resource_policies"]
+        return cast(Sequence[dict[str, Any]], data["user_resource_policies"])
 
     @api_function
     async def get_info(
@@ -177,4 +177,4 @@ class UserResourcePolicy(BaseFunction):
         q = "query($name: String!) { user_resource_policy(name: $name) { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {"name": self._name})
-        return data["user_resource_policy"]
+        return cast(dict[str, Any], data["user_resource_policy"])

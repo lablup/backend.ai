@@ -323,7 +323,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_queue_position
         )
-        return await loader.load(self.row_id)
+        return cast(int | None, await loader.load(self.row_id))
 
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
@@ -464,7 +464,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self.batch_load_idle_checks
         )
-        return await loader.load(self.row_id)
+        return cast(dict[str, Any] | None, await loader.load(self.row_id))
 
     async def resolve_vfolder_nodes(
         self,
@@ -1093,7 +1093,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     ) -> Iterable[ComputeContainer]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        return await loader.load(self.session_id)
+        return cast(Iterable[ComputeContainer], await loader.load(self.session_id))
 
     async def resolve_dependencies(
         self,
@@ -1101,14 +1101,14 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     ) -> Iterable[ComputeSession]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
-        return await loader.load(self.id)
+        return cast(Iterable[ComputeSession], await loader.load(self.id))
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "ComputeSession.commit_statuses"
         )
-        return await loader.load(self.main_kernel_id)
+        return cast(str, await loader.load(self.main_kernel_id))
 
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         containers = self.containers

@@ -270,7 +270,9 @@ class ResourcePresetDBSource:
             "total_resource_slots": domain_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
-        limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
+        limits = ResourceSlot.from_policy(
+            domain_resource_policy, cast(Mapping[str, Any], known_slot_types)
+        )
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[DomainNameFilter(domain_name)]
         )
@@ -431,7 +433,9 @@ class ResourcePresetDBSource:
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceUsageData:
         """Get keypair resource usage (limits, occupied, remaining)."""
-        limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
+        limits = ResourceSlot.from_policy(
+            resource_policy, cast(Mapping[str, Any], known_slot_types)
+        )
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[AccessKeyFilter(access_key)]
         )
@@ -455,7 +459,9 @@ class ResourcePresetDBSource:
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
-        limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
+        limits = ResourceSlot.from_policy(
+            group_resource_policy, cast(Mapping[str, Any], known_slot_types)
+        )
         occupied = await self._get_resource_occupancy(
             db_sess, known_slot_types, filters=[GroupIdFilter(group_id)]
         )
@@ -594,14 +600,20 @@ class ResourcePresetDBSource:
         """
         Private method to get a preset by ID using an existing session.
         """
-        return await session.scalar(
-            sa.select(ResourcePresetRow).where(ResourcePresetRow.id == preset_id)
+        return cast(
+            ResourcePresetRow | None,
+            await session.scalar(
+                sa.select(ResourcePresetRow).where(ResourcePresetRow.id == preset_id)
+            ),
         )
 
     async def _get_preset_by_name(self, session: SASession, name: str) -> ResourcePresetRow | None:
         """
         Private method to get a preset by name using an existing session.
         """
-        return await session.scalar(
-            sa.select(ResourcePresetRow).where(ResourcePresetRow.name == name)
+        return cast(
+            ResourcePresetRow | None,
+            await session.scalar(
+                sa.select(ResourcePresetRow).where(ResourcePresetRow.name == name)
+            ),
         )

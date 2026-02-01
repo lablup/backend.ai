@@ -308,12 +308,12 @@ class SchedulerRepository:
         """
         return await self._db_source.prepare_vfolder_mounts(
             storage_manager,
-            allowed_vfolder_types,
+            list(allowed_vfolder_types),
             user_scope,
-            resource_policy,
-            combined_mounts,
-            combined_mount_map,
-            requested_mount_options,
+            dict(resource_policy),
+            [str(m) if isinstance(m, UUID) else m for m in combined_mounts],
+            dict(combined_mount_map),
+            dict(requested_mount_options),
         )
 
     @scheduler_repository_resilience.apply()

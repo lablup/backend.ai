@@ -161,7 +161,7 @@ class ComputeSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
@@ -636,7 +636,7 @@ class ComputeSession(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_compute_session"]
+        return cast(dict[str, Any], data["modify_compute_session"])
 
     @api_function
     async def destroy(
@@ -1011,7 +1011,8 @@ class ComputeSession(BaseFunction):
         else:
             raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
-            return (await resp.json())["result"]
+            result = await resp.json()
+            return cast(dict[str, Any], result["result"])
 
     @api_function
     async def upload(
@@ -1170,7 +1171,7 @@ class ComputeSession(BaseFunction):
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
 
-            return cast(Mapping[str, Any], result)
+            return result
 
     @api_function
     async def stream_app_info(self) -> Mapping[str, Any]:
@@ -1385,7 +1386,7 @@ class InferenceSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()

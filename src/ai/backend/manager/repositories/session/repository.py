@@ -93,7 +93,7 @@ class SessionRepository:
                 owner_access_key,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
             )
 
     @session_repository_resilience.apply()
@@ -200,7 +200,7 @@ class SessionRepository:
                 session_name_or_id,
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op),
             )
 
     @session_repository_resilience.apply()
@@ -272,7 +272,7 @@ class SessionRepository:
                     ImageRow.status == ImageStatus.ALIVE,
                 )
             )
-            return await sess.scalar(query)
+            return cast(ImageRow | None, await sess.scalar(query))
 
     @session_repository_resilience.apply()
     async def get_group_name_by_domain_and_id(
@@ -318,7 +318,7 @@ class SessionRepository:
                     selectinload(SessionRow.kernels),
                 )
             )
-            return await db_session.scalar(stmt)
+            return cast(SessionRow | None, await db_session.scalar(stmt))
 
     @session_repository_resilience.apply()
     async def modify_session(
@@ -368,7 +368,7 @@ class SessionRepository:
                 .execution_options(populate_existing=True)
                 .where(SessionRow.id == session_id)
             )
-            return await db_session.scalar(select_stmt)
+            return cast(SessionRow | None, await db_session.scalar(select_stmt))
 
     @session_repository_resilience.apply()
     async def rescan_images(

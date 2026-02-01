@@ -11,6 +11,7 @@ from typing import (
     Any,
     Self,
     TypeVar,
+    cast,
     get_args,
     get_origin,
 )
@@ -212,7 +213,7 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
             try:
-                return await input_param_type.from_request(request)
+                return cast(_ParamType, await input_param_type.from_request(request))
             except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
                     f"Failed while parsing {input_param_type}"
@@ -234,16 +235,16 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> _
                 raise MalformedRequestBody(
                     f"Malformed body - URL: {request.url}, Method: {request.method}"
                 ) from e
-            return param_instance.from_body(body)
+            return cast(_ParamType, param_instance.from_body(body))
 
         if origin_type is QueryParam:
-            return param_instance.from_query(request.query)
+            return cast(_ParamType, param_instance.from_query(request.query))
 
         if origin_type is HeaderParam:
-            return param_instance.from_header(request.headers)
+            return cast(_ParamType, param_instance.from_header(request.headers))
 
         if origin_type is PathParam:
-            return param_instance.from_path(request.match_info)
+            return cast(_ParamType, param_instance.from_path(request.match_info))
 
         raise InvalidAPIParameters(
             f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"

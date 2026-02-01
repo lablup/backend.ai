@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from typing import cast
 
 import sqlalchemy as sa
 
@@ -51,7 +52,7 @@ class RevisionConditions:
                 condition = DeploymentRevisionRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
-            return condition
+            return cast(sa.sql.expression.ColumnElement[bool], condition)
 
         return inner
 
@@ -64,7 +65,7 @@ class RevisionConditions:
                 condition = DeploymentRevisionRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
-            return condition
+            return cast(sa.sql.expression.ColumnElement[bool], condition)
 
         return inner
 
@@ -77,7 +78,7 @@ class RevisionConditions:
                 condition = DeploymentRevisionRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
-            return condition
+            return cast(sa.sql.expression.ColumnElement[bool], condition)
 
         return inner
 
@@ -124,11 +125,11 @@ class RevisionOrders:
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return DeploymentRevisionRow.name.asc()
-        return DeploymentRevisionRow.name.desc()
+            return cast(QueryOrder, DeploymentRevisionRow.name.asc())
+        return cast(QueryOrder, DeploymentRevisionRow.name.desc())
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return DeploymentRevisionRow.created_at.asc()
-        return DeploymentRevisionRow.created_at.desc()
+            return cast(QueryOrder, DeploymentRevisionRow.created_at.asc())
+        return cast(QueryOrder, DeploymentRevisionRow.created_at.desc())
