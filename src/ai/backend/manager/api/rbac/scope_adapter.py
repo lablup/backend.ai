@@ -47,6 +47,10 @@ class ScopeAdapter(BaseFilterAdapter):
                 return self._build_project_scope_querier(request)
             case ScopeType.USER:
                 return self._build_user_scope_querier(request)
+            case ScopeType.CONTAINER_REGISTRY:
+                raise NotImplementedError(
+                    "Container registry scope querier is not implemented yet."
+                )
 
     def _build_domain_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier for domain scopes from search request."""
