@@ -380,7 +380,7 @@ async def api_ctx(
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if pid == 0:
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
-            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
+            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)  # type: ignore[attr-defined]
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
         try:
             yield plugin_ctx
@@ -471,13 +471,13 @@ async def api_ctx(
         internal_api_app = await api_init_stack.enter_async_context(internal_api_ctx())
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageClientWebappPluginContext(etcd, local_config.model_dump()),
+                StorageClientWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 client_api_app,
             )
         )
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),
+                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 manager_api_app,
             )
         )

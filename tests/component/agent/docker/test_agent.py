@@ -223,7 +223,7 @@ async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> N
 
 @pytest.mark.asyncio
 async def test_save_last_registry_exception(agent: DockerAgent, mocker: Any) -> None:
-    agent.latest_registry_written_time = MagicMock(return_value=0)
+    agent.latest_registry_written_time = MagicMock(return_value=0)  # type: ignore[attr-defined]
     mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)
     registry_state_path = (
         agent.local_config.agent.var_base_path / f"last_registry.{agent.local_instance_id}.dat"

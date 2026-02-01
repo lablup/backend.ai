@@ -357,7 +357,7 @@ class AgentRPCServer(aobject):
             bind=ZeroMQAddress(f"tcp://{rpc_addr.address}"),
             transport=ZeroMQRPCTransport,
             authenticator=auth_handler,
-            scheduler=ExitOrderedAsyncScheduler(),
+            scheduler=ExitOrderedAsyncScheduler(),  # type: ignore[no-untyped-call]
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,
             debug_rpc=self.local_config.debug.enabled,
@@ -870,7 +870,7 @@ class AgentRPCServer(aobject):
             done_future=done,
             suppress_events=suppress_events,
         )
-        return await done
+        return cast(dict[str, Any], await done)
 
     @rpc_function
     @collect_error

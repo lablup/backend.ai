@@ -109,14 +109,14 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
         super().__init__(length=64, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(
+    def process_bind_param(  # type: ignore[override]
         self,
         value: T_StrEnum | None,
         dialect: Dialect,
     ) -> str | None:
         return value.value if value is not None else None
 
-    def process_result_value(
+    def process_result_value(  # type: ignore[override]
         self,
         value: Any | None,
         dialect: Dialect,

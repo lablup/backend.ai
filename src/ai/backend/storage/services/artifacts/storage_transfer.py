@@ -4,6 +4,7 @@ import asyncio
 import logging
 import shutil
 from pathlib import Path
+from typing import cast
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -326,7 +327,7 @@ class StorageTransferManager:
 
             # Compare file sizes
             if hasattr(source_meta, "size") and hasattr(dest_meta, "size"):
-                return source_meta.size == dest_meta.size
+                return cast(bool, source_meta.size == dest_meta.size)
 
             # If size comparison is not available, assume success
             return True

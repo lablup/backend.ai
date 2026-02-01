@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Coroutine, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -512,7 +512,7 @@ class DeploymentExecutor:
         )
 
         res = await app_proxy_client.create_endpoint(endpoint_id, request_body)
-        return res["endpoint"]
+        return cast(str, res["endpoint"])
 
     async def _delete_endpoint_from_wsproxy(
         self,

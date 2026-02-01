@@ -12,7 +12,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 
-class TestSampleRow(Base):
+class TestSampleRow(Base):  # type: ignore[misc]
     __tablename__ = "test_sample"
     name = sa.Column(sa.String(64), primary_key=True)
 

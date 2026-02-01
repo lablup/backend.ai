@@ -2507,7 +2507,7 @@ class AgentRegistry:
             health_check=health_check_config,
         )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
-        return endpoint_json["endpoint"]
+        return cast(str, endpoint_json["endpoint"])
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (

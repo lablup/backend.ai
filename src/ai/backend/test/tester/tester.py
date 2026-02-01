@@ -58,7 +58,7 @@ class Tester:
             await runner.run()
 
     async def _run_param_spec(self, spec: TestSpec, param: Mapping[ContextName, Any]) -> None:
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = BaseTestContext.used_contexts()
         with ExitStack() as local_stack:
             for ctx_name, value in param.items():
                 if ctx := registered_contexts.get(ctx_name):
@@ -80,7 +80,7 @@ class Tester:
         if not self._config:
             raise RuntimeError("Tester configuration is not loaded")
 
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = BaseTestContext.used_contexts()
         with ExitStack() as global_stack:
             # global context manager for the tester
             for key, ctx in registered_contexts.items():

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -39,7 +39,7 @@ async def test_alias_dealias_image_by_admin() -> None:
             items = sess.Image.list(fields=("name", "registry", "tag", "aliases"))
             for item in items:
                 if "lua" in item["name"] and "5.1-alpine3.8" in item["tag"]:
-                    return item
+                    return cast(dict[str, Any], item)
             return None
 
         img_info = get_test_image_info()

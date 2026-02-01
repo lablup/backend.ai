@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.types import (
     BinarySize,
@@ -337,7 +337,10 @@ class ResourceCalculator:
         # Check if: requested >= image-minimum
         if image_min_slots > requested_slots:
             min_humanized = " ".join(
-                f"{k}={v}" for k, v in image_min_slots.to_humanized(known_slot_types).items()
+                f"{k}={v}"
+                for k, v in image_min_slots.to_humanized(
+                    cast(Mapping[str, Any], known_slot_types)
+                ).items()
             )
             raise InvalidAPIParameters(
                 f"Your resource request is smaller than the minimum required by the image. ({min_humanized})"

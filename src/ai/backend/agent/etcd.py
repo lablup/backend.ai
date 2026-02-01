@@ -53,8 +53,8 @@ class AgentEtcdClientView(AbstractKVStore):
             return self._agent_scope_prefix_map
 
         return ChainMap(
-            cast(MutableMapping[str, str], override),
-            cast(MutableMapping[str, str], self._agent_scope_prefix_map),
+            cast(MutableMapping[ConfigScopes, str], override),
+            cast(MutableMapping[ConfigScopes, str], self._agent_scope_prefix_map),
         )
 
     @override

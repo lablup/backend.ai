@@ -172,4 +172,4 @@ async def s3_client(minio_container: Any) -> AsyncIterator[S3Client]:  # noqa: F
             if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
                 raise
 
-    return client
+    yield client

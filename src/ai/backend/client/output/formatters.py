@@ -232,7 +232,7 @@ class AgentStatFormatter(OutputFormatter):
                     "" if unit_hint == "count" else unit_hint,
                 ),
             )
-            return cast(str, formatter(metric, binary))
+            return cast(str, formatter(metric, binary))  # type: ignore[no-untyped-call]
 
         bufs = []
         node_metric_bufs = []

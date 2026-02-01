@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -172,7 +172,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
                 "Joined to coordinator {}",
                 root_ctx.local_config.proxy_worker.coordinator_endpoint,
             )
-            return body["slots"]
+            return cast(list[Slot], body["slots"])
     except aiohttp.ClientResponseError as e:
         log.exception("")
         if e.status == 400:

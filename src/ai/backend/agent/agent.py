@@ -808,7 +808,7 @@ def _observe_stat_task(
                     agent_id=self.id, stat_scope=stat_scope
                 )
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
