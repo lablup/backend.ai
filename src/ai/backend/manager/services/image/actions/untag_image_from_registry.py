@@ -1,18 +1,15 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
 class UntagImageFromRegistryAction(ImageAction):
-    user_id: uuid.UUID
-    client_role: UserRole
-    image_id: uuid.UUID
+    image_id: ImageID
 
     @override
     def entity_id(self) -> str | None:

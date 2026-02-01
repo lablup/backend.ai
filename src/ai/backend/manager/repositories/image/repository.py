@@ -19,13 +19,15 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
+    ResourceLimitInput,
 )
 from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageRow,
 )
+from ai.backend.manager.models.image.row import ImageAliasRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
@@ -90,17 +92,16 @@ class ImageRepository:
         self,
         image_canonicals: list[str],
         status_filter: list[ImageStatus] | None = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
+        """
+        Deprecated. Use get_images_by_ids instead.
+        """
         images_data = await self._db_source.query_images_by_canonicals(
             image_canonicals, status_filter
         )
         image_ids = list(images_data.keys())
         installed_agents_for_images = await self._stateful_source.list_agents_with_images(image_ids)
-
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
         for image_id, image in images_data.items():
@@ -122,15 +123,15 @@ class ImageRepository:
         self,
         identifier: ImageIdentifier,
         status_filter: list[ImageStatus] | None = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> ImageWithAgentInstallStatus:
+        """
+        Deprecated. Use get_image_by_id instead.
+        """
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_identifier(
             identifier, status_filter
         )
         installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         return ImageWithAgentInstallStatus(
             image=image_data,
@@ -146,15 +147,12 @@ class ImageRepository:
         image_id: UUID,
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
-        requested_by_superadmin: bool = False,
+        hide_agents: bool = False,
     ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
             image_id, load_aliases, status_filter
         )
         installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
-        hide_agents = (
-            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
-        )
 
         return ImageWithAgentInstallStatus(
             image=image_data,
@@ -203,7 +201,7 @@ class ImageRepository:
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
     ) -> ImageData:
         """
-        Marks an image as deleted.
+        Deprecated. Use soft_delete_image_by_id instead.
         """
         return await self._db_source.mark_image_deleted(identifiers)
 
@@ -238,6 +236,9 @@ class ImageRepository:
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
+        """
+        Deprecated. Use add_image_alias_by_id instead.
+        """
         return await self._db_source.insert_image_alias(alias, image_canonical, architecture)
 
     @image_repository_resilience.apply()
@@ -253,8 +254,7 @@ class ImageRepository:
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
         """
-        Scans a single image by resolving it first and then scanning.
-        Returns RescanImagesResult with the scanned image data.
+        Deprecated. Use scan_images_by_ids instead.
         """
         return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
@@ -270,7 +270,35 @@ class ImageRepository:
     async def clear_image_custom_resource_limit(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
+        """
+        Deprecated. Use clear_image_resource_limits_by_id instead.
+        """
         return await self._db_source.clear_image_resource_limits(image_canonical, architecture)
+
+    @image_repository_resilience.apply()
+    async def add_image_alias_by_id(self, creator: Creator[ImageAliasRow]) -> ImageAliasData:
+        """
+        Creates an image alias using the Creator pattern.
+        """
+        return await self._db_source.insert_image_alias_by_id(creator)
+
+    @image_repository_resilience.apply()
+    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+        """
+        Clears image resource limits by image ID.
+        """
+        return await self._db_source.clear_image_resource_limits_by_id(image_id)
+
+    @image_repository_resilience.apply()
+    async def set_image_resource_limit_by_id(
+        self,
+        image_id: UUID,
+        resource_limit: ResourceLimitInput,
+    ) -> ImageData:
+        """
+        Sets resource limit for an image by its ID.
+        """
+        return await self._db_source.set_image_resource_limit_by_id(image_id, resource_limit)
 
     @image_repository_resilience.apply()
     async def delete_image_with_aliases(self, image_id: UUID) -> ImageData:
