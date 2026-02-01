@@ -91,7 +91,10 @@ def upgrade() -> None:
     updates = []
     for row in conn.execute(query).fetchall():
         row_mapping = cast(dict[str, Any], row._mapping)
-        updates.append({"b_access_key": row_mapping["access_key"], "modified_at": row_mapping["created_at"]})
+        updates.append({
+            "b_access_key": row_mapping["access_key"],
+            "modified_at": row_mapping["created_at"],
+        })
     if updates:
         update_query = (
             sa.update(keypairs)

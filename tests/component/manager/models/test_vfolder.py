@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID
@@ -5,8 +6,6 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from collections.abc import Sequence
-
 from ai.backend.common.types import VFolderMount
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolder

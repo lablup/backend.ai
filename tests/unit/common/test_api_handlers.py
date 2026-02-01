@@ -6,7 +6,6 @@ from typing import Any, Self
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestClient
 from pydantic import Field
 
 from ai.backend.common.api_handlers import (
@@ -311,7 +310,9 @@ async def test_middleware_parameter(aiohttp_client: Any) -> None:
     handler = TestAuthHandler()
 
     @web.middleware
-    async def auth_middleware(request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]) -> web.StreamResponse:
+    async def auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = True
         return await handler(request)
 
@@ -341,7 +342,9 @@ async def test_middleware_parameter_invalid_type(aiohttp_client: Any) -> None:
     handler = TestInvalidAuthHandler()
 
     @web.middleware
-    async def broken_auth_middleware(request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]) -> web.StreamResponse:
+    async def broken_auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = "not_a_boolean"
         return await handler(request)
 
@@ -406,7 +409,9 @@ async def test_multiple_parameters(aiohttp_client: Any) -> None:
     handler = TestMultipleParamsHandler()
 
     @web.middleware
-    async def auth_middleware(request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]) -> web.StreamResponse:
+    async def auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = True
         return await handler(request)
 

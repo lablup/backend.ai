@@ -96,9 +96,7 @@ class TestResourcePresetServiceCompatibility:
         }
 
     @pytest.fixture
-    def resource_preset_service(
-        self, mock_dependencies: dict[str, Any]
-    ) -> ResourcePresetService:
+    def resource_preset_service(self, mock_dependencies: dict[str, Any]) -> ResourcePresetService:
         """Create ResourcePresetService instance with mocked dependencies."""
         return ResourcePresetService(
             resource_preset_repository=mock_dependencies["resource_preset_repository"],

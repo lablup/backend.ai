@@ -93,7 +93,9 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
 
 
 @pytest.mark.asyncio
-async def test_get_api_session_with_specific_api_endpoint(mocker: MockerFixture, client_pool: ClientPool) -> None:
+async def test_get_api_session_with_specific_api_endpoint(
+    mocker: MockerFixture, client_pool: ClientPool
+) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(

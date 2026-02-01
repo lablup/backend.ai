@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from .color import Colors
 
@@ -107,11 +107,11 @@ class Turtle:
         pos_x: float
         pos_y: float
         if y is None:
-            assert isinstance(x, Vec2D)
+            assert isinstance(x, Vec2D)  # noqa: S101
             pos_x = x[0]
             pos_y = x[1]
         else:
-            assert isinstance(x, (float, int))
+            assert isinstance(x, (float, int))  # noqa: S101
             pos_x = x
             pos_y = y
         self.canvas.begin_group()

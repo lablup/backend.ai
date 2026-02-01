@@ -3,7 +3,6 @@ import random
 from collections.abc import AsyncGenerator
 
 import pytest
-from redis.asyncio import Redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB

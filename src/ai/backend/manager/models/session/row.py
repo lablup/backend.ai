@@ -1613,7 +1613,9 @@ class SessionRow(Base):  # type: ignore[misc]
     def get_status_elapsed_time(
         cls, status: SessionStatus, until: datetime
     ) -> sa.sql.elements.BinaryExpression[Any]:
-        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[
+            status.name
+        ].astext.cast(sa.types.DateTime(timezone=True))
         return result
 
 

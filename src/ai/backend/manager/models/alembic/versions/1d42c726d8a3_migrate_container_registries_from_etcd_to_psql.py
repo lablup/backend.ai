@@ -208,8 +208,7 @@ def migrate_data_etcd_to_psql() -> None:
     registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
-        hostname: etcd_container_registry_iv.check(item)
-        for hostname, item in registries.items()
+        hostname: etcd_container_registry_iv.check(item) for hostname, item in registries.items()
     }
 
     input_configs = []

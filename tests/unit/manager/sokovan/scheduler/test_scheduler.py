@@ -532,9 +532,7 @@ class TestProvisionerAllocation:
             designated_agent
         ]  # 4th argument (agents, criteria, config, designated_agent)
 
-    async def test_no_resource_requirements(
-        self, provisioner: SessionProvisioner
-    ) -> None:
+    async def test_no_resource_requirements(self, provisioner: SessionProvisioner) -> None:
         """Test handling of session with no kernels."""
         workload = create_session_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,

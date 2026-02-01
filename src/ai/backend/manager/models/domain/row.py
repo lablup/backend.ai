@@ -9,7 +9,6 @@ from typing import (
     Any,
     Self,
     TypedDict,
-    cast,
     override,
 )
 

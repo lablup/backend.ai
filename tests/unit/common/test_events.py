@@ -29,7 +29,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
         return (self.value + 1,)
 
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
+    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:  # noqa: F821
         return cls(value[0] + 1)
 
     @classmethod

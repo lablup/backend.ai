@@ -154,9 +154,7 @@ class TestLeaderTaskIntegration:
         # Stop election
         await leader_election.stop()
 
-    async def test_tasks_stop_on_election_stop(
-        self, leader_election: ValkeyLeaderElection
-    ) -> None:
+    async def test_tasks_stop_on_election_stop(self, leader_election: ValkeyLeaderElection) -> None:
         """Test that all tasks stop when election stops."""
         task1 = MockLeaderTask()
         task2 = MockLeaderTask()

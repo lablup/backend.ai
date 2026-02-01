@@ -9,7 +9,9 @@ from ai.backend.storage.api.manager import token_auth_middleware
 
 class TestStorageManagerAPIMiddleware:
     @pytest.mark.asyncio
-    async def test_auth_token_middleware_return_json_body_response(self, aiohttp_client: Any) -> None:
+    async def test_auth_token_middleware_return_json_body_response(
+        self, aiohttp_client: Any
+    ) -> None:
         async def handler(request: web.Request) -> web.Response:
             return web.Response(text="OK")
 

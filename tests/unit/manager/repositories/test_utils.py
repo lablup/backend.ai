@@ -188,8 +188,7 @@ async def _select_kernel_row(
 ) -> Row[Any]:
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
     result = await conn.execute(query)
-    kernel = result.first()
-    return kernel  # type: ignore[no-any-return]
+    return result.first()  # type: ignore[no-any-return]
 
 
 @pytest.mark.asyncio

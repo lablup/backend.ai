@@ -1,5 +1,4 @@
 from pathlib import Path, PurePath
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

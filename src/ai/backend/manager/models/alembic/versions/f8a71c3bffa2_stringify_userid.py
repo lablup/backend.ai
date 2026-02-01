@@ -8,7 +8,7 @@ Create Date: 2018-06-17 13:52:13.346856
 
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import sqlalchemy as sa
 from alembic import op

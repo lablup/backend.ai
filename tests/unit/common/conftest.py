@@ -71,7 +71,9 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def test_valkey_live(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
+async def test_valkey_live(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyLiveClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -88,7 +90,9 @@ async def test_valkey_live(redis_container: RedisContainerFixture) -> AsyncItera
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
+async def test_valkey_stream(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyStreamClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -106,7 +110,9 @@ async def test_valkey_stream(redis_container: RedisContainerFixture) -> AsyncIte
 
 
 @pytest.fixture
-async def test_valkey_rate_limit(redis_container: RedisContainerFixture) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
+async def test_valkey_rate_limit(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyRateLimitClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -142,7 +148,10 @@ async def test_valkey_artifact(
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(redis_container: RedisContainerFixture, test_node_id: str) -> AsyncIterator[RedisQueue]:  # noqa: F811
+async def test_valkey_stream_mq(
+    redis_container: RedisContainerFixture,  # noqa: F811
+    test_node_id: str,
+) -> AsyncIterator[RedisQueue]:
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
@@ -176,7 +185,10 @@ def test_ns() -> str:
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container: EtcdContainerFixture, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
+async def gateway_etcd(
+    etcd_container: EtcdContainerFixture,  # noqa: F811
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:
     async with AsyncEtcd(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,

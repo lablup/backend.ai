@@ -170,7 +170,9 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
     # TODO: Refactor with action-processor structure, check permission
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> ScalingGroupNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> ScalingGroupNode:
         _, scaling_group_name = AsyncNode.resolve_global_id(info, self.id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:

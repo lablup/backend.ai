@@ -111,7 +111,9 @@ class BaseRevisionGenerator(RevisionGenerator):
 
         return ModelServiceDefinition.model_validate(merged_dict)
 
-    def _merge_service_definition_dicts(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    def _merge_service_definition_dicts(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Merge service definition dictionaries with field-level override.
         Override takes precedence over base for each nested field.

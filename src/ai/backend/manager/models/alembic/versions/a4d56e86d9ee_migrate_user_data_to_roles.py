@@ -77,7 +77,9 @@ class Tables:
 
 class RoleCreator:
     @classmethod
-    def _create_self_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, uuid.UUID]:
+    def _create_self_roles(
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
+    ) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_user_id_map: dict[str, uuid.UUID] = {}

@@ -231,7 +231,9 @@ class QueryFilterParser:
     ) -> WhereClauseType:
         try:
             ast = self._parser.parse(filter_expr)
-            where_clause_result: WhereClauseType = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            where_clause_result: WhereClauseType = QueryFilterTransformer(
+                table, self._fieldspec
+            ).transform(ast)
             where_clause = where_clause_result
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}") from e

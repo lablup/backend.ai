@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Final, cast
+from typing import Final
 from uuid import UUID
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -36,8 +36,6 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
     ReservoirConfig,
-    ReservoirObjectStorageConfig,
-    ReservoirVFSStorageConfig,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,

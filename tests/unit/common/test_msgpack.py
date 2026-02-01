@@ -161,14 +161,20 @@ def test_msgpack_resource_slot() -> None:
     assert unpacked == resource_slot
 
     resource_slot = ResourceSlot(
-        cast(Mapping[SlotName, int | float | str | Decimal | BinarySize | None], {"cpu": 2, "mem": Decimal(1024**5)})
+        cast(
+            Mapping[SlotName, int | float | str | Decimal | BinarySize | None],
+            {"cpu": 2, "mem": Decimal(1024**5)},
+        )
     )
     packed = msgpack.packb(resource_slot)
     unpacked = msgpack.unpackb(packed)
     assert unpacked == resource_slot
 
     resource_slot = ResourceSlot(
-        cast(Mapping[SlotName, int | float | str | Decimal | BinarySize | None], {"cpu": 3, "mem": "1125899906842624"})
+        cast(
+            Mapping[SlotName, int | float | str | Decimal | BinarySize | None],
+            {"cpu": 3, "mem": "1125899906842624"},
+        )
     )
     packed = msgpack.packb(resource_slot)
     unpacked = msgpack.unpackb(packed)

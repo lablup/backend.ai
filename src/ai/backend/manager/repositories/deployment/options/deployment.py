@@ -323,5 +323,7 @@ class DeploymentOrders:
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return cast(sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.asc())
+            return cast(
+                sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.asc()
+            )
         return cast(sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.desc())

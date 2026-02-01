@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID
 
 import pytest
-from aiohttp import web
 
 from ai.backend.manager.api import vfolder
 from ai.backend.manager.api.vfolder import with_vfolder_rows_resolved, with_vfolder_status_checked

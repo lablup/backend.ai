@@ -48,7 +48,12 @@ class TestMountNameValidationRule:
             user_role="user",
         )
 
-    def test_valid_mount_names(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_valid_mount_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with valid mount names."""
         spec = SessionCreationSpec(
             session_creation_id="test-001",
@@ -73,7 +78,12 @@ class TestMountNameValidationRule:
         # Should not raise
         mount_rule.validate(spec, basic_context)
 
-    def test_duplicate_alias_names(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_duplicate_alias_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with duplicate alias names."""
         spec = SessionCreationSpec(
             session_creation_id="test-002",
@@ -99,7 +109,12 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
-    def test_empty_alias_name(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_empty_alias_name(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with empty alias name."""
         spec = SessionCreationSpec(
             session_creation_id="test-003",
@@ -124,7 +139,12 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "alias name cannot be empty" in str(exc_info.value).lower()
 
-    def test_reserved_folder_names(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_reserved_folder_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with reserved folder names."""
         # Reserved names that should fail (matching RESERVED_VFOLDERS in defs.py)
         reserved_names = [
@@ -176,7 +196,12 @@ class TestMountNameValidationRule:
                 mount_rule.validate(spec, basic_context)
             assert "reserved for internal path" in str(exc_info.value)
 
-    def test_alias_same_as_original_folder(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_alias_same_as_original_folder(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation when alias name is same as an existing folder name."""
         spec = SessionCreationSpec(
             session_creation_id="test-004",
@@ -201,7 +226,12 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "cannot be set to an existing folder name" in str(exc_info.value)
 
-    def test_work_directory_prefix_handling(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_work_directory_prefix_handling(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test handling of /home/work/ prefix in alias names."""
         spec = SessionCreationSpec(
             session_creation_id="test-005",
@@ -225,7 +255,12 @@ class TestMountNameValidationRule:
         # Should validate without the prefix - the prefix is stripped
         mount_rule.validate(spec, basic_context)
 
-    def test_combined_mount_maps(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_combined_mount_maps(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with both mount_map and mount_id_map."""
         spec = SessionCreationSpec(
             session_creation_id="test-006",
@@ -253,7 +288,12 @@ class TestMountNameValidationRule:
         # Should validate both maps combined
         mount_rule.validate(spec, basic_context)
 
-    def test_duplicate_across_maps(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_duplicate_across_maps(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test duplicate aliases across mount_map and mount_id_map."""
         spec = SessionCreationSpec(
             session_creation_id="test-007",
@@ -280,7 +320,12 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
-    def test_none_alias_values(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_none_alias_values(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test handling of None alias values."""
         spec = SessionCreationSpec(
             session_creation_id="test-008",
@@ -304,7 +349,12 @@ class TestMountNameValidationRule:
         # Should not raise - None values are skipped
         mount_rule.validate(spec, basic_context)
 
-    def test_special_characters_in_names(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_special_characters_in_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with special characters in folder names."""
         # These should be caught as reserved names or patterns
         invalid_names = [
@@ -336,7 +386,12 @@ class TestMountNameValidationRule:
             with pytest.raises(InvalidAPIParameters):
                 mount_rule.validate(spec, basic_context)
 
-    def test_large_mount_map(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_large_mount_map(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with a large number of mounts."""
         # Create a large mount map
         mount_map = {f"vfolder{i}": f"data{i}" for i in range(100)}
@@ -358,7 +413,12 @@ class TestMountNameValidationRule:
         # Should handle large number of mounts
         mount_rule.validate(spec, basic_context)
 
-    def test_unicode_names(self, mount_rule: MountNameValidationRule, basic_context: SessionCreationContext, base_user_scope: UserScope) -> None:
+    def test_unicode_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with unicode characters in names."""
         spec = SessionCreationSpec(
             session_creation_id="test-unicode",

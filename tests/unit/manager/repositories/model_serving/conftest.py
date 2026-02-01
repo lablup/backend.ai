@@ -9,10 +9,20 @@ import pytest
 import yarl
 from pytest_mock import MockerFixture
 
-from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant, VFolderUsageMode
+from ai.backend.common.types import (
+    ClusterMode,
+    EndpointId,
+    ResourceSlot,
+    RuntimeVariant,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -172,7 +182,9 @@ def sample_vfolder() -> VFolderRow:
 
 
 @pytest.fixture
-def sample_endpoint_creator_spec(sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow) -> EndpointCreatorSpec:
+def sample_endpoint_creator_spec(
+    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
+) -> EndpointCreatorSpec:
     return EndpointCreatorSpec(
         name="test-endpoint",
         model=sample_vfolder.id,
@@ -366,7 +378,10 @@ def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) ->
 
 
 def setup_mock_query_result(
-    mock_session: AsyncMock, scalar_result: Any = None, scalars_all_result: Any = None, scalar_one_or_none_result: Any = None
+    mock_session: AsyncMock,
+    scalar_result: Any = None,
+    scalars_all_result: Any = None,
+    scalar_one_or_none_result: Any = None,
 ) -> AsyncMock:
     """Helper function to set up common query result patterns."""
     if scalar_result is not None:
@@ -380,7 +395,9 @@ def setup_mock_query_result(
     return mock_session
 
 
-def assert_update_query_executed(mock_session: AsyncMock, expected_field: str | None = None) -> None:
+def assert_update_query_executed(
+    mock_session: AsyncMock, expected_field: str | None = None
+) -> None:
     """Helper function to verify that an update query was executed"""
     mock_session.execute.assert_called()
     if expected_field:
@@ -403,7 +420,9 @@ def assert_endpoint_creation_operations(mock_session: AsyncMock, endpoint_row: E
     mock_session.refresh.assert_called_once_with(endpoint_row)
 
 
-def create_full_featured_endpoint(sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow) -> EndpointRow:
+def create_full_featured_endpoint(
+    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
+) -> EndpointRow:
     endpoint_row = EndpointRow(
         name="full-featured-endpoint",
         domain="test-domain",

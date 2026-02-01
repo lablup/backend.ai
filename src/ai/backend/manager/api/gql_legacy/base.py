@@ -622,10 +622,14 @@ def scoped_query(
     return wrap
 
 
-def privileged_mutation(required_role: UserRole, target_func: Callable[..., Any] | None = None) -> Callable[..., Any]:
+def privileged_mutation(
+    required_role: UserRole, target_func: Callable[..., Any] | None = None
+) -> Callable[..., Any]:
     def wrap(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
-        async def wrapped(cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any) -> Any:
+        async def wrapped(
+            cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
+        ) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
@@ -798,8 +802,12 @@ async def simple_db_mutate_returning_item[
             else:
                 row = result.first()
             if result.rowcount > 0 and row is not None:
-                return cast(ResultType, result_cls(True, "success", item_cls.from_row(graph_ctx, row)))
-            return cast(ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}", None))
+                return cast(
+                    ResultType, result_cls(True, "success", item_cls.from_row(graph_ctx, row))
+                )
+            return cast(
+                ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+            )
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 

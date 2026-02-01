@@ -1595,7 +1595,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 "Group.by_user",
             )
             client_groups = [
-                group for group in cast(Sequence[Group], await loader.load(client_user_id)) if group.type in type
+                group
+                for group in cast(Sequence[Group], await loader.load(client_user_id))
+                if group.type in type
             ]
             if group.id not in (g.id for g in client_groups):
                 raise InsufficientPrivilege
@@ -2821,7 +2823,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         )
 
         # Since sess_id is declared as a string type, we have to convert this to UUID type manually.
-        matches = cast(Sequence[LegacyComputeSession], await loader.load(SessionId(uuid.UUID(sess_id))))
+        matches = cast(
+            Sequence[LegacyComputeSession], await loader.load(SessionId(uuid.UUID(sess_id)))
+        )
         if len(matches) == 0:
             return None
         if len(matches) == 1:

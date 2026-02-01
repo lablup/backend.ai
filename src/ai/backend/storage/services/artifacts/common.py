@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import cast, override
+from typing import override
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import (

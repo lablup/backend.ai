@@ -288,8 +288,7 @@ class PermissionDBSource:
             PermissionGroupRow.scope_type == scope_id.scope_type,
             PermissionGroupRow.scope_id == scope_id.scope_id,
         )
-        result = await db_session.scalar(stmt)
-        return result
+        return cast(PermissionGroupRow | None, await db_session.scalar(stmt))
 
     async def _find_permission_groups_by_scopes(
         self,

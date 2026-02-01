@@ -324,7 +324,9 @@ class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
             stmt = stmt.where(condition)
         return stmt
 
-    def _build_filter_condition(self, stmt: Select[Any], filters: T) -> tuple[Any | None, Select[Any]]:
+    def _build_filter_condition(
+        self, stmt: Select[Any], filters: T
+    ) -> tuple[Any | None, Select[Any]]:
         """Build a filter condition from FilterOptions, handling logical operations"""
         conditions = []
 

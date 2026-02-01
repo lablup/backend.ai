@@ -37,7 +37,9 @@ def mock_service(mock_volume_pool: MagicMock) -> VolumeService:
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_volume(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_get_volume(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume_info = MagicMock()
     mock_volume_info.backend = "mock-backend"
     mock_volume_info.path = "/mock/path"
@@ -63,7 +65,9 @@ async def test_get_volume(mock_log: AsyncMock, mock_service: VolumeService, mock
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_volumes(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_get_volumes(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volumes = {
         str(UUID1): MagicMock(backend="backend1", path="/path1", fsprefix="fsprefix1"),
         str(UUID2): MagicMock(backend="backend2", path="/path2", fsprefix="fsprefix2"),
@@ -97,7 +101,9 @@ async def test_get_volumes(mock_log: AsyncMock, mock_service: VolumeService, moc
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_create_quota_scope(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_create_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
 
@@ -120,7 +126,9 @@ async def test_create_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_quota_scope(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_get_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     quota_scope_meta = QuotaScopeMeta(used_bytes=500, limit_bytes=1000)
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
@@ -141,7 +149,9 @@ async def test_get_quota_scope(mock_log: AsyncMock, mock_service: VolumeService,
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_update_quota_scope(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_update_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     quota_scope_meta = QuotaScopeMeta(used_bytes=500, limit_bytes=1000)
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
@@ -164,7 +174,9 @@ async def test_update_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_delete_quota_scope(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_delete_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.quota_model.describe_quota_scope = AsyncMock(
         return_value=MagicMock(used_bytes=500, limit_bytes=1000)
@@ -185,7 +197,9 @@ async def test_delete_quota_scope(mock_log: AsyncMock, mock_service: VolumeServi
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_create_vfolder(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_create_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.create_vfolder = AsyncMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
@@ -206,7 +220,9 @@ async def test_create_vfolder(mock_log: AsyncMock, mock_service: VolumeService, 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_clone_vfolder(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_clone_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.clone_vfolder = AsyncMock()
 
@@ -230,7 +246,9 @@ async def test_clone_vfolder(mock_log: AsyncMock, mock_service: VolumeService, m
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_vfolder_info(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_get_vfolder_info(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.get_vfolder_mount = AsyncMock(return_value=Path("/mock/mount"))
 
@@ -271,7 +289,9 @@ async def test_get_vfolder_info(mock_log: AsyncMock, mock_service: VolumeService
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_delete_vfolder(mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock) -> None:
+async def test_delete_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.get_vfolder_mount = AsyncMock(side_effect=VFolderNotFoundError)
 

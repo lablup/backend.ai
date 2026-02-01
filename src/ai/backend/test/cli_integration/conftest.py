@@ -10,7 +10,6 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import pexpect
 import pytest
 from faker import Faker
 

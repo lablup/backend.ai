@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast, Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -149,41 +149,41 @@ class TestGetModelServiceInfo:
         )
 
     @pytest.fixture
-    def mock_check_user_access_get_info(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
+    def mock_check_user_access_get_info(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
         mock = cast(
             AsyncMock,
             mocker.patch.object(
-            model_serving_service,
-            "check_user_access",
-            new_callable=AsyncMock,
-        ),
+                model_serving_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_get_endpoint_by_id_get_info(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
+    def mock_get_endpoint_by_id_get_info(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
         return cast(
-        AsyncMock,
-        mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_by_id",
-            new_callable=AsyncMock,
-        ),
-    )
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_by_id",
+                new_callable=AsyncMock,
+            ),
+        )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_get_info(
         self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
         return cast(
-        AsyncMock,
-        mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
-        ),
-    )
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
+        )
 
     @pytest.mark.parametrize(
         "scenario",
@@ -261,7 +261,9 @@ class TestGetModelServiceInfo:
         # Now uses single repository for all roles
         mock_get_endpoint_by_id_get_info.return_value = mock_endpoint
 
-        async def get_model_service_info(action: GetModelServiceInfoAction) -> GetModelServiceInfoActionResult:
+        async def get_model_service_info(
+            action: GetModelServiceInfoAction,
+        ) -> GetModelServiceInfoActionResult:
             return await model_serving_processors.get_model_service_info.wait_for_complete(action)
 
         await scenario.test(get_model_service_info)

@@ -204,8 +204,12 @@ class APIStreamResponse:
     headers: Mapping[str, str] = field(default_factory=dict)
 
 
-type _ParamType = BodyParam[Any] | QueryParam[Any] | PathParam[Any] | HeaderParam[Any] | MiddlewareParam
-type _ParserType = BodyParam[Any] | QueryParam[Any] | PathParam[Any] | HeaderParam[Any] | type[MiddlewareParam]
+type _ParamType = (
+    BodyParam[Any] | QueryParam[Any] | PathParam[Any] | HeaderParam[Any] | MiddlewareParam
+)
+type _ParserType = (
+    BodyParam[Any] | QueryParam[Any] | PathParam[Any] | HeaderParam[Any] | type[MiddlewareParam]
+)
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:

@@ -14,7 +14,6 @@ from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimi
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.models.health import (
-    SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )

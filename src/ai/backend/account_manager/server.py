@@ -42,7 +42,7 @@ from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
-from .config import AccountManagerConfig, ServerConfig
+from .config import ServerConfig
 from .config import load as load_config
 from .context import CleanupContext, RootContext
 from .exceptions import (

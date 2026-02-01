@@ -47,7 +47,6 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -63,7 +62,6 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import GroupRow
@@ -83,7 +81,7 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRow, users
-from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -116,7 +114,8 @@ class AppBuilder(Protocol):
 
     async def __call__(
         self,
-        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]] | None = None,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
+        | None = None,
         subapp_pkgs: Sequence[str] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]: ...
@@ -543,7 +542,9 @@ def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> N
 
 
 @pytest.fixture()
-async def database_engine(bootstrap_config: BootstrapConfig, database: None) -> AsyncIterator[ExtendedAsyncSAEngine]:
+async def database_engine(
+    bootstrap_config: BootstrapConfig, database: None
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
     async with connect_database(bootstrap_config.db) as db:
         yield db
 
@@ -739,7 +740,8 @@ async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncItera
     _outer_ctxs: list[AbstractAsyncContextManager[Any, Any]] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]] | None = None,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
+        | None = None,
         subapp_pkgs: Sequence[str] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
@@ -830,7 +832,9 @@ def monitor_keypair() -> dict[str, str]:
 
 
 @pytest.fixture
-def get_headers(app: web.Application, default_keypair: dict[str, str], bootstrap_config: BootstrapConfig) -> Callable[..., dict[str, str]]:
+def get_headers(
+    app: web.Application, default_keypair: dict[str, str], bootstrap_config: BootstrapConfig
+) -> Callable[..., dict[str, str]]:
     def create_header(
         method: str,
         url: str,
@@ -898,8 +902,10 @@ async def prepare_kernel(
     request: Any,
     create_app_and_client: AppBuilder,
     get_headers: Callable[..., dict[str, str]],
-    default_keypair: dict[str, str]
-) -> AsyncIterator[tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]]:
+    default_keypair: dict[str, str],
+) -> AsyncIterator[
+    tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]
+]:
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
         cleanup_contexts=None,
@@ -918,7 +924,9 @@ async def prepare_kernel(
     )
     root_ctx: RootContext = app["_root.context"]
 
-    async def create_kernel(image: str = "lua:5.3-alpine", tag: str | None = None) -> dict[str, Any]:
+    async def create_kernel(
+        image: str = "lua:5.3-alpine", tag: str | None = None
+    ) -> dict[str, Any]:
         url = "/v3/kernel/"
         req_bytes = json.dumps({
             "image": image,

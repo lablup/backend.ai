@@ -7,7 +7,6 @@ Create Date: 2019-05-08 08:29:29.588817
 """
 
 import textwrap
-from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op

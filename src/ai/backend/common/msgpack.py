@@ -129,7 +129,9 @@ def packb(data: Any, **kwargs: Any) -> bytes:
     return cast(bytes, ret)
 
 
-def unpackb(packed: bytes, ext_hook_mapping: Mapping[int, ExtFunc] | None = None, **kwargs: Any) -> Any:
+def unpackb(
+    packed: bytes, ext_hook_mapping: Mapping[int, ExtFunc] | None = None, **kwargs: Any
+) -> Any:
     opts = {**DEFAULT_UNPACK_OPTS, **kwargs}
     if ext_hook_mapping is not None:
         opts["ext_hook"] = _Deserializer(ext_hook_mapping).ext_hook

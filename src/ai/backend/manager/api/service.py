@@ -100,7 +100,6 @@ from .utils import (
     get_access_key_scopes,
     pydantic_params_api_handler,
     pydantic_response_api_handler,
-    undefined,
 )
 
 if TYPE_CHECKING:

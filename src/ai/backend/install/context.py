@@ -18,7 +18,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
-from typing import Any
 from pathlib import Path
 from typing import Any, Final
 

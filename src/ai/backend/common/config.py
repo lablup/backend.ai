@@ -4,7 +4,7 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import humps
 import tomli

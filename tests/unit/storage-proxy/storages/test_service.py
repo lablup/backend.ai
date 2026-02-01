@@ -70,7 +70,9 @@ _PRESIGNED_TEST_KEY = "presigned-test-key"
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_success(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_stream_upload_success(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test successful stream upload"""
 
     test_stream = TestStreamReader([b"chunk 1", b"chunk 2"])
@@ -112,7 +114,9 @@ async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageServi
 
 
 @pytest.mark.asyncio
-async def test_stream_download_success(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_stream_download_success(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test successful stream download after upload"""
 
     # First upload a test file
@@ -137,7 +141,9 @@ async def test_stream_download_success(s3_client: object, storages_service: Obje
 
 
 @pytest.mark.asyncio
-async def test_stream_download_nonexistent_file(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_stream_download_nonexistent_file(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test stream download of nonexistent file"""
     with pytest.raises(FileStreamDownloadError):
         file_stream = await storages_service.stream_download(
@@ -148,7 +154,9 @@ async def test_stream_download_nonexistent_file(s3_client: object, storages_serv
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_success(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_get_object_info_success(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test successful object info retrieval"""
 
     # First upload a test file
@@ -169,7 +177,9 @@ async def test_get_object_info_success(s3_client: object, storages_service: Obje
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_nonexistent_file(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_get_object_info_nonexistent_file(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test object info retrieval for nonexistent file"""
     with pytest.raises(ObjectInfoFetchError):
         await storages_service.get_object_info(
@@ -192,7 +202,9 @@ async def test_get_object_info_invalid_bucket(storages_service: ObjectStorageSer
 
 
 @pytest.mark.asyncio
-async def test_delete_object_success(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_delete_object_success(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test successful object deletion"""
 
     # First upload a test file
@@ -207,7 +219,9 @@ async def test_delete_object_success(s3_client: object, storages_service: Object
 
 
 @pytest.mark.asyncio
-async def test_delete_object_nonexistent_file(s3_client: object, storages_service: ObjectStorageService) -> None:
+async def test_delete_object_nonexistent_file(
+    s3_client: object, storages_service: ObjectStorageService
+) -> None:
     """Test deletion of nonexistent file (should still return success)"""
     await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
 

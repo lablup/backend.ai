@@ -30,9 +30,9 @@ class MockFilterOptions:
     status: str | None = None
 
     # Logical operations
-    AND: list["MockFilterOptions"] | None = None
-    OR: list["MockFilterOptions"] | None = None
-    NOT: list["MockFilterOptions"] | None = None
+    AND: list[MockFilterOptions] | None = None
+    OR: list[MockFilterOptions] | None = None
+    NOT: list[MockFilterOptions] | None = None
 
 
 class MockFilterApplier(BaseFilterApplier[MockFilterOptions]):

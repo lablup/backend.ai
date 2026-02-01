@@ -112,8 +112,15 @@ class TestCreateDomain:
                 {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
             ),
             allowed_vfolder_hosts=VFolderHostPermissionMap({
-                "host1": {VFolderHostPermission.UPLOAD_FILE, VFolderHostPermission.DOWNLOAD_FILE, VFolderHostPermission.MOUNT_IN_SESSION},
-                "host2": {VFolderHostPermission.DOWNLOAD_FILE, VFolderHostPermission.MOUNT_IN_SESSION},
+                "host1": {
+                    VFolderHostPermission.UPLOAD_FILE,
+                    VFolderHostPermission.DOWNLOAD_FILE,
+                    VFolderHostPermission.MOUNT_IN_SESSION,
+                },
+                "host2": {
+                    VFolderHostPermission.DOWNLOAD_FILE,
+                    VFolderHostPermission.MOUNT_IN_SESSION,
+                },
             }),
             allowed_docker_registries=["docker.io", "registry.example.com"],
             dotfiles=b"\x90",

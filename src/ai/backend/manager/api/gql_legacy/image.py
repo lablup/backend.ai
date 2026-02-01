@@ -399,7 +399,9 @@ class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ImagePermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ImagePermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
         return None
@@ -587,7 +589,9 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     def from_legacy_image(
         cls, image: Image, *, permissions: Iterable[ImagePermission] | None = None
     ) -> ImageNode:
-        labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list[Any], image.labels)}
+        labels: dict[str, str] = {
+            kvpair.key: kvpair.value for kvpair in cast(list[Any], image.labels)
+        }
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         return cls(
             id=image.id,

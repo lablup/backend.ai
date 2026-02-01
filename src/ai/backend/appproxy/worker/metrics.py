@@ -282,7 +282,9 @@ async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> N
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
-        _tasks: list[asyncio.Task[list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None]] = [
+        _tasks: list[
+            asyncio.Task[list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None]
+        ] = [
             asyncio.create_task(gather_inference_measures(root_ctx.http_client_pool, c))
             for c in inference_circuits
         ]

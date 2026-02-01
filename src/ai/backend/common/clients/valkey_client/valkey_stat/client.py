@@ -297,7 +297,9 @@ class ValkeyStatClient:
         )
 
     @valkey_stat_resilience.apply()
-    async def get_session_statistics_batch(self, session_ids: list[str]) -> list[dict[str, Any] | None]:
+    async def get_session_statistics_batch(
+        self, session_ids: list[str]
+    ) -> list[dict[str, Any] | None]:
         """
         Get statistics for multiple sessions efficiently.
 

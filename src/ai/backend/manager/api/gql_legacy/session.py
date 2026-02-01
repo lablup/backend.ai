@@ -182,7 +182,9 @@ class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ComputeSessionPermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ComputeSessionPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
         return None

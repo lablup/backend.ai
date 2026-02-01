@@ -166,6 +166,13 @@ async def test_allowed_session_types_check(mock_query: MagicMock) -> None:
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as exc_not_found_4:
         result = await check_scaling_group(
-            mock_conn, scaling_group_opt, session_type, test_access_key, test_domain_name, test_group_id
+            mock_conn,
+            scaling_group_opt,
+            session_type,
+            test_access_key,
+            test_domain_name,
+            test_group_id,
         )
-    assert f"No scaling groups accept the session type '{session_type}'." in str(exc_not_found_4.value)
+    assert f"No scaling groups accept the session type '{session_type}'." in str(
+        exc_not_found_4.value
+    )

@@ -80,7 +80,9 @@ class NoPagination(QueryPagination):
         """No pagination applied - returns query unchanged."""
         return query
 
-    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
+    def compute_page_info(
+        self, rows: list[Row[Any]], _total_count: int
+    ) -> PageInfoResult[Row[Any]]:
         """No pagination - no next/previous pages."""
         return PageInfoResult(
             rows=rows,
@@ -166,7 +168,9 @@ class CursorForwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.first + 1)
 
-    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
+    def compute_page_info(
+        self, rows: list[Row[Any]], _total_count: int
+    ) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for cursor-based forward pagination."""
 
         # has_previous_page is True only if cursor was provided (meaning we're past the first page)
@@ -218,7 +222,9 @@ class CursorBackwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.last + 1)
 
-    def compute_page_info(self, rows: list[Row[Any]], _total_count: int) -> PageInfoResult[Row[Any]]:
+    def compute_page_info(
+        self, rows: list[Row[Any]], _total_count: int
+    ) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for cursor-based backward pagination."""
 
         # has_next_page is True only if cursor was provided (meaning there are items after this page)

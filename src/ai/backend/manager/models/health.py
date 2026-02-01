@@ -10,7 +10,6 @@ from pydantic import (
     BaseModel,
     Field,
 )
-from sqlalchemy.pool import Pool
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter

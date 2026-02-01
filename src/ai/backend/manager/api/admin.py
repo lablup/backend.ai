@@ -84,7 +84,9 @@ class CustomGraphQLView(GraphQLView):
 
 
 class GQLLoggingMiddleware:
-    def resolve(self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         if info.path.prev is None:  # indicates the root query
             graph_ctx = info.context
             log.info(

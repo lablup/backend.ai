@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import Column, Integer, String

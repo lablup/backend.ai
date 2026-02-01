@@ -184,7 +184,10 @@ def test_resource_slot_serialization() -> None:
     # while from_json() treats those values as stringified decimal expressions "as-is".
 
     # from_user_input expects Mapping[SlotName, SlotTypes]
-    st_user_input: dict[SlotName, SlotTypes] = {SlotName("a"): SlotTypes("count"), SlotName("b"): SlotTypes("bytes")}
+    st_user_input: dict[SlotName, SlotTypes] = {
+        SlotName("a"): SlotTypes("count"),
+        SlotName("b"): SlotTypes("bytes"),
+    }
     r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st_user_input)
     r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st_user_input)
     r3 = ResourceSlot.from_user_input({"a": "1"}, st_user_input)
@@ -219,7 +222,9 @@ def test_resource_slot_serialization() -> None:
     assert r2 == ResourceSlot.from_json({"a": "2", "b": "1073741824"})
     assert r3 == ResourceSlot.from_json({"a": "1", "b": "0"})
 
-    r4 = ResourceSlot.from_user_input({"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st_user_input)
+    r4 = ResourceSlot.from_user_input(
+        {"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st_user_input
+    )
     assert not r4["a"].is_finite()
     assert not r4["b"].is_finite()
     assert r4["a"] > 0

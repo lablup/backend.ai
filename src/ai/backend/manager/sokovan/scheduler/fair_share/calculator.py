@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot
@@ -43,6 +43,7 @@ class DecayedUsagesByLevel(TypedDict):
     domain: dict[str, ResourceSlot]
     project: dict[UUID, ResourceSlot]
     user: dict[UserProjectKey, ResourceSlot]
+
 
 # Default resource weights for fair share calculation
 DEFAULT_RESOURCE_WEIGHTS: ResourceSlot = ResourceSlot({

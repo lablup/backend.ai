@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 

@@ -282,20 +282,20 @@ def test_image_ref_parsing() -> None:
         result = ImageRef.parse_image_str("//127.0.0.1:5000/xyz")
 
     with pytest.raises(ValueError):
-        ref_err: ImageRef = ImageRef.from_image_str("a:!", default_repository, default_registry)
+        _ref_err: ImageRef = ImageRef.from_image_str("a:!", default_repository, default_registry)
 
     with pytest.raises(ValueError):
-        ref_err = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "127.0.0.1:5000/a:-x-", default_repository, default_registry
         )
 
     with pytest.raises(ValueError):
-        ref_err = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "http://127.0.0.1:5000/xyz", default_repository, default_registry
         )
 
     with pytest.raises(ValueError):
-        ref_err = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "//127.0.0.1:5000/xyz", default_repository, default_registry
         )
 
@@ -516,8 +516,12 @@ def test_image_ref_merge_aliases() -> None:
             "lablup/python-tensorflow:1.7-py37-ubuntu16.04", default_repository, default_registry
         ),  # 6
     ]
-    aliases_list: list[collections.abc.Mapping[str, ImageRef]] = [ref.generate_aliases() for ref in refs]
-    merged_aliases: collections.abc.Mapping[str, ImageRef] = functools.reduce(ImageRef.merge_aliases, aliases_list)
+    aliases_list: list[collections.abc.Mapping[str, ImageRef]] = [
+        ref.generate_aliases() for ref in refs
+    ]
+    merged_aliases: collections.abc.Mapping[str, ImageRef] = functools.reduce(
+        ImageRef.merge_aliases, aliases_list
+    )
     assert merged_aliases["python-tensorflow"] is refs[6]
     assert merged_aliases["python-tensorflow:1.5"] is refs[4]
     assert merged_aliases["python-tensorflow:1.7"] is refs[6]

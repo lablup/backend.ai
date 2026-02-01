@@ -1,6 +1,6 @@
-from .base import Trafaret, TrafaretMeta
-
 from typing import Any
+
+from .base import Trafaret, TrafaretMeta
 
 class NumberMeta(TrafaretMeta):
     def __getitem__(cls, slice_: Any) -> Any: ...

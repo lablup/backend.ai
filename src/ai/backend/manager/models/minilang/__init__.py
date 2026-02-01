@@ -27,16 +27,22 @@ class EnumFieldItem[TEnum: Enum](NamedTuple):
 
 
 FieldSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem, Callable[[str], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem,
+    Callable[[str], Any] | None,
 ]
 OrderSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any], Callable[[sa.Column[Any]], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any],
+    Callable[[sa.Column[Any]], Any] | None,
 ]
 
 
 def get_col_from_table(
     table: sa.Table | sa.sql.Join | type, column_name: str
-) -> sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]:
+) -> (
+    sa.Column[Any]
+    | sa.orm.attributes.InstrumentedAttribute[Any]
+    | sa.sql.elements.KeyedColumnElement[Any]
+):
     if isinstance(table, (sa.Table, sa.sql.Join)):
         col: sa.Column[Any] | sa.sql.elements.KeyedColumnElement[Any] = table.c[column_name]
         return col

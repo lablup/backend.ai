@@ -211,9 +211,7 @@ class TestLeaderCron:
         # Stop the cron
         await leader_cron_with_event_tasks.stop()
 
-    async def test_leadership_change_during_execution(
-        self, mock_tasks: list[MockTask]
-    ) -> None:
+    async def test_leadership_change_during_execution(self, mock_tasks: list[MockTask]) -> None:
         """Test behavior when leadership changes during execution."""
         # Create LeaderCron with mock tasks
         leader_cron = LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))

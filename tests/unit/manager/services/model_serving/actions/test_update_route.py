@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Any, cast
 
 import uuid
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -148,7 +148,9 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_check_user_access_update_route(self, mocker: Any, model_serving_service: Any)-> AsyncMock:
+    def mock_check_user_access_update_route(
+        self, mocker: Any, model_serving_service: Any
+    ) -> AsyncMock:
         mock = cast(
             AsyncMock,
             mocker.patch.object(
@@ -174,7 +176,7 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_update_route_traffic(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
+    def mock_update_route_traffic(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
         return cast(
             AsyncMock,
             mocker.patch.object(
@@ -185,7 +187,9 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_get_endpoint_for_appproxy_update(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
+    def mock_get_endpoint_for_appproxy_update(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
         return cast(
             AsyncMock,
             mocker.patch.object(

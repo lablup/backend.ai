@@ -107,7 +107,9 @@ def test_set_and_get_config(mocker: MockerFixture, cfg_params: dict[str, Any]) -
     assert get_config() == cfg
 
 
-def test_get_config_return_default_config_when_config_is_none(mocker: MockerFixture, cfg_params: dict[str, Any]) -> None:
+def test_get_config_return_default_config_when_config_is_none(
+    mocker: MockerFixture, cfg_params: dict[str, Any]
+) -> None:
     mocker.patch("ai.backend.client.config._config", None)
     mocker.patch(
         "os.environ",

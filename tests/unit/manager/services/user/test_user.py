@@ -77,7 +77,9 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_create_user_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_create_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that CreateUserAction has the expected structure from test scenarios."""
         # Mock successful user creation
         mock_user_data = MagicMock()
@@ -116,7 +118,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].create_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_user_with_container_config(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_create_user_with_container_config(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test 1.5: Container UID/GID configuration support."""
         mock_user_data = MagicMock()
         mock_dependencies["user_repository"].create_user_validated = AsyncMock(
@@ -153,7 +157,9 @@ class TestUserServiceCompatibility:
         assert user_data.spec.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
-    async def test_modify_user_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_modify_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that ModifyUserAction supports the expected modifications."""
         mock_user_data = MagicMock()
         mock_user_data.full_name = "Updated Name"
@@ -179,7 +185,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_user_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_delete_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that DeleteUserAction works as expected."""
         mock_dependencies["user_repository"].soft_delete_user_validated = AsyncMock()
 
@@ -191,7 +199,9 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_purge_user_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_purge_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that PurgeUserAction handles the expected scenarios."""
         # Mock user data
         mock_user_data = MagicMock()
@@ -222,7 +232,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].purge_user.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_user_month_stats_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_user_month_stats_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that UserMonthStatsAction works as expected."""
         mock_stats = [{"cpu_time": 3600, "memory_usage": 2048}]
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats = AsyncMock(
@@ -239,7 +251,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_admin_month_stats_action_structure(self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]) -> None:
+    async def test_admin_month_stats_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that AdminMonthStatsAction works as expected."""
         mock_stats = [{"total_users": 100, "total_cpu_time": 360000}]
         mock_dependencies["user_repository"].get_admin_time_binned_monthly_stats = AsyncMock(

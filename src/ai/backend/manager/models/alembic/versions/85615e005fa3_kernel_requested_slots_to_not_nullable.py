@@ -6,8 +6,8 @@ Create Date: 2023-09-22 12:37:31.725324
 
 """
 
-from typing import Any, cast
 from collections.abc import Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op

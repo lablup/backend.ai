@@ -273,9 +273,7 @@ class URLColumn(TypeDecorator[yarl.URL]):
         return None
 
 
-class IPColumn(
-    TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]
-):
+class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -292,9 +290,9 @@ class IPColumn(
             return None
         if isinstance(value, str):
             try:
-                cidr: ReadableCIDR[
-                    ipaddress.IPv4Network | ipaddress.IPv6Network
-                ] = ReadableCIDR(value)
+                cidr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = ReadableCIDR(
+                    value
+                )
                 cidr_addr = cidr.address
                 if cidr_addr is None:
                     return None

@@ -222,7 +222,9 @@ def with_vfolder_status_checked(
             return await handler(request, row, *args, **kwargs)
 
         return cast(
-            Callable[Concatenate[web.Request, Sequence[Mapping[str, Any]], P], Awaitable[web.Response]],
+            Callable[
+                Concatenate[web.Request, Sequence[Mapping[str, Any]], P], Awaitable[web.Response]
+            ],
             _wrapped,
         )
 

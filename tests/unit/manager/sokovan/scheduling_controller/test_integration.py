@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 from pathlib import PurePosixPath
-from typing import cast, Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -485,7 +485,9 @@ class TestMultiContainerSession:
 class TestEdgeCases:
     """Test edge cases and error scenarios."""
 
-    async def test_agent_preassignment(self, scheduling_controller: Any, mock_repository: Any) -> None:
+    async def test_agent_preassignment(
+        self, scheduling_controller: Any, mock_repository: Any
+    ) -> None:
         """Test session with pre-assigned agents."""
         spec = SessionCreationSpec(
             session_creation_id="test-preassigned",
@@ -656,7 +658,9 @@ class TestEdgeCases:
         session_data = mock_repository.enqueue_session.call_args[0][0]
         assert session_data.network_type == NetworkType.HOST
 
-    async def test_session_dependencies(self, scheduling_controller: Any, mock_repository: Any) -> None:
+    async def test_session_dependencies(
+        self, scheduling_controller: Any, mock_repository: Any
+    ) -> None:
         """Test session with dependencies."""
         dependency_ids = [SessionId(uuid.uuid4()) for _ in range(3)]
 

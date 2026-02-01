@@ -6,8 +6,6 @@ Create Date: 2019-06-06 15:02:58.804516
 
 """
 
-from typing import Any, cast
-
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.sql.expression import bindparam

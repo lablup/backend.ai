@@ -2,11 +2,11 @@ import io
 import re
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import tomlkit
 from tomlkit.exceptions import NonExistentKey
-from tomlkit.items import AbstractTable, Item
+from tomlkit.items import AbstractTable
 
 rx_index = re.compile(r"^(?P<key>\w+)(\[(?P<index>\d+)\])?$")
 

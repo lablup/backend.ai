@@ -95,7 +95,9 @@ class ManagerHTTPClient:
             response.raise_for_status()
             return await response.json()
 
-    async def _request_stream(self, method: str, rel_url: str, **kwargs: Any) -> AsyncIterator[bytes]:
+    async def _request_stream(
+        self, method: str, rel_url: str, **kwargs: Any
+    ) -> AsyncIterator[bytes]:
         headers = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
 

@@ -37,7 +37,11 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]
+    column: (
+        sa.Column[Any]
+        | sa.orm.attributes.InstrumentedAttribute[Any]
+        | sa.sql.elements.KeyedColumnElement[Any]
+    )
     order_direction: OrderDirection
 
 
@@ -51,7 +55,11 @@ class QueryOrderTransformer(Transformer[Any, Any]):
 
     def _get_col(
         self, col_name: str
-    ) -> sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]:
+    ) -> (
+        sa.Column[Any]
+        | sa.orm.attributes.InstrumentedAttribute[Any]
+        | sa.sql.elements.KeyedColumnElement[Any]
+    ):
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]
@@ -97,7 +105,9 @@ class QueryOrderParser:
     ) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
-            result: list[OrderingItem] = QueryOrderTransformer(table, self._column_map).transform(ast)
+            result: list[OrderingItem] = QueryOrderTransformer(table, self._column_map).transform(
+                ast
+            )
             return result
         except LarkError as e:
             raise ValueError(f"Query ordering parsing error: {e}") from e

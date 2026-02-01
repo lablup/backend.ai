@@ -1,13 +1,12 @@
 import json
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from aiohttp import web
 from dateutil.tz import gettz, tzutc
-
-from typing import Any
 
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
 from ai.backend.manager.errors.auth import InvalidAuthParameters

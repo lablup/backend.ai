@@ -13,7 +13,6 @@ from typing import (
     Concatenate,
     ParamSpec,
     TypeVar,
-    cast,
     overload,
 )
 

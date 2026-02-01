@@ -423,7 +423,9 @@ def prettify_traceback(exc: BaseException | None) -> str:
         return f"Traceback:\n{buf.getvalue()}"
 
 
-def catch_unexpected(log: Any, reraise_cancellation: bool = True, raven: Any = None) -> Callable[..., Any]:
+def catch_unexpected(
+    log: Any, reraise_cancellation: bool = True, raven: Any = None
+) -> Callable[..., Any]:
     def _wrap(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         async def _wrapped(*args: Any, **kwargs: Any) -> Any:

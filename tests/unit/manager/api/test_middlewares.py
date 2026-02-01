@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestClient
 
 from ai.backend.manager.api.utils import method_placeholder
 from ai.backend.manager.server import api_middleware

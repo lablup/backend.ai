@@ -9,13 +9,12 @@ Create Date: 2019-05-30 18:40:17.669756
 import math
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import bindparam
-
-from typing import Any, cast
 
 from ai.backend.manager.models.base import IDColumn, ResourceSlotColumn, convention
 

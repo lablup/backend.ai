@@ -412,7 +412,9 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
     try:
-        client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = ReadableCIDR(raw_client_addr, is_network=False)
+        client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = ReadableCIDR(
+            raw_client_addr, is_network=False
+        )
     except InvalidIpAddressValue as e:
         raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value") from e
     if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):

@@ -23,8 +23,8 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskUpdatedEvent,
 )
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
 
 
 class ContextSentinel(enum.Enum):
@@ -36,7 +36,9 @@ async def message_queue(
     redis_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[RedisQueue]:
     _, redis_addr = redis_container
-    redis_target = RedisTarget(addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={})
+    redis_target = RedisTarget(
+        addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={}
+    )
     message_queue = await RedisQueue.create(
         redis_target,
         RedisMQArgs(
@@ -96,7 +98,9 @@ async def valkey_bgtask_client(
     redis_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[ValkeyBgtaskClient]:
     _, redis_addr = redis_container
-    redis_target = RedisTarget(addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={})
+    redis_target = RedisTarget(
+        addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={}
+    )
 
     valkey_target = ValkeyTarget(
         addr=redis_addr.address,

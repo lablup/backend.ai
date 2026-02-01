@@ -72,9 +72,9 @@ def logging_config() -> Generator[LoggingConfig, None, None]:
 def local_config(
     test_id: str,
     logging_config: LoggingConfig,
-    etcd_container: tuple[object, object],
-    redis_container: tuple[object, object],
-) -> Generator[AgentUnifiedConfig, None, None]:  # noqa: F811
+    etcd_container: tuple[object, object],  # noqa: F811
+    redis_container: tuple[object, object],  # noqa: F811
+) -> Generator[AgentUnifiedConfig, None, None]:
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -164,7 +164,9 @@ def local_config(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(session_mocker: MockerFixture, test_id: str) -> Generator[None, None, None]:
+def test_local_instance_id(
+    session_mocker: MockerFixture, test_id: str
+) -> Generator[None, None, None]:
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )

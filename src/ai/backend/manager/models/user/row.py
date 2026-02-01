@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    cast,
 )
 from uuid import UUID
 
@@ -201,9 +200,9 @@ class UserRow(Base):  # type: ignore[misc]
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )
-    allowed_client_ip: Mapped[list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None] = mapped_column(
-        "allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True
-    )
+    allowed_client_ip: Mapped[
+        list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None
+    ] = mapped_column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True)
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
     totp_activated: Mapped[bool | None] = mapped_column(
         "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
@@ -383,7 +382,6 @@ class UserRow(Base):  # type: ignore[misc]
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
         # `cast()` requires import of KeyPairRow
-        from ai.backend.manager.models.keypair import KeyPairRow
 
         keypair_candidate: KeyPairRow | None = None
         main_keypair_row = self.main_keypair

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast, Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -153,13 +153,13 @@ class TestListModelService:
         self, mocker: Any, mock_repositories: MagicMock
     ) -> AsyncMock:
         return cast(
-        AsyncMock,
-        mocker.patch.object(
-            mock_repositories.repository,
-            "list_endpoints_by_owner_validated",
-            new_callable=AsyncMock,
-        ),
-    )
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "list_endpoints_by_owner_validated",
+                new_callable=AsyncMock,
+            ),
+        )
 
     @pytest.mark.parametrize(
         "scenario",
@@ -250,7 +250,9 @@ class TestListModelService:
 
         mock_list_endpoints_by_owner_validated.return_value = mock_endpoints
 
-        async def list_model_service(action: ListModelServiceAction) -> ListModelServiceActionResult:
+        async def list_model_service(
+            action: ListModelServiceAction,
+        ) -> ListModelServiceActionResult:
             return await model_serving_processors.list_model_service.wait_for_complete(action)
 
         await scenario.test(list_model_service)

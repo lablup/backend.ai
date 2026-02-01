@@ -52,7 +52,7 @@ class NotUnpicklableClass:
         if x == 1:
             raise TypeError("this is not unpicklable")
 
-    def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:
+    def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:  # noqa: F821
         return type(self), (1,)
 
 

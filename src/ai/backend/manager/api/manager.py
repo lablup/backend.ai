@@ -9,7 +9,7 @@ import socket
 import textwrap
 from collections.abc import Callable, Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final
 
 import aiohttp_cors
 import attrs
@@ -31,7 +31,6 @@ from ai.backend.manager.errors.common import GenericBadRequest, ServerFrozen, Se
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.health import (
-    SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
@@ -85,7 +84,9 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-    def resolve(self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if (
             info.operation.operation == "mutation"

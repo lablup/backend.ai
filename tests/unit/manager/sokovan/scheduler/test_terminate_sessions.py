@@ -4,11 +4,11 @@ Tests the batch termination of sessions marked with TERMINATING status.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import asyncio
 import time
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 

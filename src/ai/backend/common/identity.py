@@ -235,7 +235,9 @@ def _define_functions() -> None:
                 if data is None:
                     return "127.0.0.1"
                 o = json.loads(data)
-                result: str = o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+                result: str = o["network"]["interface"][0]["ipv4"]["ipAddress"][0][
+                    "privateIpAddress"
+                ]
                 return result
 
             async def _get_instance_type() -> str:

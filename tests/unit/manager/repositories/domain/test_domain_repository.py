@@ -177,7 +177,10 @@ class TestDomainRepository:
                     {"cpu": "8", "mem": "16g"}, None
                 ),
                 "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": {VFolderHostPermission(p) for p in ["modify-vfolder", "upload-file", "download-file"]}
+                    "local": {
+                        VFolderHostPermission(p)
+                        for p in ["modify-vfolder", "upload-file", "download-file"]
+                    }
                 }),
                 "allowed_docker_registries": ["registry.example.com"],
                 "dotfiles": b"test dotfiles",

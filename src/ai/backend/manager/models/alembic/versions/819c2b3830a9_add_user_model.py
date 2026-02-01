@@ -106,8 +106,8 @@ def upgrade() -> None:
         if email in [None, ""]:
             continue
         # Try to get a user whose email matches with current keypair's email
-        query = sa.select(users.c.uuid, users.c.role).select_from(users).where(
-            users.c.email == email
+        query = (
+            sa.select(users.c.uuid, users.c.role).select_from(users).where(users.c.email == email)
         )
         user_row = connection.execute(query).first()
         if user_row:
@@ -116,8 +116,8 @@ def upgrade() -> None:
             user_uuid = user_dict["uuid"]
             role = UserRole.ADMIN if is_admin else UserRole.USER
             if role == UserRole.ADMIN and user_dict["role"] != UserRole.ADMIN:
-                update_stmt = sa.update(users).values(role=UserRole.ADMIN).where(
-                    users.c.email == email
+                update_stmt = (
+                    sa.update(users).values(role=UserRole.ADMIN).where(users.c.email == email)
                 )
                 connection.execute(update_stmt)
         else:
@@ -140,8 +140,8 @@ def upgrade() -> None:
             assert new_user_row is not None, "User insertion failed"
             user_uuid = new_user_row[0]
         # Update current keypair's `user` field with associated user's uuid.
-        update_keypair_stmt = sa.update(keypairs).values(user=user_uuid).where(
-            keypairs.c.access_key == access_key
+        update_keypair_stmt = (
+            sa.update(keypairs).values(user=user_uuid).where(keypairs.c.access_key == access_key)
         )
         connection.execute(update_keypair_stmt)
 

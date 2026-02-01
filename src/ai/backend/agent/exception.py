@@ -63,7 +63,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
-    def __reduce__(self) -> tuple[type[InsufficientResource], tuple[Any, ...]]:
+    def __reduce__(self) -> tuple[type[InsufficientResource], tuple[Any, ...]]:  # noqa: F821
         return (
             self.__class__,
             (
@@ -92,7 +92,7 @@ class FractionalResourceFragmented(ResourceError):
             + f"allocating {self.requested_alloc} from {self.dev_allocs})"
         )
 
-    def __reduce__(self) -> tuple[type[FractionalResourceFragmented], tuple[Any, ...]]:
+    def __reduce__(self) -> tuple[type[FractionalResourceFragmented], tuple[Any, ...]]:  # noqa: F821
         return (
             self.__class__,
             (
@@ -112,7 +112,9 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, message: str | None = None, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, container_id: str, message: str | None = None, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.container_id = container_id
         self.message = message

@@ -13,7 +13,9 @@ from ai.backend.common.types import ValkeyTarget
 
 class TestValkeyStatClient:
     @pytest.fixture
-    async def test_valkey_stat(self, redis_container: tuple[str, HostPortPairModel]) -> AsyncIterator[ValkeyStatClient]:
+    async def test_valkey_stat(
+        self, redis_container: tuple[str, HostPortPairModel]
+    ) -> AsyncIterator[ValkeyStatClient]:
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(
             addr=hostport_pair.address,

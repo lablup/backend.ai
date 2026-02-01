@@ -31,7 +31,9 @@ async def async_handler() -> Handler:
         "metadata.oraclecloud.com",
     ],
 )
-async def test_reject_metadata_local_link_policy(async_handler: Handler, meta_local_link: str) -> None:
+async def test_reject_metadata_local_link_policy(
+    async_handler: Handler, meta_local_link: str
+) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[reject_metadata_local_link_policy], response_policies=[]
@@ -54,7 +56,9 @@ async def test_reject_metadata_local_link_policy(async_handler: Handler, meta_lo
         ".svn",
     ],
 )
-async def test_reject_access_for_unsafe_file_policy(async_handler: Handler, url_suffix: str) -> None:
+async def test_reject_access_for_unsafe_file_policy(
+    async_handler: Handler, url_suffix: str
+) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[reject_access_for_unsafe_file_policy], response_policies=[]

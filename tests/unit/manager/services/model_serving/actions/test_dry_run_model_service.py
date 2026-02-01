@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast, Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -158,15 +158,15 @@ class TestDryRunModelService:
         return mock
 
     @pytest.fixture
-    def mock_get_user_with_keypair(self, mocker: Any, mock_repositories: Any)-> AsyncMock:
+    def mock_get_user_with_keypair(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
         return cast(
-        AsyncMock,
-        mocker.patch.object(
-            mock_repositories.repository,
-            "get_user_with_keypair",
-            new_callable=AsyncMock,
-        ),
-    )
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_user_with_keypair",
+                new_callable=AsyncMock,
+            ),
+        )
 
     @pytest.fixture
     def mock_resolve_image_for_endpoint_creation_dry_run(
@@ -175,24 +175,26 @@ class TestDryRunModelService:
         mock = cast(
             AsyncMock,
             mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
-        ),
+                mock_repositories.repository,
+                "resolve_image_for_endpoint_creation",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = MagicMock(image_ref="test-image:latest")
         return mock
 
     @pytest.fixture
-    def mock_background_task_manager_start(self, mocker: Any, mock_background_task_manager: Any)-> AsyncMock:
+    def mock_background_task_manager_start(
+        self, mocker: Any, mock_background_task_manager: Any
+    ) -> AsyncMock:
         return cast(
-        AsyncMock,
-        mocker.patch.object(
-            mock_background_task_manager,
-            "start",
-            new_callable=AsyncMock,
-        ),
-    )
+            AsyncMock,
+            mocker.patch.object(
+                mock_background_task_manager,
+                "start",
+                new_callable=AsyncMock,
+            ),
+        )
 
     @pytest.mark.parametrize(
         "scenario",
@@ -266,7 +268,9 @@ class TestDryRunModelService:
         expected = cast(DryRunModelServiceActionResult, scenario.expected)
         mock_background_task_manager_start.return_value = expected.task_id
 
-        async def dry_run_model_service(action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
+        async def dry_run_model_service(
+            action: DryRunModelServiceAction,
+        ) -> DryRunModelServiceActionResult:
             return await model_serving_processors.dry_run_model_service.wait_for_complete(action)
 
         await scenario.test(dry_run_model_service)

@@ -413,14 +413,20 @@ class KernelSchedulingHistoryConditions:
     @staticmethod
     def by_from_phase(phase: KernelSchedulingPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], KernelSchedulingHistoryRow.from_phase == str(phase))
+            return cast(
+                sa.sql.expression.ColumnElement[bool],
+                KernelSchedulingHistoryRow.from_phase == str(phase),
+            )
 
         return inner
 
     @staticmethod
     def by_to_phase(phase: KernelSchedulingPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], KernelSchedulingHistoryRow.to_phase == str(phase))
+            return cast(
+                sa.sql.expression.ColumnElement[bool],
+                KernelSchedulingHistoryRow.to_phase == str(phase),
+            )
 
         return inner
 
@@ -885,14 +891,18 @@ class RouteHistoryConditions:
     @staticmethod
     def by_from_status(status: RouteStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], RouteHistoryRow.from_status == status.value)
+            return cast(
+                sa.sql.expression.ColumnElement[bool], RouteHistoryRow.from_status == status.value
+            )
 
         return inner
 
     @staticmethod
     def by_to_status(status: RouteStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], RouteHistoryRow.to_status == status.value)
+            return cast(
+                sa.sql.expression.ColumnElement[bool], RouteHistoryRow.to_status == status.value
+            )
 
         return inner
 

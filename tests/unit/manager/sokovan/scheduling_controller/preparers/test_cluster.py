@@ -75,7 +75,9 @@ class TestClusterConfigurationRule:
             cluster_size=1,
             priority=10,
             resource_policy={},
-            kernel_specs=[cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})],
+            kernel_specs=[
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})
+            ],
             creation_spec={},
         )
 
@@ -103,7 +105,9 @@ class TestClusterConfigurationRule:
             cluster_size=4,
             priority=10,
             resource_policy={},
-            kernel_specs=[cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})],
+            kernel_specs=[
+                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="test-image")})
+            ],
             creation_spec={},
         )
 
@@ -189,21 +193,30 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                cast(KernelEnqueueingConfig, {
-                    "image_ref": MagicMock(canonical="image1"),
-                    "cluster_role": "main",
-                    "cluster_idx": 1,
-                }),
-                cast(KernelEnqueueingConfig, {
-                    "image_ref": MagicMock(canonical="image2"),
-                    "cluster_role": "sub",
-                    "cluster_idx": 1,
-                }),
-                cast(KernelEnqueueingConfig, {
-                    "image_ref": MagicMock(canonical="image3"),
-                    "cluster_role": "sub",
-                    "cluster_idx": 2,
-                }),
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="image1"),
+                        "cluster_role": "main",
+                        "cluster_idx": 1,
+                    },
+                ),
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="image2"),
+                        "cluster_role": "sub",
+                        "cluster_idx": 1,
+                    },
+                ),
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="image3"),
+                        "cluster_role": "sub",
+                        "cluster_idx": 2,
+                    },
+                ),
             ],
             creation_spec={},
         )
@@ -245,8 +258,14 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1"), "cluster_hostname": "master"}),
-                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image2"), "cluster_hostname": "worker1"}),
+                cast(
+                    KernelEnqueueingConfig,
+                    {"image_ref": MagicMock(canonical="image1"), "cluster_hostname": "master"},
+                ),
+                cast(
+                    KernelEnqueueingConfig,
+                    {"image_ref": MagicMock(canonical="image2"), "cluster_hostname": "worker1"},
+                ),
             ],
             creation_spec={},
         )
@@ -279,17 +298,27 @@ class TestClusterConfigurationRule:
             priority=10,
             resource_policy={},
             kernel_specs=[
-                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1")}),  # Should auto-assign as main
-                cast(KernelEnqueueingConfig, {
-                    "image_ref": MagicMock(canonical="image2"),
-                    "cluster_role": "sub",
-                }),  # Predefined sub
-                cast(KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image3")}),  # Should auto-assign as sub
-                cast(KernelEnqueueingConfig, {
-                    "image_ref": MagicMock(canonical="image4"),
-                    "cluster_role": "sub",
-                    "cluster_idx": 5,
-                }),  # Predefined sub with custom idx
+                cast(
+                    KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image1")}
+                ),  # Should auto-assign as main
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="image2"),
+                        "cluster_role": "sub",
+                    },
+                ),  # Predefined sub
+                cast(
+                    KernelEnqueueingConfig, {"image_ref": MagicMock(canonical="image3")}
+                ),  # Should auto-assign as sub
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="image4"),
+                        "cluster_role": "sub",
+                        "cluster_idx": 5,
+                    },
+                ),  # Predefined sub with custom idx
             ],
             creation_spec={},
         )

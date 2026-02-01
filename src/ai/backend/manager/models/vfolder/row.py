@@ -732,7 +732,9 @@ async def query_accessible_vfolders(
         if extra_vf_user_conds is not None:
             query = query.where(extra_vf_user_conds)
         result = await conn.execute(query)
-        overriding_permissions: dict[uuid.UUID, VFolderPermission] = {row.vfolder: row.permission for row in result}
+        overriding_permissions: dict[uuid.UUID, VFolderPermission] = {
+            row.vfolder: row.permission for row in result
+        }
         for entry in entries:
             if (
                 entry["id"] in overriding_permissions
@@ -777,7 +779,9 @@ async def get_allowed_vfolder_hosts_by_group(
             result_hosts = allowed_hosts | values
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = (
+        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    )
     return final_result
 
 
@@ -834,7 +838,9 @@ async def get_allowed_vfolder_hosts_by_user(
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = (
+        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    )
     return final_result
 
 

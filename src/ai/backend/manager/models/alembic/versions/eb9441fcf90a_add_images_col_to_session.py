@@ -58,7 +58,9 @@ def upgrade() -> None:
             nullable=False,
             primary_key=True,
         )
-        images: sa.Column[list[str] | None] = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
+        images: sa.Column[list[str] | None] = sa.Column(
+            "images", sa.ARRAY(sa.String), nullable=True
+        )
 
     kernel_cnt_result = conn.execute(sa.select(sa.func.count()).select_from(kernels)).scalar()
     kernel_cnt = kernel_cnt_result if kernel_cnt_result is not None else 0

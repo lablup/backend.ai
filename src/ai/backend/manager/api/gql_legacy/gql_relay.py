@@ -261,7 +261,7 @@ class Connection(graphene.ObjectType):  # type: ignore[misc]
             )
 
         super().__init_subclass_with_meta__(_meta=_meta, **options)
-        return None
+        return
 
 
 class ConnectionPaginationOrder(enum.Enum):
@@ -278,7 +278,8 @@ class ConnectionResolverResult[T_Node: ObjectType](NamedTuple):
 
 
 Resolver = (
-    Callable[..., Awaitable[ConnectionResolverResult[Any]]] | Callable[..., ConnectionResolverResult[Any]]
+    Callable[..., Awaitable[ConnectionResolverResult[Any]]]
+    | Callable[..., ConnectionResolverResult[Any]]
 )
 
 

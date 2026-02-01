@@ -24,7 +24,7 @@ depends_on = None
 def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     # partial tables for data migration
-    groups = sa.Table(
+    _groups = sa.Table(
         "groups",
         metadata,
         IDColumn("id"),

@@ -1570,7 +1570,9 @@ def get_dependency_session_tree(root_node: OrderedDict[str, Any]) -> treelib.Tre
 
     dependency_tree.create_node(get_node_name(root_node), get_node_id(root_session_name))
 
-    def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict[str, Any]) -> None:
+    def construct_dependency_tree(
+        session_name: str, dependency_sessions: OrderedDict[str, Any]
+    ) -> None:
         for dependency_session in dependency_sessions:
             dependency_session_name = dependency_session["session_name"]
             session_name_counter[dependency_session_name] += 1

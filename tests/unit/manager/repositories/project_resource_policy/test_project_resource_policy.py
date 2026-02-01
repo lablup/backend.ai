@@ -4,9 +4,9 @@ Tests the repository layer with mocked database operations.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -96,7 +96,9 @@ class TestProjectResourcePolicyRepository:
             yield database_connection
 
     @pytest.fixture
-    def project_resource_policy_repository(self, mock_db_engine: Any)-> ProjectResourcePolicyRepository:
+    def project_resource_policy_repository(
+        self, mock_db_engine: Any
+    ) -> ProjectResourcePolicyRepository:
         """Create ProjectResourcePolicyRepository instance with mocked database"""
         return ProjectResourcePolicyRepository(db=mock_db_engine)
 

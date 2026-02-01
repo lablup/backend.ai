@@ -73,7 +73,9 @@ def patch_dummy_agent_config() -> Generator[None, None, None]:
 
     original_read_from_file = common_config.read_from_file
 
-    def patched_read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
+    def patched_read_from_file(
+        toml_path: Path | str | None, daemon_name: str
+    ) -> tuple[dict[str, Any], Path]:
         # Check if this is the dummy agent config file
         if toml_path and "agent.dummy.toml" in str(toml_path):
             # Return minimal config structure - trafaret will fill in defaults
@@ -96,7 +98,12 @@ def patch_dummy_agent_config() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session")
-def local_config(test_id: str, logging_config: LoggingConfig, etcd_container: Any, redis_container: Any) -> Generator[AgentUnifiedConfig, None, None]:  # noqa: F811
+def local_config(
+    test_id: str,
+    logging_config: LoggingConfig,
+    etcd_container: Any,  # noqa: F811
+    redis_container: Any,  # noqa: F811
+) -> Generator[AgentUnifiedConfig, None, None]:
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"

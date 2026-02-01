@@ -346,7 +346,11 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: AbstractAgent[Any, Any], mode: StatModes | None = None, *, cache_lifespan: int = 120
+        self,
+        agent: AbstractAgent[Any, Any],
+        mode: StatModes | None = None,
+        *,
+        cache_lifespan: int = 120,
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()

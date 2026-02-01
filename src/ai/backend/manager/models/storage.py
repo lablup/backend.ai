@@ -16,7 +16,6 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from ai.backend.common.types import (
     VFolderHostPermission,
-    VFolderHostPermissionMap,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import (

@@ -1320,12 +1320,18 @@ class VFolderMount(JSONSerializableMixin):
 
 class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerializableMixin):
     @overload
-    def __or__(self, value: dict[str, set[VFolderHostPermission]], /) -> dict[str, set[VFolderHostPermission]]: ...
+    def __or__(
+        self, value: dict[str, set[VFolderHostPermission]], /
+    ) -> dict[str, set[VFolderHostPermission]]: ...
 
     @overload
-    def __or__[_T1, _T2](self, value: dict[_T1, _T2], /) -> dict[str | _T1, set[VFolderHostPermission] | _T2]: ...
+    def __or__[T1, T2](
+        self, value: dict[T1, T2], /
+    ) -> dict[str | T1, set[VFolderHostPermission] | T2]: ...
 
-    def __or__(self, value: dict[Any, Any], /) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
+    def __or__(
+        self, value: dict[Any, Any], /
+    ) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
         if self is value:
             return self
         if not isinstance(value, dict):

@@ -1,7 +1,6 @@
 import argparse
 import ipaddress
 import pathlib
-from typing import cast
 
 from .types import HostPortPair
 
