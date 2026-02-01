@@ -123,7 +123,7 @@ def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) ->
     "--output",
     "-o",
     default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 @click.option(
@@ -148,7 +148,7 @@ def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 def dump_openapi(_cli_ctx: CLIContext, output: Path | None) -> None:
