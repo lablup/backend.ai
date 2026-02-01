@@ -38,6 +38,8 @@ class ProxyProtocol(enum.StrEnum):
     HTTP2 = "h2"
     TCP = "tcp"
     PREOPEN = "preopen"
+    VNC = "vnc"
+    RDP = "rdp"
 
 
 class AppMode(enum.StrEnum):
