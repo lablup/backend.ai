@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -80,7 +80,7 @@ class AgentDBSource:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
-                .options(selectinload(AgentRow.kernels))
+                .options(joinedload(AgentRow.kernels))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
