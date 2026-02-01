@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.output.fields import group_fields, quota_scope_fields, user_fields
 from ai.backend.client.output.types import FieldSpec
@@ -52,7 +52,7 @@ class QuotaScope(BaseFunction):
             "email": email,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["user"]
+        return cast(dict[str, Any], data["user"])
 
     @api_function
     @classmethod
@@ -73,7 +73,7 @@ class QuotaScope(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups_by_name"][0]
+        return cast(dict[str, Any], data["groups_by_name"][0])
 
     @api_function
     @classmethod
@@ -96,7 +96,7 @@ class QuotaScope(BaseFunction):
             "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["quota_scope"]["details"]
+        return cast(dict[str, Any], data["quota_scope"]["details"])
 
     @api_function
     @classmethod
@@ -123,7 +123,7 @@ class QuotaScope(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["set_quota_scope"]["quota_scope"]
+        return cast(dict[str, Any], data["set_quota_scope"]["quota_scope"])
 
     @api_function
     @classmethod
@@ -146,4 +146,4 @@ class QuotaScope(BaseFunction):
             "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["unset_quota_scope"]["quota_scope"]
+        return cast(dict[str, Any], data["unset_quota_scope"]["quota_scope"])

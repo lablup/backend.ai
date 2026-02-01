@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityPurgerTestRow(Base):
+class RBACEntityPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACEntityRowProtocol for entity purger testing."""
 
     __tablename__ = "test_rbac_purger"
@@ -1666,7 +1666,7 @@ class TestRBACEntityBatchPurger:
 # =============================================================================
 
 
-class CompositePKPurgerTestRow(Base):
+class CompositePKPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_purger_composite_pk"

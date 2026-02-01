@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACFieldCreatorTestRow(Base):
+class RBACFieldCreatorTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACFieldRow protocol for field creator testing."""
 
     __tablename__ = "test_rbac_field_creator"
@@ -395,7 +395,7 @@ class TestRBACBulkFieldCreator:
 # =============================================================================
 
 
-class CompositePKFieldCreatorTestRow(Base):
+class CompositePKFieldCreatorTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_field_creator_composite_pk"

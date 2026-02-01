@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
@@ -81,4 +81,4 @@ class Storage(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"vfolder_host": vfolder_host}
         data = await api_session.get().Admin._query(query, variables)
-        return data["storage_volume"]
+        return cast(dict[str, Any], data["storage_volume"])

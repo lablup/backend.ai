@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.request import Request
 
@@ -36,4 +36,5 @@ class ServerLog(BaseFunction):
         }
         rqst = Request("GET", "/logs/error", params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result = await resp.json()
+            return cast(Sequence[dict[str, Any]], result)

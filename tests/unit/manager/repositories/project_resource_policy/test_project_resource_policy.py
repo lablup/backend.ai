@@ -214,7 +214,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         result = await project_resource_policy_repository.get_by_name("test-policy")
 
@@ -263,7 +263,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         # Create updater with the new pattern
         spec = ProjectResourcePolicyUpdaterSpec(
@@ -329,7 +329,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.flush = AsyncMock()
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         # Update only one field using Updater pattern
         spec = ProjectResourcePolicyUpdaterSpec(
@@ -364,7 +364,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.delete = AsyncMock()
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         result = await project_resource_policy_repository.delete("test-policy")
 

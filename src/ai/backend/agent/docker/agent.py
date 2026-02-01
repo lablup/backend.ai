@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 
 
 async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
-    avail_volumes = (await docker.volumes.list())["Volumes"]
+    avail_volumes = (await docker.volumes.list())["Volumes"]  # type: ignore[no-untyped-call]
     if not avail_volumes:
         return []
     avail_volume_names = {v["Name"] for v in avail_volumes}
@@ -1571,13 +1571,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     def get_cgroup_version(self) -> str:
-        return self.docker_info["CgroupVersion"]
+        return cast(str, self.docker_info["CgroupVersion"])
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
-            return result["Config"].get("Cmd")
+            return cast(str | None, result["Config"].get("Cmd"))
 
     @override
     async def enumerate_containers(
@@ -2195,7 +2195,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         while True:
             async with closing_async(Docker()) as docker:
-                subscriber = docker.events.subscribe(create_task=True)
+                subscriber = docker.events.subscribe(create_task=True)  # type: ignore[no-untyped-call]
                 try:
                     while True:
                         try:
@@ -2255,6 +2255,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 finally:
                     await asyncio.shield(
                         self.docker_ptask_group.create_task(
-                            docker.events.stop(),
+                            docker.events.stop(),  # type: ignore[no-untyped-call]
                         )
                     )

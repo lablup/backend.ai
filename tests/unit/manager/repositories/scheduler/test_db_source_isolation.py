@@ -76,9 +76,9 @@ async def test_session_methods_use_read_committed() -> None:
     db_source = ScheduleDBSource(mock_db)
 
     # Mock the internal session methods
-    db_source._begin_readonly_session_read_committed = AsyncMock()
-    db_source._begin_session_read_committed = AsyncMock()
-    db_source._begin_readonly_read_committed = AsyncMock()
+    db_source._begin_readonly_session_read_committed = AsyncMock()  # type: ignore[method-assign]
+    db_source._begin_session_read_committed = AsyncMock()  # type: ignore[method-assign]
+    db_source._begin_readonly_read_committed = AsyncMock()  # type: ignore[method-assign]
 
     # Create mock session context managers
     mock_readonly_session = AsyncMock()

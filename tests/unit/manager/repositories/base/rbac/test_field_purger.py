@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACFieldPurgerTestRow(Base):
+class RBACFieldPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACFieldRowProtocol for field purger testing."""
 
     __tablename__ = "test_rbac_field_purger"
@@ -426,7 +426,7 @@ class TestRBACFieldBatchPurger:
 # =============================================================================
 
 
-class CompositePKFieldPurgerTestRow(Base):
+class CompositePKFieldPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_field_purger_composite_pk"

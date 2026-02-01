@@ -104,7 +104,7 @@ async def _generate() -> dict[str, Any]:
     from ai.backend.appproxy.coordinator.server import global_subapp_pkgs
 
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }

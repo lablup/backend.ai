@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.request import Request
 
@@ -70,7 +70,7 @@ class Dotfile(BaseFunction):
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
 
-            return result
+            return cast(list[Mapping[str, str]], result)
 
     def __init__(
         self,
@@ -104,7 +104,7 @@ class Dotfile(BaseFunction):
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
 
-            return result
+            return cast(str, result)
 
     @api_function
     async def update(self, data: str, permission: str) -> dict[str, Any]:

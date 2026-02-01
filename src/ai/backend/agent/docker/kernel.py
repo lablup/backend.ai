@@ -520,8 +520,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
         log.info("checking krunner-env for {}...", distro)
         do_create = False
         try:
-            vol = DockerVolume(docker, volume_name)
-            await vol.show()
+            vol = DockerVolume(docker, volume_name)  # type: ignore[no-untyped-call]
+            await vol.show()  # type: ignore[no-untyped-call]
             # Instead of checking the version from txt files inside the volume,
             # we check the version via the volume name and its existence.
             # This is because:
@@ -540,7 +540,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
             else:
                 log.info("populating {} volume version {}", volume_name, current_version)
-                await docker.volumes.create({
+                await docker.volumes.create({  # type: ignore[no-untyped-call]
                     "Name": volume_name,
                     "Driver": "local",
                 })

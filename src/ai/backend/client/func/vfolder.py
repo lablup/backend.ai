@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 import aiohttp
@@ -590,7 +590,7 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             reply = await resp.json()
-            return reply["results"]
+            return cast(ResultSet, reply["results"])
 
     @api_function
     async def mkdir(

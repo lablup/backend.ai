@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_resource_policy_fields
@@ -100,7 +100,7 @@ class KeypairResourcePolicy(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["create_keypair_resource_policy"]
+        return cast(dict[str, Any], data["create_keypair_resource_policy"])
 
     @api_function
     @classmethod
@@ -146,7 +146,7 @@ class KeypairResourcePolicy(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair_resource_policy"]
+        return cast(dict[str, Any], data["modify_keypair_resource_policy"])
 
     @api_function
     @classmethod
@@ -166,7 +166,7 @@ class KeypairResourcePolicy(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_keypair_resource_policy"]
+        return cast(dict[str, Any], data["delete_keypair_resource_policy"])
 
     @api_function
     @classmethod
@@ -181,7 +181,7 @@ class KeypairResourcePolicy(BaseFunction):
         q = "query { keypair_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["keypair_resource_policies"]
+        return cast(Sequence[dict[str, Any]], data["keypair_resource_policies"])
 
     @api_function
     async def info(
@@ -206,4 +206,4 @@ class KeypairResourcePolicy(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["keypair_resource_policy"]
+        return cast(dict[str, Any], data["keypair_resource_policy"])

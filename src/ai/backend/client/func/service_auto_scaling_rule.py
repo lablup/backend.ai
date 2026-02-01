@@ -1,7 +1,7 @@
 import textwrap
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 from ai.backend.cli.types import Undefined, undefined
@@ -141,7 +141,7 @@ class ServiceAutoScalingRule(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in (fields or _default_fields)))
         variables = {"rule_id": str(self.rule_id)}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint_auto_scaling_rule_node"]
+        return cast(Sequence[dict[str, Any]], data["endpoint_auto_scaling_rule_node"])
 
     @api_function
     async def update(
@@ -186,7 +186,7 @@ class ServiceAutoScalingRule(BaseFunction):
             {"rule_id": str(self.rule_id), "input": inputs},
         )
 
-        return data["modify_endpoint_auto_scaling_rule_node"]
+        return cast(Self, data["modify_endpoint_auto_scaling_rule_node"])
 
     @api_function
     async def delete(self) -> dict[str, Any]:
@@ -205,4 +205,4 @@ class ServiceAutoScalingRule(BaseFunction):
             "rule_id": str(self.rule_id),
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_endpoint_auto_scaling_rule_node"]
+        return cast(dict[str, Any], data["delete_endpoint_auto_scaling_rule_node"])

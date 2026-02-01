@@ -1722,7 +1722,7 @@ class TestGroupRowVFolderHostPermissionMap:
             total_resource_slots={},
             # String lists as passed from GroupCreatorSpec
             allowed_vfolder_hosts=VFolderHostPermissionMap({
-                "local": [VFolderHostPermission.CREATE, VFolderHostPermission.MOUNT_IN_SESSION],
+                "local": {VFolderHostPermission.CREATE, VFolderHostPermission.MOUNT_IN_SESSION},
             }),
             integration_id=None,
             resource_policy=project_resource_policy,

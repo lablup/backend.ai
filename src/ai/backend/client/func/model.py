@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.client.output.fields import vfolder_fields
@@ -73,7 +73,7 @@ class Model(BaseFunction):
             item["name"] for item in versions["items"] if item["type"] == "DIRECTORY"
         ]
         info["versions"].sort(reverse=True)
-        return info
+        return cast(dict[str, Any], info)
 
     @api_function
     @classmethod
@@ -108,7 +108,7 @@ class Model(BaseFunction):
         })
         async with rqst.fetch() as resp:
             await resp.text()
-        return result
+        return cast(dict[str, Any], result)
 
     @api_function
     async def delete(self) -> dict[str, Any]:

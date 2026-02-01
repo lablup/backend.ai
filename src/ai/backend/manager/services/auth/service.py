@@ -185,7 +185,11 @@ class AuthService:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         # Merge the hook results as a single map.
-        user_data_overriden = ChainMap(*cast(Mapping[str, Any], hook_result.result))
+        hook_results = cast(list[Mapping[str, Any]], hook_result.result or [])
+        # Convert Mapping to dict for ChainMap compatibility
+        user_data_overriden: ChainMap[str, Any] = ChainMap(
+            *[dict(result) for result in hook_results]
+        )
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.

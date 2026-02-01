@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class UpdaterTestRowInt(Base):
+class UpdaterTestRowInt(Base):  # type: ignore[misc]
     """ORM model for updater testing with integer PK."""
 
     __tablename__ = "test_updater_int_pk"
@@ -41,7 +41,7 @@ class UpdaterTestRowInt(Base):
     value: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
 
 
-class UpdaterTestRowUUID(Base):
+class UpdaterTestRowUUID(Base):  # type: ignore[misc]
     """ORM model for updater testing with UUID PK."""
 
     __tablename__ = "test_updater_uuid_pk"
@@ -52,7 +52,7 @@ class UpdaterTestRowUUID(Base):
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
-class UpdaterTestRowStr(Base):
+class UpdaterTestRowStr(Base):  # type: ignore[misc]
     """ORM model for updater testing with string PK."""
 
     __tablename__ = "test_updater_str_pk"

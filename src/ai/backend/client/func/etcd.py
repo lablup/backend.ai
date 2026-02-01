@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.request import Request
 
@@ -33,7 +33,7 @@ class EtcdConfig(BaseFunction):
         })
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return data.get("result", None)
+            return cast(dict[str, Any], data.get("result", None))
 
     @api_function
     @classmethod

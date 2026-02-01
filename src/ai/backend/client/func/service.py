@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 from warnings import deprecated
 
@@ -46,7 +46,7 @@ class Service(BaseFunction):
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
 
-            return result
+            return cast(list[dict[str, Any]], result)
 
     @api_function
     @classmethod
@@ -85,7 +85,7 @@ class Service(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint"]
+        return cast(Sequence[dict[str, Any]], data["endpoint"])
 
     @api_function
     @classmethod

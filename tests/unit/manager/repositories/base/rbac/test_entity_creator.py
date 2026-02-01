@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityCreatorTestRow(Base):
+class RBACEntityCreatorTestRow(Base):  # type: ignore[misc]
     """ORM model for creator testing."""
 
     __tablename__ = "test_rbac_creator"
@@ -402,7 +402,7 @@ class TestRBACBulkEntityCreator:
 # =============================================================================
 
 
-class CompositePKTestRow(Base):
+class CompositePKTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_creator_composite_pk"

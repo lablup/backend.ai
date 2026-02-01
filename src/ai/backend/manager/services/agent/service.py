@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import aiohttp
 import yarl
@@ -169,7 +169,7 @@ class AgentService:
 
                 async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
-                        return await resp.json()
+                        return cast(dict[str, Any], await resp.json())
 
                     error_msg = await resp.text()
                     raise AgentWatcherResponseError(

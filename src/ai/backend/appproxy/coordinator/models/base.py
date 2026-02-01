@@ -53,7 +53,8 @@ class BaseMixin:
         o = dict(self.__dict__)
         del o["_sa_instance_state"]
         if serializable:
-            return ensure_json_serializable(o)
+            result: dict[str, Any] = ensure_json_serializable(o)
+            return result
         return o
 
 
@@ -104,7 +105,7 @@ class EnumType(TypeDecorator[enum.Enum], SchemaType):
 
     @property
     def python_type(self) -> type[enum.Enum]:
-        return self._enum_class
+        return self._enum_cls
 
 
 class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
@@ -129,8 +130,10 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         if value is None:
             return None
         if self._use_name:
-            return value.name
-        return value.value
+            name: str = value.name
+            return name
+        val: str = value.value
+        return val
 
     def process_result_value(
         self,
@@ -173,18 +176,19 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
         if value is None:
             return self._schema()
         try:
-            self._schema(**value)
+            validated: BaseModel = self._schema(**value)
         except ValidationError as e:
             raise ValueError(
                 "The given value does not conform with the structured json column format.",
                 e.json(),
             ) from e
-        return value
+        return validated
 
     def process_result_value(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
-        return self._schema(**value)
+        result: BaseModel = self._schema(**value)
+        return result
 
     def copy(self, **kw: Any) -> StructuredJSONColumn:
         return StructuredJSONColumn(self._schema)
@@ -279,14 +283,28 @@ class IPColumn(
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value: str | None, dialect: sa.Dialect) -> str | None:
+    def process_bind_param(
+        self,
+        value: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | str | None,
+        dialect: sa.Dialect,
+    ) -> str | None:
         if value is None:
-            return value
-        try:
-            cidr = ReadableCIDR(value).address
-        except InvalidIpAddressValue as e:
-            raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
-        return cidr
+            return None
+        if isinstance(value, str):
+            try:
+                cidr: ReadableCIDR[
+                    ipaddress.IPv4Network | ipaddress.IPv6Network
+                ] = ReadableCIDR(value)
+                cidr_addr = cidr.address
+                if cidr_addr is None:
+                    return None
+                return str(cidr_addr)
+            except InvalidIpAddressValue as e:
+                raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
+        addr = value.address
+        if addr is None:
+            return None
+        return str(addr)
 
     def process_result_value(
         self, value: str | None, dialect: sa.Dialect

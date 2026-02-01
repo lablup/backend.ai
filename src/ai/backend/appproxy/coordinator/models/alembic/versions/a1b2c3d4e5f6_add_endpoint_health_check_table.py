@@ -56,15 +56,15 @@ def upgrade() -> None:
     )
 
     conn = op.get_bind()
-    query = (
+    select_query = (
         sa.select(circuit.c.id, circuit.c.endpoint_id)
         .select_from(circuit)
         .where(circuit.c.endpoint_id.is_not(None))
     )
-    rows = conn.execute(query).fetchall()
+    rows = conn.execute(select_query).fetchall()
     endpoint_ids = [r.endpoint_id for r in rows]
-    query = endpoint.insert().values([{"id": e} for e in endpoint_ids])
-    op.execute(query)
+    insert_query = endpoint.insert().values([{"id": e} for e in endpoint_ids])
+    op.execute(insert_query)
 
 
 def downgrade() -> None:
