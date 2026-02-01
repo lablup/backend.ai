@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,7 +22,7 @@ from ai.backend.manager.repositories.base.export import (
 # =============================================================================
 
 
-class ParentRow(Base):
+class ParentRow(Base):  # type: ignore[misc]
     """Parent model for testing."""
 
     __tablename__ = "test_parent"
@@ -31,7 +33,7 @@ class ParentRow(Base):
     policy_name: Mapped[str] = mapped_column(sa.String(50), nullable=True)
 
 
-class PolicyRow(Base):
+class PolicyRow(Base):  # type: ignore[misc]
     """Policy model for N:1 JOIN testing."""
 
     __tablename__ = "test_policy"
@@ -41,7 +43,7 @@ class PolicyRow(Base):
     max_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=10)
 
 
-class ChildAssocRow(Base):
+class ChildAssocRow(Base):  # type: ignore[misc]
     """Association model for 1:N JOIN testing."""
 
     __tablename__ = "test_child_assoc"
@@ -52,7 +54,7 @@ class ChildAssocRow(Base):
     child_id: Mapped[str] = mapped_column(GUID, nullable=False)
 
 
-class ChildRow(Base):
+class ChildRow(Base):  # type: ignore[misc]
     """Child model for 1:N JOIN testing."""
 
     __tablename__ = "test_child"
@@ -241,7 +243,7 @@ class TestBuildSelectFromWithJoins:
     @pytest.fixture
     def base_table(self) -> sa.FromClause:
         """Base table for testing."""
-        return ParentRow.__table__
+        return cast(sa.FromClause, ParentRow.__table__)
 
     def test_returns_base_table_for_empty_joins(
         self,
