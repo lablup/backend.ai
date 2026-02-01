@@ -247,7 +247,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         return self._enum_cls
 
 
-class CurvePublicKeyColumn(TypeDecorator[bytes]):
+class CurvePublicKeyColumn(TypeDecorator[PublicKey]):
     """
     A column type wrapper for string-based Z85-encoded CURVE public key.
 
@@ -267,7 +267,7 @@ class CurvePublicKeyColumn(TypeDecorator[bytes]):
 
     def process_bind_param(
         self,
-        value: bytes | None,
+        value: PublicKey | None,
         dialect: Dialect,
     ) -> str | None:
         return value.decode("ascii") if value else None
