@@ -5,7 +5,7 @@ import pickle
 import shutil
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.agent.kernel_registry.exception import (
     KernelRegistryLoadError,
@@ -47,7 +47,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             )
         try:
             with final_file_path.open("rb") as f:
-                return pickle.load(f)
+                return cast("MutableMapping[KernelId, AbstractKernel]", pickle.load(f))
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
             raise KernelRegistryLoadError from e

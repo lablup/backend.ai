@@ -54,7 +54,7 @@ def default_clean[T](v: T | Any) -> T:
 
 def get_env[T](
     key: str,
-    default: str | Mapping | Undefined = _undefined,
+    default: str | Mapping[str, Any] | Undefined = _undefined,
     *,
     clean: Callable[[Any], T] = default_clean,
 ) -> T:
@@ -114,7 +114,7 @@ def _clean_tokens(v: str) -> tuple[str, ...]:
     return tuple(v.split(","))
 
 
-def _clean_address_map(v: str | Mapping) -> Mapping:
+def _clean_address_map(v: str | Mapping[str, Any]) -> Mapping[str, Any]:
     if isinstance(v, dict):
         return v
     if not isinstance(v, str):
@@ -171,7 +171,7 @@ class APIConfig:
         <ai.backend.client.kernel.Kernel.get_or_create>` calls.
     """
 
-    DEFAULTS: Mapping[str, str | Mapping] = {
+    DEFAULTS: Mapping[str, str | Mapping[str, Any]] = {
         "endpoint": "https://api.cloud.backend.ai",
         "endpoint_type": "api",
         "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",

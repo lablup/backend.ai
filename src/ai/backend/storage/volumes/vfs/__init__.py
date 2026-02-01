@@ -344,7 +344,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             next_paths.append(path)
             while next_paths:
                 next_path = next_paths.popleft()
-                with os.scandir(next_path) as scanner:  # type: ignore
+                with os.scandir(next_path) as scanner:
                     for entry in scanner:
                         try:
                             stat = entry.stat(follow_symlinks=False)

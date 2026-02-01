@@ -197,7 +197,7 @@ from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySe
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -400,7 +400,7 @@ class SessionService:
                 keypair_resource_policy,
                 domain_name,
                 group_name,
-                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+                query_on_behalf_of=owner_access_key,
             )
         except ValueError as e:
             raise InvalidAPIParameters(str(e)) from e
@@ -475,7 +475,7 @@ class SessionService:
             keypair_resource_policy,
             domain_name,
             group_name,
-            query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+            query_on_behalf_of=owner_access_key,
         )
 
         try:
@@ -827,7 +827,7 @@ class SessionService:
 
             return DownloadFilesActionResult(
                 session_data=session.to_dataclass(),
-                result=mpwriter,  # type: ignore
+                result=mpwriter,
             )
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
@@ -1044,7 +1044,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp = {}
-        sess_type = cast(SessionTypes, sess.session_type)
+        sess_type = sess.session_type
         if sess_type in PRIVATE_SESSION_TYPES:
             if sess.main_kernel.agent_row is None:
                 raise KernelNotReady(

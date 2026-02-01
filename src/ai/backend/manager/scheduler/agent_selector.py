@@ -31,7 +31,7 @@ from .utils import (
     sort_requested_slots_by_priority,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:

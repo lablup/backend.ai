@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class PgAdvisoryLock(AbstractDistributedLock):
-    _lock_ctx: AbstractAsyncContextManager | None
+    _lock_ctx: AbstractAsyncContextManager[None] | None
 
     def __init__(self, db: ExtendedAsyncSAEngine, lock_id: LockID) -> None:
         self.db = db
@@ -24,7 +24,7 @@ class PgAdvisoryLock(AbstractDistributedLock):
         self._lock_ctx = self.db.advisory_lock(self.lock_id)
         await self._lock_ctx.__aenter__()
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._lock_ctx is None:
             raise DBOperationFailed("Lock context is not initialized")
         try:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import textwrap
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import group_fields
@@ -55,7 +55,7 @@ class Group(BaseFunction):
         *,
         fields: Iterable[FieldSpec | str] | None = None,
         domain_name: str | None = None,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Find the group(s) by its name.
         It may return multiple groups when there are groups with the same name
@@ -77,7 +77,7 @@ class Group(BaseFunction):
             "domain_name": domain_name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups_by_name"]
+        return cast(Sequence[dict[str, Any]], data["groups_by_name"])
 
     @api_function
     @classmethod
@@ -85,7 +85,7 @@ class Group(BaseFunction):
         cls,
         domain_name: str,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of groups.
 
@@ -102,7 +102,7 @@ class Group(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups"]
+        return cast(Sequence[dict[str, Any]], data["groups"])
 
     @api_function
     @classmethod
@@ -110,7 +110,7 @@ class Group(BaseFunction):
         cls,
         gid: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetch information of a group with group ID.
 
@@ -127,7 +127,7 @@ class Group(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["group"]
+        return cast(dict[str, Any], data["group"])
 
     @api_function
     @classmethod
@@ -142,7 +142,7 @@ class Group(BaseFunction):
         allowed_vfolder_hosts: str | None = None,
         integration_id: str | None = None,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new group with the given options.
         You need an admin privilege for this operation.
@@ -173,7 +173,7 @@ class Group(BaseFunction):
             "input": {k: v for k, v in inputs.items() if v is not None},
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_group"]
+        return cast(dict[str, Any], data["create_group"])
 
     @api_function
     @classmethod
@@ -188,7 +188,7 @@ class Group(BaseFunction):
         allowed_vfolder_hosts: str | None | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update existing group.
         You need an admin privilege for this operation.
@@ -212,11 +212,11 @@ class Group(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
-    async def delete(cls, gid: str) -> dict:
+    async def delete(cls, gid: str) -> dict[str, Any]:
         """
         Inactivates the existing group. Does not actually delete it for safety.
         """
@@ -229,11 +229,11 @@ class Group(BaseFunction):
         """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_group"]
+        return cast(dict[str, Any], data["delete_group"])
 
     @api_function
     @classmethod
-    async def purge(cls, gid: str) -> dict:
+    async def purge(cls, gid: str) -> dict[str, Any]:
         """
         Delete the existing group. This action cannot be undone.
         """
@@ -246,7 +246,7 @@ class Group(BaseFunction):
         """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_group"]
+        return cast(dict[str, Any], data["purge_group"])
 
     @api_function
     @classmethod
@@ -255,7 +255,7 @@ class Group(BaseFunction):
         gid: str,
         user_uuids: Iterable[str],
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Add users to a group.
         You need an admin privilege for this operation.
@@ -275,7 +275,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
@@ -284,7 +284,7 @@ class Group(BaseFunction):
         gid: str,
         user_uuids: Iterable[str],
         _fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Remove users from a group.
         You need an admin privilege for this operation.
@@ -304,7 +304,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return cast(dict[str, Any], data["modify_group"])
 
     @api_function
     @classmethod
@@ -327,11 +327,11 @@ class Group(BaseFunction):
 
         variables = {"id": b64encode(f"group_node:{group_id}")}
         data = await api_session.get().Admin._query(query, variables)
-        return data["group_node"]["registry_quota"]
+        return cast(int, data["group_node"]["registry_quota"])
 
     @api_function
     @classmethod
-    async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+    async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict[str, Any]:
         """
         Create Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
@@ -352,11 +352,11 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id, "quota": quota}
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_container_registry_quota"]
+        return cast(dict[str, Any], data["create_container_registry_quota"])
 
     @api_function
     @classmethod
-    async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+    async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict[str, Any]:
         """
         Update Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
@@ -377,11 +377,11 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id, "quota": quota}
         data = await api_session.get().Admin._query(query, variables)
-        return data["update_container_registry_quota"]
+        return cast(dict[str, Any], data["update_container_registry_quota"])
 
     @api_function
     @classmethod
-    async def delete_container_registry_quota(cls, group_id: str) -> dict:
+    async def delete_container_registry_quota(cls, group_id: str) -> dict[str, Any]:
         """
         Delete Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
@@ -402,4 +402,4 @@ class Group(BaseFunction):
         scope_id = f"project:{group_id}"
         variables = {"scope_id": scope_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_container_registry_quota"]
+        return cast(dict[str, Any], data["delete_container_registry_quota"])

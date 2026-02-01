@@ -281,7 +281,7 @@ class HostPortPair(BaseModel):
 
         return {"host": str(host), "port": port}
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:

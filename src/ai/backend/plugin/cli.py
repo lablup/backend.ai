@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 import colorama
@@ -40,7 +40,7 @@ class CLIContext:
         self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         self._logger.__exit__()
 
 

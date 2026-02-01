@@ -108,7 +108,7 @@ AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
 
 
 @graphene_federation.key("id")
-class EndpointAutoScalingRuleNode(graphene.ObjectType):
+class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 25.1.0."
@@ -307,7 +307,7 @@ class EndpointAutoScalingRuleConnection(Connection):
         description = "Added in 25.1.0."
 
 
-class EndpointAutoScalingRuleInput(graphene.InputObjectType):
+class EndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.1.0."
 
@@ -342,7 +342,7 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
         )
 
 
-class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
+class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.1.0."
 
@@ -411,7 +411,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         )
 
 
-class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
+class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -459,7 +459,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
+class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -507,7 +507,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
+class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -550,7 +550,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class RuntimeVariantInfo(graphene.ObjectType):
+class RuntimeVariantInfo(graphene.ObjectType):  # type: ignore[misc]
     """Added in 24.03.5."""
 
     name = graphene.String()
@@ -561,7 +561,7 @@ class RuntimeVariantInfo(graphene.ObjectType):
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
-class Endpoint(graphene.ObjectType):
+class Endpoint(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -952,17 +952,17 @@ class Endpoint(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "EndpointStatistics.by_endpoint"
         )
-        return await loader.load(self.endpoint_id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.endpoint_id))
 
 
-class EndpointList(graphene.ObjectType):
+class EndpointList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(Endpoint, required=True)
 
 
-class ExtraMountInput(graphene.InputObjectType):
+class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
     """Added in 24.03.4."""
 
     vfolder_id = graphene.String()
@@ -986,7 +986,7 @@ class ExtraMountInput(graphene.InputObjectType):
         )
 
 
-class ModifyEndpointInput(graphene.InputObjectType):
+class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
     resource_slots = graphene.JSONString()
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
@@ -1011,14 +1011,14 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
     def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
-            registry: OptionalState = OptionalState.nop()
+            registry: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.registry is not Undefined
                 and graphene_image_input.registry is not None
             ):
                 registry = OptionalState.update(graphene_image_input.registry)
 
-            architecture: OptionalState = OptionalState.nop()
+            architecture: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.architecture is not Undefined
                 and graphene_image_input.architecture is not None
@@ -1097,7 +1097,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
         )
 
 
-class ModifyEndpoint(graphene.Mutation):
+class ModifyEndpoint(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -1133,7 +1133,7 @@ class ModifyEndpoint(graphene.Mutation):
 
 
 @graphene_federation.key("token")
-class EndpointToken(graphene.ObjectType):
+class EndpointToken(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -1280,7 +1280,7 @@ class EndpointToken(graphene.ObjectType):
         return datetime.datetime.fromtimestamp(decoded["exp"], tz=tzutc())
 
 
-class EndpointTokenList(graphene.ObjectType):
+class EndpointTokenList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 import aiotools
@@ -220,7 +220,7 @@ class GroupRepository:
                 )
                 .where(groups.c.id == group_id)
             )
-            if cast(CursorResult, result).rowcount > 0:
+            if cast(CursorResult[Any], result).rowcount > 0:
                 return
             raise ProjectNotFound(f"Group not found: {group_id}")
 
@@ -230,7 +230,7 @@ class GroupRepository:
         start_date: datetime,
         end_date: datetime,
         group_ids: Sequence[UUID] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get container statistics for groups within a time period."""
         async with self._db.begin_readonly() as conn:
             j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(

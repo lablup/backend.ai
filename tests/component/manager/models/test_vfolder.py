@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 from pathlib import PurePosixPath
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -20,13 +22,13 @@ from ai.backend.manager.server import (
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
     return GraphQueryContext(
-        schema=None,  # type: ignore
+        schema=None,
         dataloader_manager=None,  # type: ignore
         config_provider=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
+        db=database_engine,
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
@@ -199,12 +201,12 @@ FIXTURES = [
     ],
 )
 async def test_batch_load_by_id(
-    test_case,
-    mock_etcd_ctx,
-    mock_config_provider_ctx,
-    database_fixture,
-    create_app_and_client,
-):
+    test_case: dict[str, Any],
+    mock_etcd_ctx: Any,
+    mock_config_provider_ctx: Any,
+    database_fixture: None,
+    create_app_and_client: Any,
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
@@ -236,6 +238,7 @@ async def test_batch_load_by_id(
         if expected_id is None:
             assert res is None
         else:
+            assert res is not None
             assert res.id == expected_id
 
 
@@ -260,7 +263,9 @@ async def test_batch_load_by_id(
         ],
     ],
 )
-def test_mounts_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
 
 
@@ -296,7 +301,9 @@ def test_mounts_duplicate(vf_id_subpath_pair, vfmounts) -> None:
         ],
     ],
 )
-def test_mounts_not_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_not_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert not is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
 
 
@@ -324,5 +331,7 @@ def test_mounts_not_duplicate(vf_id_subpath_pair, vfmounts) -> None:
         ]
     ],
 )
-def test_mounts_inclusion_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+def test_mounts_inclusion_duplicate(
+    vf_id_subpath_pair: tuple[VFolderID, PurePosixPath], vfmounts: Sequence[VFolderMount]
+) -> None:
     assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)

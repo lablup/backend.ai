@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 import graphene
@@ -25,10 +25,10 @@ __all__ = (
     "StorageVolumeList",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class StorageVolume(graphene.ObjectType):
+class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -55,7 +55,7 @@ class StorageVolume(graphene.ObjectType):
             proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
             manager_client = ctx.storage_manager.get_manager_facing_client(proxy_name)
             storage_reply = await manager_client.get_volume_performance_metric(volume_name)
-            return storage_reply["metric"]
+            return cast(Mapping[str, Any], storage_reply["metric"])
         except aiohttp.ClientResponseError:
             return {}
 
@@ -136,7 +136,7 @@ class StorageVolume(graphene.ObjectType):
                 )
 
 
-class StorageVolumeList(graphene.ObjectType):
+class StorageVolumeList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

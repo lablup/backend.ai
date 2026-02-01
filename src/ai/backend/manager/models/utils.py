@@ -13,7 +13,6 @@ from typing import (
     Concatenate,
     ParamSpec,
     TypeVar,
-    cast,
     overload,
 )
 
@@ -59,7 +58,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
@@ -147,7 +146,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 yield conn_with_isolation
@@ -192,7 +190,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(
                 isolation_level="READ COMMITTED",
                 postgresql_readonly=True,
@@ -230,13 +227,11 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
                 self._sess_factory.configure(bind=conn_with_isolation, expire_on_commit=False)
                 session = self._sess_factory()
-                session = cast(SASession, session)
                 yield session
                 await session.commit()
 
@@ -274,7 +269,6 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         async with self.connect() as conn:
             # Set isolation level to READ COMMITTED and readonly mode
-            conn = cast(SAConnection, conn)
             conn_with_isolation = await conn.execution_options(
                 isolation_level="READ COMMITTED",
                 postgresql_readonly=True,
@@ -283,7 +277,6 @@ class ExtendedAsyncSAEngine(SAEngine):
                 # Configure session factory with the connection
                 self._readonly_sess_factory.configure(bind=conn_with_isolation)
                 session = self._readonly_sess_factory()
-                session = cast(SASession, session)
                 yield session
 
     @actxmgr
@@ -340,7 +333,7 @@ async def execute_with_txn_retry(
 # Setting "type ignore" here becuase Mypy deduces all fields and attributes in `sqlalchemy` module to `Any` type
 # including `SASession` and `SAConnection`.
 @overload
-async def execute_with_txn_retry(  # type: ignore[misc]
+async def execute_with_txn_retry(
     txn_func: Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
@@ -392,10 +385,10 @@ async def execute_with_txn_retry(
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
     _lock_conn_timeout: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
@@ -604,7 +597,7 @@ def sql_json_increment(
     return expr
 
 
-def _populate_column(column: sa.Column) -> sa.Column:
+def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:
     column_attrs = dict(column.__dict__)
     name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
@@ -625,15 +618,15 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
 
 
 def agg_to_str(
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
-) -> sa.sql.functions.Function:
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+) -> sa.sql.functions.Function[Any]:
     # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
     return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
 
 
 def agg_to_array(
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute,
-) -> sa.sql.functions.Function:
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+) -> sa.sql.functions.Function[Any]:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 

@@ -173,7 +173,7 @@ class aobject:
     """
 
     @classmethod
-    async def new(cls: type[Self], *args, **kwargs) -> Self:
+    async def new(cls: type[Self], *args: Any, **kwargs: Any) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -184,7 +184,7 @@ class aobject:
         await instance.__ainit__()
         return instance
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     async def __ainit__(self) -> None:
@@ -287,7 +287,7 @@ def check_typed_tuple[T1, T2, T3, T4](
 ) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple[Any, ...]:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -1061,7 +1061,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> ResourceSlot:
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping[str, Any]) -> ResourceSlot:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])
@@ -1111,7 +1111,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
         return cls(data)
 
-    def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
+    def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
         try:
             return {
                 k: type(self)._humanize_value(Decimal(v), slot_types[k])
@@ -1228,7 +1228,10 @@ class VFolderID:
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
     def __eq__(self, other: Any) -> bool:
-        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+        result: bool = (
+            self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+        )
+        return result
 
     def __hash__(self) -> int:
         qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
@@ -1315,14 +1318,26 @@ class VFolderMount(JSONSerializableMixin):
         })
 
 
-class VFolderHostPermissionMap(dict, JSONSerializableMixin):
-    def __or__(self, other: Any) -> VFolderHostPermissionMap:
-        if self is other:
+class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerializableMixin):
+    @overload
+    def __or__(
+        self, value: dict[str, set[VFolderHostPermission]], /
+    ) -> dict[str, set[VFolderHostPermission]]: ...
+
+    @overload
+    def __or__[T1, T2](
+        self, value: dict[T1, T2], /
+    ) -> dict[str | T1, set[VFolderHostPermission] | T2]: ...
+
+    def __or__(
+        self, value: dict[Any, Any], /
+    ) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
+        if self is value:
             return self
-        if not isinstance(other, dict):
-            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: dict[str, set] = defaultdict(set)
-        for host, perms in [*self.items(), *other.items()]:
+        if not isinstance(value, dict):
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(value)} type")
+        union_map: dict[str, set[VFolderHostPermission]] = defaultdict(set)
+        for host, perms in [*self.items(), *value.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
             except ValueError as e:
@@ -1560,7 +1575,7 @@ class KernelCreationConfig(TypedDict):
 
 
 class SessionEnqueueingConfig(TypedDict):
-    creation_config: dict
+    creation_config: dict[str, Any]
     kernel_configs: list[KernelEnqueueingConfig]
 
 
@@ -1570,7 +1585,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_idx: int
     local_rank: int
     cluster_hostname: str
-    creation_config: dict
+    creation_config: dict[str, Any]
     bootstrap_script: str
     startup_command: str | None
     uid: int | None
@@ -1803,7 +1818,7 @@ class RedisHelperConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis
+    client: Redis[Any]
     name: str  # connection pool name
     service_name: str | None
     sentinel: redis.asyncio.sentinel.Sentinel | None

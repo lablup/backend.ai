@@ -256,7 +256,7 @@ class KernelResourceSpec:
 
     @classmethod
     async def aread_from_file(cls, file: AsyncTextIOWrapper) -> Self:
-        text = "\n".join(await file.readlines())  # type: ignore
+        text = "\n".join(await file.readlines())
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:
@@ -573,7 +573,7 @@ class ResourceAllocator(aobject):
 
         self._ensure_slots_are_not_overallocated()
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         for _, computer in self.computers.items():
             try:
                 await computer.instance.cleanup()
@@ -897,7 +897,7 @@ async def scan_resource_usage_per_slot(
             slot_name = SlotName(raw_slot_name)
             slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])
 
-    async def _wrap_future(fut: asyncio.Future) -> None:
+    async def _wrap_future(fut: asyncio.Future[Any]) -> None:
         # avoid type check failures when a future is directly consumed by a taskgroup
         await fut
 

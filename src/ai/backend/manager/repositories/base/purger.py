@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -67,7 +67,7 @@ async def execute_purger[TRow: Base](
             print(result.row.id)  # Deleted row
     """
     row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:
@@ -188,7 +188,7 @@ async def execute_batch_purger[TRow: Base](
         stmt = sa.delete(table).where(sa.tuple_(*pk_columns).in_(pk_subquery))
         result = await db_sess.execute(stmt)
 
-        batch_deleted = cast(CursorResult, result).rowcount
+        batch_deleted = cast(CursorResult[Any], result).rowcount
         total_deleted += batch_deleted
 
         if batch_deleted < purger.batch_size:

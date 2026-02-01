@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -70,7 +73,7 @@ class TestRlimMiddleware:
             "access_key": "AKIAIOSFODNN7EXAMPLE",
         }
 
-        def getitem(key):
+        def getitem(key: Any) -> Any:
             if key == "is_authorized":
                 return True
             if key == "keypair":

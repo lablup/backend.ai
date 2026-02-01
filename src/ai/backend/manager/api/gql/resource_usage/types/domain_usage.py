@@ -89,7 +89,7 @@ class DomainUsageBucketGQL(Node):
             capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
         )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description=(
             "Added in 26.1.0. Project usage buckets belonging to this domain. "
             "Returns paginated project-level usage history for all projects in this domain "

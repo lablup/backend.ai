@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import aiohttp_cors
 import aiotools
@@ -100,7 +100,6 @@ from .utils import (
     get_access_key_scopes,
     pydantic_params_api_handler,
     pydantic_response_api_handler,
-    undefined,
 )
 
 if TYPE_CHECKING:
@@ -122,8 +121,8 @@ async def is_user_allowed_to_access_resource(
         user = result.scalar()
         if user is None:
             return False
-        return user.domain_name == request["user"]["domain_name"]
-    return request["user"]["uuid"] == resource_owner
+        return cast(bool, user.domain_name == request["user"]["domain_name"])
+    return cast(bool, request["user"]["uuid"] == resource_owner)
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -386,7 +385,7 @@ class ValidationResult:
     owner_uuid: uuid.UUID
     owner_role: UserRole
     group_id: uuid.UUID
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
 
@@ -544,9 +543,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
-        "owner_access_key": (
-            None if params.owner_access_key is undefined else params.owner_access_key
-        ),
+        "owner_access_key": params.owner_access_key,
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)

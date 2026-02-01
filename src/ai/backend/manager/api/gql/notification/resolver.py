@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
+from typing import Any
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -94,7 +95,7 @@ NotificationChannelEdge = Edge[NotificationChannel]
 class NotificationChannelConnection(Connection[NotificationChannel]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -106,7 +107,7 @@ NotificationRuleEdge = Edge[NotificationRule]
 class NotificationRuleConnection(Connection[NotificationRule]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -114,7 +115,7 @@ class NotificationRuleConnection(Connection[NotificationRule]):
 # Query fields
 
 
-@strawberry.field(description="Get a notification channel by ID (admin only)")
+@strawberry.field(description="Get a notification channel by ID (admin only)")  # type: ignore[misc]
 async def admin_notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
@@ -126,7 +127,7 @@ async def admin_notification_channel(
     return NotificationChannel.from_dataclass(action_result.channel_data)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Get a notification channel by ID",
     deprecation_reason=(
         "Use admin_notification_channel instead. "
@@ -143,7 +144,7 @@ async def notification_channel(
     return NotificationChannel.from_dataclass(action_result.channel_data)
 
 
-@strawberry.field(description="List notification channels (admin only)")
+@strawberry.field(description="List notification channels (admin only)")  # type: ignore[misc]
 async def admin_notification_channels(
     info: Info[StrawberryGQLContext],
     filter: NotificationChannelFilter | None = None,
@@ -195,7 +196,7 @@ async def admin_notification_channels(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="List notification channels",
     deprecation_reason=(
         "Use admin_notification_channels instead. "
@@ -252,7 +253,7 @@ async def notification_channels(
     )
 
 
-@strawberry.field(description="Get a notification rule by ID (admin only)")
+@strawberry.field(description="Get a notification rule by ID (admin only)")  # type: ignore[misc]
 async def admin_notification_rule(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationRule | None:
@@ -264,7 +265,7 @@ async def admin_notification_rule(
     return NotificationRule.from_dataclass(action_result.rule_data)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Get a notification rule by ID",
     deprecation_reason=(
         "Use admin_notification_rule instead. "
@@ -279,7 +280,7 @@ async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Notific
     return NotificationRule.from_dataclass(action_result.rule_data)
 
 
-@strawberry.field(description="List notification rules (admin only)")
+@strawberry.field(description="List notification rules (admin only)")  # type: ignore[misc]
 async def admin_notification_rules(
     info: Info[StrawberryGQLContext],
     filter: NotificationRuleFilter | None = None,
@@ -329,7 +330,7 @@ async def admin_notification_rules(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="List notification rules",
     deprecation_reason=(
         "Use admin_notification_rules instead. "
@@ -384,7 +385,7 @@ async def notification_rules(
     )
 
 
-@strawberry.field(description="List available notification rule types")
+@strawberry.field(description="List available notification rule types")  # type: ignore[misc]
 async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
     """Return all available notification rule types."""
     from ai.backend.common.data.notification import NotificationRuleType
@@ -392,7 +393,7 @@ async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
     return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
 
 
-@strawberry.field(description="Get JSON schema for a notification rule type's message format")
+@strawberry.field(description="Get JSON schema for a notification rule type's message format")  # type: ignore[misc]
 async def notification_rule_type_schema(
     rule_type: NotificationRuleTypeGQL,
 ) -> strawberry.scalars.JSON:
@@ -407,7 +408,7 @@ async def notification_rule_type_schema(
 # Mutation fields
 
 
-@strawberry.mutation(description="Create a new notification channel (admin only)")
+@strawberry.mutation(description="Create a new notification channel (admin only)")  # type: ignore[misc]
 async def admin_create_notification_channel(
     input: CreateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationChannelPayload:
@@ -426,7 +427,7 @@ async def admin_create_notification_channel(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Create a new notification channel",
     deprecation_reason=(
         "Use admin_create_notification_channel instead. "
@@ -450,7 +451,7 @@ async def create_notification_channel(
     )
 
 
-@strawberry.mutation(description="Update a notification channel (admin only)")
+@strawberry.mutation(description="Update a notification channel (admin only)")  # type: ignore[misc]
 async def admin_update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationChannelPayload:
@@ -467,7 +468,7 @@ async def admin_update_notification_channel(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Update a notification channel",
     deprecation_reason=(
         "Use admin_update_notification_channel instead. "
@@ -489,7 +490,7 @@ async def update_notification_channel(
     )
 
 
-@strawberry.mutation(description="Delete a notification channel (admin only)")
+@strawberry.mutation(description="Delete a notification channel (admin only)")  # type: ignore[misc]
 async def admin_delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationChannelPayload:
@@ -503,7 +504,7 @@ async def admin_delete_notification_channel(
     return DeleteNotificationChannelPayload(id=input.id)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Delete a notification channel",
     deprecation_reason=(
         "Use admin_delete_notification_channel instead. "
@@ -522,7 +523,7 @@ async def delete_notification_channel(
     return DeleteNotificationChannelPayload(id=input.id)
 
 
-@strawberry.mutation(description="Create a new notification rule (admin only)")
+@strawberry.mutation(description="Create a new notification rule (admin only)")  # type: ignore[misc]
 async def admin_create_notification_rule(
     input: CreateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationRulePayload:
@@ -541,7 +542,7 @@ async def admin_create_notification_rule(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Create a new notification rule",
     deprecation_reason=(
         "Use admin_create_notification_rule instead. "
@@ -565,7 +566,7 @@ async def create_notification_rule(
     )
 
 
-@strawberry.mutation(description="Update a notification rule (admin only)")
+@strawberry.mutation(description="Update a notification rule (admin only)")  # type: ignore[misc]
 async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationRulePayload:
@@ -582,7 +583,7 @@ async def admin_update_notification_rule(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Update a notification rule",
     deprecation_reason=(
         "Use admin_update_notification_rule instead. "
@@ -604,7 +605,7 @@ async def update_notification_rule(
     )
 
 
-@strawberry.mutation(description="Delete a notification rule (admin only)")
+@strawberry.mutation(description="Delete a notification rule (admin only)")  # type: ignore[misc]
 async def admin_delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationRulePayload:
@@ -618,7 +619,7 @@ async def admin_delete_notification_rule(
     return DeleteNotificationRulePayload(id=input.id)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Delete a notification rule",
     deprecation_reason=(
         "Use admin_delete_notification_rule instead. "
@@ -637,7 +638,7 @@ async def delete_notification_rule(
     return DeleteNotificationRulePayload(id=input.id)
 
 
-@strawberry.mutation(description="Validate a notification channel (admin only)")
+@strawberry.mutation(description="Validate a notification channel (admin only)")  # type: ignore[misc]
 async def admin_validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationChannelPayload:
@@ -656,7 +657,7 @@ async def admin_validate_notification_channel(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Validate a notification channel",
     deprecation_reason=(
         "Use admin_validate_notification_channel instead. "
@@ -680,7 +681,7 @@ async def validate_notification_channel(
     )
 
 
-@strawberry.mutation(description="Validate a notification rule (admin only)")
+@strawberry.mutation(description="Validate a notification rule (admin only)")  # type: ignore[misc]
 async def admin_validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationRulePayload:
@@ -703,7 +704,7 @@ async def admin_validate_notification_rule(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Validate a notification rule",
     deprecation_reason=(
         "Use admin_validate_notification_rule instead. "

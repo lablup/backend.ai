@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class PurgerTestRowInt(Base):
+class PurgerTestRowInt(Base):  # type: ignore[misc]
     """ORM model for single-row purger testing with integer PK."""
 
     __tablename__ = "test_purger_int_pk"
@@ -46,7 +46,7 @@ class PurgerTestRowInt(Base):
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
-class PurgerTestRowUUID(Base):
+class PurgerTestRowUUID(Base):  # type: ignore[misc]
     """ORM model for single-row purger testing with UUID PK."""
 
     __tablename__ = "test_purger_uuid_pk"
@@ -237,7 +237,7 @@ class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
         return query
 
 
-class BatchPurgerBasicRow(Base):
+class BatchPurgerBasicRow(Base):  # type: ignore[misc]
     """ORM model for basic batch purger testing."""
 
     __tablename__ = "test_batch_purger_basic"
@@ -248,7 +248,7 @@ class BatchPurgerBasicRow(Base):
     status = sa.Column(sa.String(20), nullable=False)
 
 
-class BatchPurgerBatchingRow(Base):
+class BatchPurgerBatchingRow(Base):  # type: ignore[misc]
     """ORM model for batch purger batching tests."""
 
     __tablename__ = "test_batch_purger_batching"
@@ -259,7 +259,7 @@ class BatchPurgerBatchingRow(Base):
     status = sa.Column(sa.String(20), nullable=False)
 
 
-class BatchPurgerEdgeCaseRow(Base):
+class BatchPurgerEdgeCaseRow(Base):  # type: ignore[misc]
     """ORM model for batch purger edge case tests."""
 
     __tablename__ = "test_batch_purger_empty"
@@ -507,7 +507,7 @@ class TestBatchPurgerEdgeCases:
             assert result.deleted_count == 0
 
 
-class BatchPurgerTestRow(Base):
+class BatchPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model for batch purger testing using declarative mapping."""
 
     __tablename__ = "test_batch_purger_orm"
@@ -620,7 +620,7 @@ class TestBatchPurgerWithORMModel:
 # =============================================================================
 
 
-class BatchPurgerCompositePKRow(Base):
+class BatchPurgerCompositePKRow(Base):  # type: ignore[misc]
     """ORM model for composite PK batch purger testing."""
 
     __tablename__ = "test_batch_purger_composite_pk"

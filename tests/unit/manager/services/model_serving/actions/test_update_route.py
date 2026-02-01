@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -147,49 +148,68 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_check_user_access_update_route(self, mocker, model_serving_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            model_serving_service,
-            "check_user_access",
-            new_callable=AsyncMock,
+    def mock_check_user_access_update_route(
+        self, mocker: Any, model_serving_service: Any
+    ) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                model_serving_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_update_route(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_update_route_traffic(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "update_route_traffic",
-            new_callable=AsyncMock,
+    def mock_update_route_traffic(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "update_route_traffic",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_get_endpoint_for_appproxy_update(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_for_appproxy_update",
-            new_callable=AsyncMock,
+    def mock_get_endpoint_for_appproxy_update(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_for_appproxy_update",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
     def mock_notify_endpoint_route_update_to_appproxy(
-        self, mocker, mock_agent_registry
+        self, mocker: Any, mock_agent_registry: Any
     ) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_agent_registry,
-            "notify_endpoint_route_update_to_appproxy",
-            new_callable=AsyncMock,
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_agent_registry,
+                "notify_endpoint_route_update_to_appproxy",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
@@ -214,11 +234,11 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_update_route,
-        mock_get_endpoint_access_validation_data_update_route,
-        mock_update_route_traffic,
-        mock_get_endpoint_for_appproxy_update,
-        mock_notify_endpoint_route_update_to_appproxy,
+        mock_check_user_access_update_route: AsyncMock,
+        mock_get_endpoint_access_validation_data_update_route: AsyncMock,
+        mock_update_route_traffic: AsyncMock,
+        mock_get_endpoint_for_appproxy_update: AsyncMock,
+        mock_notify_endpoint_route_update_to_appproxy: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -254,7 +274,7 @@ class TestUpdateRoute:
         mock_update_route_traffic.return_value = mock_route_data
         mock_get_endpoint_for_appproxy_update.return_value = mock_endpoint_row
 
-        async def update_route(action: UpdateRouteAction):
+        async def update_route(action: UpdateRouteAction) -> UpdateRouteActionResult:
             return await model_serving_processors.update_route.wait_for_complete(action)
 
         await scenario.test(update_route)
@@ -279,9 +299,9 @@ class TestUpdateRoute:
         scenario: ScenarioBase[UpdateRouteAction, Exception],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_update_route,
-        mock_get_endpoint_access_validation_data_update_route,
-        mock_update_route_traffic,
+        mock_check_user_access_update_route: AsyncMock,
+        mock_get_endpoint_access_validation_data_update_route: AsyncMock,
+        mock_update_route_traffic: AsyncMock,
     ) -> None:
         # Mock validation data for access validation
         mock_validation_data = MagicMock(
@@ -294,8 +314,8 @@ class TestUpdateRoute:
         # Mock repository to return None (route not found)
         mock_update_route_traffic.return_value = None
 
-        async def update_route(action: UpdateRouteAction):
-            return await model_serving_processors.update_route.wait_for_complete(action)
+        async def update_route(action: UpdateRouteAction) -> None:
+            await model_serving_processors.update_route.wait_for_complete(action)
 
         await scenario.test(update_route)
 
@@ -304,11 +324,11 @@ class TestUpdateRoute:
         self,
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_update_route,
-        mock_get_endpoint_access_validation_data_update_route,
-        mock_update_route_traffic,
-        mock_get_endpoint_for_appproxy_update,
-        mock_notify_endpoint_route_update_to_appproxy,
+        mock_check_user_access_update_route: AsyncMock,
+        mock_get_endpoint_access_validation_data_update_route: AsyncMock,
+        mock_update_route_traffic: AsyncMock,
+        mock_get_endpoint_for_appproxy_update: AsyncMock,
+        mock_notify_endpoint_route_update_to_appproxy: AsyncMock,
     ) -> None:
         action = UpdateRouteAction(
             service_id=uuid.UUID("55555555-6666-7777-8888-999999999999"),

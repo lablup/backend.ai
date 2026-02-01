@@ -185,10 +185,10 @@ async def session_info(
 async def _select_kernel_row(
     conn: Any,
     session_id: str | uuid.UUID,
-) -> Row:
+) -> Row[Any]:
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
-    kernel, *_ = await conn.execute(query)
-    return kernel
+    result = await conn.execute(query)
+    return result.first()  # type: ignore[no-any-return]
 
 
 @pytest.mark.asyncio

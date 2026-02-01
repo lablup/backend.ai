@@ -28,12 +28,12 @@ class BaseAgentLifecycleEvent(BaseAgentEvent):
     reason: str
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.reason,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(value[0])
 
     @override
@@ -81,7 +81,7 @@ class AgentErrorEvent(AgentOperationEvent):
     severity: LogLevel = LogLevel.ERROR
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.message,
             self.traceback,
@@ -92,7 +92,7 @@ class AgentErrorEvent(AgentOperationEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             value[0],
             value[1],
@@ -112,12 +112,12 @@ class AgentHeartbeatEvent(AgentOperationEvent):
     agent_info: AgentInfo
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.agent_info.model_dump(),)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(AgentInfo.model_validate(value[0]))
 
     @classmethod
@@ -133,12 +133,12 @@ class AgentImagesRemoveEvent(AgentOperationEvent):
     image_canonicals: list[ImageCanonical]
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.image_canonicals,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(value[0])
 
     @classmethod
@@ -152,7 +152,7 @@ class AgentInstalledImagesRemoveEvent(AgentOperationEvent):
     scanned_images: Mapping[ImageCanonical, ScannedImage]
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         result = {}
         for canonical, image in self.scanned_images.items():
             result[str(canonical)] = image.to_dict()
@@ -160,7 +160,7 @@ class AgentInstalledImagesRemoveEvent(AgentOperationEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         result = {}
         for canonical, image_data in value[0].items():
             result[ImageCanonical(canonical)] = ScannedImage.from_dict(image_data)
@@ -177,12 +177,12 @@ class DoAgentResourceCheckEvent(AgentOperationEvent):
     agent_id: AgentId
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.agent_id,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             AgentId(value[0]),
         )

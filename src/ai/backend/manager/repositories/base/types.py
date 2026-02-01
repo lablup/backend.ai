@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import sqlalchemy as sa
 
@@ -53,7 +53,7 @@ class SearchScope(ABC):
 
     @property
     @abstractmethod
-    def existence_checks(self) -> Sequence[ExistenceCheck]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         """Return existence checks for scope validation.
 
         All checks are validated in a single query before the main query executes.
@@ -61,9 +61,9 @@ class SearchScope(ABC):
         raise NotImplementedError
 
 
-type QueryOrder = sa.sql.expression.UnaryExpression | sa.sql.expression.ColumnElement
+type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.ColumnElement[Any]
 
 # Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
 type CursorConditionFactory = Callable[[str], QueryCondition]
 
-TRow = TypeVar("TRow", bound="Row")
+TRow = TypeVar("TRow", bound="Row[Any]")

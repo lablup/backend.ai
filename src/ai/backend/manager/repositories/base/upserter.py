@@ -109,7 +109,7 @@ async def execute_upserter[TRow: Base](
     """
     spec = upserter.spec
     row_class = spec.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     insert_values = spec.build_insert_values()
     update_values = spec.build_update_values()
 
@@ -175,7 +175,7 @@ async def execute_bulk_upserter[TRow: Base](
     # All specs must have the same row_class
     first_spec = specs[0]
     row_class = first_spec.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
 
     # Build values list from all specs
     items = [spec.build_insert_values() for spec in specs]
@@ -191,4 +191,4 @@ async def execute_bulk_upserter[TRow: Base](
     )
 
     result = await db_sess.execute(stmt)
-    return BulkUpserterResult(upserted_count=cast(CursorResult, result).rowcount)
+    return BulkUpserterResult(upserted_count=cast(CursorResult[Any], result).rowcount)

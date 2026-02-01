@@ -47,7 +47,7 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.RESCAN_GPU_ALLOC_MAPS  # type: ignore[return-value]
+        return ManagerBgtaskName.RESCAN_GPU_ALLOC_MAPS
 
     @classmethod
     @override

@@ -21,17 +21,17 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
+def mock_hook_plugin_ctx() -> MagicMock:
     return MagicMock(spec=HookPluginContext)
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def mock_config_provider():
+def mock_config_provider() -> MagicMock:
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_provider.config = MagicMock(spec=ManagerConfig)
     mock_provider.config.auth = AuthConfig(
@@ -44,7 +44,11 @@ def mock_config_provider():
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: MagicMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
@@ -53,7 +57,10 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
 
 
 @pytest.fixture
-def setup_successful_auth(mock_auth_repository, mock_hook_plugin_ctx):
+def setup_successful_auth(
+    mock_auth_repository: AsyncMock,
+    mock_hook_plugin_ctx: MagicMock,
+) -> None:
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
@@ -75,7 +82,10 @@ def setup_successful_auth(mock_auth_repository, mock_hook_plugin_ctx):
 
 
 @pytest.mark.asyncio
-async def test_authorize_success(auth_service, setup_successful_auth):
+async def test_authorize_success(
+    auth_service: AuthService,
+    setup_successful_auth: None,
+) -> None:
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
         domain_name="default",
@@ -92,7 +102,10 @@ async def test_authorize_success(auth_service, setup_successful_auth):
 
 
 @pytest.mark.asyncio
-async def test_authorize_invalid_token_type(auth_service, mock_hook_plugin_ctx):
+async def test_authorize_invalid_token_type(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+) -> None:
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
@@ -112,8 +125,10 @@ async def test_authorize_invalid_token_type(auth_service, mock_hook_plugin_ctx):
 
 @pytest.mark.asyncio
 async def test_authorize_invalid_credentials(
-    auth_service, mock_hook_plugin_ctx, mock_auth_repository
-):
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
@@ -139,7 +154,7 @@ async def test_authorize_with_hook_authorization(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test authorization when hook provides the user"""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
@@ -187,8 +202,7 @@ async def test_authorize_with_password_expiry(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
-    mock_config_provider: MagicMock,
-):
+) -> None:
     """Test authorization fails when password is expired"""
     # The mock_config_provider already has max_password_age set to 90 days
 
@@ -228,7 +242,7 @@ async def test_authorize_with_post_hook_response(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test authorization when POST_AUTHORIZE hook returns a stream response"""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,

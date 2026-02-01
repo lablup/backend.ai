@@ -2,7 +2,7 @@
 
 import uuid
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -43,7 +43,7 @@ def create_session_workload(
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     kernels: list[KernelWorkload] | None = None,
     designated_agent_ids: list[AgentId] | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing."""
     # Set defaults for required fields
@@ -532,7 +532,7 @@ class TestProvisionerAllocation:
             designated_agent
         ]  # 4th argument (agents, criteria, config, designated_agent)
 
-    async def test_no_resource_requirements(self, provisioner: SessionProvisioner):
+    async def test_no_resource_requirements(self, provisioner: SessionProvisioner) -> None:
         """Test handling of session with no kernels."""
         workload = create_session_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
@@ -563,7 +563,7 @@ class TestProvisionerAllocation:
         mock_selector = cast(Mock, provisioner._default_agent_selector)
         assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
-    async def test_agent_selection_error(self, provisioner: SessionProvisioner):
+    async def test_agent_selection_error(self, provisioner: SessionProvisioner) -> None:
         """Test handling of agent selection errors."""
         kernels = [create_kernel_workload(cpu=Decimal("100"))]  # Impossible requirement
         workload = create_session_workload(

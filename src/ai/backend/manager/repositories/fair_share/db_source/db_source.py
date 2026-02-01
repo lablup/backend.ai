@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -999,7 +999,7 @@ class FairShareDBSource:
             raise ScalingGroupNotFound(scaling_group)
 
         if row.fair_share_spec is not None:
-            return row.fair_share_spec
+            return cast(FairShareScalingGroupSpec, row.fair_share_spec)
 
         return FairShareScalingGroupSpec()
 

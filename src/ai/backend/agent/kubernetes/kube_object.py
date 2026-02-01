@@ -62,7 +62,7 @@ class ConfigMap(AbstractAPIObject):
     def put(self, key: str, value: str) -> None:
         self.items[key] = value
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "apiVersion": "v1",
             "kind": "ConfigMap",
@@ -84,7 +84,7 @@ class Service(AbstractAPIObject):
         self.service_type = service_type
         self.labels = {"run": self.name, "backend.ai/kernel-id": kernel_id}
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         base: dict[str, Any] = {
             "apiVersion": "v1",
             "kind": "Service",
@@ -119,7 +119,7 @@ class NFSPersistentVolume(AbstractAPIObject):
     def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "apiVersion": "v1",
             "kind": "PersistentVolume",
@@ -152,7 +152,7 @@ class HostPathPersistentVolume(AbstractAPIObject):
     def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "apiVersion": "v1",
             "kind": "PersistentVolume",
@@ -183,7 +183,7 @@ class PersistentVolumeClaim(AbstractAPIObject):
     def label(self, k: str, v: str) -> None:
         self.labels[k] = v
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "apiVersion": "v1",
             "kind": "PersistentVolumeClaim",

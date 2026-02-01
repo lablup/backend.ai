@@ -28,7 +28,7 @@ def create_connection_field(field_name: str, node_fields: FieldSet) -> FieldSpec
     )
 
 
-def flatten_connection(connection_data: dict) -> list[dict]:
+def flatten_connection(connection_data: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Flattens a GraphQL Connection structure into a list of node dictionaries.
     Args:
@@ -41,7 +41,7 @@ def flatten_connection(connection_data: dict) -> list[dict]:
     return [edge["node"] for edge in connection_data["edges"]]
 
 
-def flatten_connections_in_data(data: dict) -> dict:
+def flatten_connections_in_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     Flattens all connection fields in a nested dictionary.
     If a value is a dictionary containing an 'edges' key, it is flattened using flatten_connection().
@@ -92,25 +92,25 @@ class ProgressReportingReader(io.BufferedReader):
             self.tqdm.close()
         self.close()
 
-    def read(self, *args, **kwargs) -> bytes:
+    def read(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
-    def read1(self, *args, **kwargs) -> bytes:
+    def read1(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
-    def readinto(self, *args, **kwargs) -> int:
+    def readinto(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)
         return count
 
-    def readinto1(self, *args, **kwargs) -> int:
+    def readinto1(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)

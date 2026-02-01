@@ -31,9 +31,9 @@ class RoleConditions:
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = RoleRow.name.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = RoleRow.name.ilike(f"%{spec.value}%")
             else:
-                condition = RoleRow.name.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = RoleRow.name.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -57,9 +57,9 @@ class RoleConditions:
     def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = RoleRow.name.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = RoleRow.name.ilike(f"{spec.value}%")
             else:
-                condition = RoleRow.name.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = RoleRow.name.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -70,9 +70,9 @@ class RoleConditions:
     def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = RoleRow.name.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = RoleRow.name.ilike(f"%{spec.value}")
             else:
-                condition = RoleRow.name.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = RoleRow.name.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -82,14 +82,14 @@ class RoleConditions:
     @staticmethod
     def by_sources(sources: list[RoleSource]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoleRow.source.in_(sources)  # type: ignore[attr-defined]
+            return RoleRow.source.in_(sources)
 
         return inner
 
     @staticmethod
     def by_statuses(statuses: list[RoleStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return RoleRow.status.in_(statuses)  # type: ignore[attr-defined]
+            return RoleRow.status.in_(statuses)
 
         return inner
 
@@ -133,7 +133,7 @@ class RoleConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_type == scope_type  # type: ignore[attr-defined]
+            return PermissionGroupRow.scope_type == scope_type
 
         return inner
 
@@ -145,7 +145,7 @@ class RoleConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_id == scope_id  # type: ignore[attr-defined]
+            return PermissionGroupRow.scope_id == scope_id
 
         return inner
 
@@ -157,7 +157,7 @@ class RoleConditions:
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type  # type: ignore[attr-defined]
+            return ObjectPermissionRow.entity_type == entity_type
 
         return inner
 
@@ -168,20 +168,20 @@ class RoleOrders:
     @staticmethod
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return RoleRow.name.asc()  # type: ignore[attr-defined]
-        return RoleRow.name.desc()  # type: ignore[attr-defined]
+            return RoleRow.name.asc()
+        return RoleRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return RoleRow.created_at.asc()  # type: ignore[attr-defined]
-        return RoleRow.created_at.desc()  # type: ignore[attr-defined]
+            return RoleRow.created_at.asc()
+        return RoleRow.created_at.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return RoleRow.updated_at.asc()  # type: ignore[union-attr]
-        return RoleRow.updated_at.desc()  # type: ignore[union-attr]
+            return RoleRow.updated_at.asc()
+        return RoleRow.updated_at.desc()
 
 
 class AssignedUserConditions:
@@ -190,7 +190,7 @@ class AssignedUserConditions:
     @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRoleRow.role_id == role_id  # type: ignore[attr-defined]
+            return UserRoleRow.role_id == role_id
 
         return inner
 
@@ -198,9 +198,9 @@ class AssignedUserConditions:
     def by_username_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.username.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.username.ilike(f"%{spec.value}%")
             else:
-                condition = UserRow.username.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.username.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -224,9 +224,9 @@ class AssignedUserConditions:
     def by_username_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.username.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.username.ilike(f"{spec.value}%")
             else:
-                condition = UserRow.username.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.username.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -237,9 +237,9 @@ class AssignedUserConditions:
     def by_username_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.username.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = UserRow.username.ilike(f"%{spec.value}")
             else:
-                condition = UserRow.username.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = UserRow.username.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -250,9 +250,9 @@ class AssignedUserConditions:
     def by_email_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.email.ilike(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.email.ilike(f"%{spec.value}%")
             else:
-                condition = UserRow.email.like(f"%{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.email.like(f"%{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -276,9 +276,9 @@ class AssignedUserConditions:
     def by_email_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.email.ilike(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.email.ilike(f"{spec.value}%")
             else:
-                condition = UserRow.email.like(f"{spec.value}%")  # type: ignore[attr-defined]
+                condition = UserRow.email.like(f"{spec.value}%")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -289,9 +289,9 @@ class AssignedUserConditions:
     def by_email_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = UserRow.email.ilike(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = UserRow.email.ilike(f"%{spec.value}")
             else:
-                condition = UserRow.email.like(f"%{spec.value}")  # type: ignore[attr-defined]
+                condition = UserRow.email.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -301,7 +301,7 @@ class AssignedUserConditions:
     @staticmethod
     def by_granted_by_equals(granted_by: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRoleRow.granted_by == granted_by  # type: ignore[attr-defined]
+            return UserRoleRow.granted_by == granted_by
 
         return inner
 
@@ -312,20 +312,20 @@ class AssignedUserOrders:
     @staticmethod
     def username(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return UserRow.username.asc()  # type: ignore[attr-defined]
-        return UserRow.username.desc()  # type: ignore[attr-defined]
+            return UserRow.username.asc()
+        return UserRow.username.desc()
 
     @staticmethod
     def email(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return UserRow.email.asc()  # type: ignore[attr-defined]
-        return UserRow.email.desc()  # type: ignore[attr-defined]
+            return UserRow.email.asc()
+        return UserRow.email.desc()
 
     @staticmethod
     def granted_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return UserRoleRow.granted_at.asc()  # type: ignore[attr-defined]
-        return UserRoleRow.granted_at.desc()  # type: ignore[attr-defined]
+            return UserRoleRow.granted_at.asc()
+        return UserRoleRow.granted_at.desc()
 
 
 class DomainScopeConditions:

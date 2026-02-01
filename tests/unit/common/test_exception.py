@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
+from typing import Any
 
 import pytest
 from aiohttp import web
@@ -64,7 +68,12 @@ class TestBackendAIErrorCode:
         ],
     )
     async def test_passthrough_error_propagation_through_handler(
-        self, aiohttp_client, status_code, error_code, error_message, expected_error_code_str
+        self,
+        aiohttp_client: Callable[[Any], Awaitable[Any]],
+        status_code: HTTPStatus,
+        error_code: ErrorCode,
+        error_message: str,
+        expected_error_code_str: str,
     ) -> None:
         """Test that PassthroughError correctly propagates status code and error code through aiohttp handler."""
 

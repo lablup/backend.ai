@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
@@ -97,7 +97,7 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
         self,
         extra_msg: str | None = None,
         extra_data: dict[str, Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
@@ -188,7 +188,7 @@ class BackendAgentError(BackendAIError):
                 "title": exc_info,
             }
         elif isinstance(exc_info, AgentError):
-            e = cast(AgentError, exc_info)
+            e = exc_info
             agent_details = {
                 "type": agent_error_type,
                 "title": "Agent-side exception occurred.",
@@ -227,7 +227,7 @@ class BackendAgentError(BackendAIError):
             return f"<{type(self).__name__}: {self.agent_error_title} ({self.agent_exception})>"
         return f"<{type(self).__name__}: {self.agent_error_title}>"
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[BackendAgentError], tuple[Any, ...]]:  # type: ignore[override]
         return (type(self), (self.agent_error_type, self.agent_details))
 
 

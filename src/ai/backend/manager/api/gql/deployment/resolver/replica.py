@@ -25,7 +25,7 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")
+@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
 async def replicas(
     info: Info[StrawberryGQLContext],
     filter: ReplicaFilter | None = None,
@@ -51,7 +51,7 @@ async def replicas(
     )
 
 
-@strawberry.field(description="Added in 25.16.0")
+@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
@@ -67,7 +67,7 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | No
 # Subscription resolvers
 
 
-@strawberry.subscription(description="Added in 25.16.0")
+@strawberry.subscription(description="Added in 25.16.0")  # type: ignore[misc]
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:

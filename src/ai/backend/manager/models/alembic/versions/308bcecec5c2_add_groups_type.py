@@ -116,7 +116,7 @@ projecttype = postgresql.ENUM(
 )
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
     projecttype.create(conn)
     op.add_column(
@@ -167,7 +167,7 @@ def upgrade():
             )
 
 
-def downgrade():
+def downgrade() -> None:
     conn = op.get_bind()
     cmd = """DELETE FROM groups WHERE "type" = 'model-store'"""
     conn.execute(text(cmd))

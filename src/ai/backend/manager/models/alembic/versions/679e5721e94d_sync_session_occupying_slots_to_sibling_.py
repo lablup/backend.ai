@@ -31,7 +31,7 @@ Base: Any = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     __table_args__ = {"extend_existing": True}
 
@@ -46,7 +46,7 @@ class SessionRow(Base):
     kernels = relationship("KernelRow")
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
     __table_args__ = {"extend_existing": True}
 
@@ -64,7 +64,7 @@ class KernelRow(Base):
     )
 
 
-def _sync_single_kernel_cluster_session():
+def _sync_single_kernel_cluster_session() -> None:
     conn = op.get_bind()
     sync_stmt = textwrap.dedent(
         """
@@ -78,7 +78,7 @@ def _sync_single_kernel_cluster_session():
     conn.execute(text(sync_stmt))
 
 
-def _sync_multi_kernel_cluster_session():
+def _sync_multi_kernel_cluster_session() -> None:
     db_sess = Session(op.get_bind())
 
     while True:
@@ -90,7 +90,7 @@ def _sync_multi_kernel_cluster_session():
                 & (SessionRow.status_history.op("?")("RUNNING"))
             )
             .limit(PAGE_SIZE)
-            .options(selectinload(SessionRow.kernels).options(load_only(KernelRow.occupied_slots)))
+            .options(selectinload(SessionRow.kernels).options(load_only("occupied_slots")))  # type: ignore[arg-type]
         )
         session_list = cast(list[SessionRow], db_sess.scalars(select_stmt).all())
         if not session_list:
@@ -108,10 +108,10 @@ def _sync_multi_kernel_cluster_session():
         db_sess.execute(update_stmt, data)
 
 
-def upgrade():
+def upgrade() -> None:
     _sync_single_kernel_cluster_session()
     _sync_multi_kernel_cluster_session()
 
 
-def downgrade():
+def downgrade() -> None:
     pass

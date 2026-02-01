@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
+from typing import Any
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
@@ -8,13 +9,13 @@ from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
     api_port_pool: set[int]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         h2_config = self.root_context.local_config.proxy_worker.http2
         if not h2_config:

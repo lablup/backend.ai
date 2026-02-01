@@ -104,7 +104,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderPermissionValueField(graphene.Scalar):
+class VFolderPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."
 
@@ -113,7 +113,9 @@ class VFolderPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> VFolderRBACPermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> VFolderRBACPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return VFolderRBACPermission(node.value)
         return None
@@ -124,7 +126,7 @@ class VFolderPermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class VirtualFolderNode(graphene.ObjectType):
+class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.03.4"
@@ -218,9 +220,9 @@ class VirtualFolderNode(graphene.ObjectType):
             return self.created_at
 
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except ParserError:
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     @classmethod
     def from_row(
@@ -303,7 +305,6 @@ class VirtualFolderNode(graphene.ObjectType):
             query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
-                vfolder_row = cast(VFolderRow | None, vfolder_row)
         if vfolder_row is None:
             return None
         return cls.from_row(
@@ -453,7 +454,7 @@ class VirtualFolderConnection(Connection):
         description = "Added in 24.03.4"
 
 
-class ModelCard(graphene.ObjectType):
+class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -543,18 +544,18 @@ class ModelCard(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except (TypeError, ParserError):
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     def resolve_modified_at(
         self,
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.modified_at)
+            return dtparse(cast(str, self.modified_at))
         except (TypeError, ParserError):
-            return self.modified_at
+            return cast(datetime, self.modified_at)
 
     @classmethod
     def parse_model(
@@ -808,7 +809,7 @@ class ModelCardConnection(Connection):
 # Legacy GraphQL classes (moved from models.vfolder.row)
 
 
-class VirtualFolder(graphene.ObjectType):
+class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -837,7 +838,7 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Self | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | VFolderRow | None) -> Self | None:
         match row:
             case None:
                 return None
@@ -1291,14 +1292,14 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
 
-class VirtualFolderList(graphene.ObjectType):
+class VirtualFolderList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolder, required=True)
 
 
-class VirtualFolderPermissionGQL(graphene.ObjectType):
+class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
     """Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum)."""
 
     class Meta:
@@ -1312,7 +1313,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
     user_email = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> VirtualFolderPermissionGQL | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> VirtualFolderPermissionGQL | None:
         if row is None:
             return None
         return cls(
@@ -1406,20 +1407,20 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
 VirtualFolderPermission = VirtualFolderPermissionGQL
 
 
-class VirtualFolderPermissionList(graphene.ObjectType):
+class VirtualFolderPermissionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolderPermissionGQL, required=True)
 
 
-class QuotaDetails(graphene.ObjectType):
+class QuotaDetails(graphene.ObjectType):  # type: ignore[misc]
     usage_bytes = BigInt(required=False)
     usage_count = BigInt(required=False)
     hard_limit_bytes = BigInt(required=False)
 
 
-class QuotaScope(graphene.ObjectType):
+class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -1495,11 +1496,11 @@ class QuotaScope(graphene.ObjectType):
             )
 
 
-class QuotaScopeInput(graphene.InputObjectType):
+class QuotaScopeInput(graphene.InputObjectType):  # type: ignore[misc]
     hard_limit_bytes = BigInt(required=False)
 
 
-class SetQuotaScope(graphene.Mutation):
+class SetQuotaScope(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1549,7 +1550,7 @@ class SetQuotaScope(graphene.Mutation):
         )
 
 
-class UnsetQuotaScope(graphene.Mutation):
+class UnsetQuotaScope(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,

@@ -84,7 +84,9 @@ class CustomGraphQLView(GraphQLView):
 
 
 class GQLLoggingMiddleware:
-    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         if info.path.prev is None:  # indicates the root query
             graph_ctx = info.context
             log.info(
@@ -117,7 +119,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     rules = []
     if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         rules.append(CustomIntrospectionRule)
-    max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
+    max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:
@@ -154,19 +156,22 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         user_repository=root_ctx.repositories.user.repository,
         agent_repository=root_ctx.repositories.agent.repository,
     )
-    result = await app_ctx.gql_schema.execute_async(
-        params["query"],
-        None,  # root
-        variable_values=params["variables"],
-        operation_name=params["operation_name"],
-        context_value=gql_ctx,
-        middleware=[
-            GQLMutationPrivilegeCheckMiddleware(),
-            GQLMutationUnfrozenRequiredMiddleware(),
-            GQLMetricMiddleware(),
-            GQLExceptionMiddleware(),
-            GQLLoggingMiddleware(),
-        ],
+    result = cast(
+        ExecutionResult,
+        await app_ctx.gql_schema.execute_async(
+            params["query"],
+            None,  # root
+            variable_values=params["variables"],
+            operation_name=params["operation_name"],
+            context_value=gql_ctx,
+            middleware=[
+                GQLMutationPrivilegeCheckMiddleware(),
+                GQLMutationUnfrozenRequiredMiddleware(),
+                GQLMetricMiddleware(),
+                GQLExceptionMiddleware(),
+                GQLLoggingMiddleware(),
+            ],
+        ),
     )
 
     if result.errors:

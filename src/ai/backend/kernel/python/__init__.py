@@ -29,7 +29,7 @@ class Runner(BaseRunner):
     }
     jupyter_kspec_name = "python"
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.input_queue: janus.Queue[tuple[str, str]] | None = None
         self.output_queue: janus.Queue[bytes] | None = None

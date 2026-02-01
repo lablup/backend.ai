@@ -11,7 +11,7 @@ import pytest
 
 
 @pytest.fixture
-def database_engine():
+def database_engine() -> None:
     """
     Guard fixture to prevent database usage in service tests.
 
@@ -26,7 +26,7 @@ def database_engine():
 
 
 @pytest.fixture
-def database_fixture():
+def database_fixture() -> None:
     """
     Guard fixture to prevent database fixture usage in service tests.
 
@@ -40,7 +40,7 @@ def database_fixture():
 
 
 @pytest.fixture
-def database_connection():
+def database_connection() -> None:
     """
     Guard fixture to prevent database connection usage in service tests.
 

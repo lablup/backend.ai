@@ -174,7 +174,7 @@ class NextResult(TypedDict):
     console: NotRequired[Sequence[Any]]
 
 
-class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
+class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     version: int
     ownership_data: KernelOwnershipData
     agent_config: Mapping[str, Any]
@@ -189,13 +189,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     data: dict[Any, Any]
     last_used: float
     termination_reason: KernelLifecycleEventReason | None
-    clean_event: asyncio.Future | None
+    clean_event: asyncio.Future[Any] | None
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
     session_type: SessionTypes
 
-    _tasks: set[asyncio.Task]
+    _tasks: set[asyncio.Task[Any]]
 
     runner: AbstractCodeRunner | None
 
@@ -364,7 +364,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -377,7 +377,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file or an entire directory) as a tar archive.
         The path should be inside /home/work of the container.
@@ -390,7 +390,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file) as a tar archive.
         The path should be inside /home/work of the container.
@@ -402,7 +402,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         """
         List the directory entries of the designated path.
         The path should be inside /home/work of the container.
@@ -673,9 +673,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     current_run_id: str | None
     pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
-    read_task: asyncio.Task | None
-    status_task: asyncio.Task | None
-    watchdog_task: asyncio.Task | None
+    read_task: asyncio.Task[Any] | None
+    status_task: asyncio.Task[Any] | None
+    watchdog_task: asyncio.Task[Any] | None
 
     _closed: bool
 
@@ -811,7 +811,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.watchdog_task = loop.create_task(self.watchdog())
 
     async def _close_tasks(self) -> None:
-        concurrent_safe_tasks: tuple[asyncio.Task | None, ...] = (
+        concurrent_safe_tasks: tuple[asyncio.Task[Any] | None, ...] = (
             self.status_task,
             self.read_task,
             self.watchdog_task,
@@ -894,7 +894,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
-            return msgpack.unpackb(result)
+            return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
             return None
 
@@ -933,7 +933,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             async with timeout(timeout_seconds):
                 result = await self.model_service_queue.get()
             self.model_service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
@@ -949,7 +949,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
@@ -972,7 +972,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from tabulate import tabulate
 
@@ -13,6 +13,7 @@ from ai.backend.common.types import ResultSet
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
 _Item = Mapping[str, Any]
+T = TypeVar("T")
 
 
 class NoItems(Exception):
@@ -131,7 +132,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         else:
             if is_scalar:
                 for line in tabulate_items(
-                    map(lambda v: {fields[0].field_name: v}, items),  # type: ignore
+                    map(lambda v: {fields[0].field_name: v}, items),
                     fields,
                 ):
                     print(line, end="")
@@ -144,7 +145,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_paginated_list(
         self,
-        fetch_func: Callable[[int, int], PaginatedResult],
+        fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
         page_size: int | None = None,
         plain: bool = False,
@@ -165,7 +166,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     else:
                         raise NoItems
                 current_offset += len(result.items)
-                yield from result.items
+                yield from cast(Sequence[_Item], result.items)
                 if current_offset >= result.total_count:
                     break
 
@@ -199,7 +200,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         item: _Item,
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["ok", item["ok"]],
@@ -223,7 +224,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         msg: str = "Failed",
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["Message", msg],

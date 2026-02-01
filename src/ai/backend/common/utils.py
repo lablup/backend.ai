@@ -256,7 +256,7 @@ def str_to_timedelta(tstr: str) -> timedelta:
     if set(groups.values()) == {None}:
         raise ValueError("Invalid time expression")
     params = {n: -float(t) if sign == "-" else float(t) for n, t in groups.items() if t}
-    return timedelta(**params)  # type: ignore
+    return timedelta(**params)
 
 
 class FstabEntry:
@@ -475,7 +475,7 @@ async def mount(
     if err:
         raise VolumeMountFailed(f"Failed to mount {fs_location} on {mountpoint}. (e: {err})")
     if edit_fstab:
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.add(
                 fs_location,
@@ -531,7 +531,7 @@ async def umount(
         except OSError:
             pass
     if edit_fstab:
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True

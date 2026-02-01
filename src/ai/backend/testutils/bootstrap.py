@@ -21,6 +21,12 @@ from testcontainers.redis import RedisContainer
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
 
+# Type aliases for container fixtures
+RedisContainerFixture = tuple[str, HostPortPairModel]
+EtcdContainerFixture = tuple[str, HostPortPairModel]
+PostgresContainerFixture = tuple[str, HostPortPairModel]
+MinioContainerFixture = tuple[str, HostPortPairModel]
+
 log = logging.getLogger(__spec__.name)
 
 PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))

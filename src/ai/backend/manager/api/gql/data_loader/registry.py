@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class DataLoaderRegistry:
-    _loader: dict[Callable, DataLoader]
+    _loader: dict[Callable[..., Any], DataLoader[Any, Any]]
 
     def __init__(self) -> None:
         self._loader = {}
@@ -18,7 +18,7 @@ class DataLoaderRegistry:
         self,
         func: Callable[["StrawberryGQLContext", Any], Awaitable[Any]],
         context: "StrawberryGQLContext",
-    ) -> DataLoader:
+    ) -> DataLoader[Any, Any]:
         loader = self._loader.get(func, None)
         if loader is None:
             new_loader = DataLoader(apartial(func, context))

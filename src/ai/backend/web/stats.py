@@ -4,10 +4,11 @@ import asyncio
 import weakref
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from aiohttp import web
 
-type WeakTaskSet = weakref.WeakSet[asyncio.Task]
+type WeakTaskSet = weakref.WeakSet[asyncio.Task[Any]]
 
 
 @dataclass

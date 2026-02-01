@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -52,7 +52,7 @@ def _get_permission_group_join_condition() -> sa.ColumnElement[bool]:
     return PermissionGroupRow.id == foreign(ObjectPermissionRow.permission_group_id)
 
 
-class ObjectPermissionRow(Base):
+class ObjectPermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "object_permissions"
     __table_args__ = (
         sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),
@@ -108,7 +108,7 @@ class ObjectPermissionRow(Base):
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
     @classmethod
-    def from_sa_row(cls, row: sa.engine.Row) -> Self:
+    def from_sa_row(cls, row: sa.engine.Row[Any]) -> Self:
         return cls(
             id=row.id,
             role_id=row.role_id,

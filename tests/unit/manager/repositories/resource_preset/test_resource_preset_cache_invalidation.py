@@ -117,7 +117,7 @@ class TestResourcePresetCacheInvalidation:
     async def sample_preset_creator(
         self,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[Creator, None]:
+    ) -> AsyncGenerator[Creator[ResourcePresetRow], None]:
         """Create sample resource preset creator for testing"""
         creator = Creator(
             spec=ResourcePresetCreatorSpec(
@@ -177,7 +177,7 @@ class TestResourcePresetCacheInvalidation:
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
-        sample_preset_creator: Creator,
+        sample_preset_creator: Creator[ResourcePresetRow],
     ) -> None:
         """Test that creating a preset invalidates all preset caches"""
         # Get reference to cache source and valkey stat

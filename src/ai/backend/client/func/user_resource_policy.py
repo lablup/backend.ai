@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any, cast
 
 from ai.backend.client.output.fields import user_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
@@ -45,7 +46,7 @@ class UserResourcePolicy(BaseFunction):
         max_quota_scope_size: int,
         max_session_count_per_model_session: int,
         max_customized_image_count: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Create a new user resource policy.
 
@@ -80,7 +81,7 @@ class UserResourcePolicy(BaseFunction):
             },
         )
 
-        return result["create_user_resource_policy"]
+        return cast(dict[str, Any], result["create_user_resource_policy"])
 
     @api_function
     @classmethod
@@ -92,7 +93,7 @@ class UserResourcePolicy(BaseFunction):
         max_quota_scope_size: int | None = None,
         max_session_count_per_model_session: int | None = None,
         max_customized_image_count: int | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update an existing user resource policy with the given options.
 
@@ -124,10 +125,10 @@ class UserResourcePolicy(BaseFunction):
         }
 
         result = await api_session.get().Admin._query(q, variables)
-        return result["modify_user_resource_policy"]
+        return cast(dict[str, Any], result["modify_user_resource_policy"])
 
     @api_function
-    async def delete(self) -> dict:
+    async def delete(self) -> dict[str, Any]:
         """
         Delete an existing user resource policy.
         :return: Result of the deletion operation.
@@ -142,14 +143,14 @@ class UserResourcePolicy(BaseFunction):
         """)
 
         result = await api_session.get().Admin._query(q, {"name": self._name})
-        return result["delete_user_resource_policy"]
+        return cast(dict[str, Any], result["delete_user_resource_policy"])
 
     @api_function
     @classmethod
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists all user resource policies.
 
@@ -159,13 +160,13 @@ class UserResourcePolicy(BaseFunction):
         q = "query { user_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["user_resource_policies"]
+        return cast(Sequence[dict[str, Any]], data["user_resource_policies"])
 
     @api_function
     async def get_info(
         self,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Get information about a specific user resource policy.
 
@@ -176,4 +177,4 @@ class UserResourcePolicy(BaseFunction):
         q = "query($name: String!) { user_resource_policy(name: $name) { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {"name": self._name})
-        return data["user_resource_policy"]
+        return cast(dict[str, Any], data["user_resource_policy"])

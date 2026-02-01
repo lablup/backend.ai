@@ -1,13 +1,21 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
+from uuid import uuid4
 
 import pytest
-from tenacity import BaseAction
 
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
+from ai.backend.manager.actions.action import (
+    BaseAction,
+    BaseActionResult,
+    BaseActionResultMeta,
+    BaseActionTriggerMeta,
+    ProcessResult,
+)
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import OperationStatus
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -47,7 +55,7 @@ class MockException(Exception):
     pass
 
 
-class MockActionMonitor:
+class MockActionMonitor(ActionMonitor):
     expected_prepare_action: MockAction
     expected_done_action: MockAction
     expected_done_result: ProcessResult
@@ -62,10 +70,12 @@ class MockActionMonitor:
         self.expected_done_action = expected_done_action
         self.expected_done_result = expected_done_result
 
-    async def prepare(self, action: MockAction, _meta: MockActionTriggerMeta) -> None:
+    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
+        assert isinstance(action, MockAction)
         assert action == self.expected_prepare_action
 
-    async def done(self, action: MockAction, result: ProcessResult) -> None:
+    async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        assert isinstance(action, MockAction)
         assert action == self.expected_done_action
         # Partially check the result
         assert result.meta.status == self.expected_done_result.meta.status
@@ -86,7 +96,8 @@ async def mock_exception_processor_func(action: MockAction) -> MockActionResult:
     raise MockException("Mock exception")
 
 
-async def test_processor_success():
+async def test_processor_success() -> None:
+    now = datetime.now(tz=UTC)
     monitor = MockActionMonitor(
         expected_prepare_action=MockAction(
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
@@ -96,13 +107,13 @@ async def test_processor_success():
         ),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
-                action_id=None,
+                action_id=uuid4(),
                 entity_id="1",
-                status="success",
+                status=OperationStatus.SUCCESS,
                 description="Success",
-                started_at=None,
-                ended_at=None,
-                duration=0.0,
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
                 error_code=None,
             ),
         ),
@@ -116,7 +127,8 @@ async def test_processor_success():
     assert result.entity_id() == "1"
 
 
-async def test_processor_exception():
+async def test_processor_exception() -> None:
+    now = datetime.now(tz=UTC)
     monitor = MockActionMonitor(
         expected_prepare_action=MockAction(
             id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
@@ -126,13 +138,13 @@ async def test_processor_exception():
         ),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
-                action_id=None,
+                action_id=uuid4(),
                 entity_id="1",
-                status="error",
+                status=OperationStatus.ERROR,
                 description="Mock exception",
-                started_at=None,
-                ended_at=None,
-                duration=0.0,
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
                 error_code=ErrorCode.default(),
             ),
         ),

@@ -4,7 +4,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 __all__ = ("RouteStatus", "RoutingRow")
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
@@ -44,7 +44,7 @@ def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
     return RoutingRow.revision == DeploymentRevisionRow.id
 
 
-class RoutingRow(Base):
+class RoutingRow(Base):  # type: ignore[misc]
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
@@ -89,7 +89,7 @@ class RoutingRow(Base):
         nullable=True,
     )
 
-    error_data: Mapped[dict | None] = mapped_column(
+    error_data: Mapped[dict[str, Any] | None] = mapped_column(
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
 

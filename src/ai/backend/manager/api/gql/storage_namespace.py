@@ -118,7 +118,7 @@ class UnregisterStorageNamespacePayload:
     id: uuid.UUID
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -139,7 +139,7 @@ async def register_storage_namespace(
     return RegisterStorageNamespacePayload(id=action_result.storage_id)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 

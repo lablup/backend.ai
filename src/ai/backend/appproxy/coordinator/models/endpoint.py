@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-class Endpoint(Base, BaseMixin):
+class Endpoint(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     """

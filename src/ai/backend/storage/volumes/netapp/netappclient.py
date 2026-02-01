@@ -67,6 +67,7 @@ from typing import (
     NotRequired,
     TypeAlias,
     TypedDict,
+    cast,
 )
 
 import aiohttp
@@ -319,7 +320,8 @@ class NetAppClient:
             f"/api/storage/volumes/{volume_id}/metrics",
             params={"fields": ",".join(_extra_fields)},
         ) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     async def list_qtrees(
         self,
@@ -480,7 +482,8 @@ class NetAppClient:
                 raise NetAppClientError(
                     f"Quota rule not found for the volume {volume_id} and the qtree {qtree_name}"
                 )
-            return records[0]
+            result: dict[str, Any] = records[0]
+            return result
 
     async def update_quota_rule(
         self,
@@ -626,4 +629,4 @@ class NetAppClient:
             f"/api/storage/volumes/{volume_uuid}?fields=qos",
         ) as resp:
             data = await resp.json()
-        return data["qos"]
+        return cast(Mapping[str, Any], data["qos"])

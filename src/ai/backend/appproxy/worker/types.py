@@ -302,7 +302,7 @@ class PrometheusMetrics:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: BaseFrontend
+    proxy_frontend: BaseFrontend[Any, Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
@@ -364,7 +364,7 @@ class Circuit(SerializableCircuit):
         MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._app_inference_metrics = {}
         self._replica_inference_metrics = {}
@@ -578,7 +578,7 @@ class Metric:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "__type": self.type.name,  # type: ignore
+            "__type": self.type.name,
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
                 str(remove_exponent(self.capacity.quantize(q)))

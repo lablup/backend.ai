@@ -16,7 +16,7 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
-from glide.exceptions import ClosingError
+from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 from redis.asyncio.sentinel import Sentinel
 
 from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound

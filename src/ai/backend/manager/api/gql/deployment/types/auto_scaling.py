@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -142,7 +142,7 @@ AutoScalingRuleEdge = Edge[AutoScalingRule]
 class AutoScalingRuleConnection(Connection[AutoScalingRule]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

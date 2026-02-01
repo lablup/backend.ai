@@ -25,8 +25,8 @@ def cli() -> None:
     pass
 
 
-async def generate_graphene_gql_schema(output_path: Path) -> None:
-    if output_path == "-":
+async def generate_graphene_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
         log.info("======== Graphene GraphQL API Schema ========")
         print(str(graphene_schema))
     else:
@@ -34,8 +34,8 @@ async def generate_graphene_gql_schema(output_path: Path) -> None:
             await fw.write(str(graphene_schema))
 
 
-async def generate_strawberry_gql_schema(output_path: Path) -> None:
-    if output_path == "-":
+async def generate_strawberry_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
         log.info("======== Strawberry GraphQL API Schema ========")
         print(strawberry_schema.as_str())
     else:
@@ -123,7 +123,7 @@ def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) ->
     "--output",
     "-o",
     default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 @click.option(
@@ -147,17 +147,17 @@ def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
 @click.option(
     "--output",
     "-o",
-    default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
-def dump_openapi(_cli_ctx: CLIContext, output: Path) -> None:
+def dump_openapi(_cli_ctx: CLIContext, output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
     openapi = asyncio.run(generate())
-    if output == "-" or output is None:
+    if output is None:
         print(pretty_json_str(openapi))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(pretty_json_str(openapi))

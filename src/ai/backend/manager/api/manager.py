@@ -9,7 +9,7 @@ import socket
 import textwrap
 from collections.abc import Callable, Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final
 
 import aiohttp_cors
 import attrs
@@ -31,7 +31,6 @@ from ai.backend.manager.errors.common import GenericBadRequest, ServerFrozen, Se
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.health import (
-    SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
@@ -85,7 +84,9 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-    def resolve(self, next: Callable, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if (
             info.operation.operation == "mutation"
@@ -116,7 +117,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(float | None, root_ctx.config_provider.config.manager.status_update_interval)
+    interval = root_ctx.config_provider.config.manager.status_update_interval
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -366,7 +367,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     closed_cxn_metrics = []
     redis_cxn_metrics = []
     for stat in status:
-        sqlalchemy_info = cast(SQLAlchemyConnectionInfo, stat.sqlalchemy_info)
+        sqlalchemy_info = stat.sqlalchemy_info
 
         total_cxn_metrics.append(
             SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)
@@ -397,8 +398,8 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    status_watch_task: asyncio.Task
-    db_status_report_task: asyncio.Task
+    status_watch_task: asyncio.Task[Any]
+    db_status_report_task: asyncio.Task[Any]
 
 
 async def init(app: web.Application) -> None:

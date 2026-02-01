@@ -39,7 +39,7 @@ Base = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
@@ -143,7 +143,7 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[GUID] = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
@@ -172,8 +172,8 @@ def upgrade() -> None:
             nullable=True,
         )
         domain_name = sa.Column("domain_name", sa.String(length=64), nullable=False)
-        group_id: sa.Column[GUID] = sa.Column("group_id", GUID(), nullable=False)
-        user_uuid: sa.Column[GUID] = sa.Column("user_uuid", GUID(), nullable=False)
+        group_id: sa.Column[GUID[UUID]] = sa.Column("group_id", GUID(), nullable=False)
+        user_uuid: sa.Column[GUID[UUID]] = sa.Column("user_uuid", GUID(), nullable=False)
         access_key = sa.Column("access_key", sa.String(length=20), nullable=True)
         # kp_resource_policy = sa.Column(
         #     'kp_resource_policy', sa.String(length=256), nullable=False)
@@ -279,7 +279,7 @@ def upgrade() -> None:
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
 
-    def migrate_kernel_to_session(kernel_query: sa.sql.Select, is_single_kernel: bool) -> None:
+    def migrate_kernel_to_session(kernel_query: sa.sql.Select[Any], is_single_kernel: bool) -> None:
         session_map: dict[UUID, dict[str, Any]] = {}
         main_kernel_rows: dict[UUID, dict[str, Any]] = {}
         single_kernel_ids: dict[UUID, UUID] = {}
@@ -548,7 +548,7 @@ def downgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[GUID] = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),

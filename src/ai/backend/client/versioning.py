@@ -38,7 +38,7 @@ def get_id_or_name(api_version: tuple[int, str], obj: ComputeSession) -> str:
 
 def apply_version_aware_fields(
     api_session: BaseSession,
-    fields: Sequence[tuple[str, Callable | str]],
+    fields: Sequence[tuple[str, Callable[[BaseSession], str] | str]],
 ) -> Sequence[tuple[str, str]]:
     version_aware_fields = []
     for f in fields:

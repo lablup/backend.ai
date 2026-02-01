@@ -27,7 +27,7 @@ from ai.backend.manager.services.deployment.actions.route import (
 # Query resolvers
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 25.19.0. List routes for a deployment with optional filters."
 )
 async def routes(
@@ -58,7 +58,7 @@ async def routes(
     )
 
 
-@strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")
+@strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")  # type: ignore[misc]
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
@@ -72,7 +72,7 @@ async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.19.0. Update the traffic status of a route.")
+@strawberry.mutation(description="Added in 25.19.0. Update the traffic status of a route.")  # type: ignore[misc]
 async def update_route_traffic_status(
     input: UpdateRouteTrafficStatusInputGQL,
     info: Info[StrawberryGQLContext],

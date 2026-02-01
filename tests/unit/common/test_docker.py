@@ -20,7 +20,7 @@ from ai.backend.common.docker import (
 
 
 @pytest.mark.asyncio
-async def test_get_docker_connector(monkeypatch):
+async def test_get_docker_connector(monkeypatch: pytest.MonkeyPatch) -> None:
     get_docker_context_host.cache_clear()
     _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
@@ -120,7 +120,7 @@ async def test_get_docker_connector(monkeypatch):
             get_docker_connector()
 
 
-def test_image_ref_typing():
+def test_image_ref_typing() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -132,42 +132,42 @@ def test_image_ref_typing():
     assert isinstance(ref, collections.abc.Hashable)
 
 
-def test_image_ref_parsing():
+def test_image_ref_parsing() -> None:
     result = ImageRef.parse_image_str("c")
     assert result.project_and_image_name == f"{default_repository}/c"
     assert result.tag == "latest"
     assert result.registry == default_registry
-    assert result.tag_set == ("latest", set())
+    assert result.tag_set == ("latest", PlatformTagSet([]))
 
     result = ImageRef.parse_image_str("c:gcc6.3-alpine3.8")
     assert result.project_and_image_name == f"{default_repository}/c"
     assert result.tag == "gcc6.3-alpine3.8"
     assert result.registry == default_registry
-    assert result.tag_set == ("gcc6.3", {"alpine"})
+    assert result.tag_set == ("gcc6.3", PlatformTagSet(["alpine3.8"]))
 
     result = ImageRef.parse_image_str("python:3.6-ubuntu")
     assert result.project_and_image_name == f"{default_repository}/python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
     result = ImageRef.parse_image_str("kernel-python:3.6-ubuntu")
     assert result.project_and_image_name == f"{default_repository}/kernel-python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
     result = ImageRef.parse_image_str("lablup/python-tensorflow:1.10-py36-ubuntu")
     assert result.project_and_image_name == "lablup/python-tensorflow"
     assert result.tag == "1.10-py36-ubuntu"
     assert result.registry == default_registry
-    assert result.tag_set == ("1.10", {"ubuntu", "py"})
+    assert result.tag_set == ("1.10", PlatformTagSet(["py36", "ubuntu"]))
 
     result = ImageRef.parse_image_str("lablup/kernel-python:3.6-ubuntu")
     assert result.project_and_image_name == "lablup/kernel-python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
     # To parse registry URLs correctly, we first need to give
     # the valid registry URLs!
@@ -175,19 +175,19 @@ def test_image_ref_parsing():
     assert result.project_and_image_name == "myregistry.org/lua"
     assert result.tag == "latest"
     assert result.registry == default_registry
-    assert result.tag_set == ("latest", set())
+    assert result.tag_set == ("latest", PlatformTagSet([]))
 
     result = ImageRef.parse_image_str("myregistry.org/lua", "myregistry.org")
     assert result.project_and_image_name == "lua"
     assert result.tag == "latest"
     assert result.registry == "myregistry.org"
-    assert result.tag_set == ("latest", set())
+    assert result.tag_set == ("latest", PlatformTagSet([]))
 
     result = ImageRef.parse_image_str("myregistry.org/lua:5.3-alpine", "myregistry.org")
     assert result.project_and_image_name == "lua"
     assert result.tag == "5.3-alpine"
     assert result.registry == "myregistry.org"
-    assert result.tag_set == ("5.3", {"alpine"})
+    assert result.tag_set == ("5.3", PlatformTagSet(["alpine"]))
 
     # Non-standard port number should be a part of the known registry value.
     result = ImageRef.parse_image_str(
@@ -196,7 +196,7 @@ def test_image_ref_parsing():
     assert result.project_and_image_name == "mybase/python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "myregistry.org:999"
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     result = ImageRef.parse_image_str(
         "myregistry.org/mybase/moon/python:3.6-cuda9-ubuntu", "myregistry.org"
@@ -204,70 +204,70 @@ def test_image_ref_parsing():
     assert result.project_and_image_name == "mybase/moon/python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "myregistry.org"
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     # IP addresses are treated as valid registry URLs.
     result = ImageRef.parse_image_str("127.0.0.1:5000/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "127.0.0.1:5000"
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     # IPv6 addresses must be bracketted.
     result = ImageRef.parse_image_str("::1/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "::1/python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == default_registry
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     result = ImageRef.parse_image_str("[::1]/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "[::1]"
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     result = ImageRef.parse_image_str("[::1]:5000/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "[::1]:5000"
-    assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
+    assert result.tag_set == ("3.6", PlatformTagSet(["cuda9", "ubuntu"]))
 
     result = ImageRef.parse_image_str("[212c:9cb9:eada:e57b:84c9:6a9:fbec:bdd2]:1024/python")
     assert result.project_and_image_name == "python"
     assert result.tag == "latest"
     assert result.registry == "[212c:9cb9:eada:e57b:84c9:6a9:fbec:bdd2]:1024"
-    assert result.tag_set == ("latest", set())
+    assert result.tag_set == ("latest", PlatformTagSet([]))
 
-    result = ImageRef.from_image_str(
+    ref: ImageRef = ImageRef.from_image_str(
         "myregistry.org/project/kernel-python:3.6-ubuntu",
         "project",
         "myregistry.org",
     )
-    assert result.project == "project"
-    assert result.name == "kernel-python"
-    assert result.tag == "3.6-ubuntu"
-    assert result.registry == "myregistry.org"
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert ref.project == "project"
+    assert ref.name == "kernel-python"
+    assert ref.tag == "3.6-ubuntu"
+    assert ref.registry == "myregistry.org"
+    assert ref.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "myregistry.org/project/sub/kernel-python:3.6-ubuntu",
         "project",
         "myregistry.org",
     )
-    assert result.project == "project"
-    assert result.name == "sub/kernel-python"
-    assert result.tag == "3.6-ubuntu"
-    assert result.registry == "myregistry.org"
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert ref.project == "project"
+    assert ref.name == "sub/kernel-python"
+    assert ref.tag == "3.6-ubuntu"
+    assert ref.registry == "myregistry.org"
+    assert ref.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "myregistry.org/project/sub/kernel-python:3.6-ubuntu", "project/sub", "myregistry.org"
     )
-    assert result.project == "project/sub"
-    assert result.name == "kernel-python"
-    assert result.tag == "3.6-ubuntu"
-    assert result.registry == "myregistry.org"
-    assert result.tag_set == ("3.6", {"ubuntu"})
+    assert ref.project == "project/sub"
+    assert ref.name == "kernel-python"
+    assert ref.tag == "3.6-ubuntu"
+    assert ref.registry == "myregistry.org"
+    assert ref.tag_set == ("3.6", PlatformTagSet(["ubuntu"]))
 
     with pytest.raises(ValueError):
         result = ImageRef.parse_image_str("a:!")
@@ -282,79 +282,79 @@ def test_image_ref_parsing():
         result = ImageRef.parse_image_str("//127.0.0.1:5000/xyz")
 
     with pytest.raises(ValueError):
-        result = ImageRef.from_image_str("a:!", default_repository, default_registry)
+        _ref_err: ImageRef = ImageRef.from_image_str("a:!", default_repository, default_registry)
 
     with pytest.raises(ValueError):
-        result = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "127.0.0.1:5000/a:-x-", default_repository, default_registry
         )
 
     with pytest.raises(ValueError):
-        result = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "http://127.0.0.1:5000/xyz", default_repository, default_registry
         )
 
     with pytest.raises(ValueError):
-        result = ImageRef.from_image_str(
+        _ref_err = ImageRef.from_image_str(
             "//127.0.0.1:5000/xyz", default_repository, default_registry
         )
 
 
-def test_image_ref_formats():
-    result = ImageRef.parse_image_str("python:3.6-cuda9-ubuntu")
-    assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
-    assert result.short == "lablup/python:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
+def test_image_ref_formats() -> None:
+    parsed_result = ImageRef.parse_image_str("python:3.6-cuda9-ubuntu")
+    assert parsed_result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
+    assert parsed_result.short == "lablup/python:3.6-cuda9-ubuntu"
+    assert str(parsed_result) == parsed_result.canonical
 
-    result = ImageRef.parse_image_str(
+    parsed_result = ImageRef.parse_image_str(
         "myregistry.org/user/python:3.6-cuda9-ubuntu", "myregistry.org"
     )
-    assert result.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
-    assert result.short == "user/python:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
+    assert parsed_result.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
+    assert parsed_result.short == "user/python:3.6-cuda9-ubuntu"
+    assert str(parsed_result) == parsed_result.canonical
 
-    result = ImageRef.from_image_str("python:3.6-cuda9-ubuntu", "lablup", "index.docker.io")
-    assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
-    assert result.short == "lablup/python:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
-    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+    ref: ImageRef = ImageRef.from_image_str("python:3.6-cuda9-ubuntu", "lablup", "index.docker.io")
+    assert ref.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
+    assert ref.short == "lablup/python:3.6-cuda9-ubuntu"
+    assert str(ref) == ref.canonical
+    assert repr(ref) == f'<ImageRef: "{ref.canonical}" ({ref.architecture})>'
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "myregistry.org/user/python:3.6-cuda9-ubuntu", "user", "myregistry.org"
     )
-    assert result.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
-    assert result.short == "user/python:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
-    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+    assert ref.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
+    assert ref.short == "user/python:3.6-cuda9-ubuntu"
+    assert str(ref) == ref.canonical
+    assert repr(ref) == f'<ImageRef: "{ref.canonical}" ({ref.architecture})>'
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "registry.gitlab.com/user/python:3.6-cuda9-ubuntu", "user/python", "registry.gitlab.com"
     )
-    assert result.canonical == "registry.gitlab.com/user/python:3.6-cuda9-ubuntu"
-    assert result.short == "user/python:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
-    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+    assert ref.canonical == "registry.gitlab.com/user/python:3.6-cuda9-ubuntu"
+    assert ref.short == "user/python:3.6-cuda9-ubuntu"
+    assert str(ref) == ref.canonical
+    assert repr(ref) == f'<ImageRef: "{ref.canonical}" ({ref.architecture})>'
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "registry.gitlab.com/user/python/img:3.6-cuda9-ubuntu", "user/python", "registry.gitlab.com"
     )
-    assert result.canonical == "registry.gitlab.com/user/python/img:3.6-cuda9-ubuntu"
-    assert result.short == "user/python/img:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
-    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+    assert ref.canonical == "registry.gitlab.com/user/python/img:3.6-cuda9-ubuntu"
+    assert ref.short == "user/python/img:3.6-cuda9-ubuntu"
+    assert str(ref) == ref.canonical
+    assert repr(ref) == f'<ImageRef: "{ref.canonical}" ({ref.architecture})>'
 
-    result = ImageRef.from_image_str(
+    ref = ImageRef.from_image_str(
         "registry.gitlab.com/user/workspace/python/img:3.6-cuda9-ubuntu",
         "user/workspace/python",
         "registry.gitlab.com",
     )
-    assert result.canonical == "registry.gitlab.com/user/workspace/python/img:3.6-cuda9-ubuntu"
-    assert result.short == "user/workspace/python/img:3.6-cuda9-ubuntu"
-    assert str(result) == result.canonical
-    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+    assert ref.canonical == "registry.gitlab.com/user/workspace/python/img:3.6-cuda9-ubuntu"
+    assert ref.short == "user/workspace/python/img:3.6-cuda9-ubuntu"
+    assert str(ref) == ref.canonical
+    assert repr(ref) == f'<ImageRef: "{ref.canonical}" ({ref.architecture})>'
 
 
-def test_image_ref_generate_aliases():
+def test_image_ref_generate_aliases() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -378,7 +378,7 @@ def test_image_ref_generate_aliases():
         assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
-def test_image_ref_generate_aliases_with_accelerator():
+def test_image_ref_generate_aliases_with_accelerator() -> None:
     ref = ImageRef(
         name="python-tensorflow",
         project=default_repository,
@@ -402,7 +402,7 @@ def test_image_ref_generate_aliases_with_accelerator():
         assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
-def test_image_ref_generate_aliases_of_names():
+def test_image_ref_generate_aliases_of_names() -> None:
     # an alias may include only last framework name in the name.
     ref = ImageRef(
         name="python-tensorflow",
@@ -418,7 +418,7 @@ def test_image_ref_generate_aliases_of_names():
     assert "python" not in aliases
 
 
-def test_image_ref_generate_aliases_disallowed():
+def test_image_ref_generate_aliases_disallowed() -> None:
     # an alias must include the main platform version tag
     ref = ImageRef(
         name="python-tensorflow",
@@ -438,7 +438,7 @@ def test_image_ref_generate_aliases_disallowed():
     assert "python-tensorflow:cuda10.0" not in aliases
 
 
-def test_image_ref_ordering():
+def test_image_ref_ordering() -> None:
     # ordering is defined as the tuple-ordering of platform tags.
     # (tag components that come first have higher priority when comparing.)
     r1 = ImageRef.from_image_str(
@@ -484,7 +484,7 @@ def test_image_ref_ordering():
     assert not r5 > r4
 
 
-def test_image_ref_merge_aliases():
+def test_image_ref_merge_aliases() -> None:
     # After merging, aliases that indicates two or more references should
     # indicate most recent versions.
     refs = [
@@ -516,20 +516,24 @@ def test_image_ref_merge_aliases():
             "lablup/python-tensorflow:1.7-py37-ubuntu16.04", default_repository, default_registry
         ),  # 6
     ]
-    aliases = [ref.generate_aliases() for ref in refs]
-    aliases = functools.reduce(ImageRef.merge_aliases, aliases)
-    assert aliases["python-tensorflow"] is refs[6]
-    assert aliases["python-tensorflow:1.5"] is refs[4]
-    assert aliases["python-tensorflow:1.7"] is refs[6]
-    assert aliases["python-tensorflow:1.7-py36"] is refs[5]
-    assert aliases["python-tensorflow:1.5"] is refs[4]
-    assert aliases["python-tensorflow:1.5-cuda"] is refs[1]
-    assert aliases["python-tensorflow:1.7-cuda10"] is refs[2]
-    assert aliases["python-tensorflow:1.7-cuda9"] is refs[3]
-    assert aliases["python"] is refs[0]
+    aliases_list: list[collections.abc.Mapping[str, ImageRef]] = [
+        ref.generate_aliases() for ref in refs
+    ]
+    merged_aliases: collections.abc.Mapping[str, ImageRef] = functools.reduce(
+        ImageRef.merge_aliases, aliases_list
+    )
+    assert merged_aliases["python-tensorflow"] is refs[6]
+    assert merged_aliases["python-tensorflow:1.5"] is refs[4]
+    assert merged_aliases["python-tensorflow:1.7"] is refs[6]
+    assert merged_aliases["python-tensorflow:1.7-py36"] is refs[5]
+    assert merged_aliases["python-tensorflow:1.5"] is refs[4]
+    assert merged_aliases["python-tensorflow:1.5-cuda"] is refs[1]
+    assert merged_aliases["python-tensorflow:1.7-cuda10"] is refs[2]
+    assert merged_aliases["python-tensorflow:1.7-cuda9"] is refs[3]
+    assert merged_aliases["python"] is refs[0]
 
 
-def test_platform_tag_set_typing():
+def test_platform_tag_set_typing() -> None:
     tags = PlatformTagSet(["py36", "cuda9"])
     assert isinstance(tags, collections.abc.Mapping)
     assert isinstance(tags, typing.Mapping)
@@ -537,7 +541,7 @@ def test_platform_tag_set_typing():
     assert not isinstance(tags, typing.MutableMapping)
 
 
-def test_platform_tag_set():
+def test_platform_tag_set() -> None:
     tags = PlatformTagSet(["py36", "cuda9", "ubuntu16.04", "mkl2018.3"])
     assert "py" in tags
     assert "cuda" in tags
@@ -561,5 +565,5 @@ def test_platform_tag_set():
         tags = PlatformTagSet(["1234"])
 
 
-def test_platform_tag_set_abbreviations():
+def test_platform_tag_set_abbreviations() -> None:
     pass

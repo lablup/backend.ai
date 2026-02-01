@@ -36,7 +36,7 @@ def _get_reservoir_registry_join_condition() -> sa.ColumnElement[bool]:
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ArtifactRegistryRow(Base):
+class ArtifactRegistryRow(Base):  # type: ignore[misc]
     """
     Common information of all artifact_registry records.
     """

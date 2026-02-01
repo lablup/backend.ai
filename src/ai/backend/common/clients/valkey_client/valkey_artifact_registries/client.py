@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from glide import ExpirySet, ExpiryType
 
@@ -149,7 +149,7 @@ class ValkeyArtifactRegistryClient:
             return None
 
         json_value = value.decode()
-        return load_json(json_value)
+        return cast(Mapping[str, Any] | None, load_json(json_value))
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_registry(

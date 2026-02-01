@@ -6,7 +6,7 @@ import yarl
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 
 
-def test_shared_config_flatten():
+def test_shared_config_flatten() -> None:
     data = LegacyEtcdLoader.flatten(
         "abc/def",
         {

@@ -10,7 +10,7 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 
 
 @pytest.mark.asyncio
-async def test_read_committed_isolation_level():
+async def test_read_committed_isolation_level() -> None:
     """Test that all database operations use READ COMMITTED isolation level"""
 
     # Create a mock database engine
@@ -68,7 +68,7 @@ async def test_read_committed_isolation_level():
 
 
 @pytest.mark.asyncio
-async def test_session_methods_use_read_committed():
+async def test_session_methods_use_read_committed() -> None:
     """Test that public methods use the READ COMMITTED session methods"""
 
     # Create a mock database engine and ScheduleDBSource
@@ -76,9 +76,9 @@ async def test_session_methods_use_read_committed():
     db_source = ScheduleDBSource(mock_db)
 
     # Mock the internal session methods
-    db_source._begin_readonly_session_read_committed = AsyncMock()
-    db_source._begin_session_read_committed = AsyncMock()
-    db_source._begin_readonly_read_committed = AsyncMock()
+    db_source._begin_readonly_session_read_committed = AsyncMock()  # type: ignore[method-assign]
+    db_source._begin_session_read_committed = AsyncMock()  # type: ignore[method-assign]
+    db_source._begin_readonly_read_committed = AsyncMock()  # type: ignore[method-assign]
 
     # Create mock session context managers
     mock_readonly_session = AsyncMock()

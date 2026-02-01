@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
 import jwt
 from aiohttp import web
@@ -14,7 +14,7 @@ from ai.backend.appproxy.coordinator.types import RootContext
 def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Handler], Handler]:
     def wrap(handler: Handler) -> Handler:
         @functools.wraps(handler)
-        async def wrapped(request: web.Request, *args, **kwargs) -> web.StreamResponse:
+        async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             permitted_token = root_ctx.local_config.secrets.api_secret
             permitted_header_values = (

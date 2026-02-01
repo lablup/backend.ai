@@ -15,7 +15,7 @@ from ai.backend.common.leader.valkey_leader_election import (
 
 
 @pytest.fixture
-async def mock_leader_client():
+async def mock_leader_client() -> AsyncMock:
     """Create a mock ValkeyLeaderClient."""
     client = AsyncMock(spec=ValkeyLeaderClient)
     client.acquire_or_renew_leadership = AsyncMock(return_value=False)
@@ -25,7 +25,7 @@ async def mock_leader_client():
 
 
 @pytest.fixture
-async def leader_election_config():
+async def leader_election_config() -> ValkeyLeaderElectionConfig:
     """Create a ValkeyLeaderElectionConfig."""
     return ValkeyLeaderElectionConfig(
         server_id="test-server-001",
@@ -36,7 +36,9 @@ async def leader_election_config():
 
 
 @pytest.fixture
-async def leader_election(mock_leader_client, leader_election_config):
+async def leader_election(
+    mock_leader_client: AsyncMock, leader_election_config: ValkeyLeaderElectionConfig
+) -> ValkeyLeaderElection:
     """Create a ValkeyLeaderElection instance."""
     return ValkeyLeaderElection(
         leader_client=mock_leader_client,
@@ -47,7 +49,11 @@ async def leader_election(mock_leader_client, leader_election_config):
 class TestValkeyLeaderElection:
     """Test cases for ValkeyLeaderElection."""
 
-    async def test_initialization(self, leader_election, leader_election_config):
+    async def test_initialization(
+        self,
+        leader_election: ValkeyLeaderElection,
+        leader_election_config: ValkeyLeaderElectionConfig,
+    ) -> None:
         """Test ValkeyLeaderElection initialization."""
         assert leader_election.server_id == "test-server-001"
         assert leader_election._config == leader_election_config
@@ -57,7 +63,9 @@ class TestValkeyLeaderElection:
         assert leader_election.is_leader is False
         assert leader_election._stopped is False
 
-    async def test_start_stop(self, leader_election, mock_leader_client):
+    async def test_start_stop(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test starting and stopping the election."""
         # Start the election
         await leader_election.start()
@@ -75,7 +83,9 @@ class TestValkeyLeaderElection:
         # Verify everything was stopped
         assert leader_election._stopped is True
 
-    async def test_leader_acquisition(self, leader_election, mock_leader_client):
+    async def test_leader_acquisition(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test leader acquisition process."""
         # Configure mock to simulate becoming leader
         mock_leader_client.acquire_or_renew_leadership.side_effect = [False, True, True]
@@ -95,7 +105,9 @@ class TestValkeyLeaderElection:
         # Stop the election
         await leader_election.stop()
 
-    async def test_leader_loss(self, leader_election, mock_leader_client):
+    async def test_leader_loss(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test losing leadership."""
         # Configure mock to simulate becoming leader then losing it
         mock_leader_client.acquire_or_renew_leadership.side_effect = [True, True, False]
@@ -112,7 +124,9 @@ class TestValkeyLeaderElection:
         # Stop the election
         await leader_election.stop()
 
-    async def test_release_leadership_on_stop(self, leader_election, mock_leader_client):
+    async def test_release_leadership_on_stop(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that leadership is released when stopping."""
         # Set up as leader
         mock_leader_client.acquire_or_renew_leadership.return_value = True
@@ -133,7 +147,9 @@ class TestValkeyLeaderElection:
         )
         assert leader_election.is_leader is False
 
-    async def test_error_handling_in_renewal_loop(self, leader_election, mock_leader_client):
+    async def test_error_handling_in_renewal_loop(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test error handling in the renewal loop."""
         # Configure mock to raise an exception
         mock_leader_client.acquire_or_renew_leadership.side_effect = Exception("Connection error")
@@ -150,7 +166,9 @@ class TestValkeyLeaderElection:
         # Stop the election
         await leader_election.stop()
 
-    async def test_leadership_renewal(self, leader_election, mock_leader_client):
+    async def test_leadership_renewal(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test continuous leadership renewal."""
         # Configure mock to always return True (maintain leadership)
         mock_leader_client.acquire_or_renew_leadership.return_value = True

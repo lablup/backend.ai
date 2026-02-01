@@ -3,6 +3,8 @@ Simple tests for Resource Preset Service functionality based on test scenarios.
 Tests the core resource preset service actions to verify compatibility with test scenarios.
 """
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 from typing import Any
@@ -94,7 +96,7 @@ class TestResourcePresetServiceCompatibility:
         }
 
     @pytest.fixture
-    def resource_preset_service(self, mock_dependencies) -> ResourcePresetService:
+    def resource_preset_service(self, mock_dependencies: dict[str, Any]) -> ResourcePresetService:
         """Create ResourcePresetService instance with mocked dependencies."""
         return ResourcePresetService(
             resource_preset_repository=mock_dependencies["resource_preset_repository"],
@@ -102,7 +104,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_create_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that CreateResourcePresetAction has the expected structure from test scenarios."""
         # Mock successful preset creation
@@ -139,7 +143,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_create_gpu_preset_with_scaling_group(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test GPU preset creation with scaling group."""
         mock_preset_data = ResourcePresetData(
@@ -181,7 +187,9 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.scaling_group_name == "gpu-cluster"
 
     @pytest.mark.asyncio
-    async def test_create_preset_missing_intrinsic_slots(self, resource_preset_service) -> None:
+    async def test_create_preset_missing_intrinsic_slots(
+        self, resource_preset_service: ResourcePresetService
+    ) -> None:
         """Test preset creation fails when missing intrinsic slots."""
         action = CreateResourcePresetAction(
             creator=Creator(
@@ -199,7 +207,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_create_duplicate_preset(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test duplicate preset name raises ResourcePresetConflict."""
 
@@ -223,7 +233,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_modify_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that ModifyResourcePresetAction supports the expected modifications."""
         mock_preset_data = ResourcePresetData(
@@ -258,7 +270,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_modify_preset_name_change(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test preset name modification."""
         preset_id = uuid.uuid4()
@@ -288,7 +302,9 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.name == "cpu-medium"
 
     @pytest.mark.asyncio
-    async def test_modify_preset_missing_identifiers(self, resource_preset_service) -> None:
+    async def test_modify_preset_missing_identifiers(
+        self, resource_preset_service: ResourcePresetService
+    ) -> None:
         """Test modify fails when neither name nor id provided."""
         action = ModifyResourcePresetAction(
             name=None,
@@ -304,7 +320,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_delete_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that DeleteResourcePresetAction works as expected."""
         mock_preset_data = ResourcePresetData(
@@ -329,7 +347,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_preset(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test delete non-existent preset raises ObjectNotFound."""
         mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
@@ -343,7 +363,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_list_presets_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that ListResourcePresetsAction returns expected structure."""
         mock_presets = [
@@ -389,7 +411,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_check_presets_with_sufficient_resources(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
@@ -414,7 +438,12 @@ class TestResourcePresetServiceCompatibility:
         assert result.group_limits is not None
         assert len(result.presets) > 0
 
-    async def _setup_check_presets_mocks(self, service, deps, action) -> None:
+    async def _setup_check_presets_mocks(
+        self,
+        service: ResourcePresetService,
+        deps: dict[str, Any],
+        action: CheckResourcePresetsAction,
+    ) -> None:
         """Helper to setup complex mocks for check_presets tests."""
         # Mock database connection
         mock_conn = AsyncMock()
@@ -462,7 +491,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_custom_resource_types_support(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test support for custom resource types like NPU/TPU."""
         mock_preset_data = ResourcePresetData(
@@ -500,7 +531,9 @@ class TestResourcePresetServiceCompatibility:
 
     @pytest.mark.asyncio
     async def test_shared_memory_adjustment(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test shared memory adjustment in preset modification."""
         mock_preset_data = ResourcePresetData(

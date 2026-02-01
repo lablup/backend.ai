@@ -78,7 +78,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis | Any], Awaitable[Any]],
+    func: Callable[[Redis[Any] | Any], Awaitable[Any]],
     *,
     service_name: str | None = None,
     encoding: str | None = None,
@@ -207,7 +207,7 @@ def get_redis_object(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Legacy function kept for external code that depends on the common package.
@@ -275,7 +275,7 @@ def get_redis_object(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: ConnectionPool = ConnectionPool.from_url(
+    connection_pool: ConnectionPool[bytes] = ConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,
@@ -294,7 +294,7 @@ def get_redis_object_for_lock(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Create a Redis connection using BlockingConnectionPool for distributed locking.
@@ -364,7 +364,7 @@ def get_redis_object_for_lock(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
+    connection_pool: BlockingConnectionPool[bytes] = BlockingConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,

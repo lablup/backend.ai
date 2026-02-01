@@ -36,7 +36,7 @@ class AbstractNetworkAgentPlugin[TKernel: AbstractKernel](AbstractPlugin, metacl
         cluster_info: ClusterInfo,
         *,
         network_name: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """
         Returns required container config to attach container to network.
@@ -58,7 +58,7 @@ class AbstractNetworkAgentPlugin[TKernel: AbstractKernel](AbstractPlugin, metacl
         kernel: TKernel,
         bind_host: str,
         ports: Iterable[tuple[int, int]],
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Prepare underlying network setup before container is actually spawned.
@@ -71,7 +71,7 @@ class AbstractNetworkAgentPlugin[TKernel: AbstractKernel](AbstractPlugin, metacl
         kernel: TKernel,
         bind_host: str,
         ports: Iterable[tuple[int, int]],
-        **kwargs,
+        **kwargs: Any,
     ) -> ContainerNetworkInfo | None:
         """
         Expose given set of ports to the public network after container is started.
@@ -80,5 +80,5 @@ class AbstractNetworkAgentPlugin[TKernel: AbstractKernel](AbstractPlugin, metacl
         pass
 
 
-class NetworkPluginContext(BasePluginContext[AbstractNetworkAgentPlugin]):
+class NetworkPluginContext(BasePluginContext[AbstractNetworkAgentPlugin[Any]]):
     plugin_group = "backendai_network_agent_v1"

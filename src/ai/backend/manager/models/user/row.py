@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import logging
 import uuid as uuid_mod
 from collections.abc import Sequence
@@ -7,7 +8,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    cast,
 )
 from uuid import UUID
 
@@ -144,7 +144,7 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(Base):
+class UserRow(Base):  # type: ignore[misc]
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
@@ -200,9 +200,9 @@ class UserRow(Base):
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )
-    allowed_client_ip: Mapped[list[ReadableCIDR] | None] = mapped_column(
-        "allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True
-    )
+    allowed_client_ip: Mapped[
+        list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None
+    ] = mapped_column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True)
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
     totp_activated: Mapped[bool | None] = mapped_column(
         "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
@@ -382,12 +382,11 @@ class UserRow(Base):
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
         # `cast()` requires import of KeyPairRow
-        from ai.backend.manager.models.keypair import KeyPairRow
 
         keypair_candidate: KeyPairRow | None = None
-        main_keypair_row = cast(KeyPairRow | None, self.main_keypair)
+        main_keypair_row = self.main_keypair
         if main_keypair_row is None:
-            keypair_rows = cast(list[KeyPairRow], self.keypairs)
+            keypair_rows = self.keypairs
             active_keypairs = [row for row in keypair_rows if row.is_active]
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:
@@ -443,8 +442,8 @@ def by_user_uuid(
     user_uuid: UUID,
 ) -> QueryCondition:
     def _by_user_uuid(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.uuid == user_uuid)
 
     return _by_user_uuid
@@ -454,8 +453,8 @@ def by_username(
     username: str,
 ) -> QueryCondition:
     def _by_username(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.username == username)
 
     return _by_username
@@ -465,8 +464,8 @@ def by_user_email(
     email: str,
 ) -> QueryCondition:
     def _by_email(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.email == email)
 
     return _by_email
@@ -544,7 +543,8 @@ async def check_credential_with_migration(
                 .values(password=target_password_info)
             )
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping
 
 
 async def check_credential(
@@ -589,4 +589,5 @@ async def check_credential(
     except ValueError as e:
         raise AuthorizationFailed("User credential mismatch.") from e
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping

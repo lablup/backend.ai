@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import socket
-from typing import Final
+from typing import Any, Final
 
 import aiotools
 
@@ -12,7 +12,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
@@ -20,7 +20,7 @@ MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 class TCPBackend(BaseBackend):
     routes: list[RouteInfo]
 
-    def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
+    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
 

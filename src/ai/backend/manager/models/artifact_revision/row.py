@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -46,7 +46,7 @@ def _get_association_artifacts_storages_join_cond() -> sa.ColumnElement[bool]:
     return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
-class ArtifactRevisionRow(Base):
+class ArtifactRevisionRow(Base):  # type: ignore[misc]
     __tablename__ = "artifact_revisions"
     __table_args__ = (
         # constraint
@@ -96,7 +96,7 @@ class ArtifactRevisionRow(Base):
         server_default=None,
         index=True,
     )
-    verification_result: Mapped[dict | None] = mapped_column(
+    verification_result: Mapped[dict[str, Any] | None] = mapped_column(
         "verification_result", sa.JSON(none_as_null=True), nullable=True, default=None
     )
 

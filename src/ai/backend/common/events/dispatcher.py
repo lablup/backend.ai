@@ -82,7 +82,7 @@ class EventHandler[TContext, TEvent: "AbstractEvent"]:
     handler_type: _EventHandlerType
     coalescing_opts: CoalescingOptions | None
     coalescing_state: CoalescingState
-    args_matcher: Callable[[tuple], bool] | None
+    args_matcher: Callable[[tuple[Any, ...]], bool] | None
     event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
     event_complete_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
 
@@ -97,7 +97,7 @@ class CoalescingState:
     batch_size: int = 0
     last_added: float = 0.0
     last_handle: asyncio.TimerHandle | None = None
-    fut_sync: asyncio.Future | None = None
+    fut_sync: asyncio.Future[Any] | None = None
 
     def proceed(self) -> None:
         if self.fut_sync is not None and not self.fut_sync.done():
@@ -215,7 +215,7 @@ class EventDispatcherGroup(ABC):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
@@ -229,7 +229,7 @@ class EventDispatcherGroup(ABC):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
@@ -271,7 +271,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
@@ -294,7 +294,7 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
@@ -330,8 +330,8 @@ class EventDispatcher(EventDispatcherGroup):
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
-    _consumer_loop_task: asyncio.Task | None
-    _subscriber_loop_task: asyncio.Task | None
+    _consumer_loop_task: asyncio.Task[Any] | None
+    _subscriber_loop_task: asyncio.Task[Any] | None
     _consumer_taskgroup: PersistentTaskGroup
     _subscriber_taskgroup: PersistentTaskGroup
 
@@ -377,7 +377,7 @@ class EventDispatcher(EventDispatcherGroup):
             await self._consumer_taskgroup.shutdown()
             await self._subscriber_taskgroup.shutdown()
 
-            def cancel_task(task: asyncio.Task | None) -> None:
+            def cancel_task(task: asyncio.Task[Any] | None) -> None:
                 if task is not None and not task.done():
                     task.cancel()
                     cancelled_tasks.append(task)
@@ -409,7 +409,7 @@ class EventDispatcher(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TConsumedEvent]:
@@ -457,7 +457,7 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TSubscirbedEvent]:
@@ -500,9 +500,9 @@ class EventDispatcher(EventDispatcherGroup):
 
     async def _handle(
         self,
-        evh: EventHandler,
+        evh: EventHandler,  # type: ignore[type-arg]
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
     ) -> None:
@@ -532,9 +532,9 @@ class EventDispatcher(EventDispatcherGroup):
                     with metadata.apply_context():
                         if asyncio.iscoroutinefunction(cb):
                             # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                            await cb(evh.context, source, event)  # type: ignore
+                            await cb(evh.context, source, event)
                         else:
-                            cb(evh.context, source, event)  # type: ignore
+                            cb(evh.context, source, event)
                         for post_callback in post_callbacks:
                             await post_callback.done()
                         self._metric_observer.observe_event_success(
@@ -544,9 +544,9 @@ class EventDispatcher(EventDispatcherGroup):
                 else:
                     if asyncio.iscoroutinefunction(cb):
                         # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                        await cb(evh.context, source, event)  # type: ignore
+                        await cb(evh.context, source, event)
                     else:
-                        cb(evh.context, source, event)  # type: ignore
+                        cb(evh.context, source, event)
                     for post_callback in post_callbacks:
                         await post_callback.done()
                     self._metric_observer.observe_event_success(
@@ -576,7 +576,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         event_name: str,
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
     ) -> None:
@@ -598,7 +598,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         event_name: str,
         source: AgentId,
-        args: tuple,
+        args: tuple[Any, ...],
         metadata: MessageMetadata | None = None,
     ) -> None:
         if self._log_events:
@@ -609,7 +609,7 @@ class EventDispatcher(EventDispatcherGroup):
             )
             await asyncio.sleep(0)
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def _consume_loop(self) -> None:
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
@@ -637,7 +637,7 @@ class EventDispatcher(EventDispatcherGroup):
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def _subscribe_loop(self) -> None:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:

@@ -92,7 +92,7 @@ def create_test_config(
     if num_agents > 1:
         agents_list = []
         for i in range(num_agents):
-            agent_override: dict = {
+            agent_override: dict[str, Any] = {
                 "agent": {"id": f"agent{i + 1}"},
             }
             # In MANUAL mode, each agent needs allocation config
@@ -149,18 +149,18 @@ def create_mock_computers(
     """
     result: dict[DeviceName, AbstractComputePlugin] = {}
     for device_name, alloc_map in computers_spec.items():
-        mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)  # type: ignore[assignment]
+        mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)
         mock_plugin.get_metadata.return_value = {"slot_name": str(device_name)}  # type: ignore[attr-defined]
 
         # Create mock devices for each device_id in the alloc_map
         mock_devices: list[AbstractComputeDevice] = []
         for dev_id in alloc_map.device_slots.keys():
-            mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)  # type: ignore[assignment]
-            mock_device.device_id = dev_id  # type: ignore[attr-defined]
+            mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
+            mock_device.device_id = dev_id
             mock_devices.append(mock_device)
 
         # Create a fresh alloc_map for each call
-        async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:  # type: ignore[misc]
+        async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:
             if isinstance(original_map, FractionAllocMap):
                 return create_fraction_alloc_map({
                     dev_id: (slot.slot_name, slot.amount)
@@ -173,9 +173,9 @@ def create_mock_computers(
                 })
             raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
 
-        mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[attr-defined,assignment]
-        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[attr-defined,method-assign]
-        mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[attr-defined,method-assign]
+        mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
+        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
+        mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         result[device_name] = mock_plugin
     return result
@@ -184,7 +184,7 @@ def create_mock_computers(
 @pytest.fixture
 def mock_etcd() -> AsyncEtcd:
     """Create a minimal mock etcd for testing."""
-    mock: AsyncEtcd = Mock(spec=AsyncEtcd)  # type: ignore[assignment]
+    mock: AsyncEtcd = Mock(spec=AsyncEtcd)
     return mock
 
 

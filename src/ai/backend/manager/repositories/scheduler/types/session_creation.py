@@ -87,9 +87,9 @@ class SessionCreationSpec:
     cluster_mode: ClusterMode
     cluster_size: int
     priority: int
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     kernel_specs: list[KernelEnqueueingConfig]
-    creation_spec: dict
+    creation_spec: dict[str, Any]
 
     # Optional parameters
     scaling_group: str | None = None
@@ -102,7 +102,7 @@ class SessionCreationSpec:
     sudo_session_enabled: bool = False
     network: NetworkRow | None = None
     designated_agent_list: list[str] | None = None
-    internal_data: dict | None = None
+    internal_data: dict[str, Any] | None = None
     public_sgroup_only: bool = True
     startup_command: str | None = None
 
@@ -218,8 +218,8 @@ class KernelEnqueueData:
     status_history: dict[str, str]
     occupied_slots: ResourceSlot
     requested_slots: ResourceSlot
-    occupied_shares: dict
-    resource_opts: dict
+    occupied_shares: dict[str, Any]
+    resource_opts: dict[str, Any]
     environ: list[str]  # List of "KEY=VALUE" strings
     bootstrap_script: str | None
     startup_command: str | None

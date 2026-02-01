@@ -7,7 +7,7 @@ import urllib.parse
 from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from aiohttp import web
@@ -91,8 +91,8 @@ class WekaFs:
         )
 
 
-def error_handler(inner: Callable[..., Awaitable[Any]]) -> Any:
-    async def outer(*args, **kwargs) -> Any:
+def error_handler(inner: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    async def outer(*args: Any, **kwargs: Any) -> Any:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:
@@ -376,7 +376,7 @@ class WekaAPIClient:
         ) as sess:
             response = await self._build_request(sess, "GET", "/cluster")
             data = await response.json()
-            return data["data"]
+            return cast(Mapping[str, Any], data["data"])
 
     @error_handler
     async def get_metric(
@@ -403,4 +403,4 @@ class WekaAPIClient:
                 f"/stats?{querystring}",
             )
             data = await response.json()
-            return data["data"]["all"]
+            return cast(Mapping[str, Any], data["data"]["all"])

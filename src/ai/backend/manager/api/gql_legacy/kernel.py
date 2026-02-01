@@ -67,7 +67,7 @@ __all__ = (
 )
 
 
-class KernelNode(graphene.ObjectType):
+class KernelNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -192,7 +192,7 @@ class KernelNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self.batch_load_live_stat
         )
-        return await loader.load(self.row_id)
+        return cast(dict[str, Any] | None, await loader.load(self.row_id))
 
     @classmethod
     async def batch_load_live_stat(
@@ -208,7 +208,7 @@ class KernelConnection(Connection):
         description = "Added in 24.09.0."
 
 
-class ComputeContainer(graphene.ObjectType):
+class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -314,7 +314,7 @@ class ComputeContainer(graphene.ObjectType):
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
@@ -523,7 +523,7 @@ class ComputeContainer(graphene.ObjectType):
             )
 
 
-class ComputeContainerList(graphene.ObjectType):
+class ComputeContainerList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
@@ -535,7 +535,7 @@ class ComputeContainerList(graphene.ObjectType):
 MetricValueType = TypeVar("MetricValueType", int, float)
 
 
-class LegacyComputeSession(graphene.ObjectType):
+class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
     """
     Represents a main session.
     """
@@ -607,7 +607,7 @@ class LegacyComputeSession(graphene.ObjectType):
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         return await self.resolve_live_stat(info)
@@ -675,7 +675,7 @@ class LegacyComputeSession(graphene.ObjectType):
         return await self._resolve_legacy_metric(info, "io_scratch_size", "current", int)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         from ai.backend.manager.errors.resource import DataTransformationFailed
 
         if row is None:
@@ -742,7 +742,7 @@ class LegacyComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, context: GraphQueryContext, row: Row) -> LegacyComputeSession | None:
+    def from_row(cls, context: GraphQueryContext, row: Row[Any]) -> LegacyComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(context, row)
@@ -916,7 +916,7 @@ class LegacyComputeSession(graphene.ObjectType):
             )
 
 
-class LegacyComputeSessionList(graphene.ObjectType):
+class LegacyComputeSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

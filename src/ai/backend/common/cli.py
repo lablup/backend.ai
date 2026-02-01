@@ -10,9 +10,9 @@ from typing import Any
 import click
 
 
-def wrap_method(method: Callable) -> Callable:
+def wrap_method(method: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(method)
-    def wrapped(self: Any, *args, **kwargs) -> Any:
+    def wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
         return method(self._impl, *args, **kwargs)
 
     return wrapped
@@ -31,7 +31,7 @@ class LazyClickMixin:
     _import_name: str
     _loaded_impl: click.Command | click.Group | None
 
-    def __init__(self, *, import_name: str, **kwargs) -> None:
+    def __init__(self, *, import_name: str, **kwargs: Any) -> None:
         self._import_name = import_name
         self._loaded_impl = None
         super().__init__(**kwargs)

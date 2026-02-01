@@ -40,7 +40,7 @@ class ArtifactRegistry:
     )
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
 ) -> ArtifactRegistry | None:

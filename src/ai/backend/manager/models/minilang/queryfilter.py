@@ -56,13 +56,13 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-type FilterableSQLQuery = sa.sql.Select | sa.sql.Update | sa.sql.Delete
-_TQuery = TypeVar("_TQuery", sa.sql.Select, sa.sql.Update, sa.sql.Delete)
+type FilterableSQLQuery = sa.sql.Select[Any] | sa.sql.Update | sa.sql.Delete
+_TQuery = TypeVar("_TQuery", sa.sql.Select[Any], sa.sql.Update, sa.sql.Delete)
 type FieldSpecType = Mapping[str, FieldSpecItem] | None
 type WhereClauseType = sa.sql.expression.ColumnElement[bool]
 
 
-class QueryFilterTransformer(Transformer):
+class QueryFilterTransformer(Transformer[Any, Any]):
     def __init__(
         self, sa_table: sa.Table | sa.sql.Join | type, fieldspec: FieldSpecType | None = None
     ) -> None:
@@ -145,7 +145,8 @@ class QueryFilterTransformer(Transformer):
                     expr = col.ilike(val)
                 case _:
                     raise ValueError(f"Unknown operator: {op}")
-            return expr
+            result: sa.sql.elements.ColumnElement[Any] = expr
+            return result
 
         expr: sa.sql.elements.ColumnElement[Any]
         try:
@@ -161,7 +162,8 @@ class QueryFilterTransformer(Transformer):
                             .select_from(unnested_col)
                             .where(build_expr(op, sa.column("item"), val))
                         )
-                        expr = sa.exists(subq)
+                        result_expr: sa.sql.elements.ColumnElement[Any] = sa.exists(subq)
+                        expr = result_expr
                     case JSONFieldItem(col_name, obj_key):
                         # For json columns, we additionally indicate the object key
                         # to retrieve the value used in the expression.
@@ -191,15 +193,16 @@ class QueryFilterTransformer(Transformer):
             raise ValueError("Unknown/unsupported field name", col_name) from e
         return expr
 
-    def unary_expr(self, *args) -> sa.sql.elements.ColumnElement[Any] | tuple:
+    def unary_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple[Any, ...]:
         children = args[0]
         op = children[0].value
         expr = children[1]
         if op in ("not", "!"):
-            return sa.not_(expr)
+            result: sa.sql.elements.ColumnElement[Any] = sa.not_(expr)
+            return result
         return args
 
-    def combine_expr(self, *args) -> sa.sql.elements.ColumnElement[Any] | tuple:
+    def combine_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple[Any, ...]:
         children = args[0]
         op = children[1].value
         expr1 = children[0]
@@ -210,9 +213,10 @@ class QueryFilterTransformer(Transformer):
             return sa.or_(expr1, expr2)
         return args
 
-    def paren_expr(self, *args) -> sa.sql.elements.ColumnElement[Any]:
+    def paren_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any]:
         children = args[0]
-        return children[0]
+        result: sa.sql.elements.ColumnElement[Any] = children[0]
+        return result
 
 
 class QueryFilterParser:
@@ -227,7 +231,10 @@ class QueryFilterParser:
     ) -> WhereClauseType:
         try:
             ast = self._parser.parse(filter_expr)
-            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            where_clause_result: WhereClauseType = QueryFilterTransformer(
+                table, self._fieldspec
+            ).transform(ast)
+            where_clause = where_clause_result
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}") from e
         return where_clause

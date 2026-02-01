@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
@@ -33,7 +33,7 @@ def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentAutoScalingPolicyRow(Base):
+class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
     """
     Represents an auto-scaling policy for a deployment (K8s HPA equivalent).
 

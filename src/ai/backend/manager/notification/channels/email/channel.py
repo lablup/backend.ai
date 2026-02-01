@@ -14,7 +14,7 @@ from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
 

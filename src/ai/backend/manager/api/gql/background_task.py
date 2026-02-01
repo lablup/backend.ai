@@ -110,7 +110,7 @@ class BackgroundTaskEventPayload:
         )
 
 
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description="Subscribe to real-time events for a specific background task. "
     "Streams progress updates and completion events (done/cancelled/failed) "
     "for the task lifecycle."

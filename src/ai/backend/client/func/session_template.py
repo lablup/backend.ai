@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
@@ -43,7 +43,8 @@ class SessionTemplate(BaseFunction):
         rqst = Request("GET", "/template/session")
         rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result = await resp.json()
+            return cast(list[Mapping[str, str]], result)
 
     def __init__(self, template_id: str, owner_access_key: str | None = None) -> None:
         self.template_id = template_id

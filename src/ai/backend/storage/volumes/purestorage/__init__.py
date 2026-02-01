@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from typing import Any
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
@@ -36,7 +37,7 @@ class FlashBladeVolume(BaseVolume):
     name = "purestorage"
     _toolkit_version: int | None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self._toolkit_version = None

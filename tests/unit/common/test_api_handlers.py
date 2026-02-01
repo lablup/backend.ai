@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Self
+from typing import Any, Self
 
 import pytest
 from aiohttp import web
@@ -33,7 +36,7 @@ class TestEmptyHandler:
 
 
 @pytest.mark.asyncio
-async def test_empty_parameter_handler_in_class(aiohttp_client):
+async def test_empty_parameter_handler_in_class(aiohttp_client: Any) -> None:
     handler = TestEmptyHandler()
     app = web.Application()
     app.router.add_get("/system", handler.handle_empty)
@@ -60,8 +63,8 @@ class TestSearchParamsModel(BaseRequestModel):
 
 
 class TestCombinedResponseModel(BaseResponseModel):
-    user_info: dict
-    search_info: dict
+    user_info: dict[str, Any]
+    search_info: dict[str, Any]
     timestamp: str
 
 
@@ -92,7 +95,7 @@ class CombinedParamsHandler:
 
 
 @pytest.mark.asyncio
-async def test_combined_parameters_handler_in_class(aiohttp_client):
+async def test_combined_parameters_handler_in_class(aiohttp_client: Any) -> None:
     handler = CombinedParamsHandler()
     app = web.Application()
     app.router.add_post("/users/search", handler.handle_combined)
@@ -130,7 +133,7 @@ class TestMessageHandler:
 
 
 @pytest.mark.asyncio
-async def test_empty_parameter(aiohttp_client):
+async def test_empty_parameter(aiohttp_client: Any) -> None:
     handler = TestMessageHandler()
     app = web.Application()
     app.router.add_route("GET", "/test", handler.handle_message)
@@ -164,7 +167,7 @@ class TestPostUserHandler:
 
 
 @pytest.mark.asyncio
-async def test_body_parameter(aiohttp_client):
+async def test_body_parameter(aiohttp_client: Any) -> None:
     handler = TestPostUserHandler()
     app = web.Application()
     app.router.add_route("POST", "/test", handler.handle_user)
@@ -202,7 +205,7 @@ class TestSearchQueryHandler:
 
 
 @pytest.mark.asyncio
-async def test_query_parameter(aiohttp_client):
+async def test_query_parameter(aiohttp_client: Any) -> None:
     handler = TestSearchQueryHandler()
     app = web.Application()
     app.router.add_get("/test", handler.handle_search)
@@ -235,7 +238,7 @@ class TestAuthHeaderHandler:
 
 
 @pytest.mark.asyncio
-async def test_header_parameter(aiohttp_client):
+async def test_header_parameter(aiohttp_client: Any) -> None:
     handler = TestAuthHeaderHandler()
     app = web.Application()
     app.router.add_get("/test", handler.handle_auth)
@@ -268,7 +271,7 @@ class TestUserPathHandler:
 
 
 @pytest.mark.asyncio
-async def test_path_parameter(aiohttp_client):
+async def test_path_parameter(aiohttp_client: Any) -> None:
     handler = TestUserPathHandler()
     app = web.Application()
     app.router.add_get("/test/{user_id}", handler.handle_path)
@@ -303,11 +306,13 @@ class TestAuthHandler:
 
 
 @pytest.mark.asyncio
-async def test_middleware_parameter(aiohttp_client):
+async def test_middleware_parameter(aiohttp_client: Any) -> None:
     handler = TestAuthHandler()
 
     @web.middleware
-    async def auth_middleware(request, handler):
+    async def auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = True
         return await handler(request)
 
@@ -333,11 +338,13 @@ class TestInvalidAuthHandler:
 
 
 @pytest.mark.asyncio
-async def test_middleware_parameter_invalid_type(aiohttp_client):
+async def test_middleware_parameter_invalid_type(aiohttp_client: Any) -> None:
     handler = TestInvalidAuthHandler()
 
     @web.middleware
-    async def broken_auth_middleware(request, handler):
+    async def broken_auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = "not_a_boolean"
         return await handler(request)
 
@@ -398,11 +405,13 @@ class TestMultipleParamsHandler:
 
 
 @pytest.mark.asyncio
-async def test_multiple_parameters(aiohttp_client):
+async def test_multiple_parameters(aiohttp_client: Any) -> None:
     handler = TestMultipleParamsHandler()
 
     @web.middleware
-    async def auth_middleware(request, handler):
+    async def auth_middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
         request["is_authorized"] = True
         return await handler(request)
 
@@ -442,7 +451,7 @@ class TestRegisterUserHandler:
 
 
 @pytest.mark.asyncio
-async def test_invalid_body(aiohttp_client):
+async def test_invalid_body(aiohttp_client: Any) -> None:
     handler = TestRegisterUserHandler()
     app = web.Application()
     app.router.add_post("/test", handler.handle_register)
@@ -476,7 +485,7 @@ class TestProductSearchHandler:
 
 
 @pytest.mark.asyncio
-async def test_invalid_query_parameter(aiohttp_client):
+async def test_invalid_query_parameter(aiohttp_client: Any) -> None:
     handler = TestProductSearchHandler()
     app = web.Application()
     app.router.add_get("/test", handler.handle_product_search)

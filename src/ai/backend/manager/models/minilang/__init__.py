@@ -15,7 +15,7 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.orm.attributes.InstrumentedAttribute | sa.Column
+    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.Column[Any]
 
 
 TEnum = TypeVar("TEnum", bound=Enum)
@@ -27,20 +27,28 @@ class EnumFieldItem[TEnum: Enum](NamedTuple):
 
 
 FieldSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem | ORMFieldItem, Callable[[str], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem,
+    Callable[[str], Any] | None,
 ]
 OrderSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem, Callable[[sa.Column], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any],
+    Callable[[sa.Column[Any]], Any] | None,
 ]
 
 
 def get_col_from_table(
     table: sa.Table | sa.sql.Join | type, column_name: str
-) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
+) -> (
+    sa.Column[Any]
+    | sa.orm.attributes.InstrumentedAttribute[Any]
+    | sa.sql.elements.KeyedColumnElement[Any]
+):
     if isinstance(table, (sa.Table, sa.sql.Join)):
-        return table.c[column_name]
+        col: sa.Column[Any] | sa.sql.elements.KeyedColumnElement[Any] = table.c[column_name]
+        return col
     # For ORM class table
-    return getattr(table, column_name)
+    attr: sa.orm.attributes.InstrumentedAttribute[Any] = getattr(table, column_name)
+    return attr
 
 
 class ExternalTableFilterSpec:

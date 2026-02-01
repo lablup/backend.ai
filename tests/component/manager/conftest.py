@@ -12,14 +12,14 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from unittest.mock import AsyncMock, MagicMock
 
 import aiofiles.os
@@ -47,7 +47,6 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -82,7 +81,7 @@ from ai.backend.manager.models.scaling_group import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRow, users
-from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -110,7 +109,19 @@ here = Path(__file__).parent
 log = logging.getLogger("tests.manager.conftest")
 
 
-def pytest_addoption(parser):
+class AppBuilder(Protocol):
+    """Protocol for the app_builder function returned by create_app_and_client fixture."""
+
+    async def __call__(
+        self,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
+        | None = None,
+        subapp_pkgs: Sequence[str] | None = None,
+        scheduler_opts: Mapping[str, Any] | None = None,
+    ) -> tuple[web.Application, Client]: ...
+
+
+def pytest_addoption(parser: Any) -> None:
     parser.addoption(
         "--rescan-cr-backend-ai",
         action="store_true",
@@ -119,14 +130,14 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     config.addinivalue_line(
         "markers",
         "rescan_cr_backend_ai: mark test to run only when --rescan-cr-backend-ai is set",
     )
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config: Any, items: Any) -> None:
     if not config.getoption("--rescan-cr-backend-ai"):
         skip_flag = pytest.mark.skip(reason="--rescan-cr-backend-ai not set")
         for item in items:
@@ -135,24 +146,24 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_id():
+def test_id() -> str:
     return secrets.token_hex(12)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_ns(test_id):
+def test_ns(test_id: str) -> str:
     ret = f"testing-ns-{test_id}"
     os.environ["BACKEND_NAMESPACE"] = ret
     return ret
 
 
 @pytest.fixture(scope="session")
-def test_db(test_id):
+def test_db(test_id: str) -> str:
     return f"test_db_{test_id}"
 
 
 @pytest.fixture(scope="session")
-def vfolder_mount(test_id):
+def vfolder_mount(test_id: str) -> Iterator[Path]:
     ret = Path.cwd() / f"tmp/backend.ai/manager-testing/vfolders-{test_id}"
     ret.mkdir(parents=True, exist_ok=True)
     yield ret
@@ -163,24 +174,31 @@ def vfolder_mount(test_id):
 
 
 @pytest.fixture(scope="session")
-def vfolder_fsprefix(test_id):
+def vfolder_fsprefix(test_id: str) -> Path:
     # NOTE: the prefix must NOT start with "/"
     return Path("fsprefix/inner/")
 
 
 @pytest.fixture(scope="session")
-def vfolder_host():
+def vfolder_host() -> str:
     return "local"
 
 
 @pytest.fixture(scope="session")
-def logging_config():
+def logging_config() -> Iterator[LoggingConfig]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -198,7 +216,7 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
-def ipc_base_path(test_id) -> Path:
+def ipc_base_path(test_id: str) -> Path:
     ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     return ipc_base_path
@@ -206,13 +224,13 @@ def ipc_base_path(test_id) -> Path:
 
 @pytest.fixture(scope="session")
 def bootstrap_config(
-    test_id,
+    test_id: str,
     ipc_base_path: Path,
-    logging_config,
-    etcd_container,  # noqa: F811
-    redis_container,  # noqa: F811
-    postgres_container,  # noqa: F811
-    test_db,
+    logging_config: LoggingConfig,
+    etcd_container: Any,  # noqa: F811
+    redis_container: Any,  # noqa: F811
+    postgres_container: Any,  # noqa: F811
+    test_db: str,
 ) -> Iterator[BootstrapConfig]:
     etcd_addr = etcd_container[1]
     postgres_addr = postgres_container[1]
@@ -295,7 +313,7 @@ def mock_etcd_ctx(
 
 
 @pytest.fixture
-def event_dispatcher_test_ctx():
+def event_dispatcher_test_ctx() -> Callable[[RootContext], AbstractAsyncContextManager[None]]:
     # TODO: Remove this fixture when the root context is refactored
     @actxmgr
     async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
@@ -325,12 +343,12 @@ def mock_config_provider_ctx(
 
 @pytest.fixture(scope="session")
 def etcd_fixture(
-    test_id,
-    bootstrap_config,
-    redis_container,  # noqa: F811
-    vfolder_mount,
-    vfolder_fsprefix,
-    vfolder_host,
+    test_id: str,
+    bootstrap_config: BootstrapConfig,
+    redis_container: Any,  # noqa: F811
+    vfolder_mount: Path,
+    vfolder_fsprefix: Path,
+    vfolder_host: str,
 ) -> Iterator[None]:
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = redis_container[1]
@@ -407,7 +425,7 @@ def local_config(bootstrap_config: BootstrapConfig) -> dict[str, Any]:
 
 @pytest.fixture
 async def unified_config(
-    app, bootstrap_config: BootstrapConfig, etcd_fixture
+    app: web.Application, bootstrap_config: BootstrapConfig, etcd_fixture: None
 ) -> AsyncIterator[ManagerUnifiedConfig]:
     root_ctx: RootContext = app["_root.context"]
     async with AsyncEtcd.create_from_config(bootstrap_config.etcd.to_dataclass()) as etcd:
@@ -420,7 +438,7 @@ async def unified_config(
 
 
 @pytest.fixture(scope="session")
-def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
+def database(request: Any, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
@@ -524,7 +542,9 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
 
 
 @pytest.fixture()
-async def database_engine(bootstrap_config, database):
+async def database_engine(
+    bootstrap_config: BootstrapConfig, database: None
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
     async with connect_database(bootstrap_config.db) as db:
         yield db
 
@@ -537,7 +557,7 @@ def extra_fixtures(request: pytest.FixtureRequest) -> dict[str, Any]:
 
 @pytest.fixture()
 async def database_fixture(
-    bootstrap_config, test_db, database, extra_fixtures
+    bootstrap_config: BootstrapConfig, test_db: str, database: None, extra_fixtures: dict[str, Any]
 ) -> AsyncIterator[None]:
     """
     Populate the example data as fixtures to the database
@@ -556,7 +576,7 @@ async def database_fixture(
     extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
-    def fixture_json_encoder(obj: Any):
+    def fixture_json_encoder(obj: Any) -> Any:
         if isinstance(obj, ResourceSlot):
             return obj.to_json()
         if isinstance(obj, Decimal):
@@ -650,49 +670,49 @@ def file_lock_factory(
 
 
 class Client:
-    def __init__(self, session: aiohttp.ClientSession, url) -> None:
+    def __init__(self, session: aiohttp.ClientSession, url: str) -> None:
         self._session = session
         if not url.endswith("/"):
             url += "/"
         self._url = url
 
-    def request(self, method, path, **kwargs):
+    def request(self, method: str, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.request(method, url, **kwargs)
 
-    def get(self, path, **kwargs):
+    def get(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.get(url, **kwargs)
 
-    def post(self, path, **kwargs):
+    def post(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.post(url, **kwargs)
 
-    def put(self, path, **kwargs):
+    def put(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.put(url, **kwargs)
 
-    def patch(self, path, **kwargs):
+    def patch(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.patch(url, **kwargs)
 
-    def delete(self, path, **kwargs):
+    def delete(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
         return self._session.delete(url, **kwargs)
 
-    def ws_connect(self, path, **kwargs):
+    def ws_connect(self, path: str, **kwargs: Any) -> Any:
         while path.startswith("/"):
             path = path[1:]
         url = self._url + path
@@ -700,7 +720,7 @@ class Client:
 
 
 @pytest.fixture
-async def app(bootstrap_config):
+async def app(bootstrap_config: BootstrapConfig) -> web.Application:
     """
     Create an empty application with the test configuration.
     """
@@ -713,14 +733,15 @@ async def app(bootstrap_config):
 
 
 @pytest.fixture
-async def create_app_and_client(bootstrap_config) -> AsyncIterator:
+async def create_app_and_client(bootstrap_config: BootstrapConfig) -> AsyncIterator[AppBuilder]:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
-    _outer_ctxs: list[AbstractAsyncContextManager] = []
+    _outer_ctxs: list[AbstractAsyncContextManager[Any, Any]] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] | None = None,
+        cleanup_contexts: Sequence[Callable[[RootContext], AbstractAsyncContextManager[None]]]
+        | None = None,
         subapp_pkgs: Sequence[str] | None = None,
         scheduler_opts: Mapping[str, Any] | None = None,
     ) -> tuple[web.Application, Client]:
@@ -730,7 +751,7 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
         if scheduler_opts is None:
             scheduler_opts = {}
         _cleanup_ctxs = []
-        _outer_ctx_classes: list[type[AbstractAsyncContextManager]] = []
+        _outer_ctx_classes: list[type[AbstractAsyncContextManager[Any, Any]]] = []
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
                 # if isinstance(ctx, AbstractAsyncContextManager):
@@ -778,7 +799,7 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
 
 
 @pytest.fixture
-def default_keypair():
+def default_keypair() -> dict[str, str]:
     return {
         "access_key": "AKIAIOSFODNN7EXAMPLE",
         "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -786,7 +807,7 @@ def default_keypair():
 
 
 @pytest.fixture
-def default_domain_keypair():
+def default_domain_keypair() -> dict[str, str]:
     """Default domain admin keypair"""
     return {
         "access_key": "AKIAHUKCHDEZGEXAMPLE",
@@ -795,7 +816,7 @@ def default_domain_keypair():
 
 
 @pytest.fixture
-def user_keypair():
+def user_keypair() -> dict[str, str]:
     return {
         "access_key": "AKIANABBDUSEREXAMPLE",
         "secret_key": "C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf",
@@ -803,7 +824,7 @@ def user_keypair():
 
 
 @pytest.fixture
-def monitor_keypair():
+def monitor_keypair() -> dict[str, str]:
     return {
         "access_key": "AKIANAMONITOREXAMPLE",
         "secret_key": "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",
@@ -811,16 +832,18 @@ def monitor_keypair():
 
 
 @pytest.fixture
-def get_headers(app, default_keypair, bootstrap_config):
+def get_headers(
+    app: web.Application, default_keypair: dict[str, str], bootstrap_config: BootstrapConfig
+) -> Callable[..., dict[str, str]]:
     def create_header(
-        method,
-        url,
-        req_bytes,
-        allowed_ip="10.10.10.10",  # Same with fixture
-        ctype="application/json",
-        hash_type="sha256",
-        api_version="v5.20191215",
-        keypair=default_keypair,
+        method: str,
+        url: str,
+        req_bytes: bytes,
+        allowed_ip: str = "10.10.10.10",  # Same with fixture
+        ctype: str = "application/json",
+        hash_type: str = "sha256",
+        api_version: str = "v5.20191215",
+        keypair: dict[str, str] = default_keypair,
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         hostname = f"127.0.0.1:{bootstrap_config.manager.service_addr.port}"
@@ -876,11 +899,17 @@ def get_headers(app, default_keypair, bootstrap_config):
 
 @pytest.fixture
 async def prepare_kernel(
-    request, create_app_and_client, get_headers, default_keypair
-) -> AsyncIterator[tuple[web.Application, Client, Callable]]:
+    request: Any,
+    create_app_and_client: AppBuilder,
+    get_headers: Callable[..., dict[str, str]],
+    default_keypair: dict[str, str],
+) -> AsyncIterator[
+    tuple[web.Application, Client, Callable[[str, str | None], Awaitable[dict[str, Any]]]]
+]:
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
-        modules=[
+        cleanup_contexts=None,
+        subapp_pkgs=[
             "etcd",
             "events",
             "auth",
@@ -891,11 +920,13 @@ async def prepare_kernel(
             "stream",
             "manager",
         ],
-        spawn_agent=True,
+        scheduler_opts=None,
     )
     root_ctx: RootContext = app["_root.context"]
 
-    async def create_kernel(image="lua:5.3-alpine", tag=None) -> dict[str, Any]:
+    async def create_kernel(
+        image: str = "lua:5.3-alpine", tag: str | None = None
+    ) -> dict[str, Any]:
         url = "/v3/kernel/"
         req_bytes = json.dumps({
             "image": image,
@@ -904,7 +935,9 @@ async def prepare_kernel(
         }).encode()
         headers = get_headers("POST", url, req_bytes)
         response = await client.post(url, data=req_bytes, headers=headers)
-        return await response.json()
+        result: dict[str, Any] = await response.json()
+
+        return result
 
     yield app, client, create_kernel
 
@@ -931,7 +964,7 @@ class DummyEtcd:
 
 
 @pytest.fixture
-async def registry_ctx(mocker):
+async def registry_ctx(mocker: Any) -> AsyncIterator[Any]:
     mocked_etcd = DummyEtcd()
     mock_etcd_config_loader = MagicMock()
     mock_etcd_config_loader.update_resource_slots = AsyncMock()
@@ -1013,7 +1046,7 @@ async def registry_ctx(mocker):
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
-        scheduling_controller=mock_scheduling_controller,  # type: ignore
+        scheduling_controller=mock_scheduling_controller,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
@@ -1033,7 +1066,7 @@ async def registry_ctx(mocker):
 
 
 @pytest.fixture(scope="function")
-async def session_info(database_engine):
+async def session_info(database_engine: ExtendedAsyncSAEngine) -> AsyncIterator[tuple[str, Any]]:
     user_uuid = str(uuid.uuid4()).replace("-", "")
     user_password = str(uuid.uuid4()).replace("-", "")
     password_info = create_test_password_info(user_password)

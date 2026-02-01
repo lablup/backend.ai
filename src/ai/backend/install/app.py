@@ -4,6 +4,7 @@ import asyncio
 import json
 import textwrap
 from pathlib import Path
+from typing import Any, cast
 from weakref import WeakSet
 
 from rich.text import Text
@@ -45,11 +46,11 @@ from .types import (
     PrerequisiteError,
 )
 
-top_tasks: WeakSet[asyncio.Task] = WeakSet()
+top_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
 
 
 class DevSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -73,7 +74,10 @@ class DevSetup(Static):
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
         ctx = DevContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info,
+            install_variable,
+            cast(App[None], self.app),
+            non_interactive=self._non_interactive,
         )
         try:
             # prerequisites
@@ -109,7 +113,7 @@ class DevSetup(Static):
 
 
 class PackageSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -151,7 +155,10 @@ class PackageSetup(Static):
                     raise ValueError("Target path input was cancelled")
                 dist_info.target_path = Path(value)
         ctx = PackageContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info,
+            install_variable,
+            cast(App[None], self.app),
+            non_interactive=self._non_interactive,
         )
         try:
             await ctx.check_prerequisites()
@@ -189,7 +196,7 @@ class Configure(Static):
     install_variable: InstallVariable | None
     public_facing_address: str | None
 
-    def __init__(self, id: str, **kwargs) -> None:
+    def __init__(self, id: str, **kwargs: Any) -> None:
         super().__init__(**kwargs, id=id)
         self.public_facing_address = None
         self.install_variable = None
@@ -238,7 +245,7 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
 
@@ -524,7 +531,7 @@ class ModeMenu(Static):
         self.app.call_later(configure.feed_variables, self.install_variable)
 
 
-class InstallerApp(App):
+class InstallerApp(App[None]):
     BINDINGS = [
         Binding("q", "shutdown", "Interrupt ongoing tasks / Quit the installer"),
         Binding(

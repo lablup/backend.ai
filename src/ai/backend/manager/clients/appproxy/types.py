@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.config import ModelHealthCheck
@@ -44,7 +46,7 @@ class CreateEndpointRequestBody(BaseModel):
     version: str = Field(default="v2", description="API version")
     service_name: str = Field(description="Name of the service/endpoint")
     tags: TagsModel = Field(description="Metadata tags for the endpoint")
-    apps: dict = Field(default_factory=dict, description="Application configuration")
+    apps: dict[str, Any] = Field(default_factory=dict, description="Application configuration")
     open_to_public: bool = Field(
         default=False, description="Whether the endpoint is publicly accessible"
     )

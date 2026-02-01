@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Coroutine, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -27,6 +27,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -511,7 +512,7 @@ class DeploymentExecutor:
         )
 
         res = await app_proxy_client.create_endpoint(endpoint_id, request_body)
-        return res["endpoint"]
+        return cast(str, res["endpoint"])
 
     async def _delete_endpoint_from_wsproxy(
         self,
@@ -533,7 +534,7 @@ class DeploymentExecutor:
     def _verify_deployment_replicas(
         self,
         deployment: DeploymentInfo,
-        route_map: Mapping[UUID, Sequence],
+        route_map: Mapping[UUID, Sequence[RouteInfo]],
     ) -> None:
         """Verify that deployment has the expected number of active routes."""
         pool = DeploymentRecorderContext.current_pool()
@@ -550,7 +551,7 @@ class DeploymentExecutor:
     def _evaluate_deployment_scaling(
         self,
         deployment: DeploymentInfo,
-        route_map: Mapping[UUID, Sequence],
+        route_map: Mapping[UUID, Sequence[RouteInfo]],
     ) -> tuple[list[Creator[RoutingRow]], list[UUID]]:
         """Evaluate scaling action for a deployment and return creators/route IDs."""
         pool = DeploymentRecorderContext.current_pool()

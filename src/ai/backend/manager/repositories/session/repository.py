@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.reporter import ProgressReporter
@@ -9,6 +10,7 @@ if TYPE_CHECKING:
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
@@ -82,7 +84,7 @@ class SessionRepository:
         owner_access_key: AccessKey,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
-        eager_loading_op: list | None = None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -91,7 +93,7 @@ class SessionRepository:
                 owner_access_key,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
             )
 
     @session_repository_resilience.apply()
@@ -119,7 +121,7 @@ class SessionRepository:
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates.c.template)
@@ -134,7 +136,7 @@ class SessionRepository:
     async def get_template_info_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates)
@@ -190,7 +192,7 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         owner_access_key: AccessKey,
-        eager_loading_op: list,
+        eager_loading_op: Sequence[_AbstractLoad],
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -198,7 +200,7 @@ class SessionRepository:
                 session_name_or_id,
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op),
             )
 
     @session_repository_resilience.apply()
@@ -270,7 +272,7 @@ class SessionRepository:
                     ImageRow.status == ImageStatus.ALIVE,
                 )
             )
-            return await sess.scalar(query)
+            return cast(ImageRow | None, await sess.scalar(query))
 
     @session_repository_resilience.apply()
     async def get_group_name_by_domain_and_id(
@@ -316,7 +318,7 @@ class SessionRepository:
                     selectinload(SessionRow.kernels),
                 )
             )
-            return await db_session.scalar(stmt)
+            return cast(SessionRow | None, await db_session.scalar(stmt))
 
     @session_repository_resilience.apply()
     async def modify_session(
@@ -331,7 +333,6 @@ class SessionRepository:
             session_row = await db_session.scalar(query_stmt)
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
 
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
@@ -367,7 +368,7 @@ class SessionRepository:
                 .execution_options(populate_existing=True)
                 .where(SessionRow.id == session_id)
             )
-            return await db_session.scalar(select_stmt)
+            return cast(SessionRow | None, await db_session.scalar(select_stmt))
 
     @session_repository_resilience.apply()
     async def rescan_images(
@@ -390,11 +391,11 @@ class SessionRepository:
         requester_access_key: AccessKey,
         user_role: UserRole,
         domain_name: str,
-        keypair_resource_policy: dict | None,
+        keypair_resource_policy: dict[str, Any] | None,
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID, dict]:
+    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
@@ -489,7 +490,7 @@ class SessionRepository:
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
-                    session_ids = [cast(SessionId, session.id)]
+                    session_ids = [session.id]
 
                 return session_ids
             except SessionNotFound:
@@ -520,7 +521,7 @@ class SessionRepository:
         self,
         session_name_or_id: uuid.UUID | str,
         access_key: AccessKey,
-    ) -> dict[str, list | str]:
+    ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,

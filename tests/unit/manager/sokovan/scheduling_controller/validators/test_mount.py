@@ -1,31 +1,36 @@
 """Tests for mount validation rules."""
 
+from uuid import UUID
+
 import pytest
 
+from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserInfo,
+    ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.mount import (
     MountNameValidationRule,
 )
+from ai.backend.manager.types import UserScope
 
 
 class TestMountNameValidationRule:
     """Test cases for MountNameValidationRule."""
 
     @pytest.fixture
-    def mount_rule(self):
+    def mount_rule(self) -> MountNameValidationRule:
         """Create a MountNameValidationRule instance."""
         return MountNameValidationRule()
 
     @pytest.fixture
-    def basic_context(self):
+    def basic_context(self) -> SessionCreationContext:
         """Create a basic SessionCreationContext."""
         return SessionCreationContext(
-            scaling_group_network=None,
+            scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
             allowed_scaling_groups=[],
             image_infos={},
             vfolder_mounts=[],
@@ -33,15 +38,30 @@ class TestMountNameValidationRule:
             container_user_info=ContainerUserInfo(),
         )
 
-    def test_valid_mount_names(self, mount_rule, basic_context):
+    @pytest.fixture
+    def base_user_scope(self) -> UserScope:
+        """Create a basic UserScope for testing."""
+        return UserScope(
+            domain_name="default",
+            group_id=UUID("00000000-0000-0000-0000-000000000000"),
+            user_uuid=UUID("00000000-0000-0000-0000-000000000001"),
+            user_role="user",
+        )
+
+    def test_valid_mount_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with valid mount names."""
         spec = SessionCreationSpec(
             session_creation_id="test-001",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -58,15 +78,20 @@ class TestMountNameValidationRule:
         # Should not raise
         mount_rule.validate(spec, basic_context)
 
-    def test_duplicate_alias_names(self, mount_rule, basic_context):
+    def test_duplicate_alias_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with duplicate alias names."""
         spec = SessionCreationSpec(
             session_creation_id="test-002",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -84,15 +109,20 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
-    def test_empty_alias_name(self, mount_rule, basic_context):
+    def test_empty_alias_name(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with empty alias name."""
         spec = SessionCreationSpec(
             session_creation_id="test-003",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -109,7 +139,12 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "alias name cannot be empty" in str(exc_info.value).lower()
 
-    def test_reserved_folder_names(self, mount_rule, basic_context):
+    def test_reserved_folder_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with reserved folder names."""
         # Reserved names that should fail (matching RESERVED_VFOLDERS in defs.py)
         reserved_names = [
@@ -142,10 +177,10 @@ class TestMountNameValidationRule:
             spec = SessionCreationSpec(
                 session_creation_id=f"test-reserved-{reserved_name}",
                 session_name="test",
-                access_key="test-key",
-                user_scope=None,
-                session_type=None,
-                cluster_mode=None,
+                access_key=AccessKey("test-key"),
+                user_scope=base_user_scope,
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 priority=10,
                 resource_policy={},
@@ -161,15 +196,20 @@ class TestMountNameValidationRule:
                 mount_rule.validate(spec, basic_context)
             assert "reserved for internal path" in str(exc_info.value)
 
-    def test_alias_same_as_original_folder(self, mount_rule, basic_context):
+    def test_alias_same_as_original_folder(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation when alias name is same as an existing folder name."""
         spec = SessionCreationSpec(
             session_creation_id="test-004",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -186,15 +226,20 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "cannot be set to an existing folder name" in str(exc_info.value)
 
-    def test_work_directory_prefix_handling(self, mount_rule, basic_context):
+    def test_work_directory_prefix_handling(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test handling of /home/work/ prefix in alias names."""
         spec = SessionCreationSpec(
             session_creation_id="test-005",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -210,15 +255,20 @@ class TestMountNameValidationRule:
         # Should validate without the prefix - the prefix is stripped
         mount_rule.validate(spec, basic_context)
 
-    def test_combined_mount_maps(self, mount_rule, basic_context):
+    def test_combined_mount_maps(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with both mount_map and mount_id_map."""
         spec = SessionCreationSpec(
             session_creation_id="test-006",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -238,15 +288,20 @@ class TestMountNameValidationRule:
         # Should validate both maps combined
         mount_rule.validate(spec, basic_context)
 
-    def test_duplicate_across_maps(self, mount_rule, basic_context):
+    def test_duplicate_across_maps(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test duplicate aliases across mount_map and mount_id_map."""
         spec = SessionCreationSpec(
             session_creation_id="test-007",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -265,15 +320,20 @@ class TestMountNameValidationRule:
             mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
-    def test_none_alias_values(self, mount_rule, basic_context):
+    def test_none_alias_values(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test handling of None alias values."""
         spec = SessionCreationSpec(
             session_creation_id="test-008",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -289,7 +349,12 @@ class TestMountNameValidationRule:
         # Should not raise - None values are skipped
         mount_rule.validate(spec, basic_context)
 
-    def test_special_characters_in_names(self, mount_rule, basic_context):
+    def test_special_characters_in_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with special characters in folder names."""
         # These should be caught as reserved names or patterns
         invalid_names = [
@@ -303,10 +368,10 @@ class TestMountNameValidationRule:
             spec = SessionCreationSpec(
                 session_creation_id=f"test-special-{hash(invalid_name)}",
                 session_name="test",
-                access_key="test-key",
-                user_scope=None,
-                session_type=None,
-                cluster_mode=None,
+                access_key=AccessKey("test-key"),
+                user_scope=base_user_scope,
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 priority=10,
                 resource_policy={},
@@ -321,7 +386,12 @@ class TestMountNameValidationRule:
             with pytest.raises(InvalidAPIParameters):
                 mount_rule.validate(spec, basic_context)
 
-    def test_large_mount_map(self, mount_rule, basic_context):
+    def test_large_mount_map(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with a large number of mounts."""
         # Create a large mount map
         mount_map = {f"vfolder{i}": f"data{i}" for i in range(100)}
@@ -329,10 +399,10 @@ class TestMountNameValidationRule:
         spec = SessionCreationSpec(
             session_creation_id="test-large",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},
@@ -343,15 +413,20 @@ class TestMountNameValidationRule:
         # Should handle large number of mounts
         mount_rule.validate(spec, basic_context)
 
-    def test_unicode_names(self, mount_rule, basic_context):
+    def test_unicode_names(
+        self,
+        mount_rule: MountNameValidationRule,
+        basic_context: SessionCreationContext,
+        base_user_scope: UserScope,
+    ) -> None:
         """Test validation with unicode characters in names."""
         spec = SessionCreationSpec(
             session_creation_id="test-unicode",
             session_name="test",
-            access_key="test-key",
-            user_scope=None,
-            session_type=None,
-            cluster_mode=None,
+            access_key=AccessKey("test-key"),
+            user_scope=base_user_scope,
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             priority=10,
             resource_policy={},

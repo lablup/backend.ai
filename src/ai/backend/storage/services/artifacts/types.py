@@ -12,7 +12,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.data.storage.types import ImportStepContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass

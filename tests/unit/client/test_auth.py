@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from dateutil.tz import tzutc
 
 from ai.backend.client.auth import decrypt_payload, encrypt_payload, generate_signature
 
+if TYPE_CHECKING:
+    from ai.backend.client.config import APIConfig
 
-def test_generate_signature(defconfig):
+
+def test_generate_signature(defconfig: APIConfig) -> None:
     kwargs = dict(
         method="GET",
         version=defconfig.version,
@@ -24,7 +30,7 @@ def test_generate_signature(defconfig):
     assert signature in headers["Authorization"]
 
 
-def test_encrypt():
+def test_encrypt() -> None:
     endpoint = "https://example.com"
     orig = b"hello world"
     enc = encrypt_payload(endpoint, orig)

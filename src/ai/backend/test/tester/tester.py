@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -58,7 +58,9 @@ class Tester:
             await runner.run()
 
     async def _run_param_spec(self, spec: TestSpec, param: Mapping[ContextName, Any]) -> None:
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = (
+            BaseTestContext.used_contexts()
+        )
         with ExitStack() as local_stack:
             for ctx_name, value in param.items():
                 if ctx := registered_contexts.get(ctx_name):
@@ -80,7 +82,9 @@ class Tester:
         if not self._config:
             raise RuntimeError("Tester configuration is not loaded")
 
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = (
+            BaseTestContext.used_contexts()
+        )
         with ExitStack() as global_stack:
             # global context manager for the tester
             for key, ctx in registered_contexts.items():
@@ -99,7 +103,7 @@ class Tester:
         Run all test specifications.
         """
         self._config = await self._load_tester_config(self._config_file_path)
-        exclude_tags = cast(TesterConfig, self._config).runner.exclude_tags
+        exclude_tags = self._config.runner.exclude_tags
 
         tasks = []
         for spec in self._spec_manager.all_specs():

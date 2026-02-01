@@ -10,7 +10,7 @@ import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Self, override
+from typing import Any, Self, override
 
 import msgpack
 import yarl
@@ -53,7 +53,7 @@ class NoopLogger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         pass
 
 
@@ -125,7 +125,7 @@ class LocalLogger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         self.handler_stack.close()
         return None
 
@@ -208,7 +208,7 @@ class Logger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         # Resetting generates "different context" errors.
         # Since practically we only need to check activeness in alembic scripts
         # and it should be active until the program terminates,
@@ -367,7 +367,7 @@ def log_processor(
         if "graylog" in config.drivers:
             external_handlers.append(handler_stack.enter_context(setup_graylog_handler(config)))
 
-        zctx = zmq.Context[zmq.Socket]()
+        zctx = zmq.Context[zmq.Socket[Any]]()
         agg_sock = zctx.socket(zmq.PULL)
         agg_sock.bind(log_endpoint)
         ep_url = yarl.URL(log_endpoint)

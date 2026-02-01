@@ -5,7 +5,7 @@ import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Final, ParamSpec, TypeVar
+from typing import Final, ParamSpec, TypeVar, cast
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -142,7 +142,7 @@ class RetryPolicy(Policy):
             case BackoffStrategy.EXPONENTIAL:
                 # Exponential backoff: delay * (2 ^ (attempt - 1))
                 delay = self._retry_delay * (2 ** (attempt - 1))
-                return min(delay, self._max_delay)
+                return cast(float, min(delay, self._max_delay))
             case _:
                 # Fixed delay
                 return self._retry_delay

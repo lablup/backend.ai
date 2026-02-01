@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -147,31 +149,42 @@ class TestListErrors:
         )
 
     @pytest.fixture
-    def mock_check_user_access_list_errors(self, mocker, model_serving_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            model_serving_service,
-            "check_user_access",
-            new_callable=AsyncMock,
+    def mock_check_user_access_list_errors(
+        self, mocker: Any, model_serving_service: Any
+    ) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                model_serving_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_get_endpoint_by_id_list_errors(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_by_id",
-            new_callable=AsyncMock,
+    def mock_get_endpoint_by_id_list_errors(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_by_id",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_list_errors(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.mark.parametrize(
@@ -231,9 +244,9 @@ class TestListErrors:
         scenario: ScenarioBase[ListErrorsAction, ListErrorsActionResult],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_user_access_list_errors,
-        mock_get_endpoint_by_id_list_errors,
-        mock_get_endpoint_access_validation_data_list_errors,
+        mock_check_user_access_list_errors: AsyncMock,
+        mock_get_endpoint_by_id_list_errors: AsyncMock,
+        mock_get_endpoint_access_validation_data_list_errors: AsyncMock,
     ) -> None:
         # Mock repository responses
         expected = cast(ListErrorsActionResult, scenario.expected)
@@ -268,7 +281,7 @@ class TestListErrors:
         # Now uses single repository for all roles
         mock_get_endpoint_by_id_list_errors.return_value = mock_endpoint
 
-        async def list_errors(action: ListErrorsAction):
+        async def list_errors(action: ListErrorsAction) -> ListErrorsActionResult:
             return await model_serving_processors.list_errors.wait_for_complete(action)
 
         await scenario.test(list_errors)

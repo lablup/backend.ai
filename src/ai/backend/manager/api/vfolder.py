@@ -16,6 +16,7 @@ from typing import (
     Any,
     Concatenate,
     ParamSpec,
+    cast,
 )
 
 import aiohttp
@@ -220,7 +221,12 @@ def with_vfolder_status_checked(
             request["vfolder_row"] = row
             return await handler(request, row, *args, **kwargs)
 
-        return _wrapped
+        return cast(
+            Callable[
+                Concatenate[web.Request, Sequence[Mapping[str, Any]], P], Awaitable[web.Response]
+            ],
+            _wrapped,
+        )
 
     return _wrapper
 
@@ -339,7 +345,10 @@ def with_vfolder_rows_resolved(
                 **kwargs,
             )
 
-        return _wrapped
+        return cast(
+            Callable[Concatenate[web.Request, P], Awaitable[web.Response]],
+            _wrapped,
+        )
 
     return _wrapper
 
@@ -384,7 +393,10 @@ def vfolder_check_exists[**P](
                 raise VFolderNotFound()
         return await handler(request, dict(row._mapping), *args, **kwargs)
 
-    return _wrapped
+    return cast(
+        Callable[Concatenate[web.Request, P], Awaitable[web.Response]],
+        _wrapped,
+    )
 
 
 class CreateRequestModel(LegacyBaseRequestModel):
@@ -618,7 +630,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
                 conn, resource_policy, domain_name, request["user"]["uuid"], group_id
             )
-            allowed_hosts = allowed_hosts | allowed_hosts_by_user
+            allowed_hosts = cast(VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_user)
         if "group" in allowed_vfolder_types:
             allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
                 conn,
@@ -626,7 +638,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                 domain_name,
                 group_id,
             )
-            allowed_hosts = allowed_hosts | allowed_hosts_by_group
+            allowed_hosts = cast(VFolderHostPermissionMap, allowed_hosts | allowed_hosts_by_group)
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap({
@@ -2397,7 +2409,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
@@ -2515,7 +2527,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
@@ -2643,7 +2655,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
         sema: asyncio.Semaphore,
         sess: aiohttp.ClientSession,
         agent_id: str,
-    ) -> tuple[str, Mapping]:
+    ) -> tuple[str, Mapping[str, Any]]:
         async with sema:
             watcher_info = await get_watcher_info(request, agent_id)
             try:
@@ -2824,7 +2836,7 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.storage_ptask_group.shutdown()
 
 
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
     app = web.Application()
     app["prefix"] = "folders"
     app["api_versions"] = (2, 3, 4)

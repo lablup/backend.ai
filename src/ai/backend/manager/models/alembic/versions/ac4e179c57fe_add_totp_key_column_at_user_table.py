@@ -16,7 +16,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("users", sa.Column("totp_key", sa.CHAR(32), nullable=True))
     op.add_column(
         "users",
@@ -26,6 +26,6 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("users", "totp_activated")
     op.drop_column("users", "totp_key")

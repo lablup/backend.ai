@@ -21,7 +21,7 @@ def mock_corofunc(return_value: Any) -> Mock:
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs) -> AsyncMock:
+async def mock_awaitable(**kwargs: Any) -> AsyncMock:
     """
     Mock awaitable.
 

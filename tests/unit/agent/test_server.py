@@ -7,7 +7,7 @@
 # )
 
 
-def test_dummy():
+def test_dummy() -> None:
     # prevent pants error due to pytest exit code 5: "no tests collected"
     pass
 

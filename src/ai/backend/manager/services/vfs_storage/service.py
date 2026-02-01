@@ -28,7 +28,7 @@ from ai.backend.manager.services.vfs_storage.actions.update import (
     UpdateVFSStorageActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFSStorageService:

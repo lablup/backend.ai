@@ -23,7 +23,7 @@ async def aexecute_interactive(
     stdin_hook: Callable[[Mapping[str, Any]], Any]
     | Callable[[Mapping[str, Any]], Awaitable[Any]]
     | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Async version of jupyter_client's execute_interactive method.
 
     https://github.com/jupyter/jupyter_client/blob/9f1c379/jupyter_client/client.py#L415

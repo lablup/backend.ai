@@ -87,7 +87,7 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
@@ -98,7 +98,7 @@ async def huggingface_registry(
     return HuggingFaceRegistry.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -185,7 +185,7 @@ class DeleteHuggingFaceRegistryPayload:
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
@@ -205,7 +205,7 @@ async def create_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
@@ -224,7 +224,7 @@ async def update_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload:

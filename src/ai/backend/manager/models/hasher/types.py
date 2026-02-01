@@ -124,7 +124,7 @@ class PasswordInfo:
         return self.rounds != hash_info.rounds
 
 
-class PasswordColumn(TypeDecorator):
+class PasswordColumn(TypeDecorator[str]):
     """Custom column type that prevents direct password assignment.
 
     Passwords should be set using proper functions that have access to config:

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -72,39 +75,55 @@ class TestDeleteAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_check_user_access_delete_rule(self, mocker, auto_scaling_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            auto_scaling_service,
-            "check_user_access",
-            new_callable=AsyncMock,
+    def mock_check_user_access_delete_rule(
+        self, mocker: Any, auto_scaling_service: Any
+    ) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                auto_scaling_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_get_auto_scaling_rule_by_id_delete_rule(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_auto_scaling_rule_by_id",
-            new_callable=AsyncMock,
+    def mock_get_auto_scaling_rule_by_id_delete_rule(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_auto_scaling_rule_by_id",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_delete_rule(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_delete_auto_scaling_rule(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "delete_auto_scaling_rule",
-            new_callable=AsyncMock,
+    def mock_delete_auto_scaling_rule(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "delete_auto_scaling_rule",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.mark.parametrize(
@@ -136,10 +155,10 @@ class TestDeleteAutoScalingRule:
         ],
         user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_user_access_delete_rule,
-        mock_get_auto_scaling_rule_by_id_delete_rule,
-        mock_get_endpoint_access_validation_data_delete_rule,
-        mock_delete_auto_scaling_rule,
+        mock_check_user_access_delete_rule: AsyncMock,
+        mock_get_auto_scaling_rule_by_id_delete_rule: AsyncMock,
+        mock_get_endpoint_access_validation_data_delete_rule: AsyncMock,
+        mock_delete_auto_scaling_rule: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -164,7 +183,9 @@ class TestDeleteAutoScalingRule:
             mock_get_auto_scaling_rule_by_id_delete_rule.return_value = None
             mock_delete_auto_scaling_rule.return_value = False
 
-        async def delete_auto_scaling_rule(action: DeleteEndpointAutoScalingRuleAction):
+        async def delete_auto_scaling_rule(
+            action: DeleteEndpointAutoScalingRuleAction,
+        ) -> DeleteEndpointAutoScalingRuleActionResult:
             return (
                 await auto_scaling_processors.delete_endpoint_auto_scaling_rule.wait_for_complete(
                     action

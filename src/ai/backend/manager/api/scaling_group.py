@@ -3,7 +3,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 import aiohttp_cors
@@ -55,7 +55,7 @@ async def query_wsproxy_status(
             raise InternalServerError(
                 "Got invalid response from wsproxy when querying status"
             ) from e
-        return result
+        return cast(dict[str, Any], result)
 
 
 @auth_required

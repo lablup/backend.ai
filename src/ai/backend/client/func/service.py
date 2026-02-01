@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 from warnings import deprecated
 
@@ -44,7 +44,9 @@ class Service(BaseFunction):
             params["name"] = name
         rqst = Request("GET", "/services", params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(list[dict[str, Any]], result)
 
     @api_function
     @classmethod
@@ -83,7 +85,7 @@ class Service(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint"]
+        return cast(Sequence[dict[str, Any]], data["endpoint"])
 
     @api_function
     @classmethod
@@ -325,43 +327,57 @@ class Service(BaseFunction):
     async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/services/{self.id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def sync(self) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/sync")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def scale(self, to: int) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/scale")
         rqst.set_json({"to": to})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def generate_api_token(self, duration: str) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/token")
         rqst.set_json({"duration": duration})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float) -> dict[str, Any]:
         rqst = Request("PUT", f"/services/{self.id}/routings/{target_route_id}")
         rqst.set_json({"traffic_ratio": new_ratio})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def downscale_single_route(self, target_route_id: UUID) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}/routings/{target_route_id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

@@ -6,6 +6,7 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -76,7 +77,7 @@ class ResourceConfigDTO(BaseModel):
     """Resource configuration for revision."""
 
     resource_group_name: str = Field(description="Resource group name")
-    resource_slot: dict = Field(description="Resource slot allocation")
+    resource_slot: dict[str, Any] = Field(description="Resource slot allocation")
 
 
 class ModelRuntimeConfigDTO(BaseModel):
@@ -208,7 +209,7 @@ class RouteDTO(BaseModel):
     created_at: datetime = Field(description="Creation timestamp")
     revision_id: UUID | None = Field(default=None, description="Revision ID")
     traffic_status: RouteTrafficStatus = Field(description="Traffic status")
-    error_data: dict = Field(default_factory=dict, description="Error data if any")
+    error_data: dict[str, Any] = Field(default_factory=dict, description="Error data if any")
 
 
 class CursorPaginationInfo(BaseModel):

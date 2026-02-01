@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 _PREFIX: Final[str] = "ai/backend/config"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AvailableServiceNode(graphene.ObjectType):
+class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Available services for configuration.
     Added in 25.8.0.
@@ -49,7 +49,7 @@ class AvailableServiceConnection(Connection):
         description = "Added in 25.8.0."
 
 
-class ServiceConfigNode(graphene.ObjectType):
+class ServiceConfigNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Configuration data for a specific service.
     Added in 25.8.0.
@@ -134,7 +134,7 @@ class ServiceConfigConnection(Connection):
         description = "Added in 25.8.0."
 
 
-class ModifyServiceConfigNodeInput(graphene.InputObjectType):
+class ModifyServiceConfigNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Input data for modifying configuration.
     Added in 25.8.0.
@@ -150,7 +150,7 @@ class ModifyServiceConfigNodeInput(graphene.InputObjectType):
     )
 
 
-class ModifyServiceConfigNodePayload(graphene.ObjectType):
+class ModifyServiceConfigNodePayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Payload for the ModifyServiceConfigNode mutation.
     Added in 25.8.0.
@@ -164,7 +164,7 @@ class ModifyServiceConfigNodePayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN,)
 
 
-class ModifyServiceConfigNode(graphene.Mutation):
+class ModifyServiceConfigNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     Output = ModifyServiceConfigNodePayload

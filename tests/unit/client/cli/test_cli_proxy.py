@@ -1,4 +1,6 @@
+from collections.abc import AsyncIterator, Callable
 from http import HTTPStatus
+from typing import Any
 
 import aiohttp
 import pytest
@@ -9,12 +11,14 @@ from ai.backend.client.cli.proxy import create_proxy_app
 
 
 @pytest.fixture
-async def api_app_fixture(unused_tcp_port_factory):
+async def api_app_fixture(
+    unused_tcp_port_factory: Callable[[], int],
+) -> AsyncIterator[tuple[web.Application, list[Any], int]]:
     api_port = unused_tcp_port_factory()
     app = web.Application()
-    recv_queue = []
+    recv_queue: list[Any] = []
 
-    async def echo_ws(request):
+    async def echo_ws(request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         async for msg in ws:
@@ -28,7 +32,7 @@ async def api_app_fixture(unused_tcp_port_factory):
                 recv_queue.append(msg)
         return ws
 
-    async def echo_web(request):
+    async def echo_web(request: web.Request) -> web.Response:
         body = await request.read()
         resp = web.Response(status=HTTPStatus.OK, reason="Good", body=body)
         resp.headers["Content-Type"] = request.content_type
@@ -47,7 +51,9 @@ async def api_app_fixture(unused_tcp_port_factory):
 
 
 @pytest.fixture
-async def proxy_app_fixture(unused_tcp_port_factory):
+async def proxy_app_fixture(
+    unused_tcp_port_factory: Callable[[], int],
+) -> AsyncIterator[tuple[web.Application, int]]:
     app = create_proxy_app()
     runner = web.AppRunner(app)
     proxy_port = unused_tcp_port_factory()
@@ -65,11 +71,11 @@ async def proxy_app_fixture(unused_tcp_port_factory):
 )
 @pytest.mark.asyncio
 async def test_proxy_web(
-    monkeypatch,
-    example_keypair,
-    api_app_fixture,
-    proxy_app_fixture,
-):
+    monkeypatch: Any,
+    example_keypair: tuple[str, str],
+    api_app_fixture: tuple[web.Application, list[Any], int],
+    proxy_app_fixture: tuple[web.Application, int],
+) -> None:
     api_app, recv_queue, api_port = api_app_fixture
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
@@ -93,11 +99,11 @@ async def test_proxy_web(
 )
 @pytest.mark.asyncio
 async def test_proxy_web_502(
-    monkeypatch,
-    example_keypair,
-    proxy_app_fixture,
-    unused_tcp_port_factory,
-):
+    monkeypatch: Any,
+    example_keypair: tuple[str, str],
+    proxy_app_fixture: tuple[web.Application, int],
+    unused_tcp_port_factory: Callable[[], int],
+) -> None:
     api_port = unused_tcp_port_factory()
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
@@ -120,11 +126,11 @@ async def test_proxy_web_502(
 )
 @pytest.mark.asyncio
 async def test_proxy_websocket(
-    monkeypatch,
-    example_keypair,
-    api_app_fixture,
-    proxy_app_fixture,
-):
+    monkeypatch: Any,
+    example_keypair: tuple[str, str],
+    api_app_fixture: tuple[web.Application, list[Any], int],
+    proxy_app_fixture: tuple[web.Application, int],
+) -> None:
     api_app, recv_queue, api_port = api_app_fixture
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])

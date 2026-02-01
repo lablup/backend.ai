@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
@@ -36,7 +36,7 @@ class Image(BaseFunction):
         cls,
         operation: bool = False,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of registered images in this cluster.
         """
@@ -52,7 +52,7 @@ class Image(BaseFunction):
             "is_operation": operation,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["images"]
+        return cast(Sequence[dict[str, Any]], data["images"])
 
     @api_function
     @classmethod
@@ -61,7 +61,7 @@ class Image(BaseFunction):
         reference: str,
         architecture: str,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the information about registered image in this cluster.
         """
@@ -78,7 +78,7 @@ class Image(BaseFunction):
             "architecture": architecture,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["image"]
+        return cast(Sequence[dict[str, Any]], data["image"])
 
     @api_function
     @classmethod
@@ -86,7 +86,7 @@ class Image(BaseFunction):
         cls,
         id: str,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the information about registered image in this cluster.
         """
@@ -102,14 +102,14 @@ class Image(BaseFunction):
             "id": id,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["image"]
+        return cast(Sequence[dict[str, Any]], data["image"])
 
     @api_function
     @classmethod
     async def list_customized(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields_admin,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of customized images in this cluster.
         """
@@ -122,7 +122,7 @@ class Image(BaseFunction):
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {})
-        return data["customized_images"]
+        return cast(Sequence[dict[str, Any]], data["customized_images"])
 
     @api_function
     @classmethod
@@ -141,7 +141,7 @@ class Image(BaseFunction):
         }
 
         data = await api_session.get().Admin._query(q, variables)
-        return data["rescan_images"]
+        return cast(dict[str, Any], data["rescan_images"])
 
     @api_function
     @classmethod
@@ -157,7 +157,7 @@ class Image(BaseFunction):
             "image_id": image_id,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["forget_image_by_id"]
+        return cast(dict[str, Any], data["forget_image_by_id"])
 
     @api_function
     @classmethod
@@ -184,7 +184,7 @@ class Image(BaseFunction):
         }
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, variables)
-        return data["purge_image_by_id"]
+        return cast(dict[str, Any], data["purge_image_by_id"])
 
     @api_function
     @classmethod
@@ -203,7 +203,7 @@ class Image(BaseFunction):
             "image_id": image_id,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["untag_image_from_registry"]
+        return cast(dict[str, Any], data["untag_image_from_registry"])
 
     @api_function
     @classmethod
@@ -220,7 +220,7 @@ class Image(BaseFunction):
             "architecture": architecture,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["forget_image"]
+        return cast(dict[str, Any], data["forget_image"])
 
     @api_function
     @classmethod
@@ -229,7 +229,7 @@ class Image(BaseFunction):
         alias: str,
         target: str,
         arch: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         q = _d("""
             mutation($alias: String!, $target: String!) {
                 alias_image(alias: $alias, target: $target) {
@@ -244,11 +244,11 @@ class Image(BaseFunction):
         if arch:
             variables = {"architecture": arch, **variables}
         data = await api_session.get().Admin._query(q, variables)
-        return data["alias_image"]
+        return cast(dict[str, Any], data["alias_image"])
 
     @api_function
     @classmethod
-    async def dealias_image(cls, alias: str) -> dict:
+    async def dealias_image(cls, alias: str) -> dict[str, Any]:
         q = _d("""
             mutation($alias: String!) {
                 dealias_image(alias: $alias) {
@@ -260,4 +260,4 @@ class Image(BaseFunction):
             "alias": alias,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["dealias_image"]
+        return cast(dict[str, Any], data["dealias_image"])

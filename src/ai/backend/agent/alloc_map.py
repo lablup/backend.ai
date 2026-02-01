@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
+    Any,
     TypeVar,
     final,
 )
@@ -286,9 +287,9 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 
     def __init__(
         self,
-        *args,
+        *args: Any,
         allocation_strategy: AllocationStrategy = AllocationStrategy.EVENLY,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.allocation_strategy = allocation_strategy
         self._allocate_impl = {
@@ -497,11 +498,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 class FractionAllocMap(AbstractAllocMap):
     def __init__(
         self,
-        *args,
+        *args: Any,
         allocation_strategy: AllocationStrategy = AllocationStrategy.EVENLY,
         quantum_size: Decimal = Decimal("0.01"),
         enforce_physical_continuity: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.allocation_strategy = allocation_strategy
         self.quantum_size = quantum_size

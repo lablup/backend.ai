@@ -15,7 +15,7 @@ from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TokenResponseModel(BaseModel):

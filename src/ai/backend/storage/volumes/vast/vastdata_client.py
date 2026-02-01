@@ -90,7 +90,7 @@ class VASTClusterInfo:
     max_file_size: int = -1
     max_performance: Performance = field(default_factory=default_perf)
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:
@@ -117,7 +117,7 @@ class VASTQuota:
     used_capacity: int
     percent_capacity: int
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         names = {f.name for f in fields(self)}
         for k, v in kwargs.items():
             if k in names:

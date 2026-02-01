@@ -67,7 +67,7 @@ class DummyEventPropagator(EventPropagator):
 
 
 @pytest.mark.asyncio
-async def test_hub_normal_aliases():
+async def test_hub_normal_aliases() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, "s001"),
@@ -111,7 +111,7 @@ async def test_hub_normal_aliases():
 
 
 @pytest.mark.asyncio
-async def test_hub_wildcard_aliases():
+async def test_hub_wildcard_aliases() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
@@ -154,54 +154,58 @@ async def test_hub_wildcard_aliases():
 
 
 @pytest.mark.asyncio
-async def test_hub_close_by_alias():
+async def test_hub_close_by_alias() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
     ]
     propagator1 = DummyEventPropagator()
-    propagator1.close = AsyncMock()
+    mock_close1 = AsyncMock()
+    propagator1.close = mock_close1  # type: ignore[method-assign]
     hub.register_event_propagator(propagator1, aliases)
     aliases = [
         (EventDomain.SESSION, "s004"),
         (EventDomain.SESSION, "s005"),
     ]
     propagator2 = DummyEventPropagator()
-    propagator2.close = AsyncMock()
+    mock_close2 = AsyncMock()
+    propagator2.close = mock_close2  # type: ignore[method-assign]
     hub.register_event_propagator(propagator2, aliases)
 
     await hub.close_by_alias(EventDomain.SESSION, WILDCARD)
 
     # WILDCARD does not mean closing of all propagators,
     # but closing of propagators registered using WILDCARD.
-    propagator1.close.assert_awaited_once()
-    propagator2.close.assert_not_awaited()
+    mock_close1.assert_awaited_once()
+    mock_close2.assert_not_awaited()
 
     # Closing with each domain ID calls close() individually.
     await hub.close_by_alias(EventDomain.SESSION, "s004")
     await hub.close_by_alias(EventDomain.SESSION, "s005")
-    assert propagator2.close.await_count == 2
+    assert mock_close2.await_count == 2
 
 
 @pytest.mark.asyncio
-async def test_hub_shutdown():
+async def test_hub_shutdown() -> None:
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
     ]
     propagator1 = DummyEventPropagator()
-    propagator1.close = AsyncMock()
+    mock_close1 = AsyncMock()
+    propagator1.close = mock_close1  # type: ignore[method-assign]
     hub.register_event_propagator(propagator1, aliases)
     aliases = [
         (EventDomain.SESSION, "s004"),
         (EventDomain.SESSION, "s005"),
     ]
     propagator2 = DummyEventPropagator()
-    propagator2.close = AsyncMock()
+    mock_close2 = AsyncMock()
+    propagator2.close = mock_close2  # type: ignore[method-assign]
     hub.register_event_propagator(propagator2, aliases)
 
     await hub.shutdown()
 
     # All propagators should now be closed.
-    propagator1.close.assert_awaited_once()
-    propagator2.close.assert_awaited_once()
+    mock_close1.assert_awaited_once()
+    mock_close2.assert_awaited_once()

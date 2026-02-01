@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import ipaddress
 import json
 import logging
 import uuid
@@ -30,7 +31,7 @@ from ai.backend.logging import BraceStyleAdapter
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -52,7 +53,8 @@ class BaseMixin:
         o = dict(self.__dict__)
         del o["_sa_instance_state"]
         if serializable:
-            return ensure_json_serializable(o)
+            result: dict[str, Any] = ensure_json_serializable(o)
+            return result
         return o
 
 
@@ -71,8 +73,7 @@ def zero_if_none(val: int | None) -> int:
     return 0 if val is None else val
 
 
-# FIXME: remove type: ignore annotation as soon as possible
-class EnumType(TypeDecorator, SchemaType):  # type: ignore
+class EnumType(TypeDecorator[enum.Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -104,10 +105,10 @@ class EnumType(TypeDecorator, SchemaType):  # type: ignore
 
     @property
     def python_type(self) -> type[enum.Enum]:
-        return self._enum_class
+        return self._enum_cls
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -115,7 +116,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts: Any) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
         self._use_name = use_name
@@ -129,8 +130,10 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         if value is None:
             return None
         if self._use_name:
-            return value.name
-        return value.value
+            name: str = value.name
+            return name
+        val: str = value.value
+        return val
 
     def process_result_value(
         self,
@@ -143,7 +146,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **kw) -> StrEnumType[T_StrEnum]:
+    def copy(self, **kw: Any) -> StrEnumType[T_StrEnum]:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
@@ -151,7 +154,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class StructuredJSONColumn(TypeDecorator):
+class StructuredJSONColumn(TypeDecorator[BaseModel]):
     """
     A column type to convert JSON values back and forth using a Trafaret.
     """
@@ -166,31 +169,32 @@ class StructuredJSONColumn(TypeDecorator):
 
     def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
-            return dialect.type_descriptor(sa.JSON())  # type: ignore[arg-type]
+            return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
     def process_bind_param(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
         try:
-            self._schema(**value)
+            validated: BaseModel = self._schema(**value)
         except ValidationError as e:
             raise ValueError(
                 "The given value does not conform with the structured json column format.",
                 e.json(),
             ) from e
-        return value
+        return validated
 
     def process_result_value(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
-        return self._schema(**value)
+        result: BaseModel = self._schema(**value)
+        return result
 
     def copy(self, **kw: Any) -> StructuredJSONColumn:
         return StructuredJSONColumn(self._schema)
 
 
-class StructuredJSONObjectColumn(TypeDecorator):
+class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
     """
     A column type to convert JSON values back and forth using BaseModel.
     """
@@ -219,7 +223,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
+class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
     """
     A column type to convert JSON values back and forth using BaseModel,
     but store and load a list of the objects.
@@ -248,7 +252,7 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator):
         return StructuredJSONObjectListColumn(self._schema)
 
 
-class URLColumn(TypeDecorator):
+class URLColumn(TypeDecorator[yarl.URL]):
     """
     A column type for URL strings
     """
@@ -269,7 +273,7 @@ class URLColumn(TypeDecorator):
         return None
 
 
-class IPColumn(TypeDecorator):
+class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -277,16 +281,32 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value: str | None, dialect: sa.Dialect) -> str | None:
+    def process_bind_param(
+        self,
+        value: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | str | None,
+        dialect: sa.Dialect,
+    ) -> str | None:
         if value is None:
-            return value
-        try:
-            cidr = ReadableCIDR(value).address
-        except InvalidIpAddressValue as e:
-            raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
-        return cidr
+            return None
+        if isinstance(value, str):
+            try:
+                cidr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = ReadableCIDR(
+                    value
+                )
+                cidr_addr = cidr.address
+                if cidr_addr is None:
+                    return None
+                return str(cidr_addr)
+            except InvalidIpAddressValue as e:
+                raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
+        addr = value.address
+        if addr is None:
+            return None
+        return str(addr)
 
-    def process_result_value(self, value: str | None, dialect: sa.Dialect) -> ReadableCIDR | None:
+    def process_result_value(
+        self, value: str | None, dialect: sa.Dialect
+    ) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
         if value is None:
             return None
         return ReadableCIDR(value)
@@ -295,7 +315,7 @@ class IPColumn(TypeDecorator):
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator[UUID_SubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -338,9 +358,9 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column[Any]:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)

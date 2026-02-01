@@ -439,7 +439,7 @@ class DeploymentRepository:
             model_definition_candidates,
         )
         yaml = YAML()
-        return yaml.load(model_definition_bytes)
+        return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
     @deployment_repository_resilience.apply()
     async def fetch_service_definition(
@@ -762,7 +762,7 @@ class DeploymentRepository:
         if metric_requested_endpoints:
             endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
                 self._valkey_stat,
-                cast(list[uuid.UUID], metric_requested_endpoints),
+                metric_requested_endpoints,
             )
             endpoint_statistics_by_id = {
                 endpoint_id: metric

@@ -68,7 +68,7 @@ class TCPProxy(ServiceProxy):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.down_task: asyncio.Task | None = None
+        self.down_task: asyncio.Task[Any] | None = None
 
     async def proxy(self) -> web.WebSocketResponse:
         try:
@@ -150,7 +150,7 @@ class WebSocketProxy:
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
     # FIXME: use __future__.annotations in Python 3.7+
-    upstream_buffer: asyncio.Queue  # contains: Tuple[Union[bytes, str], web.WSMsgType]
+    upstream_buffer: asyncio.Queue[tuple[bytes | str, web.WSMsgType]]
     upstream_buffer_task: asyncio.Future[None] | None
     downstream_cb: AsyncCallback[str | bytes, None] | None
     upstream_cb: AsyncCallback[str | bytes, None] | None
@@ -230,8 +230,10 @@ class WebSocketProxy:
             try:
                 if self.up_conn and not self.up_conn.closed:
                     if tp == aiohttp.WSMsgType.TEXT:
+                        assert isinstance(msg, str)  # noqa: S101
                         await self.up_conn.send_str(msg)
                     elif tp == aiohttp.WSMsgType.binary:
+                        assert isinstance(msg, bytes)  # noqa: S101
                         await self.up_conn.send_bytes(msg)
                 else:
                     await self.close_downstream()

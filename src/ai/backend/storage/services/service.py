@@ -4,6 +4,7 @@ import uuid
 import weakref
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
+from typing import Any
 
 from aiohttp import web
 
@@ -41,7 +42,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class VolumeService:
     _volume_pool: VolumePool
     _event_producer: EventProducer
-    _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
+    _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]
 
     def __init__(
         self,
@@ -50,7 +51,7 @@ class VolumeService:
     ) -> None:
         self._volume_pool = volume_pool
         self._event_producer = event_producer
-        self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task]()
+        self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]()
 
     async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
         async with self._volume_pool.get_volume(volume_id) as volume:

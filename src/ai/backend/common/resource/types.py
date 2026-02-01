@@ -38,7 +38,7 @@ class TotalResourceData:
     total_free_slots: ResourceSlot  # total - occupied_slots
     total_capacity_slots: ResourceSlot  # available_slots
 
-    def to_json(self) -> dict:
+    def to_json(self) -> dict[str, Any]:
         return {
             "total_used_slots": self.total_used_slots.to_json(),
             "total_free_slots": self.total_free_slots.to_json(),

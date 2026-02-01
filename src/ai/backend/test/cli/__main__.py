@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
 
+if TYPE_CHECKING:
+    from ai.backend.test.testcases.spec_manager import TestSpecManager
+
 _DEFAULT_CONFIG_PATH = "configs/tester/tester.toml"
 
 
-def _spec_manager():
+def _spec_manager() -> TestSpecManager:
     """
     Returns the test specification manager for the CLI.
     """

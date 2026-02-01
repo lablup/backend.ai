@@ -244,8 +244,8 @@ class DummyAgent(
 
     def __init__(
         self,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.dummy_config = read_dummy_config()

@@ -73,7 +73,7 @@ def _get_kernel_usage_record_domain_join_condition() -> sa.ColumnElement[bool]:
     return KernelUsageRecordRow.domain_name == foreign(DomainRow.name)
 
 
-class KernelUsageRecordRow(Base):
+class KernelUsageRecordRow(Base):  # type: ignore[misc]
     """Per-period kernel resource usage records (raw data).
 
     Each record represents kernel resource usage during a specific
@@ -163,7 +163,7 @@ def _get_domain_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class DomainUsageBucketRow(Base):
+class DomainUsageBucketRow(Base):  # type: ignore[misc]
     """Per-domain period-based resource usage aggregation.
 
     Cache summing all Project/User usage within the domain.
@@ -251,7 +251,7 @@ def _get_project_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return ProjectUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class ProjectUsageBucketRow(Base):
+class ProjectUsageBucketRow(Base):  # type: ignore[misc]
     """Per-project period-based resource usage aggregation.
 
     Cache summing all User usage within the project.
@@ -353,7 +353,7 @@ def _get_user_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return UserUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class UserUsageBucketRow(Base):
+class UserUsageBucketRow(Base):  # type: ignore[misc]
     """Per-user period-based resource usage aggregation (computation cache).
 
     Cache aggregating raw data from kernel_usage_records per decay_unit period.

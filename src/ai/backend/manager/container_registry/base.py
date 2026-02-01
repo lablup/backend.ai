@@ -620,7 +620,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         image: str,
         tag: str,
-        manifests: dict[str, dict],
+        manifests: dict[str, dict[str, Any]],
         skip_reason: str | None = None,
     ) -> None:
         """

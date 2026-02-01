@@ -295,7 +295,7 @@ class DockerKernel(AbstractKernel):
             log.warning("Session is already being committed.")
 
     @override
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         loop = current_loop()
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
@@ -316,7 +316,7 @@ class DockerKernel(AbstractKernel):
             ) from e
 
     @override
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -345,7 +345,7 @@ class DockerKernel(AbstractKernel):
         return tarbytes
 
     @override
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -385,7 +385,7 @@ class DockerKernel(AbstractKernel):
         return content_bytes
 
     @override
-    async def list_files(self, container_path: os.PathLike | str) -> dict[str, Any]:
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
@@ -520,8 +520,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
         log.info("checking krunner-env for {}...", distro)
         do_create = False
         try:
-            vol = DockerVolume(docker, volume_name)
-            await vol.show()
+            vol = DockerVolume(docker, volume_name)  # type: ignore[no-untyped-call]
+            await vol.show()  # type: ignore[no-untyped-call]
             # Instead of checking the version from txt files inside the volume,
             # we check the version via the volume name and its existence.
             # This is because:
@@ -540,7 +540,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
             else:
                 log.info("populating {} volume version {}", volume_name, current_version)
-                await docker.volumes.create({
+                await docker.volumes.create({  # type: ignore[no-untyped-call]
                     "Name": volume_name,
                     "Driver": "local",
                 })

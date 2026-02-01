@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ResultSet
@@ -120,7 +120,7 @@ class JsonOutputHandler(BaseOutputHandler):
 
     def print_paginated_list(
         self,
-        fetch_func: Callable[[int, int], PaginatedResult],
+        fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
         page_size: int | None = None,
         plain: bool = False,
@@ -138,7 +138,7 @@ class JsonOutputHandler(BaseOutputHandler):
                             field_map[k].alt_name: field_map[k].formatter.format_json(
                                 v, field_map[k]
                             )
-                            for k, v in item.items()
+                            for k, v in cast(Mapping[str, Any], item).items()
                             if k in field_map
                         }
                         for item in result.items
@@ -153,7 +153,7 @@ class JsonOutputHandler(BaseOutputHandler):
         item: Mapping[str, Any],
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         data = {
             "ok": item.get("ok", False),
@@ -178,7 +178,7 @@ class JsonOutputHandler(BaseOutputHandler):
         msg: str = "Failed",
         item_name: str | None = None,
         action_name: str | None = None,
-        extra_info: Mapping = {},
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         data = {
             "ok": False,

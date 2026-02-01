@@ -15,7 +15,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint("fk_users_main_access_key_keypairs", "users", type_="foreignkey")
     op.create_foreign_key(
         op.f("fk_users_main_access_key_keypairs"),
@@ -27,7 +27,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(op.f("fk_users_main_access_key_keypairs"), "users", type_="foreignkey")
     op.create_foreign_key(
         "fk_users_main_access_key_keypairs",

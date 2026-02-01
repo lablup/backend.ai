@@ -33,7 +33,7 @@ class AffinityHint:
     policy: AffinityPolicy
 
 
-class AffinityMap(nx.Graph):
+class AffinityMap(nx.Graph):  # type: ignore[misc]
     """
     Represents the NUMA distance matrix of all device pairs from all compute device plugins.
     """

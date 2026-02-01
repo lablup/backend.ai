@@ -127,7 +127,7 @@ class Request:
         *,
         content_type: str | None = None,
         params: Mapping[str, str | int] | None = None,
-        reporthook: Callable | None = None,
+        reporthook: Callable[..., Any] | None = None,
         override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
@@ -291,7 +291,7 @@ class Request:
 
     # TODO: attach rate-limit information
 
-    def fetch(self, **kwargs) -> FetchContextManager:
+    def fetch(self, **kwargs: Any) -> FetchContextManager:
         """
         Sends the request to the server and reads the response.
 
@@ -345,7 +345,7 @@ class Request:
         return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
     def connect_websocket(
-        self, protocols: Iterable[str] = tuple(), **kwargs
+        self, protocols: Iterable[str] = tuple(), **kwargs: Any
     ) -> WebSocketContextManager:
         """
         Creates a WebSocket connection.
@@ -385,7 +385,7 @@ class Request:
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)
 
-    def connect_events(self, **kwargs) -> SSEContextManager:
+    def connect_events(self, **kwargs: Any) -> SSEContextManager:
         """
         Creates a Server-Sent Events connection.
 
@@ -450,8 +450,11 @@ class SyncResponseMixin:
 
     def text(self) -> str:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.text(),
+        return cast(
+            str,
+            sync_session.worker_thread.execute(
+                self._raw_response.text(),
+            ),
         )
 
     def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
@@ -463,14 +466,20 @@ class SyncResponseMixin:
 
     def read(self, n: int = -1) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(n),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(n),
+            ),
         )
 
     def readall(self) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(-1),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(-1),
+            ),
         )
 
 
@@ -501,7 +510,7 @@ class BaseResponse:
         underlying_response: aiohttp.ClientResponse,
         *,
         async_mode: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self._session = session
         self._raw_response = underlying_response
@@ -621,7 +630,7 @@ class FetchContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *exc_info) -> bool | None:
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._rqst_ctx is None:
             raise RuntimeError("Request context is not initialized")
         await self._rqst_ctx.__aexit__(*exc_info)
@@ -640,7 +649,7 @@ class WebSocketResponse(BaseResponse):
         self,
         session: BaseSession,
         underlying_response: aiohttp.ClientResponse,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # Unfortunately, aiohttp.ClientWebSocketResponse is not a subclass of aiohttp.ClientResponse.
         # Since we block methods that require ClientResponse-specific methods, we just force-typecast.
@@ -727,7 +736,7 @@ class WebSocketContextManager:
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Callable | None = None,
+        on_enter: Callable[..., Any] | None = None,
         response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
@@ -769,7 +778,7 @@ class WebSocketContextManager:
             await self.on_enter(wrapped_ws)
         return wrapped_ws
 
-    async def __aexit__(self, *args) -> bool | None:
+    async def __aexit__(self, *args: Any) -> bool | None:
         if self._ws_ctx is None:
             raise RuntimeError("WebSocket context is not initialized")
         await self._ws_ctx.__aexit__(*args)
@@ -800,7 +809,7 @@ class SSEResponse(BaseResponse):
         connector: Callable[[], Awaitable[aiohttp.ClientResponse]],
         auto_reconnect: bool = True,
         default_retry: int = 5,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(session, underlying_response, async_mode=True, **kwargs)
         self._auto_reconnect = auto_reconnect
@@ -925,7 +934,7 @@ class SSEContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *args) -> bool | None:
+    async def __aexit__(self, *args: Any) -> bool | None:
         if self._rqst_ctx is None:
             raise RuntimeError("SSE request context is not initialized")
         await self._rqst_ctx.__aexit__(*args)

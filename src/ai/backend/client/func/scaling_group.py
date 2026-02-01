@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import scaling_group_fields
@@ -59,7 +59,7 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_available(cls, group: str) -> Sequence[dict]:
+    async def list_available(cls, group: str) -> Sequence[dict[str, Any]]:
         """
         List available scaling groups for the current user,
         considering the user, the user's domain, and the designated user group.
@@ -71,14 +71,14 @@ class ScalingGroup(BaseFunction):
         )
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return data["scaling_groups"]
+            return cast(Sequence[dict[str, Any]], data["scaling_groups"])
 
     @api_function
     @classmethod
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         List available scaling groups for the current user,
         considering the user, the user's domain, and the designated user group.
@@ -93,7 +93,7 @@ class ScalingGroup(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"is_active": None}
         data = await api_session.get().Admin._query(query, variables)
-        return data["scaling_groups"]
+        return cast(Sequence[dict[str, Any]], data["scaling_groups"])
 
     @api_function
     @classmethod
@@ -101,7 +101,7 @@ class ScalingGroup(BaseFunction):
         cls,
         name: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetch information of a scaling group by name.
 
@@ -116,7 +116,7 @@ class ScalingGroup(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["scaling_group"]
+        return cast(dict[str, Any], data["scaling_group"])
 
     @api_function
     @classmethod
@@ -135,7 +135,7 @@ class ScalingGroup(BaseFunction):
         wsproxy_addr: str | None = None,
         wsproxy_api_token: str | None = None,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new scaling group with the given options.
         """
@@ -167,7 +167,7 @@ class ScalingGroup(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_scaling_group"]
+        return cast(dict[str, Any], data["create_scaling_group"])
 
     @api_function
     @classmethod
@@ -186,7 +186,7 @@ class ScalingGroup(BaseFunction):
         wsproxy_addr: str | None | Undefined = undefined,
         wsproxy_api_token: str | None | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update existing scaling group.
         """
@@ -217,11 +217,11 @@ class ScalingGroup(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_scaling_group"]
+        return cast(dict[str, Any], data["modify_scaling_group"])
 
     @api_function
     @classmethod
-    async def delete(cls, name: str) -> dict:
+    async def delete(cls, name: str) -> dict[str, Any]:
         """
         Deletes an existing scaling group.
         """
@@ -234,11 +234,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_scaling_group"]
+        return cast(dict[str, Any], data["delete_scaling_group"])
 
     @api_function
     @classmethod
-    async def associate_domain(cls, scaling_group: str, domain: str) -> dict:
+    async def associate_domain(cls, scaling_group: str, domain: str) -> dict[str, Any]:
         """
         Associate scaling_group with domain.
 
@@ -255,11 +255,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"scaling_group": scaling_group, "domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data["associate_scaling_group_with_domain"]
+        return cast(dict[str, Any], data["associate_scaling_group_with_domain"])
 
     @api_function
     @classmethod
-    async def dissociate_domain(cls, scaling_group: str, domain: str) -> dict:
+    async def dissociate_domain(cls, scaling_group: str, domain: str) -> dict[str, Any]:
         """
         Dissociate scaling_group from domain.
 
@@ -276,11 +276,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"scaling_group": scaling_group, "domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_scaling_group_with_domain"]
+        return cast(dict[str, Any], data["disassociate_scaling_group_with_domain"])
 
     @api_function
     @classmethod
-    async def dissociate_all_domain(cls, domain: str) -> dict:
+    async def dissociate_all_domain(cls, domain: str) -> dict[str, Any]:
         """
         Dissociate all scaling_groups from domain.
 
@@ -295,11 +295,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_all_scaling_groups_with_domain"]
+        return cast(dict[str, Any], data["disassociate_all_scaling_groups_with_domain"])
 
     @api_function
     @classmethod
-    async def associate_group(cls, scaling_group: str, group_id: str) -> dict:
+    async def associate_group(cls, scaling_group: str, group_id: str) -> dict[str, Any]:
         """
         Associate scaling_group with group.
 
@@ -316,11 +316,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"scaling_group": scaling_group, "user_group": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["associate_scaling_group_with_user_group"]
+        return cast(dict[str, Any], data["associate_scaling_group_with_user_group"])
 
     @api_function
     @classmethod
-    async def dissociate_group(cls, scaling_group: str, group_id: str) -> dict:
+    async def dissociate_group(cls, scaling_group: str, group_id: str) -> dict[str, Any]:
         """
         Dissociate scaling_group from group.
 
@@ -337,11 +337,11 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"scaling_group": scaling_group, "user_group": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_scaling_group_with_user_group"]
+        return cast(dict[str, Any], data["disassociate_scaling_group_with_user_group"])
 
     @api_function
     @classmethod
-    async def dissociate_all_group(cls, group_id: str) -> dict:
+    async def dissociate_all_group(cls, group_id: str) -> dict[str, Any]:
         """
         Dissociate all scaling_groups from group.
 
@@ -356,4 +356,4 @@ class ScalingGroup(BaseFunction):
         """)
         variables = {"group_id": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_all_scaling_groups_with_group"]
+        return cast(dict[str, Any], data["disassociate_all_scaling_groups_with_group"])

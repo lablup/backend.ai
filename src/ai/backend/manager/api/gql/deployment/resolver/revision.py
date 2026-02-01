@@ -46,7 +46,7 @@ from ai.backend.manager.services.deployment.actions.revision_operations.activate
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")
+@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
 async def revisions(
     info: Info[StrawberryGQLContext],
     filter: ModelRevisionFilter | None = None,
@@ -72,7 +72,7 @@ async def revisions(
     )
 
 
-@strawberry.field(description="Added in 25.16.0")
+@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
@@ -83,7 +83,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     return ModelRevision.from_dataclass(result.data)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 25.16.0. Get JSON Schema for inference runtime configuration"
 )
 async def inference_runtime_config(name: str) -> JSON:
@@ -102,7 +102,7 @@ async def inference_runtime_config(name: str) -> JSON:
             }
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes"
 )
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
@@ -117,7 +117,7 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
 async def add_model_revision(
     input: AddRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddRevisionPayload:
@@ -132,7 +132,7 @@ async def add_model_revision(
     return AddRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Added in 25.16.0. Create model revision which is not attached to any deployment."
 )
 async def create_model_revision(
@@ -147,7 +147,7 @@ async def create_model_revision(
     return CreateRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description="Added in 25.19.0. Activate a specific revision to be the current revision."
 )
 async def activate_deployment_revision(

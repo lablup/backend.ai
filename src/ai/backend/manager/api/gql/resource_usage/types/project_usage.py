@@ -93,7 +93,7 @@ class ProjectUsageBucketGQL(Node):
             capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
         )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description=(
             "Added in 26.1.0. User usage buckets belonging to this project. "
             "Returns paginated user-level usage history for all users in this project "

@@ -93,7 +93,7 @@ class AbstractTask(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, values: tuple) -> Self:
+    def deserialize(cls, values: tuple[Any, ...]) -> Self:
         pass
 
     def serialize_to_request(self) -> Request:
@@ -120,7 +120,7 @@ class ChownTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> Self:
+    def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
             values[1],
@@ -187,7 +187,7 @@ class MountTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> Self:
+    def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
             QuotaScopeID.parse(values[1]),
@@ -258,7 +258,7 @@ class UmountTask(AbstractTask):
         ))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> Self:
+    def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
             QuotaScopeID.parse(values[1]),
@@ -289,7 +289,7 @@ class DeletePathTask(AbstractTask):
         return msgpack.packb((self.path,))
 
     @classmethod
-    def deserialize(cls, values: tuple) -> Self:
+    def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
         )
@@ -387,7 +387,7 @@ class WatcherProcess:
 
     def _deserialize_from_request(self, raw_data: Request) -> AbstractTask:
         serializer_name = str(raw_data.header, "utf8")
-        values: tuple = msgpack.unpackb(raw_data.body)
+        values: tuple[Any, ...] = msgpack.unpackb(raw_data.body)
         serializer_cls = self.serializer_map[serializer_name]
         return serializer_cls.deserialize(values)
 
@@ -425,7 +425,7 @@ class WatcherClient:
         self.output_sock = zctx.socket(zmq.PULL)
         self.output_sock_addr = get_zmq_socket_file_path(output_sock_prefix, self.pidx)
         self.result_queue: asyncio.Queue[Response] = asyncio.Queue(maxsize=128)
-        self.output_listening_task: asyncio.Task | None = None
+        self.output_listening_task: asyncio.Task[Any] | None = None
 
     async def init(self) -> None:
         self.input_sock.connect(self.input_sock_addr)

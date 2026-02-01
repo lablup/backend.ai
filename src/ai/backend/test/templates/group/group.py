@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import override
+from typing import Any, override
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -45,7 +45,7 @@ class GroupTemplate(WrapperTestTemplate):
             if info is not None:
                 await self._retry_purge_group(client_session, group_id)
 
-    async def _retry_purge_group(self, client_session, group_id: str) -> None:
+    async def _retry_purge_group(self, client_session: Any, group_id: str) -> None:
         for _ in range(3):
             try:
                 await client_session.Group.purge(group_id)

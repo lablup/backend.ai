@@ -17,7 +17,7 @@ from ai.backend.common.types import (
 
 
 @pytest.mark.asyncio
-async def test_aobject():
+async def test_aobject() -> None:
     init_count = 0
     ainit_count = 0
 
@@ -61,7 +61,7 @@ async def test_aobject():
     assert ainit_count == 2
 
 
-def test_check_typed_dict():
+def test_check_typed_dict() -> None:
     # As of 24.09, check_typed_dict() is a mere alias of typeguard.check_type().
     with pytest.raises(TypeError):  # the second arg is not hashable
         check_typed_dict({}, {})
@@ -83,9 +83,11 @@ def test_check_typed_dict():
     assert isinstance(a, dict)
 
 
-def test_binary_size_str_conversion():
+def test_binary_size_str_conversion() -> None:
     assert BinarySize.from_str("1 byte") == 1
-    assert BinarySize.from_str(19291991) == 19291991
+    # MyPy doesn't support numbers.Integral for static type checking
+    # The function accepts int which is a numbers.Integral, so we can safely ignore this
+    assert BinarySize.from_str(19291991) == 19291991  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         BinarySize.from_str("1.1")
     assert BinarySize.from_str("1.1k") == 1126
@@ -119,12 +121,12 @@ def test_binary_size_str_conversion():
     assert BinarySize.from_str("0.5m") == 524288
     assert BinarySize.from_str("512k") == 524288
     assert f"{BinarySize(930): }" == "930"
-    assert f"{BinarySize(1024):k}" == "1k"  # type: ignore
-    assert f"{BinarySize(524288):k}" == "512k"  # type: ignore
-    assert f"{BinarySize(1048576):k}" == "1024k"  # type: ignore
-    assert f"{BinarySize(524288):m}" == "0.5m"  # type: ignore
-    assert f"{BinarySize(1048576):m}" == "1m"  # type: ignore
-    assert f"{BinarySize(1048576123):m}" == "1000m"  # type: ignore
+    assert f"{BinarySize(1024):k}" == "1k"
+    assert f"{BinarySize(524288):k}" == "512k"
+    assert f"{BinarySize(1048576):k}" == "1024k"
+    assert f"{BinarySize(524288):m}" == "0.5m"
+    assert f"{BinarySize(1048576):m}" == "1m"
+    assert f"{BinarySize(1048576123):m}" == "1000m"
     assert f"{BinarySize(2**30):g}" == "1g"
     with pytest.raises(ValueError):
         f"{BinarySize(1):x}"
@@ -139,7 +141,7 @@ def test_binary_size_str_conversion():
     assert f"{BinarySize(2**30):s}" == "1g"
 
 
-def test_binary_size_decimal_conversion():
+def test_binary_size_decimal_conversion() -> None:
     assert Decimal(BinarySize(1)) == 1
     assert Decimal(BinarySize(2)) == 2
     assert Decimal(BinarySize(1024)) == 1024
@@ -176,17 +178,21 @@ def test_slot_name_parsing() -> None:
     assert s.minor_type == "mig-10g"
 
 
-def test_resource_slot_serialization():
+def test_resource_slot_serialization() -> None:
     # from_user_input() and from_policy() takes the explicit slot type information to
     # convert human-readable values to raw decimal values,
     # while from_json() treats those values as stringified decimal expressions "as-is".
 
-    st = {"a": "count", "b": "bytes"}
-    r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st)
-    r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st)
-    r3 = ResourceSlot.from_user_input({"a": "1"}, st)
+    # from_user_input expects Mapping[SlotName, SlotTypes]
+    st_user_input: dict[SlotName, SlotTypes] = {
+        SlotName("a"): SlotTypes("count"),
+        SlotName("b"): SlotTypes("bytes"),
+    }
+    r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st_user_input)
+    r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st_user_input)
+    r3 = ResourceSlot.from_user_input({"a": "1"}, st_user_input)
     with pytest.raises(ValueError):
-        ResourceSlot.from_user_input({"x": "1"}, st)
+        ResourceSlot.from_user_input({"x": "1"}, st_user_input)
 
     assert r1["a"] == Decimal(1)
     assert r2["a"] == Decimal(2)
@@ -206,29 +212,36 @@ def test_resource_slot_serialization():
     assert r1.to_json() == {"a": "1", "b": "2147483648"}
     assert r2.to_json() == {"a": "2", "b": "1073741824"}
     assert r3.to_json() == {"a": "1", "b": "0"}
-    assert r1.to_humanized(st) == {"a": "1", "b": "2g"}
-    assert r2.to_humanized(st) == {"a": "2", "b": "1g"}
-    assert r3.to_humanized(st) == {"a": "1", "b": "0"}
+
+    # to_humanized expects Mapping[str, Any] (plain string keys)
+    st_humanized: dict[str, str] = {"a": "count", "b": "bytes"}
+    assert r1.to_humanized(st_humanized) == {"a": "1", "b": "2g"}
+    assert r2.to_humanized(st_humanized) == {"a": "2", "b": "1g"}
+    assert r3.to_humanized(st_humanized) == {"a": "1", "b": "0"}
     assert r1 == ResourceSlot.from_json({"a": "1", "b": "2147483648"})
     assert r2 == ResourceSlot.from_json({"a": "2", "b": "1073741824"})
     assert r3 == ResourceSlot.from_json({"a": "1", "b": "0"})
 
-    r4 = ResourceSlot.from_user_input({"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st)
+    r4 = ResourceSlot.from_user_input(
+        {"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st_user_input
+    )
     assert not r4["a"].is_finite()
     assert not r4["b"].is_finite()
     assert r4["a"] > 0
     assert r4["b"] < 0
-    assert r4.to_humanized(st) == {"a": "Infinity", "b": "-Infinity"}
+    assert r4.to_humanized(st_humanized) == {"a": "Infinity", "b": "-Infinity"}
 
     # The result for "unspecified" fields may be different
     # depending on the policy options.
 
+    # from_policy expects Mapping[str, Any] (plain string keys)
+    st_policy: dict[str, str] = {"a": "count", "b": "bytes"}
     r1 = ResourceSlot.from_policy(
         {
             "total_resource_slots": {"a": "10"},
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         },
-        st,
+        st_policy,
     )
     assert r1["a"] == Decimal(10)
     assert r1["b"] == Decimal("Infinity")
@@ -237,25 +250,25 @@ def test_resource_slot_serialization():
             "total_resource_slots": {"a": "10"},
             "default_for_unspecified": DefaultForUnspecified.LIMITED,
         },
-        st,
+        st_policy,
     )
     assert r2["a"] == Decimal(10)
     assert r2["b"] == Decimal(0)
 
 
-def test_resource_slot_serialization_prevent_scientific_notation():
+def test_resource_slot_serialization_prevent_scientific_notation() -> None:
     r1 = ResourceSlot({"a": "2E+1", "b": "200"})
     assert r1.to_json()["a"] == "20"
     assert r1.to_json()["b"] == "200"
 
 
-def test_resource_slot_serialization_filter_null():
+def test_resource_slot_serialization_filter_null() -> None:
     r1 = ResourceSlot({"a": "1", "x": None})
     assert r1.to_json()["a"] == "1"
     assert "x" not in r1.to_json()
 
 
-def test_resource_slot_parsing_typeless_user_input():
+def test_resource_slot_parsing_typeless_user_input() -> None:
     # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
     r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
     assert r1["a"] == Decimal(1)
@@ -273,7 +286,7 @@ def test_resource_slot_parsing_typeless_user_input():
     assert r1["cuda.smp"].is_infinite()
 
 
-def test_resource_slot_parsing_typeless_user_input_serialize_again():
+def test_resource_slot_parsing_typeless_user_input_serialize_again() -> None:
     # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
     r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
     assert r1["a"] == Decimal(1)
@@ -290,7 +303,7 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again():
     assert r2 == r1
 
 
-def test_resource_slot_parsing_typeless_user_input_serialize_again_2():
+def test_resource_slot_parsing_typeless_user_input_serialize_again_2() -> None:
     with pytest.raises(ValueError, match="Unknown slot type"):
         ResourceSlot.from_user_input(
             {"a": "1", "shmem": "2g"},
@@ -302,7 +315,7 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again_2():
         )
 
 
-def test_resource_slot_comparison_simple_equality():
+def test_resource_slot_comparison_simple_equality() -> None:
     r1 = ResourceSlot.from_json({"a": "3", "b": "200"})
     r2 = ResourceSlot.from_json({"a": "4", "b": "100"})
     r3 = ResourceSlot.from_json({"a": "2"})
@@ -315,7 +328,7 @@ def test_resource_slot_comparison_simple_equality():
     assert r2 == r5
 
 
-def test_resource_slot_comparison_ordering():
+def test_resource_slot_comparison_ordering() -> None:
     r1 = ResourceSlot.from_json({"a": "3", "b": "200"})
     r2 = ResourceSlot.from_json({"a": "4", "b": "100"})
     r3 = ResourceSlot.from_json({"a": "2"})
@@ -330,7 +343,7 @@ def test_resource_slot_comparison_ordering():
     assert r3["b"] == 0  # auto-sync of slots
 
 
-def test_resource_slot_comparison_ordering_reverse():
+def test_resource_slot_comparison_ordering_reverse() -> None:
     r1 = ResourceSlot.from_json({"a": "3", "b": "200"})
     r2 = ResourceSlot.from_json({"a": "4", "b": "100"})
     r3 = ResourceSlot.from_json({"a": "2"})
@@ -345,7 +358,7 @@ def test_resource_slot_comparison_ordering_reverse():
     assert r4["b"] == 0  # auto-sync of slots
 
 
-def test_resource_slot_comparison_subset():
+def test_resource_slot_comparison_subset() -> None:
     r1 = ResourceSlot.from_json({"a": "3", "b": "200"})
     r3 = ResourceSlot.from_json({"a": "3"})
     assert r3.eq_contained(r1)
@@ -354,7 +367,7 @@ def test_resource_slot_comparison_subset():
     assert r1.eq_contains(r3)
 
 
-def test_resource_slot_calc_with_infinity():
+def test_resource_slot_calc_with_infinity() -> None:
     r1 = ResourceSlot.from_json({"a": "Infinity"})
     r2 = ResourceSlot.from_json({"a": "3"})
     r3 = r1 - r2

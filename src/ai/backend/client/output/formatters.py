@@ -5,7 +5,7 @@ import json
 import textwrap
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 import humanize
 
@@ -232,7 +232,7 @@ class AgentStatFormatter(OutputFormatter):
                     "" if unit_hint == "count" else unit_hint,
                 ),
             )
-            return formatter(metric, binary)
+            return cast(str, formatter(metric, binary))  # type: ignore[no-untyped-call]
 
         bufs = []
         node_metric_bufs = []

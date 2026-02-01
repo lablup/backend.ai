@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import base64
 import uuid
+from collections.abc import Generator
 from dataclasses import dataclass
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,19 +46,18 @@ class ExpectedStatements:
 # ============= Helper Functions =============
 
 
-def compile_to_sql(stmt: sa.sql.Select) -> str:
+def compile_to_sql(stmt: sa.sql.Select[Any]) -> str:
     """Compile SQLAlchemy statement to PostgreSQL SQL string."""
-    return str(
-        stmt.compile(
-            dialect=postgresql.dialect(),
-            compile_kwargs={"literal_binds": True},
-        )
+    compiled = stmt.compile(
+        dialect=postgresql.dialect(),  # type: ignore[no-untyped-call]
+        compile_kwargs={"literal_binds": True},
     )
+    return str(compiled)
 
 
 def verify_statements(
-    stmt: sa.sql.Select,
-    count_stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
+    count_stmt: sa.sql.Select[Any],
     conditions: list[WhereClauseType],
     expected: ExpectedStatements,
 ) -> None:
@@ -118,7 +119,7 @@ class TestCursorPaginationBugFixes:
         return base64.b64encode(node_id.encode()).decode()
 
     @pytest.fixture
-    def mock_orm_class(self):
+    def mock_orm_class(self) -> type:
         """Create a real declarative ORM class for testing."""
         Base = declarative_base()
 
@@ -138,7 +139,7 @@ class TestCursorPaginationBugFixes:
         return mock
 
     @pytest.fixture(autouse=True)
-    def patch_resolve_global_id(self, cursor_row_id: uuid.UUID):
+    def patch_resolve_global_id(self, cursor_row_id: uuid.UUID) -> Generator[None, None, None]:
         """Auto-apply patch for AsyncNode.resolve_global_id to all tests."""
         with patch(
             "ai.backend.manager.api.gql_legacy.base.AsyncNode.resolve_global_id",
@@ -199,8 +200,8 @@ class TestCursorPaginationBugFixes:
     )
     async def test_bug1_pagination_without_order_expr(
         self,
-        mock_orm_class,
-        mock_info,
+        mock_orm_class: type[Any],
+        mock_info: MagicMock,
         cursor_id: str,
         pagination_order: ConnectionPaginationOrder,
         expected: ExpectedStatements,
@@ -262,8 +263,8 @@ class TestCursorPaginationBugFixes:
     )
     async def test_pagination_with_asc_order_expr(
         self,
-        mock_orm_class,
-        mock_info,
+        mock_orm_class: type[Any],
+        mock_info: MagicMock,
         cursor_id: str,
         order_expr_asc: OrderExprArg,
         pagination_order: ConnectionPaginationOrder,
@@ -329,8 +330,8 @@ class TestCursorPaginationBugFixes:
     )
     async def test_pagination_with_desc_order_expr(
         self,
-        mock_orm_class,
-        mock_info,
+        mock_orm_class: type[Any],
+        mock_info: MagicMock,
         cursor_id: str,
         order_expr_desc: OrderExprArg,
         pagination_order: ConnectionPaginationOrder,
@@ -365,8 +366,8 @@ class TestCursorPaginationBugFixes:
 
     async def test_bug2_count_query_not_affected_by_cursor(
         self,
-        mock_orm_class,
-        mock_info,
+        mock_orm_class: type[Any],
+        mock_info: MagicMock,
         cursor_id: str,
         filter_expr: FilterExprArg,
     ) -> None:

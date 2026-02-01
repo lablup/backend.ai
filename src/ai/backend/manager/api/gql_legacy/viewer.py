@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 __all__ = ("Viewer",)
 
 
-class Viewer(graphene.ObjectType):
+class Viewer(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.14.2."
 

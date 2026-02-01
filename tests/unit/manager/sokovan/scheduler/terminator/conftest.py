@@ -176,7 +176,7 @@ def terminating_sessions_multiple() -> list[TerminatingSessionData]:
 def terminating_session_kernel_no_agent() -> TerminatingSessionData:
     """Session with kernel that has no agent assigned."""
     kernel = _create_terminating_kernel_data()
-    kernel.agent_id = None  # type: ignore[assignment]
+    kernel.agent_id = None
     return _create_terminating_session_data(kernels=[kernel])
 
 
@@ -185,7 +185,7 @@ def terminating_session_mixed_agents() -> TerminatingSessionData:
     """Session with kernels, some with agents, some without."""
     kernel_with_agent = _create_terminating_kernel_data()
     kernel_without_agent = _create_terminating_kernel_data()
-    kernel_without_agent.agent_id = None  # type: ignore[assignment]
+    kernel_without_agent.agent_id = None
     return _create_terminating_session_data(kernels=[kernel_with_agent, kernel_without_agent])
 
 

@@ -43,7 +43,7 @@ class ConsoleFormatter(logging.Formatter):
         return format_exception(self, ei)
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
-        ct = self.converter(record.created)  # type: ignore
+        ct = self.converter(record.created)
         if datefmt:
             datefmt = datefmt.replace("%f", f"{int(record.msecs):03d}")
             return time.strftime(datefmt, ct)
@@ -72,8 +72,8 @@ class CustomJsonFormatter(JsonFormatter):
             log_record["level"] = record.levelname.upper()
 
 
-class ColorizedFormatter(coloredlogs.ColoredFormatter):
-    def __init__(self, *args, **kwargs) -> None:
+class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
 

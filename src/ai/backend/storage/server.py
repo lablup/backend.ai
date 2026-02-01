@@ -55,7 +55,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.plugin import BasePluginContext
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -373,14 +373,14 @@ async def api_ctx(
 
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
-        plugin_ctx: BasePluginContext, root_app: web.Application
-    ) -> AsyncGenerator[BasePluginContext]:
+        plugin_ctx: BasePluginContext[AbstractPlugin], root_app: web.Application
+    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin], None]:
         pid = os.getpid()
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if pid == 0:
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
-            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
+            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)  # type: ignore[attr-defined]
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
         try:
             yield plugin_ctx
@@ -471,13 +471,13 @@ async def api_ctx(
         internal_api_app = await api_init_stack.enter_async_context(internal_api_ctx())
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageClientWebappPluginContext(etcd, local_config.model_dump()),
+                StorageClientWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 client_api_app,
             )
         )
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),
+                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 manager_api_app,
             )
         )
@@ -694,7 +694,7 @@ async def server_main(
             watcher=watcher_client,
             metric_registry=metric_registry,
             cors_options={
-                "*": aiohttp_cors.ResourceOptions(
+                "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },

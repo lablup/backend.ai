@@ -22,7 +22,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     # partial table to insert "default" domain
@@ -61,25 +61,22 @@ def upgrade():
     # Fill in users' domain_name column with default domain.
     # Create default domain if not exist.
     connection = op.get_bind()
-    query = sa.select([domains]).select_from(domains).where(domains.c.name == "default")
+    query = sa.select(domains).select_from(domains).where(domains.c.name == "default")
     results = connection.execute(query).first()
     if results is None:
-        query = sa.insert(domains).values(
-            name="default", description="Default domain", is_active=True, total_resource_slots="{}"
-        )
-        query = textwrap.dedent(
+        insert_query = textwrap.dedent(
             """\
             INSERT INTO domains (name, description, is_active, total_resource_slots)
             VALUES ('default', 'Default domain', True, '{}'::jsonb);"""
         )
-        connection.execute(text(query))
+        connection.execute(text(insert_query))
 
     # Fill in users' domain_name field.
-    query = "UPDATE users SET domain_name = 'default' WHERE email != 'admin@lablup.com';"
-    connection.execute(text(query))
+    update_query = "UPDATE users SET domain_name = 'default' WHERE email != 'admin@lablup.com';"
+    connection.execute(text(update_query))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(op.f("fk_users_domain_name_domains"), "users", type_="foreignkey")
     op.drop_index(op.f("ix_users_domain_name"), table_name="users")
     op.drop_column("users", "domain_name")

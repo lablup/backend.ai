@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
@@ -32,7 +32,7 @@ class ImagePullStartedEvent(BaseImageEvent):
     image_ref: ImageRef | None = None
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         if self.image_ref is None:
             return (self.image, str(self.agent_id), self.timestamp)
 
@@ -45,7 +45,7 @@ class ImagePullStartedEvent(BaseImageEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         # Backward compatibility
         if len(value) <= 3:
             return cls(
@@ -74,7 +74,7 @@ class ImagePullFinishedEvent(BaseImageEvent):
     image_ref: ImageRef | None = None
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.image,
             str(self.agent_id),
@@ -85,7 +85,7 @@ class ImagePullFinishedEvent(BaseImageEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         # Backward compatibility
         if len(value) <= 4:
             return cls(
@@ -115,14 +115,14 @@ class ImagePullFailedEvent(BaseImageEvent):
     image_ref: ImageRef | None = None
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         if self.image_ref is None:
             return (self.image, str(self.agent_id), self.msg)
         return (self.image, str(self.agent_id), self.msg, self.image_ref)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         # Backward compatibility
         if len(value) <= 3:
             return cls(

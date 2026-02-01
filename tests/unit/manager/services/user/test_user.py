@@ -4,11 +4,14 @@ Tests the core user service actions to verify compatibility with test scenarios.
 """
 
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -35,7 +38,7 @@ class TestUserServiceCompatibility:
     """Test compatibility of user service with test scenarios."""
 
     @pytest.fixture
-    def mock_dependencies(self):
+    def mock_dependencies(self) -> dict[str, MagicMock]:
         """Create mocked dependencies for testing."""
         storage_manager = MagicMock(spec=StorageSessionManager)
         valkey_client = MagicMock(spec=ValkeyStatClient)
@@ -52,7 +55,7 @@ class TestUserServiceCompatibility:
         }
 
     @pytest.fixture
-    def user_service(self, mock_dependencies):
+    def user_service(self, mock_dependencies: dict[str, AsyncMock]) -> UserService:
         """Create UserService instance with mocked dependencies."""
         return UserService(
             storage_manager=mock_dependencies["storage_manager"],
@@ -62,7 +65,11 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.fixture
-    def user_processors(self, user_service, mock_dependencies):
+    def user_processors(
+        self,
+        user_service: UserService,
+        mock_dependencies: dict[str, AsyncMock],
+    ) -> UserProcessors:
         """Create UserProcessors instance."""
         return UserProcessors(
             user_service=user_service,
@@ -70,7 +77,9 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_create_user_action_structure(self, user_service, mock_dependencies):
+    async def test_create_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that CreateUserAction has the expected structure from test scenarios."""
         # Mock successful user creation
         mock_user_data = MagicMock()
@@ -109,7 +118,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].create_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_user_with_container_config(self, user_service, mock_dependencies):
+    async def test_create_user_with_container_config(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test 1.5: Container UID/GID configuration support."""
         mock_user_data = MagicMock()
         mock_dependencies["user_repository"].create_user_validated = AsyncMock(
@@ -146,7 +157,9 @@ class TestUserServiceCompatibility:
         assert user_data.spec.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
-    async def test_modify_user_action_structure(self, user_service, mock_dependencies):
+    async def test_modify_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that ModifyUserAction supports the expected modifications."""
         mock_user_data = MagicMock()
         mock_user_data.full_name = "Updated Name"
@@ -172,7 +185,9 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_user_action_structure(self, user_service, mock_dependencies):
+    async def test_delete_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that DeleteUserAction works as expected."""
         mock_dependencies["user_repository"].soft_delete_user_validated = AsyncMock()
 
@@ -184,7 +199,9 @@ class TestUserServiceCompatibility:
         )
 
     @pytest.mark.asyncio
-    async def test_purge_user_action_structure(self, user_service, mock_dependencies):
+    async def test_purge_user_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that PurgeUserAction handles the expected scenarios."""
         # Mock user data
         mock_user_data = MagicMock()
@@ -205,9 +222,9 @@ class TestUserServiceCompatibility:
         action = PurgeUserAction(
             email="user@example.com",
             user_info_ctx=UserInfoContext(
-                uuid="test-uuid",
+                uuid=UUID("00000000-0000-0000-0000-000000000000"),
                 email="user@example.com",
-                main_access_key="test-key",
+                main_access_key=AccessKey("test-key"),
             ),
         )
 
@@ -215,15 +232,17 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].purge_user.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_user_month_stats_action_structure(self, user_service, mock_dependencies):
+    async def test_user_month_stats_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that UserMonthStatsAction works as expected."""
-        mock_stats = {"cpu_time": 3600, "memory_usage": 2048}
+        mock_stats = [{"cpu_time": 3600, "memory_usage": 2048}]
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats = AsyncMock(
             return_value=mock_stats
         )
 
         # Use a valid UUID format instead of "test-user-id"
-        test_user_uuid = str(uuid.uuid4())
+        test_user_uuid = uuid.uuid4()
         action = UserMonthStatsAction(user_id=test_user_uuid)
 
         result = await user_service.user_month_stats(action)
@@ -232,9 +251,11 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_admin_month_stats_action_structure(self, user_service, mock_dependencies):
+    async def test_admin_month_stats_action_structure(
+        self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
+    ) -> None:
         """Test that AdminMonthStatsAction works as expected."""
-        mock_stats = {"total_users": 100, "total_cpu_time": 360000}
+        mock_stats = [{"total_users": 100, "total_cpu_time": 360000}]
         mock_dependencies["user_repository"].get_admin_time_binned_monthly_stats = AsyncMock(
             return_value=mock_stats
         )
@@ -248,7 +269,7 @@ class TestUserServiceCompatibility:
             "user_repository"
         ].get_admin_time_binned_monthly_stats.assert_called_once()
 
-    def test_user_creator_fields(self):
+    def test_user_creator_fields(self) -> None:
         """Test that UserCreator has all expected fields from test scenarios."""
         # Test that UserCreator can be created with all scenario fields
         password_info = PasswordInfo(
@@ -279,15 +300,17 @@ class TestUserServiceCompatibility:
             )
         )
 
-        assert creator.spec.email == "test@example.com"
-        assert creator.spec.container_uid == 2000
-        assert creator.spec.container_main_gid == 2000
-        assert creator.spec.container_gids == [2000, 2001]
-        assert creator.spec.allowed_client_ip == ["192.168.1.0/24"]
-        assert creator.spec.resource_policy == "default-policy"
-        assert creator.spec.sudo_session_enabled is False
+        # Cast to UserCreatorSpec to access specific fields
+        spec = cast(UserCreatorSpec, creator.spec)
+        assert spec.email == "test@example.com"
+        assert spec.container_uid == 2000
+        assert spec.container_main_gid == 2000
+        assert spec.container_gids == [2000, 2001]
+        assert spec.allowed_client_ip == ["192.168.1.0/24"]
+        assert spec.resource_policy == "default-policy"
+        assert spec.sudo_session_enabled is False
 
-    def test_user_updater_spec_fields(self):
+    def test_user_updater_spec_fields(self) -> None:
         """Test that UserUpdaterSpec supports expected modification fields."""
         spec = UserUpdaterSpec(
             full_name=OptionalState.update("Updated Name"),

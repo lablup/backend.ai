@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import random
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,6 +25,10 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisTarget, ValkeyTarget
+
+if TYPE_CHECKING:
+    from ai.backend.testutils.bootstrap import EtcdContainerFixture, RedisContainerFixture
+
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -29,7 +36,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 )
 
 
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: Any) -> None:
     parser.addoption(
         "--skip-test-redis",
         action="store_true",
@@ -38,11 +45,11 @@ def pytest_addoption(parser) -> None:
     )
 
 
-def pytest_configure(config) -> None:
+def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "redis: mark test as part of Redis test suite")
 
 
-def pytest_collection_modifyitems(config, items) -> None:
+def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     if config.getoption("--skip-test-redis"):
         # auto-skip tests marked with "redis" unless --test-redis option is given.
         do_skip = pytest.mark.skip(
@@ -64,7 +71,9 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def test_valkey_live(redis_container) -> AsyncIterator[ValkeyLiveClient]:  # noqa: F811
+async def test_valkey_live(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyLiveClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -81,7 +90,9 @@ async def test_valkey_live(redis_container) -> AsyncIterator[ValkeyLiveClient]: 
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClient]:  # noqa: F811
+async def test_valkey_stream(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyStreamClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -99,7 +110,9 @@ async def test_valkey_stream(redis_container) -> AsyncIterator[ValkeyStreamClien
 
 
 @pytest.fixture
-async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLimitClient]:  # noqa: F811
+async def test_valkey_rate_limit(
+    redis_container: RedisContainerFixture,  # noqa: F811
+) -> AsyncIterator[ValkeyRateLimitClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
@@ -117,7 +130,7 @@ async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLim
 
 @pytest.fixture
 async def test_valkey_artifact(
-    redis_container,  # noqa: F811
+    redis_container: RedisContainerFixture,  # noqa: F811
 ) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
@@ -135,7 +148,10 @@ async def test_valkey_artifact(
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[RedisQueue]:  # noqa: F811
+async def test_valkey_stream_mq(
+    redis_container: RedisContainerFixture,  # noqa: F811
+    test_node_id: str,
+) -> AsyncIterator[RedisQueue]:
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
@@ -164,9 +180,17 @@ async def test_valkey_stream_mq(redis_container, test_node_id) -> AsyncIterator[
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container, test_ns) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
+def test_ns() -> str:
+    return f"test-{secrets.token_hex(8)}"
+
+
+@pytest.fixture
+async def gateway_etcd(
+    etcd_container: EtcdContainerFixture,  # noqa: F811
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:
     async with AsyncEtcd(
-        addrs=[etcd_container[1]],
+        addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",

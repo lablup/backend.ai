@@ -6,7 +6,7 @@ Tests the service layer with mocked repositories.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -1065,7 +1065,7 @@ class TestUploadFiles:
         mock_reader = MagicMock()
         call_count = 0
 
-        async def mock_next():
+        async def mock_next() -> MagicMock | None:
             nonlocal call_count
             if call_count == 0:
                 call_count += 1
@@ -1343,7 +1343,7 @@ class TestGetContainerLogs:
         assert isinstance(result, GetContainerLogsActionResult)
         assert result.session_data == sample_session_data
         # Result is wrapped as {"result": {"logs": <agent_logs>}}
-        assert result.result["result"]["logs"] == agent_logs
+        assert cast(dict[str, Any], result.result)["result"]["logs"] == agent_logs
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.get_logs_from_agent.assert_called_once()
 

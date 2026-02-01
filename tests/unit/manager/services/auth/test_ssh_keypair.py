@@ -18,12 +18,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: AsyncMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
@@ -36,7 +40,7 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
 async def test_get_ssh_keypair_existing_key(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test getting existing SSH public key"""
     action = GetSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -57,7 +61,7 @@ async def test_get_ssh_keypair_existing_key(
 async def test_get_ssh_keypair_nonexistent_key(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test getting non-existing SSH public key returns empty string"""
     action = GetSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -77,7 +81,7 @@ async def test_get_ssh_keypair_nonexistent_key(
 async def test_generate_ssh_keypair(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test SSH keypair generation"""
     action = GenerateSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -110,7 +114,7 @@ async def test_generate_ssh_keypair(
 async def test_upload_ssh_keypair_valid_keys(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test uploading valid SSH keypair"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -141,7 +145,7 @@ async def test_upload_ssh_keypair_valid_keys(
 async def test_upload_ssh_keypair_invalid_keys(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test uploading invalid SSH keypair"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -167,8 +171,7 @@ async def test_upload_ssh_keypair_invalid_keys(
 @pytest.mark.asyncio
 async def test_upload_ssh_keypair_validation_message(
     auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test that upload SSH keypair passes validation error message correctly"""
     action = UploadSSHKeypairAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),

@@ -6,6 +6,7 @@ from typing import (
     Any,
     Protocol,
     TypeVar,
+    cast,
     override,
 )
 
@@ -28,7 +29,8 @@ class BoolExprType(click.ParamType):
         if isinstance(value, bool):
             return value
         try:
-            return trafaret.ToBool().check(value)
+            result: bool = trafaret.ToBool().check(value)
+            return result
         except trafaret.DataError:
             self.fail(f"Cannot parser/convert {value!r} as a boolean.", param, ctx)
 
@@ -233,11 +235,19 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
                 case int():
                     return arg
                 case str():
-                    return [self.type_(elem) for elem in arg.split(",")]  # type: ignore[call-arg]
+                    result = []
+                    for elem in arg.split(","):
+                        if isinstance(self.type_, type) and issubclass(self.type_, click.ParamType):
+                            param_type_cls = cast(type[click.ParamType], self.type_)
+                            result.append(param_type_cls().convert(elem, param, ctx))
+                        else:
+                            constructor = cast(type[SingleValueConstructorType], self.type_)
+                            result.append(constructor(elem))
+                    return result
                 case _:
-                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)  # type: ignore[call-arg]
+                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)
         except ValueError as e:
-            self.fail(repr(e), param, ctx)  # type: ignore[call-arg]
+            self.fail(repr(e), param, ctx)
 
 
 class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.ParamType):
@@ -249,19 +259,21 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
 
     def convert(
         self,
-        value: str,
+        value: str | Undefined,
         param: click.Parameter | None,
         ctx: click.Context | None,
     ) -> TScalar | Undefined:
         try:
             if value is undefined:
                 return undefined
+            result: TScalar | Undefined
             match self.type_:
                 case click.ParamType():
-                    return self.type_(value)
+                    result = self.type_(value)
                 case type() if issubclass(self.type_, click.ParamType):
-                    return self.type_()(value)
+                    result = self.type_()(value)
                 case _:
-                    return self.type_(value)
+                    result = self.type_(value)
+            return result
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

@@ -7,7 +7,7 @@ Create Date: 2023-12-06 12:20:11.537908
 """
 
 import enum
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -115,9 +115,9 @@ def upgrade() -> None:
             return None
 
     def prepare_keypair(
-        user_email,
-        user_id,
-        user_role,
+        user_email: str,
+        user_id: Any,
+        user_role: UserRole,
     ) -> dict[str, Any]:
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
@@ -155,7 +155,7 @@ def upgrade() -> None:
             main_kp = pick_main_keypair(row.keypairs)
             if main_kp is None:
                 # Create new keypair when the user has no keypair
-                kp_data = prepare_keypair(row.email, row.uuid, row.role)
+                kp_data = prepare_keypair(str(row.email), row.uuid, cast(UserRole, row.role))
                 db_session.execute(sa.insert(KeyPairRow).values(**kp_data))
                 user_id_kp_maps.append({
                     "user_id": row.uuid,

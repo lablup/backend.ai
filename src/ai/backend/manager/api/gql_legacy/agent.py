@@ -7,6 +7,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
+    cast,
 )
 
 import graphene
@@ -114,7 +115,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     return {}
 
 
-class AgentNode(graphene.ObjectType):
+class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.12.0."
@@ -215,7 +216,7 @@ class AgentNode(graphene.ObjectType):
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_container_count)
-        return await loader.load(self.id)
+        return cast(int, await loader.load(self.id))
 
     @classmethod
     async def batch_load_live_stat(
@@ -242,7 +243,7 @@ class AgentNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[AgentNode]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
@@ -324,7 +325,7 @@ class AgentConnection(Connection):
 ### Legacy
 
 
-class Agent(graphene.ObjectType):
+class Agent(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -402,7 +403,7 @@ class Agent(graphene.ObjectType):
             ComputeContainer.batch_load_by_agent_id,
             status=_status,
         )
-        return await loader.load(self.id)
+        return cast(list[ComputeContainer], await loader.load(self.id))
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
@@ -438,7 +439,7 @@ class Agent(graphene.ObjectType):
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
-        return await loader.load(self.id)
+        return cast(int, await loader.load(self.id))
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)
@@ -651,11 +652,11 @@ async def _query_domain_groups_by_ak(
 
 async def _append_sgroup_from_clause(
     graph_ctx: GraphQueryContext,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     access_key: str,
     domain_name: str | None,
     scaling_group: str | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 
     if scaling_group is not None:
@@ -669,14 +670,14 @@ async def _append_sgroup_from_clause(
     return query
 
 
-class AgentList(graphene.ObjectType):
+class AgentList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(Agent, required=True)
 
 
-class AgentSummary(graphene.ObjectType):
+class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     """
     A schema for normal users.
     """
@@ -838,19 +839,19 @@ class AgentSummary(graphene.ObjectType):
         ]
 
 
-class AgentSummaryList(graphene.ObjectType):
+class AgentSummaryList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(AgentSummary, required=True)
 
 
-class ModifyAgentInput(graphene.InputObjectType):
+class ModifyAgentInput(graphene.InputObjectType):  # type: ignore[misc]
     schedulable = graphene.Boolean(required=False, default=True)
     scaling_group = graphene.String(required=False)
 
 
-class ModifyAgent(graphene.Mutation):
+class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -884,7 +885,7 @@ class ModifyAgent(graphene.Mutation):
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
-class RescanGPUAllocMaps(graphene.Mutation):
+class RescanGPUAllocMaps(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:

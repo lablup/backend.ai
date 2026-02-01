@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -19,12 +20,12 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def mock_config_provider():
+def mock_config_provider() -> MagicMock:
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_provider.config = MagicMock(spec=ManagerConfig)
     mock_provider.config.auth = AuthConfig(
@@ -37,7 +38,11 @@ def mock_config_provider():
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: MagicMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
@@ -48,10 +53,10 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
 @pytest.mark.asyncio
 async def test_update_password_no_auth_successful(
     auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mock_hook_plugin_ctx: AsyncMock,
+    mocker: Any,
+) -> None:
     """Test successfully updating password without auth"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -91,10 +96,10 @@ async def test_update_password_no_auth_successful(
 
 @pytest.mark.asyncio
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_config_provider: MagicMock,
-):
+    auth_service: AuthService,
+) -> None:
     """Test update password fails when max_password_age is None"""
     # Set max_password_age to None in the mock
     mock_config_provider.config.auth.max_password_age = None
@@ -120,10 +125,10 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none(
 
 @pytest.mark.asyncio
 async def test_update_password_no_auth_fails_with_incorrect_current_password(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-):
+    auth_service: AuthService,
+) -> None:
     """Test update password fails with incorrect current password"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -151,11 +156,11 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
 
 @pytest.mark.asyncio
 async def test_update_password_no_auth_fails_when_new_password_same_as_current(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test update password fails when new password is same as current"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -190,11 +195,11 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
 
 @pytest.mark.asyncio
 async def test_update_password_no_auth_with_retry(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test that password update uses retry mechanism"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
@@ -233,11 +238,11 @@ async def test_update_password_no_auth_with_retry(
 
 @pytest.mark.asyncio
 async def test_update_password_no_auth_hook_rejection(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test password update fails when hook rejects"""
     action = UpdatePasswordNoAuthAction(
         domain_name="default",

@@ -116,7 +116,7 @@ class TestAgentSummaryLoadSlice:
             requested_ids.extend(ids)
             return MagicMock()
 
-        async def mock_list_data(_: list) -> list[AgentData]:
+        async def mock_list_data(_: list[AgentId]) -> list[AgentData]:
             return [agent_data_map[aid] for aid in requested_ids if aid in agent_data_map]
 
         mock_graph_ctx.agent_repository.list_data = AsyncMock(side_effect=mock_list_data)

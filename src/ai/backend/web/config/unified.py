@@ -2038,7 +2038,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
     ]
     otel: Annotated[
         OTELConfig,
-        Field(default_factory=OTELConfig),  # type: ignore[arg-type]
+        Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description="OpenTelemetry integration for distributed tracing and metrics collection.",
             added_version="25.12.0",
@@ -2047,7 +2047,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "etcd connection settings for distributed configuration and "
@@ -2059,7 +2059,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description="Pyroscope continuous profiling integration for performance analysis.",
             added_version="25.12.0",
@@ -2069,7 +2069,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
     service_discovery: Annotated[
         ServiceDiscoveryConfig,
         Field(
-            default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
+            default_factory=ServiceDiscoveryConfig,
             validation_alias=AliasChoices("service-discovery", "service_discovery"),
             serialization_alias="service-discovery",
         ),

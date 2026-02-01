@@ -319,7 +319,6 @@ class UserRepository:
     ) -> bool:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
-        result = cast(str | None, result)
         return result is not None
 
     async def _check_resource_policy_exists(
@@ -330,7 +329,6 @@ class UserRepository:
             UserResourcePolicyRow.name == policy_name
         )
         result = await session.scalar(query)
-        result = cast(str | None, result)
         return result is not None
 
     async def _check_user_exists_with_email_or_username(
@@ -340,7 +338,6 @@ class UserRepository:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
-        result = cast(UUID | None, result)
         return result is not None
 
     async def _check_username_exists_for_other_user(
@@ -351,7 +348,6 @@ class UserRepository:
             sa.and_(UserRow.username == username, UserRow.email != exclude_email)
         )
         result = await conn.scalar(query)
-        result = cast(UUID | None, result)
         return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
@@ -374,7 +370,7 @@ class UserRepository:
         res = result.first()
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
-        return res
+        return cast(UserRow, res)
 
     def _validate_user_access(self, _user_row: UserRow, _requester_uuid: UUID | None) -> bool:
         """Private method to validate user access - can be extended for ownership logic."""
@@ -746,7 +742,7 @@ class UserRepository:
     async def get_admin_time_binned_monthly_stats(
         self,
         valkey_stat_client: ValkeyStatClient,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get time-binned monthly statistics for all users."""
         return await self._get_time_binned_monthly_stats(None, valkey_stat_client)
 
@@ -760,7 +756,7 @@ class UserRepository:
         row = result.first()
         if not row:
             raise UserNotFound()
-        return row.uuid
+        return cast(UUID, row.uuid)
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,

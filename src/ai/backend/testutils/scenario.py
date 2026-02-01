@@ -13,14 +13,14 @@ class ScenarioBase[TInput, TResult]:
     description: str
     input: TInput
     expected: TResult | None
-    expected_exception: TException | None
+    expected_exception: TException | None  # type: ignore[type-arg]
 
     def __init__(
         self,
         description: str,
         input: TInput,
         expected: TResult | None,
-        expected_exception: TException | None,
+        expected_exception: TException | None,  # type: ignore[type-arg]
     ) -> None:
         self.description = description
         self.input = input
@@ -32,7 +32,7 @@ class ScenarioBase[TInput, TResult]:
         return cls(description, input, expected, None)
 
     @classmethod
-    def failure(cls, description: str, input: TInput, expected_exception: TException) -> Self:
+    def failure(cls, description: str, input: TInput, expected_exception: TException) -> Self:  # type: ignore[type-arg]
         return cls(description, input, None, expected_exception)
 
     async def test(self, fn: Callable[[TInput], Awaitable[TResult | None]]) -> None:

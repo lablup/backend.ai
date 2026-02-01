@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -40,28 +40,28 @@ if TYPE_CHECKING:
 
 __all__ = ("DeploymentRevisionRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_endpoint_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_endpoint_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(DeploymentRevisionRow.endpoint) == EndpointRow.id
 
 
-def _get_image_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return foreign(DeploymentRevisionRow.image) == ImageRow.id
 
 
-def _get_routings_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.routing import RoutingRow
 
     return DeploymentRevisionRow.id == foreign(RoutingRow.revision)
 
 
-class DeploymentRevisionRow(Base):
+class DeploymentRevisionRow(Base):  # type: ignore[misc]
     """
     Represents a deployment revision (K8s ReplicaSet equivalent).
 
@@ -102,7 +102,7 @@ class DeploymentRevisionRow(Base):
     model_definition_path: Mapped[str | None] = mapped_column(
         "model_definition_path", sa.String(length=128), nullable=True
     )
-    model_definition: Mapped[dict | None] = mapped_column(
+    model_definition: Mapped[dict[str, Any] | None] = mapped_column(
         "model_definition", pgsql.JSONB(), nullable=True
     )
 
@@ -113,7 +113,7 @@ class DeploymentRevisionRow(Base):
     resource_slots: Mapped[ResourceSlot] = mapped_column(
         "resource_slots", ResourceSlotColumn(), nullable=False
     )
-    resource_opts: Mapped[dict] = mapped_column(
+    resource_opts: Mapped[dict[str, Any]] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
 
@@ -134,7 +134,7 @@ class DeploymentRevisionRow(Base):
     bootstrap_script: Mapped[str | None] = mapped_column(
         "bootstrap_script", sa.String(length=16 * 1024), nullable=True
     )
-    environ: Mapped[dict] = mapped_column(
+    environ: Mapped[dict[str, Any]] = mapped_column(
         "environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
     callback_url: Mapped[str | None] = mapped_column(

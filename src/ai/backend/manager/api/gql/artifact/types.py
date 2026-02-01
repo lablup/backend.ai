@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from aiotools import apartial
@@ -933,7 +933,7 @@ ArtifactRevisionEdge = Edge[ArtifactRevision]
 class ArtifactConnection(Connection[Artifact]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -950,7 +950,7 @@ class ArtifactConnection(Connection[Artifact]):
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

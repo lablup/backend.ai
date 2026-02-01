@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -58,7 +58,12 @@ class TestCreateModelService:
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
-        return MagicMock(spec=StorageSessionManager)
+        mock = MagicMock(spec=StorageSessionManager)
+        mock.get_proxy_and_volume.return_value = ("proxy", "volume")
+        mock_client = MagicMock()
+        mock_client.fetch_file_content = AsyncMock(return_value=b"")
+        mock.get_manager_facing_client.return_value = mock_client
+        return mock
 
     @pytest.fixture
     def mock_action_monitor(self) -> MagicMock:
@@ -155,11 +160,14 @@ class TestCreateModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id(self, mocker, mock_repositories) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_repositories.repository,
-            "get_vfolder_by_id",
-            new_callable=AsyncMock,
+    def mock_get_vfolder_by_id(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_vfolder_by_id",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = MagicMock(
             id=uuid.uuid4(),
@@ -168,61 +176,83 @@ class TestCreateModelService:
         return mock
 
     @pytest.fixture
-    def mock_fetch_file_from_storage_proxy(self, mocker, model_serving_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            model_serving_service,
-            "_fetch_file_from_storage_proxy",
-            new_callable=AsyncMock,
+    def mock_fetch_file_from_storage_proxy(
+        self, mocker: Any, model_serving_service: Any
+    ) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                model_serving_service,
+                "_fetch_file_from_storage_proxy",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation(self, mocker, mock_repositories) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
+    def mock_resolve_image_for_endpoint_creation(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "resolve_image_for_endpoint_creation",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = MagicMock(image_ref="test-image:latest")
         return mock
 
     @pytest.fixture
-    def mock_resolve_group_id(self, mocker, mock_repositories) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_group_id",
-            new_callable=AsyncMock,
+    def mock_resolve_group_id(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "resolve_group_id",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = "test-project-id"
         return mock
 
     @pytest.fixture
-    def mock_create_session(self, mocker, mock_agent_registry) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_agent_registry,
-            "create_session",
-            new_callable=AsyncMock,
+    def mock_create_session(self, mocker: Any, mock_agent_registry: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_agent_registry,
+                "create_session",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_check_endpoint_name_uniqueness(self, mocker, mock_repositories) -> AsyncMock:
-        mock = mocker.patch.object(
-            mock_repositories.repository,
-            "check_endpoint_name_uniqueness",
-            new_callable=AsyncMock,
+    def mock_check_endpoint_name_uniqueness(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "check_endpoint_name_uniqueness",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = True
         return mock
 
     @pytest.fixture
-    def mock_create_endpoint_validated(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "create_endpoint_validated",
-            new_callable=AsyncMock,
+    def mock_create_endpoint_validated(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "create_endpoint_validated",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.mark.parametrize(
@@ -435,14 +465,10 @@ class TestCreateModelService:
         self,
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
-        mock_get_vfolder_by_id,
-        mock_fetch_file_from_storage_proxy,
-        mock_resolve_image_for_endpoint_creation,
-        mock_resolve_group_id,
-        mock_create_session,
-        mock_check_endpoint_name_uniqueness,
-        mock_create_endpoint_validated,
-    ):
+        mock_create_endpoint_validated: AsyncMock,
+        mock_check_endpoint_name_uniqueness: AsyncMock,
+        mock_create_session: AsyncMock,
+    ) -> None:
         expected = cast(CreateModelServiceActionResult, scenario.expected)
 
         if scenario.description == "Successful model deployment":
@@ -459,7 +485,9 @@ class TestCreateModelService:
             mock_endpoint_data = MagicMock(id=expected.data.endpoint_id)
             mock_create_endpoint_validated.return_value = mock_endpoint_data
 
-        async def create_model_service(action: CreateModelServiceAction):
+        async def create_model_service(
+            action: CreateModelServiceAction,
+        ) -> CreateModelServiceActionResult:
             return await model_serving_processors.create_model_service.wait_for_complete(action)
 
         await scenario.test(create_model_service)

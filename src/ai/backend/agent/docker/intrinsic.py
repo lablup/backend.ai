@@ -279,7 +279,8 @@ class CPUPlugin(AbstractComputePlugin):
                     return None
                 if ret is None:
                     return None
-                return nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
+                cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
+                return cpu_usage / 1e6
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl

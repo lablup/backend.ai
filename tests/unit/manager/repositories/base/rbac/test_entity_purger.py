@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityPurgerTestRow(Base):
+class RBACEntityPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACEntityRowProtocol for entity purger testing."""
 
     __tablename__ = "test_rbac_purger"
@@ -1666,7 +1666,7 @@ class TestRBACEntityBatchPurger:
 # =============================================================================
 
 
-class CompositePKPurgerTestRow(Base):
+class CompositePKPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_purger_composite_pk"
@@ -1692,7 +1692,7 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
 class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTestRow]):
     """Batch purger spec for composite PK testing."""
 
-    def build_subquery(self) -> sa.Select:
+    def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKPurgerTestRow)
 
     def entity_type(self) -> EntityType:

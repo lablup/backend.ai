@@ -130,7 +130,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @graphene_federation.key("id")
-class ScalingGroupNode(graphene.ObjectType):
+class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.12.0."
@@ -170,7 +170,9 @@ class ScalingGroupNode(graphene.ObjectType):
         )
 
     # TODO: Refactor with action-processor structure, check permission
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> ScalingGroupNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> ScalingGroupNode:
         _, scaling_group_name = AsyncNode.resolve_global_id(info, self.id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -267,7 +269,7 @@ class ScalingGroupConnection(Connection):
         description = "Added in 24.12.0."
 
 
-class ScalingGroup(graphene.ObjectType):
+class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
@@ -316,7 +318,7 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
-    def __init__(self, is_masked: bool = False, *args, **kwargs: Any) -> None:
+    def __init__(self, is_masked: bool = False, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._is_masked = is_masked
 
@@ -436,7 +438,7 @@ class ScalingGroup(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row | None,
+        row: Row[Any] | None,
     ) -> ScalingGroup | None:
         if row is None:
             return None
@@ -625,7 +627,7 @@ class ScalingGroup(graphene.ObjectType):
             )
 
 
-class CreateScalingGroupInput(graphene.InputObjectType):
+class CreateScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
     is_public = graphene.Boolean(required=False, default_value=True)
@@ -638,7 +640,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     use_host_network = graphene.Boolean(required=False, default_value=False)
 
 
-class ModifyScalingGroupInput(graphene.InputObjectType):
+class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
     is_public = graphene.Boolean(required=False)
@@ -686,7 +688,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
         return Updater(spec=spec, pk_value=name)
 
 
-class CreateScalingGroup(graphene.Mutation):
+class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -744,7 +746,7 @@ class CreateScalingGroup(graphene.Mutation):
         )
 
 
-class ModifyScalingGroup(graphene.Mutation):
+class ModifyScalingGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -769,7 +771,7 @@ class ModifyScalingGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DeleteScalingGroup(graphene.Mutation):
+class DeleteScalingGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -794,7 +796,7 @@ class DeleteScalingGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupWithDomain(graphene.Mutation):
+class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -829,7 +831,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupsWithDomain(graphene.Mutation):
+class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -867,7 +869,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupWithDomain(graphene.Mutation):
+class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -900,7 +902,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupsWithDomain(graphene.Mutation):
+class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -935,7 +937,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
+class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -965,7 +967,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupWithUserGroup(graphene.Mutation):
+class AssociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1000,7 +1002,7 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
+class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -1038,7 +1040,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
+class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1071,7 +1073,7 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
+class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -1106,7 +1108,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
+class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1136,7 +1138,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupWithKeyPair(graphene.Mutation):
+class AssociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1171,7 +1173,7 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
+class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -1209,7 +1211,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
+class DisassociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1242,7 +1244,7 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
+class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.9."""
 
     allowed_roles = (UserRole.SUPERADMIN,)

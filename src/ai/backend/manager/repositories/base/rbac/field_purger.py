@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
@@ -130,7 +130,7 @@ async def _batch_delete_entity_fields(
     ]
 
     result = await db_sess.execute(sa.delete(EntityFieldRow).where(sa.or_(*conditions)))
-    return cast(CursorResult, result).rowcount or 0
+    return cast(CursorResult[Any], result).rowcount or 0
 
 
 # =============================================================================
@@ -144,7 +144,7 @@ async def _delete_row_by_pk_returning(
 ) -> TRow | None:
     """Delete a row by primary key and return the deleted row data."""
     row_class = purger.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:
@@ -159,7 +159,7 @@ async def _delete_row_by_pk_returning(
     if row_data is None:
         return None
 
-    return row_class(**dict(row_data._mapping))
+    return cast(TRow, row_class(**dict(row_data._mapping)))
 
 
 # =============================================================================

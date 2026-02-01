@@ -8,7 +8,8 @@ __all__ = ("StringSetFlag",)
 
 class StringSetFlag(enum.StrEnum):
     def __eq__(self, other: Any) -> bool:
-        return self.value == other
+        result: bool = self.value == other
+        return result
 
     def __hash__(self) -> int:
         return hash(self.value)
@@ -18,7 +19,8 @@ class StringSetFlag(enum.StrEnum):
             other = other.value
         if not isinstance(other, (set, frozenset)):
             other = {other}
-        return {self.value} | other
+        result: set[str] = {self.value} | other
+        return result
 
     __ror__ = __or__
 

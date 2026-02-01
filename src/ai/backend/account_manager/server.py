@@ -42,7 +42,7 @@ from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
-from .config import AccountManagerConfig, ServerConfig
+from .config import ServerConfig
 from .config import load as load_config
 from .context import CleanupContext, RootContext
 from .exceptions import (
@@ -55,7 +55,7 @@ from .exceptions import (
 from .models.utils import connect_database
 from .types import AppCreator, EventLoopType, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 global_subapp_pkgs: Final[tuple[str, ...]] = (
@@ -74,14 +74,14 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
         raise ex
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
-    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))  # type: ignore[name-defined]
+    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))
     return await _handler(request)
 
 
@@ -90,7 +90,7 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    log: LoggerAdapter = request["log"]
+    log: LoggerAdapter[logging.Logger] = request["log"]
 
     try:
         resp = await handler(request)
@@ -218,7 +218,7 @@ def build_root_app(
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -284,8 +284,8 @@ async def server_main(
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
-    local_config = cast(ServerConfig, root_ctx.local_config)
-    am_config = cast(AccountManagerConfig, local_config.account_manager)
+    local_config = root_ctx.local_config
+    am_config = local_config.account_manager
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config.pyroscope.enabled,
@@ -433,7 +433,7 @@ def main(
     server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
-        account_manager_cfg = cast(AccountManagerConfig, server_config.account_manager)
+        account_manager_cfg = server_config.account_manager
         account_manager_cfg.pid_file.touch(exist_ok=True)
         account_manager_cfg.pid_file.write_text(str(os.getpid()))
         ipc_base_path = account_manager_cfg.ipc_base_path

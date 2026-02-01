@@ -55,7 +55,7 @@ def _get_domain_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class DomainFairShareRow(Base):
+class DomainFairShareRow(Base):  # type: ignore[misc]
     """Per-domain Fair Share state.
 
     Stores weight (configured value) and calculated values together for current state.
@@ -252,7 +252,7 @@ def _get_project_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return ProjectFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class ProjectFairShareRow(Base):
+class ProjectFairShareRow(Base):  # type: ignore[misc]
     """Per-project Fair Share state.
 
     One row per (resource_group, project_id) combination.
@@ -448,7 +448,7 @@ def _get_user_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return UserFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class UserFairShareRow(Base):
+class UserFairShareRow(Base):  # type: ignore[misc]
     """Per-user Fair Share state.
 
     Since a User can belong to multiple Projects, distinguished by

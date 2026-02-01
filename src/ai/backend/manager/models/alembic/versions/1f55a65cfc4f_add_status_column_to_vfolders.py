@@ -31,7 +31,7 @@ vfolderstatus_choices = [v.value for v in VFolderOperationStatus]
 vfolderstatus = postgresql.ENUM(*vfolderstatus_choices, name="vfolderstatus")
 
 
-def upgrade():
+def upgrade() -> None:
     vfolderstatus.create(op.get_bind())
     op.add_column(
         "vfolders",
@@ -45,6 +45,6 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("vfolders", "status")
     vfolderstatus.drop(op.get_bind())

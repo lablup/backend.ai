@@ -124,7 +124,9 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[tuple[AsyncIterator | Coroutine, Context] | Sentinel]
+    work_queue: queue.Queue[
+        tuple[AsyncIterator[Any] | Coroutine[Any, Any, Any], Context] | Sentinel
+    ]
     done_queue: queue.Queue[Any | Exception]
     stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
@@ -138,7 +140,7 @@ class _SyncWorkerThread(threading.Thread):
         "work_queue",
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.work_queue = queue.Queue()
         self.done_queue = queue.Queue()
@@ -160,7 +162,7 @@ class _SyncWorkerThread(threading.Thread):
                 else:
                     try:
                         # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
-                        result = ctx.run(loop.run_until_complete, coro)  # type: ignore
+                        result = ctx.run(loop.run_until_complete, coro)
                     except Exception as e:
                         self.done_queue.put_nowait(e)
                     else:
@@ -173,7 +175,7 @@ class _SyncWorkerThread(threading.Thread):
             loop.stop()
             loop.close()
 
-    def execute(self, coro: Coroutine) -> Any:
+    def execute(self, coro: Coroutine[Any, Any, Any]) -> Any:
         ctx = copy_context()  # preserve context for the worker thread
         try:
             self.work_queue.put((coro, ctx))
@@ -404,13 +406,13 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __enter__(self) -> BaseSession:
         raise NotImplementedError
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
     async def __aenter__(self) -> BaseSession:
         raise NotImplementedError
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
 
@@ -487,7 +489,7 @@ class Session(BaseSession):
                 pass
         return self
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         self.close()
         return False  # raise up the inner exception
 
@@ -561,7 +563,7 @@ class AsyncSession(BaseSession):
                 pass
         return self
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
 

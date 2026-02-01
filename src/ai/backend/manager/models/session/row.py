@@ -518,7 +518,7 @@ def _build_session_fetch_query(
     do_ordering: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     cond = base_cond
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
@@ -655,19 +655,19 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -1180,7 +1180,8 @@ class SessionRow(Base):
     ) -> SessionId | None:
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
-            return await db_session.scalar(query)
+            result: SessionId | None = await db_session.scalar(query)
+            return result
 
     @classmethod
     async def get_sessions_by_status(
@@ -1290,7 +1291,7 @@ class SessionRow(Base):
     def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
-        for kernel_row in cast(list[KernelRow], self.kernels):
+        for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
 
     @staticmethod
@@ -1366,7 +1367,7 @@ class SessionRow(Base):
         allow_stale: bool = True,
         for_update: bool = False,
         max_matches: int | None = 10,
-        eager_loading_op: Sequence | None = None,
+        eager_loading_op: Sequence[Any] | None = None,
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
@@ -1611,14 +1612,17 @@ class SessionRow(Base):
     @classmethod
     def get_status_elapsed_time(
         cls, status: SessionStatus, until: datetime
-    ) -> sa.sql.elements.BinaryExpression:
-        return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+    ) -> sa.sql.elements.BinaryExpression[Any]:
+        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[
+            status.name
+        ].astext.cast(sa.types.DateTime(timezone=True))
+        return result
 
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.status.in_(statuses))
 
     return _by_status
@@ -1626,8 +1630,8 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
 
 def by_user_id(user_id: UUID) -> QueryCondition:
     def _by_user_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.user_uuid == user_id)
 
     return _by_user_id
@@ -1635,8 +1639,8 @@ def by_user_id(user_id: UUID) -> QueryCondition:
 
 def by_project_id(project_id: UUID) -> QueryCondition:
     def _by_project_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.group_id == project_id)
 
     return _by_project_id
@@ -1644,8 +1648,8 @@ def by_project_id(project_id: UUID) -> QueryCondition:
 
 def by_domain_name(domain_name: str) -> QueryCondition:
     def _by_domain_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.domain_name == domain_name)
 
     return _by_domain_name
@@ -1653,8 +1657,8 @@ def by_domain_name(domain_name: str) -> QueryCondition:
 
 def by_resource_group_name(resource_group_name: str) -> QueryCondition:
     def _by_resource_group_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
 
     return _by_resource_group_name
@@ -1662,8 +1666,8 @@ def by_resource_group_name(resource_group_name: str) -> QueryCondition:
 
 def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition:
     def _by_raw_filter(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         qfparser = QueryFilterParser(filter_spec)
         new_cond = qfparser.parse_filter(SessionRow, raw_filter)
         return query_stmt.where(new_cond)
@@ -1716,7 +1720,7 @@ class SessionLifecycleManager:
             def _calculate_session_occupied_slots(session_row: SessionRow) -> None:
                 session_occupying_slots = ResourceSlot()
                 for row in session_row.kernels:
-                    kernel_row = cast(KernelRow, row)
+                    kernel_row = row
                     kernel_allocs = kernel_row.occupied_slots
                     session_occupying_slots.sync_keys(kernel_allocs)
                     for key, val in session_occupying_slots.items():
@@ -1878,7 +1882,7 @@ class SessionLifecycleManager:
         return ret
 
 
-class SessionDependencyRow(Base):
+class SessionDependencyRow(Base):  # type: ignore[misc]
     __tablename__ = "session_dependencies"
     session_id: Mapped[UUID] = mapped_column(
         "session_id",
@@ -1944,7 +1948,7 @@ MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 class ComputeSessionPermissionContext(
@@ -1956,7 +1960,7 @@ class ComputeSessionPermissionContext(
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1982,7 +1986,7 @@ class ComputeSessionPermissionContext(
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -1992,7 +1996,7 @@ class ComputeSessionPermissionContext(
         self, rbac_obj: SessionRow
     ) -> frozenset[ComputeSessionPermission]:
         session_row = rbac_obj
-        session_id = cast(SessionId, session_row.id)
+        session_id = session_row.id
         permissions: frozenset[ComputeSessionPermission] = frozenset()
 
         if (
@@ -2138,7 +2142,7 @@ class ComputeSessionPermissionContextBuilder(
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
-            _row = cast(GroupRow, row)
+            _row = row
             _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
             result.merge(_project_perm_ctx)
         return result

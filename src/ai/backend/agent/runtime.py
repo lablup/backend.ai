@@ -4,7 +4,7 @@ import asyncio
 import signal
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiotools
 
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 class AgentRuntime:
     _local_config: AgentUnifiedConfig
     _etcd_views: Mapping[AgentId, AgentEtcdClientView]
-    _agents: Mapping[AgentId, AbstractAgent]
-    _primary_agent: AbstractAgent
+    _agents: Mapping[AgentId, AbstractAgent[Any, Any]]
+    _primary_agent: AbstractAgent[Any, Any]
     _kernel_registry: KernelRegistry
     _resource_allocator: ResourceAllocator
     _metadata_server: MetadataServer | None
@@ -56,7 +56,7 @@ class AgentRuntime:
 
         agent_configs = local_config.get_agent_configs()
         etcd_views: dict[AgentId, AgentEtcdClientView] = {}
-        create_agent_tasks: list[asyncio.Task] = []
+        create_agent_tasks: list[asyncio.Task[Any]] = []
         async with asyncio.TaskGroup() as tg:
             for i, agent_config in enumerate(agent_configs):
                 agent_id = AgentId(agent_config.agent.defaulted_id)
@@ -127,7 +127,7 @@ class AgentRuntime:
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
-    ) -> AbstractAgent:
+    ) -> AbstractAgent[Any, Any]:
         agent_kwargs = {
             "kernel_registry": kernel_registry,
             "stats_monitor": stats_monitor,
@@ -146,8 +146,8 @@ class AgentRuntime:
         self,
         local_config: AgentUnifiedConfig,
         etcd_views: Mapping[AgentId, AgentEtcdClientView],
-        agents: dict[AgentId, AbstractAgent],
-        primary_agent: AbstractAgent,
+        agents: dict[AgentId, AbstractAgent[Any, Any]],
+        primary_agent: AbstractAgent[Any, Any],
         kernel_registry: KernelRegistry,
         resource_allocator: ResourceAllocator,
         metadata_server: MetadataServer | None = None,
@@ -166,7 +166,7 @@ class AgentRuntime:
             aiotools.create_timer(self._collect_node_stat, UTILIZATION_METRIC_INTERVAL),
         ]
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await aiotools.cancel_and_wait(self._timer_tasks)
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)
@@ -174,10 +174,10 @@ class AgentRuntime:
             await self._metadata_server.cleanup()
         await self._resource_allocator.__aexit__(*exc_info)
 
-    def get_agents(self) -> list[AbstractAgent]:
+    def get_agents(self) -> list[AbstractAgent[Any, Any]]:
         return list(self._agents.values())
 
-    def get_agent(self, agent_id: AgentId | None) -> AbstractAgent:
+    def get_agent(self, agent_id: AgentId | None) -> AbstractAgent[Any, Any]:
         if agent_id is None:
             return self._primary_agent
         if agent_id not in self._agents:

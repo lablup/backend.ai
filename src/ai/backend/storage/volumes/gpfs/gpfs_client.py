@@ -5,7 +5,7 @@ import urllib.parse
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -52,7 +52,7 @@ _T = TypeVar("_T")
 def error_handler[T](
     inner: Callable[..., Coroutine[Any, Any, T]],
 ) -> Callable[..., Coroutine[Any, Any, T]]:
-    async def outer(*args, **kwargs) -> T:
+    async def outer(*args: Any, **kwargs: Any) -> T:
         try:
             return await inner(*args, **kwargs)
         except web.HTTPBadRequest as e:
@@ -371,7 +371,7 @@ class GPFSAPIClient:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/cluster")
             data = await response.json()
-            return data["cluster"]
+            return cast(Mapping[str, Any], data["cluster"])
 
     @error_handler
     async def get_metric(
@@ -385,7 +385,7 @@ class GPFSAPIClient:
                 "GET",
                 f"/perfmon/data?{querystring}",
             )
-            return await response.json()
+            return cast(Mapping[str, Any], await response.json())
 
     @error_handler
     async def list_nodes(self) -> list[str]:

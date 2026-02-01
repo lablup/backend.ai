@@ -46,7 +46,7 @@ class ResourceGroupUnit(StrEnum):
 
 @attrs.define(slots=True)
 class ResourceUsage:
-    nfs: set = attrs.field(factory=set)
+    nfs: set[Any] = attrs.field(factory=set)
     cpu_allocated: float = attrs.field(default=0.0)
     cpu_used: float = attrs.field(default=0.0)
     mem_allocated: int = attrs.field(default=0)
@@ -56,7 +56,7 @@ class ResourceUsage:
     disk_used: int = attrs.field(default=0)
     io_read: int = attrs.field(default=0)
     io_write: int = attrs.field(default=0)
-    device_type: set = attrs.field(factory=set)
+    device_type: set[str] = attrs.field(factory=set)
     smp: float = attrs.field(default=0.0)
     gpu_mem_allocated: float = attrs.field(default=0.0)
     gpu_allocated: float = attrs.field(default=0.0)
@@ -115,7 +115,7 @@ def to_str(val: Any) -> str | None:
 @attrs.define(slots=True)
 class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
-    child_usage_group: dict = attrs.field(factory=dict)
+    child_usage_group: dict[str, Any] = attrs.field(factory=dict)
 
     project_row: GroupRow | None = attrs.field(default=None)
     session_row: SessionRow | None = attrs.field(default=None)
@@ -233,7 +233,7 @@ class BaseResourceUsageGroup:
 @attrs.define(slots=True, kw_only=True)
 class KernelResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
-    # child_usage_group: dict = attrs.field(factory=dict)
+    # child_usage_group intentionally not redefined as kernels have no children
     agent: str
     kernel_id: UUID
     project_row: GroupRow
@@ -284,7 +284,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
 @attrs.define(slots=True, kw_only=True)
 class SessionResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.SESSION
-    child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)
+    child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     session_id: UUID
     project_row: GroupRow
     session_row: SessionRow
@@ -352,7 +352,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
 @attrs.define(slots=True, kw_only=True)
 class ProjectResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.PROJECT
-    child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)
+    child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     project_id: UUID
     project_row: GroupRow
 
@@ -593,7 +593,7 @@ def _parse_query(
     kernel_cond: ColumnElement[bool] | None = None,
     session_cond: ColumnElement[bool] | None = None,
     project_cond: ColumnElement[bool] | None = None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     session_load = joinedload(KernelRow.session)
     if session_cond is not None:
         session_load = joinedload(KernelRow.session.and_(session_cond))

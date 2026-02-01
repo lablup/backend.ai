@@ -136,7 +136,7 @@ class ComputeSession(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of sessions.
 
@@ -161,10 +161,12 @@ class ComputeSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -386,7 +388,7 @@ class ComputeSession(BaseFunction):
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            o = cls(name, owner_access_key)  # type: ignore
+            o = cls(name, owner_access_key)
             if api_session.get().api_version[0] >= 5:
                 o.id = UUID(data["sessionId"])
             o.created = data.get("created", True)  # True is for legacy
@@ -634,7 +636,7 @@ class ComputeSession(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_compute_session"]
+        return cast(dict[str, Any], data["modify_compute_session"])
 
     @api_function
     async def destroy(
@@ -661,7 +663,9 @@ class ComputeSession(BaseFunction):
         )
         async with rqst.fetch() as resp:
             if resp.status == 200:
-                return await resp.json()
+                result: dict[str, Any] = await resp.json()
+
+                return result
         return None
 
     @api_function
@@ -715,7 +719,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def export_to_image(self, new_image_name: str) -> dict[str, Any]:
@@ -733,7 +739,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def interrupt(self) -> None:
@@ -755,7 +763,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -790,7 +798,9 @@ class ComputeSession(BaseFunction):
             },
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_info(self) -> dict[str, Any]:
@@ -807,12 +817,14 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def detail(
         self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieves a detailed information about the compute session.
         This is similar to :func:`get_info`, but includes more information
@@ -869,7 +881,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_dependency_graph(self) -> dict[str, Any]:
@@ -890,7 +904,9 @@ class ComputeSession(BaseFunction):
         )
 
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def get_status_history(self) -> dict[str, Any]:
@@ -907,7 +923,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def execute(
@@ -915,7 +933,7 @@ class ComputeSession(BaseFunction):
         run_id: str | None = None,
         code: str | None = None,
         mode: str = "query",
-        opts: dict | None = None,
+        opts: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -993,7 +1011,8 @@ class ComputeSession(BaseFunction):
         else:
             raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
-            return (await resp.json())["result"]
+            result = await resp.json()
+            return cast(dict[str, Any], result["result"])
 
     @api_function
     async def upload(
@@ -1150,7 +1169,9 @@ class ComputeSession(BaseFunction):
             "path": path,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def stream_app_info(self) -> Mapping[str, Any]:
@@ -1165,7 +1186,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with api_request.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def get_abusing_report(self) -> Mapping[str, Any]:
@@ -1182,7 +1205,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def start_service(
@@ -1215,7 +1240,9 @@ class ComputeSession(BaseFunction):
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     # only supported in AsyncAPISession
     def listen_events(self, scope: str = "*") -> SSEContextManager:
@@ -1274,7 +1301,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict | None = None
+        self, code: str = "", *, mode: str = "query", opts: dict[str, Any] | None = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1342,7 +1369,7 @@ class InferenceSession(BaseFunction):
         page_size: int = 20,
         _filter: str | None = None,
         _order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of inference sessions.
         """
@@ -1359,10 +1386,12 @@ class InferenceSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -1513,7 +1542,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if an user has passed the tab key just after the code in

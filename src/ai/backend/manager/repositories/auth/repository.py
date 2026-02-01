@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -36,8 +37,8 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_data: dict[str, Any],
+        keypair_data: dict[str, Any],
         group_name: str,
         domain_name: str,
     ) -> UserData:

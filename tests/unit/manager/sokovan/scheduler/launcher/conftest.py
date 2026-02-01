@@ -299,7 +299,7 @@ def session_for_start_host_network() -> SessionDataForStart:
 def session_for_start_kernel_no_agent() -> SessionDataForStart:
     """Session with kernel that has no agent assigned."""
     kernel = _create_kernel_binding_data()
-    kernel.agent_id = None  # type: ignore[assignment]
+    kernel.agent_id = None
     return _create_session_for_start(kernels=[kernel])
 
 

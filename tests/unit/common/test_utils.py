@@ -10,6 +10,7 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
+from pytest_mock import MockerFixture
 
 from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
@@ -187,7 +188,7 @@ def test_string_set_flag() -> None:
     assert {"b"} == MyFlags.A ^ {"a", "b"}
     assert {"a", "b", "c"} == MyFlags.A ^ {"b", "c"}
     with pytest.raises(TypeError):
-        123 & MyFlags.A  # type: ignore[operator]
+        123 & MyFlags.A
 
     assert {"a", "c"} & MyFlags.A
     assert not {"a", "c"} & MyFlags.B
@@ -207,7 +208,7 @@ class TestAsyncBarrier:
         assert barrier.cond is not None  # default condition
 
     @pytest.mark.asyncio
-    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker) -> None:
+    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker: MockerFixture) -> None:
         mock_cond = mocker.patch.object(asyncio, "Condition")
         mock_resp = {
             "notify_all": mock.Mock(),
@@ -222,10 +223,10 @@ class TestAsyncBarrier:
 
         assert barrier.count == 1
         # The methods are added at runtime.
-        mock_cond.return_value.notify_all.assert_called_once_with()  # type: ignore
-        mock_cond.return_value.wait.assert_not_called()  # type: ignore
+        mock_cond.return_value.notify_all.assert_called_once_with()
+        mock_cond.return_value.wait.assert_not_called()
 
-    def test_async_barrier_reset(self):
+    def test_async_barrier_reset(self) -> None:
         barrier = AsyncBarrier(num_parties=5)
         barrier.count = 5
 
@@ -238,12 +239,12 @@ class TestAsyncBarrier:
 async def test_run_through() -> None:
     i = 0
 
-    async def do():
+    async def do() -> None:
         nonlocal i
         i += 1
         raise ZeroDivisionError
 
-    def do_sync():
+    def do_sync() -> None:
         nonlocal i
         i += 1
         raise ZeroDivisionError
@@ -267,9 +268,9 @@ async def test_run_through() -> None:
     assert i == 4
 
     await run_through(
-        do,  # coroutine-function
-        do_sync,  # function
-        lambda: do_sync(),  # function wrapped with lambda
+        do(),  # coroutine
+        do(),  # coroutine
+        do(),  # coroutine
         do(),  # coroutine
         ignored_exceptions=(ZeroDivisionError,),
     )

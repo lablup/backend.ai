@@ -47,7 +47,7 @@ def _get_notification_channel_creator_join_condition() -> sa.ColumnElement[bool]
     return foreign(NotificationChannelRow.created_by) == UserRow.uuid
 
 
-class NotificationChannelRow(Base):
+class NotificationChannelRow(Base):  # type: ignore[misc]
     __tablename__ = "notification_channels"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -135,7 +135,7 @@ def _get_notification_rule_creator_join_condition() -> sa.ColumnElement[bool]:
     return foreign(NotificationRuleRow.created_by) == UserRow.uuid
 
 
-class NotificationRuleRow(Base):
+class NotificationRuleRow(Base):  # type: ignore[misc]
     __tablename__ = "notification_rules"
 
     id: Mapped[uuid.UUID] = mapped_column(

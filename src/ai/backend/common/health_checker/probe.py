@@ -4,6 +4,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from aiotools import cancel_and_wait
 
@@ -64,7 +65,7 @@ class HealthProbe:
 
     _checkers: dict[ServiceGroup, RegisteredChecker]
     _lock: asyncio.Lock
-    _loop_task: asyncio.Task | None
+    _loop_task: asyncio.Task[Any] | None
     _running: bool
     _options: HealthProbeOptions
 

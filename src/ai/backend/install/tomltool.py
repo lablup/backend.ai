@@ -2,6 +2,7 @@ import io
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import tomlkit
 from tomlkit.exceptions import NonExistentKey
@@ -40,18 +41,19 @@ def toml_get(filepath: str, key: str) -> str:
 
 
 def toml_set(filepath: str, key: str, value: str) -> None:
+    current_table: Any
     if not Path(filepath).exists():
         # Create a new TOML document
         keytree = key.split(".")
         doc = tomlkit.document()
-        table = doc
+        current_table = doc
         while True:
             k = keytree.pop(0)
             if len(keytree) > 0:
-                table[k] = tomlkit.table()  # type: ignore
-                table = table[k]  # type: ignore
+                current_table[k] = tomlkit.table()
+                current_table = current_table[k]
             else:
-                table[k] = value  # type: ignore
+                current_table[k] = value
                 break
     else:
         if filepath == "-":
@@ -61,7 +63,7 @@ def toml_set(filepath: str, key: str, value: str) -> None:
         doc = tomlkit.load(file)
         keytree = key.split(".")
         keytree_traversed = keytree[:-1]
-        table = doc
+        current_table = doc
         try:
             while True:
                 try:
@@ -72,18 +74,18 @@ def toml_set(filepath: str, key: str, value: str) -> None:
                     if (match_index := rx_index.search(k)) and (
                         (index := match_index.group("index")) is not None
                     ):
-                        table = table[match_index.group("key")][int(index)]  # type: ignore
+                        current_table = current_table[match_index.group("key")][int(index)]
                     else:
-                        table = table[k]  # type: ignore
+                        current_table = current_table[k]
                 except NonExistentKey:
-                    table[k] = tomlkit.table()  # type: ignore
-                    table = table[k]  # type: ignore
+                    current_table[k] = tomlkit.table()
+                    current_table = current_table[k]
             last_key = keytree[-1]
-            if not isinstance(table, AbstractTable):
+            if not isinstance(current_table, AbstractTable):
                 raise ValueError(
                     f"We can only set values in a table. {key!r} is not a table key.",
                 )
-            table[last_key] = value
+            current_table[last_key] = value
         finally:
             if isinstance(file, io.BufferedIOBase):
                 file.close()

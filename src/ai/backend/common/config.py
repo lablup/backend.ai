@@ -4,7 +4,7 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import humps
 import tomli
@@ -389,7 +389,7 @@ def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict
     else:
         discovered_path = Path(toml_path)
     try:
-        config = cast(dict[str, Any], tomli.loads(discovered_path.read_text()))
+        config = tomli.loads(discovered_path.read_text())
     except OSError as e:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
@@ -406,7 +406,7 @@ async def read_from_etcd(
     if raw_value is None:
         return None
     config: dict[str, Any]
-    config = cast(dict[str, Any], tomli.loads(raw_value))
+    config = tomli.loads(raw_value)
     return config
 
 

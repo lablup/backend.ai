@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiotools
 from aiohttp import web
@@ -29,7 +29,7 @@ from .base import BaseFrontend
 if TYPE_CHECKING:
     pass
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
@@ -37,8 +37,8 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
     BaseFrontend[TraefikBackend, TCircuitKeyType]
 ):
     runner: web.AppRunner
-    last_used_time_marker_writer_task: asyncio.Task
-    active_circuit_writer_task: asyncio.Task
+    last_used_time_marker_writer_task: asyncio.Task[Any]
+    active_circuit_writer_task: asyncio.Task[Any]
     redis_keys: dict[str, float]
     redis_keys_lock: asyncio.Lock
     active_circuits: set[uuid.UUID]

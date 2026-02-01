@@ -12,7 +12,7 @@ from ai.backend.manager.services.notification.actions import ProcessNotification
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationEventHandler",)
 

@@ -49,7 +49,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @server_status_required(READ_ALLOWED)
 @superadmin_required
-@pydantic_params_api_handler(PatchContainerRegistryRequestModel)
+@pydantic_params_api_handler(PatchContainerRegistryRequestModel)  # type: ignore[arg-type]
 async def patch_container_registry(
     request: web.Request, params: PatchContainerRegistryRequestModel
 ) -> PatchContainerRegistryResponseModel:

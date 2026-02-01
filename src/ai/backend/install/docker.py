@@ -6,7 +6,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -65,7 +65,7 @@ async def detect_snap_docker() -> str | None:
         response_data = await r.json()
         for pkg_data in response_data["result"]:
             if pkg_data["name"] == "docker":
-                return pkg_data["version"]
+                return cast(str, pkg_data["version"])
     return None
 
 
@@ -126,7 +126,7 @@ async def detect_system_docker(ctx: Context) -> str:
                     f" {r.status} {r.reason}"
                 )
             response_data = await r.json()
-            return response_data["Version"]
+            return cast(str, response_data["Version"])
 
 
 def fail_with_snap_docker_refresh_request() -> None:

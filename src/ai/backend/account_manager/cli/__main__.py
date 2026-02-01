@@ -29,11 +29,11 @@ def main(
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_example_configuration(output: Path) -> None:
+def generate_example_configuration(output: Path | None) -> None:
     """
     Generates example TOML configuration file for Backend.AI Account Manager.
     """
@@ -43,11 +43,10 @@ def generate_example_configuration(output: Path) -> None:
     from ai.backend.account_manager.utils import ensure_json_serializable
 
     generated_example = generate_example_json(ServerConfig)
-    if output == "-" or output is None:
+    if output is None:
         print(tomlkit.dumps(ensure_json_serializable(generated_example)))
     else:
-        output_path = Path(output)
-        with output_path.open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(tomlkit.dumps(ensure_json_serializable(generated_example)))
 
 

@@ -43,9 +43,9 @@ class CephDirQuotaModel(BaseQuotaModel):
         loop = asyncio.get_running_loop()
 
         def read_attrs() -> tuple[int, int]:
-            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined]
+            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined,unused-ignore]
             try:
-                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined]
+                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined,unused-ignore]
             except OSError as e:
                 match e.errno:
                     case 61:
@@ -88,7 +88,7 @@ class CephDirQuotaModel(BaseQuotaModel):
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
-            lambda: os.setxattr(  # type: ignore[attr-defined]
+            lambda: os.setxattr(  # type: ignore[attr-defined,unused-ignore]
                 qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()
             ),
         )
@@ -103,7 +103,7 @@ class CephDirQuotaModel(BaseQuotaModel):
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
-            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined]
+            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined,unused-ignore]
         )
 
 
@@ -113,8 +113,8 @@ class CephFSOpModel(BaseFSOpModel):
         raw_reports = await loop.run_in_executor(
             None,
             lambda: (
-                os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
-                os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+                os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined,unused-ignore]
+                os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined,unused-ignore]
             ),
         )
         file_count = int(raw_reports[0].strip().decode())
@@ -125,7 +125,7 @@ class CephFSOpModel(BaseFSOpModel):
         loop = asyncio.get_running_loop()
         raw_report = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined,unused-ignore]
         )
         return BinarySize(raw_report.strip().decode())
 

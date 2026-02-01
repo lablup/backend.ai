@@ -23,7 +23,7 @@ __all__: Sequence[str] = (
 )
 
 
-class AppConfigRow(Base):
+class AppConfigRow(Base):  # type: ignore[misc]
     __tablename__ = "app_configs"
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -65,7 +65,7 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:
@@ -437,7 +437,7 @@ class UnsupportedTypeError(RuntimeError):
 def generate_example_json(
     schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
     parent: list[str] | None = None,
-) -> dict | list:
+) -> dict[str, Any] | list[Any]:
     if parent is None:
         parent = []
     if isinstance(schema, types.UnionType):

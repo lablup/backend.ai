@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import random
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -13,19 +16,23 @@ from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.service import AuthService
 
 
-def generate_fake_keypair():
+def generate_fake_keypair() -> tuple[str, str]:
     ak = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=20))
     sk = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
     return ak, sk
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: AsyncMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
@@ -36,10 +43,10 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
 @pytest.mark.asyncio
 async def test_signup_successful_with_minimal_data(
     auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mock_hook_plugin_ctx: AsyncMock,
+    mocker: Any,
+) -> None:
     """Test successful user signup with minimal data"""
     action = SignupAction(
         domain_name="default",
@@ -81,11 +88,11 @@ async def test_signup_successful_with_minimal_data(
 
 @pytest.mark.asyncio
 async def test_signup_successful_with_full_data(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test successful user signup with full data"""
     action = SignupAction(
         domain_name="custom",
@@ -127,10 +134,10 @@ async def test_signup_successful_with_full_data(
 
 @pytest.mark.asyncio
 async def test_signup_fails_when_email_already_exists(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-):
+    auth_service: AuthService,
+) -> None:
     """Test signup fails when email already exists"""
     action = SignupAction(
         domain_name="default",
@@ -160,11 +167,11 @@ async def test_signup_fails_when_email_already_exists(
 
 @pytest.mark.asyncio
 async def test_signup_with_hook_override(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test signup when PRE_SIGNUP hook overrides user data"""
     action = SignupAction(
         domain_name="default",
@@ -224,10 +231,10 @@ async def test_signup_with_hook_override(
 
 @pytest.mark.asyncio
 async def test_signup_creation_error(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-):
+    auth_service: AuthService,
+) -> None:
     """Test signup fails when user creation raises an error"""
     action = SignupAction(
         domain_name="default",
@@ -257,11 +264,11 @@ async def test_signup_creation_error(
 
 @pytest.mark.asyncio
 async def test_signup_post_hook_notification(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker,
-):
+    mocker: Any,
+    auth_service: AuthService,
+) -> None:
     """Test that POST_SIGNUP hook is notified after successful signup"""
     request_mock = MagicMock()
     request_mock.headers = {"Accept-Language": "ko-kr,ko;q=0.9,en;q=0.8"}

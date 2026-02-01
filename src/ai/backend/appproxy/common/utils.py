@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import (
     Any,
     TypeVar,
+    cast,
 )
 from uuid import UUID
 
@@ -146,15 +147,15 @@ TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
 type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
-    [web.Request], Awaitable[PydanticResponse | TAnyResponse]
+    [web.Request], Awaitable[PydanticResponse[Any] | TAnyResponse]
 ]
 type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
-    [web.Request, TParamModel], Awaitable[PydanticResponse | TAnyResponse]
+    [web.Request, TParamModel], Awaitable[PydanticResponse[Any] | TAnyResponse]
 ]
 
 
 def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
-    response: PydanticResponse | TAnyResponse,
+    response: PydanticResponse[Any] | TAnyResponse,
 ) -> web.StreamResponse:
     json_body: Any
     match response:
@@ -174,7 +175,7 @@ def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
 
 
 def pydantic_api_response_handler(
-    handler: THandlerFuncWithoutParam,
+    handler: THandlerFuncWithoutParam,  # type: ignore[type-arg]
     is_deprecated: bool = False,
 ) -> Handler:
     """
@@ -186,8 +187,8 @@ def pydantic_api_response_handler(
     @functools.wraps(handler)
     async def wrapped(
         request: web.Request,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> web.StreamResponse:
         response = await handler(request, *args, **kwargs)
         return ensure_stream_response_type(response)
@@ -201,15 +202,15 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
     is_deprecated: bool = False,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+) -> Callable[[THandlerFuncWithParam], Handler]:  # type: ignore[type-arg]
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam,  # type: ignore[type-arg]
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
@@ -304,7 +305,7 @@ def mime_match(base_array: str, compare: str, strict: bool = False) -> bool:
 
 
 class BackendAIAccessLogger(AccessLogger):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:
@@ -342,7 +343,7 @@ class BackendAIAccessLogger(AccessLogger):
 
 async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
     try:
-        return await redis_helper.execute(connection, lambda r: r.ping())
+        return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e from e

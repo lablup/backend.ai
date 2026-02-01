@@ -66,7 +66,7 @@ async def _login(
     cookie_file = temp_dir / "cookie.dat"
     if cookie_file.exists():
         try:
-            session.aiohttp_session.cookie_jar.load(cookie_file)  # type: ignore
+            session.aiohttp_session.cookie_jar.load(cookie_file)
             return
         except Exception:
             pass
@@ -76,7 +76,7 @@ async def _login(
         raise ValueError("Login failed: " + result.get("data", {}).get("details", "Unknown error"))
 
     session.aiohttp_session.cookie_jar.update_cookies(result["cookies"])
-    session.aiohttp_session.cookie_jar.save(cookie_file)  # type: ignore
+    session.aiohttp_session.cookie_jar.save(cookie_file)
 
 
 async def _logout(session: AsyncSession, test_id: str) -> None:

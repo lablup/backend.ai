@@ -143,9 +143,9 @@ from .utils import get_subnet_ip
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def collect_error(meth: Callable) -> Callable:
+def collect_error(meth: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(meth)
-    async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+    async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
@@ -232,10 +232,10 @@ class RPCFunctionRegistryV2:
         return _inner
 
 
-def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
-    def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
-        async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+        async def _inner(self: AgentRPCServer, *args: Any, **kwargs: Any) -> Any:
             start_time = time.perf_counter()
             try:
                 res = await meth(self, *args, **kwargs)
@@ -274,7 +274,7 @@ class AgentRPCServer(aobject):
     rpc_addr: str
     agent_addr: str
 
-    debug_server_task: asyncio.Task
+    debug_server_task: asyncio.Task[Any]
     stats_monitor: AgentStatsPluginContext
     error_monitor: AgentErrorPluginContext
     health_probe: HealthProbe
@@ -357,7 +357,7 @@ class AgentRPCServer(aobject):
             bind=ZeroMQAddress(f"tcp://{rpc_addr.address}"),
             transport=ZeroMQRPCTransport,
             authenticator=auth_handler,
-            scheduler=ExitOrderedAsyncScheduler(),
+            scheduler=ExitOrderedAsyncScheduler(),  # type: ignore[no-untyped-call]
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,
             debug_rpc=self.local_config.debug.enabled,
@@ -575,7 +575,7 @@ class AgentRPCServer(aobject):
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self.runtime.mark_stop_signal(stop_signal)
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
         self.debug_server_task.cancel()
@@ -622,7 +622,7 @@ class AgentRPCServer(aobject):
         self,
         config_data: tomlkit.TOMLDocument,
         scaling_group: str,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         if "agents" not in config_data:
             raise InvalidAgentConfigError("Missing 'agents' section in configuration data.")
@@ -786,8 +786,8 @@ class AgentRPCServer(aobject):
         self,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
-        raw_configs: Sequence[dict],
-        raw_cluster_info: dict,
+        raw_configs: Sequence[dict[str, Any]],
+        raw_cluster_info: dict[str, Any],
         kernel_image_refs: dict[KernelId, ImageRef],
         agent_id: AgentId | None = None,
     ) -> Any:
@@ -870,7 +870,7 @@ class AgentRPCServer(aobject):
             done_future=done,
             suppress_events=suppress_events,
         )
-        return await done
+        return cast(dict[str, Any], await done)
 
     @rpc_function
     @collect_error
@@ -889,7 +889,7 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         text: str,
-        opts: dict,
+        opts: dict[str, Any],
         agent_id: AgentId | None = None,
     ) -> CodeCompletionResp:
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
@@ -914,7 +914,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         kernel_image: ImageRef,
-        updated_config: dict,
+        updated_config: dict[str, Any],
         agent_id: AgentId | None = None,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
@@ -1065,7 +1065,7 @@ class AgentRPCServer(aobject):
         agent = self.runtime.get_agent(agent_id)
         bgtask_mgr = agent.background_task_manager
 
-        image_push_timeout = cast(float | None, self.local_config.api.push_timeout)
+        image_push_timeout = self.local_config.api.push_timeout
 
         async def _push_image(_reporter: ProgressReporter) -> None:
             await agent.push_image(
@@ -1299,7 +1299,7 @@ def build_root_server() -> web.Application:
     cors = aiohttp_cors.setup(
         app,
         defaults={
-            "*": aiohttp_cors.ResourceOptions(
+            "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         },

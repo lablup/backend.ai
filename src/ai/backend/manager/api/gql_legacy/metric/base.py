@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, cast
 
 import graphene
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
-class MetricResultValue(graphene.ObjectType):
+class MetricResultValue(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0. A pair of timestamp and value."
 
@@ -19,7 +19,7 @@ class MetricResultValue(graphene.ObjectType):
     value = graphene.String()
 
 
-class ContainerUtilizationMetricMetadata(graphene.ObjectType):
+class ContainerUtilizationMetricMetadata(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -39,7 +39,7 @@ class ContainerUtilizationMetricMetadata(graphene.ObjectType):
         )
 
 
-class ContainerUtilizationMetric(graphene.ObjectType):
+class ContainerUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -57,7 +57,8 @@ class ContainerUtilizationMetric(graphene.ObjectType):
     async def resolve_max_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:
             return None
-        return max(self.values, key=lambda x: Decimal(x.value)).value
+        max_item = max(self.values, key=lambda x: Decimal(x.value))
+        return cast(str, max_item.value)
 
     async def resolve_avg_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:

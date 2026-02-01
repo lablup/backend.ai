@@ -170,7 +170,7 @@ ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.
 ImageTypeEnum = graphene.Enum.from_enum(ImageType, description="Added in 25.12.0.")
 
 
-class Image(graphene.ObjectType):
+class Image(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
     namespace = graphene.String(description="Added in 24.12.0.")
@@ -390,7 +390,7 @@ class Image(graphene.ObjectType):
         return False
 
 
-class ImagePermissionValueField(graphene.Scalar):
+class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}."
 
@@ -399,7 +399,9 @@ class ImagePermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ImagePermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ImagePermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
         return None
@@ -410,7 +412,7 @@ class ImagePermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class ImageNode(graphene.ObjectType):
+class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -587,7 +589,9 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(
         cls, image: Image, *, permissions: Iterable[ImagePermission] | None = None
     ) -> ImageNode:
-        labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
+        labels: dict[str, str] = {
+            kvpair.key: kvpair.value for kvpair in cast(list[Any], image.labels)
+        }
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         return cls(
             id=image.id,
@@ -749,7 +753,7 @@ class ImageConnection(Connection):
         description = "Added in 25.3.0."
 
 
-class ForgetImageById(graphene.Mutation):
+class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.0."""
 
     allowed_roles = (
@@ -789,7 +793,7 @@ class ForgetImageById(graphene.Mutation):
         )
 
 
-class ForgetImage(graphene.Mutation):
+class ForgetImage(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.4.0. Use `forget_image_by_id` instead.
     """
@@ -836,7 +840,7 @@ class ForgetImage(graphene.Mutation):
         )
 
 
-class PurgeImageOptions(graphene.InputObjectType):
+class PurgeImageOptions(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.10.0.
     """
@@ -847,7 +851,7 @@ class PurgeImageOptions(graphene.InputObjectType):
     )
 
 
-class PurgeImageById(graphene.Mutation):
+class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.4.0."""
 
     allowed_roles = (
@@ -897,7 +901,7 @@ class PurgeImageById(graphene.Mutation):
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
-class UntagImageFromRegistry(graphene.Mutation):
+class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
     """Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead."""
 
     allowed_roles = (
@@ -936,7 +940,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         )
 
 
-class PreloadImage(graphene.Mutation):
+class PreloadImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -957,7 +961,7 @@ class PreloadImage(graphene.Mutation):
         return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
-class UnloadImage(graphene.Mutation):
+class UnloadImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -978,7 +982,7 @@ class UnloadImage(graphene.Mutation):
         return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
-class RescanImages(graphene.Mutation):
+class RescanImages(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -1002,7 +1006,7 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult[Any]:
             if registry is None:
                 all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
                     LoadAllContainerRegistriesAction()
@@ -1043,7 +1047,7 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
-class AliasImage(graphene.Mutation):
+class AliasImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1080,7 +1084,7 @@ class AliasImage(graphene.Mutation):
         return AliasImage(ok=True, msg="")
 
 
-class DealiasImage(graphene.Mutation):
+class DealiasImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1107,7 +1111,7 @@ class DealiasImage(graphene.Mutation):
         return DealiasImage(ok=True, msg="")
 
 
-class ClearImages(graphene.Mutation):
+class ClearImages(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1145,7 +1149,7 @@ class ClearImages(graphene.Mutation):
         return ClearImages(ok=True, msg="")
 
 
-class ModifyImageInput(graphene.InputObjectType):
+class ModifyImageInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=False)
     registry = graphene.String(required=False)
     image = graphene.String(required=False)
@@ -1204,7 +1208,7 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
 
-class ModifyImage(graphene.Mutation):
+class ModifyImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1242,7 +1246,7 @@ class ModifyImage(graphene.Mutation):
         return ModifyImage(ok=True, msg="")
 
 
-class PurgeImagesKey(graphene.InputObjectType):
+class PurgeImagesKey(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1251,7 +1255,7 @@ class PurgeImagesKey(graphene.InputObjectType):
     images = graphene.List(ImageRefType, required=True)
 
 
-class PurgeImagesOptions(graphene.InputObjectType):
+class PurgeImagesOptions(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1265,7 +1269,7 @@ class PurgeImagesOptions(graphene.InputObjectType):
     )
 
 
-class PurgeImagesPayload(graphene.ObjectType):
+class PurgeImagesPayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1274,7 +1278,7 @@ class PurgeImagesPayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
 
 
-class PurgeImages(graphene.Mutation):
+class PurgeImages(graphene.Mutation):  # type: ignore[misc]
     """
     Added in 25.4.0.
     """
@@ -1327,7 +1331,7 @@ class PurgeImages(graphene.Mutation):
         return PurgeImagesPayload(task_id=task_id)
 
 
-class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1340,7 +1344,7 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     )
 
 
-class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1349,7 +1353,7 @@ class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN,)
 
 
-class ClearImageCustomResourceLimit(graphene.Mutation):
+class ClearImageCustomResourceLimit(graphene.Mutation):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """

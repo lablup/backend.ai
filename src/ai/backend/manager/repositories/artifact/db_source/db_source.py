@@ -62,8 +62,8 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
     """Applies artifact-specific filters to queries"""
 
     def apply_entity_filters(
-        self, stmt: Select, filters: ArtifactFilterOptions
-    ) -> tuple[list[sa.sql.expression.ColumnElement[bool]], Select]:
+        self, stmt: Select[Any], filters: ArtifactFilterOptions
+    ) -> tuple[list[sa.sql.expression.ColumnElement[bool]], Select[Any]]:
         """Apply artifact-specific filters and return list of conditions and updated statement"""
         conditions: list[sa.sql.expression.ColumnElement[bool]] = []
 
@@ -143,8 +143,8 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
     """Applies artifact revision-specific filters to queries"""
 
     def apply_entity_filters(
-        self, stmt: Select, filters: ArtifactRevisionFilterOptions
-    ) -> tuple[list[Any], Select]:
+        self, stmt: Select[Any], filters: ArtifactRevisionFilterOptions
+    ) -> tuple[list[Any], Select[Any]]:
         """Apply artifact revision-specific filters and return list of conditions and updated statement"""
         conditions = []
 
@@ -622,7 +622,7 @@ class ArtifactDBSource:
                 )
             )
 
-            if cast(CursorResult, delete_result).rowcount == 0:
+            if cast(CursorResult[Any], delete_result).rowcount == 0:
                 raise ArtifactAssociationDeletionError("Failed to delete association")
 
             return association_data

@@ -28,7 +28,7 @@ userstatus_choices = (
 userstatus = postgresql.ENUM(*userstatus_choices, name="userstatus")
 
 
-def upgrade():
+def upgrade() -> None:
     userstatus.create(op.get_bind())
     op.add_column(
         "users", sa.Column("status", sa.Enum(*userstatus_choices, name="userstatus"), nullable=True)
@@ -50,7 +50,7 @@ def upgrade():
     op.drop_column("users", "is_active")
 
 
-def downgrade():
+def downgrade() -> None:
     op.add_column("users", sa.Column("is_active", sa.Boolean(), nullable=True))
 
     # Set user's is_active field.

@@ -2,7 +2,7 @@ from ai.backend.client.cli.session.execute import prepare_mount_arg
 from ai.backend.common.types import MountPermission, MountTypes
 
 
-def test_vfolder_mount():
+def test_vfolder_mount() -> None:
     # given
     mount = [
         "type=bind,source=/colon\\:path/test,target=/data",
@@ -42,7 +42,7 @@ def test_vfolder_mount():
     }
 
 
-def test_vfolder_mount_without_target():
+def test_vfolder_mount_without_target() -> None:
     # given
     mount = [
         "type=volume,source=vf-dd244f7f,perm=ro",
@@ -62,7 +62,7 @@ def test_vfolder_mount_without_target():
     }
 
 
-def test_vfolder_mount__edge_cases_with():
+def test_vfolder_mount__edge_cases_with() -> None:
     # given
     mount = [
         "type=bind,source=vf-abc\\,zxc,target=/home/work",  # source with a comma

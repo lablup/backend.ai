@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.image import ImageRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
@@ -111,7 +111,7 @@ def _get_association_join_condition() -> sa.ColumnElement[bool]:
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-class ContainerRegistryRow(Base):
+class ContainerRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "container_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -169,7 +169,7 @@ class ContainerRegistryRow(Base):
         password: str | None = None,
         ssl_verify: bool | None = None,
         is_global: bool | None = None,
-        extra: dict | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         self.id = id
         self.url = url
@@ -213,7 +213,7 @@ class ContainerRegistryRow(Base):
     @classmethod
     async def get_container_registry_info(
         cls, session: AsyncSession, registry_id: uuid.UUID
-    ) -> tuple[yarl.URL, dict]:
+    ) -> tuple[yarl.URL, dict[str, Any]]:
         query_stmt = (
             sa.select(ContainerRegistryRow)
             .where(ContainerRegistryRow.id == registry_id)

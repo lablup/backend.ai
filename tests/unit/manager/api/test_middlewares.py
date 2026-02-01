@@ -1,14 +1,18 @@
+from __future__ import annotations
+
+from typing import Any
+
 from aiohttp import web
 
 from ai.backend.manager.api.utils import method_placeholder
 from ai.backend.manager.server import api_middleware
 
 
-async def test_api_method_override(aiohttp_client):
+async def test_api_method_override(aiohttp_client: Any) -> None:
     observed_method = None
     app = web.Application()
 
-    async def service_handler(request):
+    async def service_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"test")
@@ -49,16 +53,16 @@ async def test_api_method_override(aiohttp_client):
     assert observed_method is None
 
 
-async def test_api_method_override_with_different_ops(aiohttp_client):
+async def test_api_method_override_with_different_ops(aiohttp_client: Any) -> None:
     observed_method = None
     app = web.Application()
 
-    async def op1_handler(request):
+    async def op1_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op1")
 
-    async def op2_handler(request):
+    async def op2_handler(request: web.Request) -> web.Response:
         nonlocal observed_method
         observed_method = request.method
         return web.Response(body=b"op2")
@@ -108,11 +112,11 @@ async def test_api_method_override_with_different_ops(aiohttp_client):
     assert observed_method == "REPORT"
 
 
-async def test_api_ver(aiohttp_client):
-    inner_request = None
+async def test_api_ver(aiohttp_client: Any) -> None:
+    inner_request: web.Request | None = None
     app = web.Application()
 
-    async def dummy_handler(request):
+    async def dummy_handler(request: web.Request) -> web.Response:
         nonlocal inner_request
         inner_request = request
         return web.Response(body=b"test")
@@ -129,6 +133,7 @@ async def test_api_ver(aiohttp_client):
         },
     )
     assert resp.status == 200
+    assert inner_request is not None
     assert inner_request["api_version"][0] == 5
 
     # normal call with different version
@@ -139,6 +144,7 @@ async def test_api_ver(aiohttp_client):
         },
     )
     assert resp.status == 200
+    assert inner_request is not None
     assert inner_request["api_version"][0] == 4
 
     # calling with invalid/deprecated version

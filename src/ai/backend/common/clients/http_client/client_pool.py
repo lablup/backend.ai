@@ -7,7 +7,7 @@ import time
 import warnings
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 import aiohttp
 from aiotools import cancel_and_wait
@@ -28,7 +28,7 @@ def tcp_client_session_factory(
     limit: int = 100,
     limit_per_host: int = 0,
     timeout: aiohttp.ClientTimeout | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> aiohttp.ClientSession:
     """
     The default TCP-based ClientSession factory.

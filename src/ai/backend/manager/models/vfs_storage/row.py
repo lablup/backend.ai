@@ -33,7 +33,7 @@ def _get_vfs_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-class VFSStorageRow(Base):
+class VFSStorageRow(Base):  # type: ignore[misc]
     """
     Represents a VFS storage configuration.
     This model is used to store the details of VFS storage backends

@@ -3,7 +3,7 @@ from collections.abc import Iterable
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddleware
+from ai.backend.appproxy.common.types import CORSOptions, FrontendServerMode, WebMiddleware
 from ai.backend.appproxy.worker import __version__
 from ai.backend.appproxy.worker.errors import MissingPortProxyConfigError
 from ai.backend.appproxy.worker.types import RootContext
@@ -33,7 +33,7 @@ async def status(request: web.Request) -> web.Response:
 
     root_ctx: RootContext = request.app["_root.context"]
     worker_config = root_ctx.local_config.proxy_worker
-    if worker_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
+    if worker_config.frontend_mode == FrontendServerMode.WILDCARD_DOMAIN:
         available_slots = 0
     else:
         if worker_config.port_proxy is None:

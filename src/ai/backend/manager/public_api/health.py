@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import textwrap
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp_cors
 import attrs
@@ -14,7 +14,6 @@ from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimi
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.models.health import (
-    SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
     report_manager_status,
 )
@@ -24,7 +23,7 @@ from .types import CORSOptions
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
@@ -143,7 +142,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     closed_cxn_metrics = []
     redis_cxn_metrics = []
     for stat in status:
-        sqlalchemy_info = cast(SQLAlchemyConnectionInfo, stat.sqlalchemy_info)
+        sqlalchemy_info = stat.sqlalchemy_info
 
         total_cxn_metrics.append(
             SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)
@@ -174,7 +173,7 @@ async def get_manager_status_for_prom(request: web.Request) -> web.Response:
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    db_status_report_task: asyncio.Task
+    db_status_report_task: asyncio.Task[Any]
 
 
 async def init(app: web.Application) -> None:
@@ -192,7 +191,7 @@ async def shutdown(app: web.Application) -> None:
             await app_ctx.db_status_report_task
 
 
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
     app = web.Application()
     app["health.context"] = PrivateContext()
     app["prefix"] = "health"

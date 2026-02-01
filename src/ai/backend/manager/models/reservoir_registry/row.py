@@ -36,7 +36,7 @@ def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ReservoirRegistryRow(Base):
+class ReservoirRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "reservoir_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(

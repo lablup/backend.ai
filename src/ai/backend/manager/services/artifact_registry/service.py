@@ -76,7 +76,7 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.update impo
     UpdateReservoirRegistryActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryService:

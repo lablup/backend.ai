@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
+from typing import Any
 
 import aiohttp_cors
 from aiohttp import web
@@ -33,7 +34,7 @@ async def shutdown(app: web.Application) -> None:
     pass
 
 
-def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list]:
+def create_app(default_cors_options: CORSOptions) -> tuple[web.Application, list[Any]]:
     app = web.Application()
     app["prefix"] = "acl"
     app["api_versions"] = (4,)

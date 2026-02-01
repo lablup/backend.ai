@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import random
 import secrets
 import socket
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import aiodns
@@ -10,7 +13,7 @@ from aioresponses import aioresponses
 import ai.backend.common.identity
 
 
-def test_is_containerized():
+def test_is_containerized() -> None:
     mocked_path = MagicMock()
     mocked_path.read_text.return_value = "\n".join([
         "13:name=systemd:/docker-ce/docker/67bfa4f7a0d87eb95592dd95ce851fe6625db539fa2ea616000202b328c32c92",
@@ -54,8 +57,10 @@ def test_is_containerized():
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id(mocker, provider):
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_id(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -89,8 +94,10 @@ async def test_get_instance_id(mocker, provider):
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id_failures(mocker, provider):
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_id_failures(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -103,8 +110,10 @@ async def test_get_instance_id_failures(mocker, provider):
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_ip(mocker, provider):
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_ip(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 
@@ -112,7 +121,7 @@ async def test_get_instance_ip(mocker, provider):
         random_ip = ".".join(str(random.randint(0, 255)) for _ in range(4))
         if provider == "amazon":
             m.get("http://169.254.169.254/latest/meta-data/local-ipv4", body=random_ip)
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider == "azure":
             m.get(
@@ -131,21 +140,21 @@ async def test_get_instance_ip(mocker, provider):
                     },
                 },
             )
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider == "google":
             m.get(
                 "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip",
                 body=random_ip,
             )
-            ret = await ai.backend.common.identity.get_instance_ip()
+            ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider is None:
             mocked_ares_host_result = MagicMock()
             mocked_ares_host_result.addresses = ["10.1.2.3"]
             mocked_resolver = MagicMock()
 
-            async def coro_return_mocked_result(*args):
+            async def coro_return_mocked_result(*args: Any) -> MagicMock:
                 return mocked_ares_host_result
 
             mocked_resolver.gethostbyname = coro_return_mocked_result
@@ -153,10 +162,10 @@ async def test_get_instance_ip(mocker, provider):
                 patch("aiodns.DNSResolver", return_value=mocked_resolver),
                 patch("socket.gethostname", return_value="myname"),
             ):
-                ret = await ai.backend.common.identity.get_instance_ip()
+                ret = await ai.backend.common.identity.get_instance_ip(None)
                 assert ret == "10.1.2.3"
 
-            async def coro_raise_error(*args):
+            async def coro_raise_error(*args: Any) -> None:
                 raise aiodns.error.DNSError("domain not found")
 
             mocked_resolver = MagicMock()
@@ -165,15 +174,17 @@ async def test_get_instance_ip(mocker, provider):
                 patch("aiodns.DNSResolver", return_value=mocked_resolver),
                 patch("socket.gethostname", return_value="myname"),
             ):
-                ret = await ai.backend.common.identity.get_instance_ip()
+                ret = await ai.backend.common.identity.get_instance_ip(None)
                 assert ret == "127.0.0.1"
 
 
 @pytest.mark.skip
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_type(mocker, provider):
-    ai.backend.common.identity.current_provider = provider
+async def test_get_instance_type(provider: str | None) -> None:
+    ai.backend.common.identity.current_provider = (
+        ai.backend.common.identity.CloudProvider(provider) if provider else None
+    )
     ai.backend.common.identity._defined = False
     ai.backend.common.identity._define_functions()
 

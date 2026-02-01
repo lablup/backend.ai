@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 
 import pytest
@@ -8,11 +10,11 @@ from ai.backend.manager.models.vfolder import verify_vfolder_name
 
 
 @pytest.mark.asyncio
-async def test_call_non_bursty():
+async def test_call_non_bursty() -> None:
     key = "x"
     execution_count = 0
 
-    async def execute():
+    async def execute() -> None:
         nonlocal execution_count
         await asyncio.sleep(0)
         execution_count += 1
@@ -23,7 +25,7 @@ async def test_call_non_bursty():
     # check run as coroutine
     execution_count = 0
     with pytest.raises(TypeError):
-        await call_non_bursty(key, execute())
+        await call_non_bursty(key, execute())  # type: ignore[arg-type]
 
     # check run as coroutinefunction
     execution_count = 0
@@ -47,7 +49,7 @@ async def test_call_non_bursty():
     assert execution_count == 5
 
 
-def test_vfolder_name_validator():
+def test_vfolder_name_validator() -> None:
     assert not verify_vfolder_name(".bashrc")
     assert not verify_vfolder_name(".terminfo")
     assert verify_vfolder_name("bashrc")
@@ -64,7 +66,7 @@ def test_vfolder_name_validator():
     assert verify_vfolder_name("home/work")
 
 
-def test_dotfile_name_validator():
+def test_dotfile_name_validator() -> None:
     assert not verify_dotfile_name(".terminfo")
     assert not verify_dotfile_name(".config")
     assert not verify_dotfile_name(".ssh/authorized_keys")
@@ -72,7 +74,7 @@ def test_dotfile_name_validator():
     assert verify_dotfile_name(".ssh/id_rsa")
 
 
-def test_mask_sensitive_keys():
+def test_mask_sensitive_keys() -> None:
     a = {"a": 123, "my-Secret": "hello"}
     b = mask_sensitive_keys(a)
     # original is untouched

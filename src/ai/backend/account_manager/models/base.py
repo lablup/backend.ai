@@ -19,7 +19,7 @@ from sqlalchemy.types import CHAR, VARCHAR, TypeDecorator
 from ai.backend.account_manager.utils import hash_password
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -45,7 +45,7 @@ pgsql_connect_opts = {
 UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
-class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
+class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -55,10 +55,10 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator[Any]:
         if dialect.name == "postgresql":
-            return cast(TypeDecorator, dialect.type_descriptor(UUID()))
-        return cast(TypeDecorator, dialect.type_descriptor(CHAR(16)))
+            return cast(TypeDecorator[Any], dialect.type_descriptor(UUID()))
+        return cast(TypeDecorator[Any], dialect.type_descriptor(CHAR(16)))
 
     def process_bind_param(
         self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect
@@ -96,7 +96,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator):
 T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -104,26 +104,26 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], **opts: Any) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
         self._enum_cls = enum_cls
 
-    def process_bind_param(
+    def process_bind_param(  # type: ignore[override]
         self,
         value: T_StrEnum | None,
         dialect: Dialect,
     ) -> str | None:
         return value.value if value is not None else None
 
-    def process_result_value(
+    def process_result_value(  # type: ignore[override]
         self,
         value: Any | None,
         dialect: Dialect,
     ) -> T_StrEnum | None:
         return self._enum_cls(value) if value is not None else None
 
-    def copy(self, **kw) -> Self:
+    def copy(self, **kw: Any) -> Self:
         return StrEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -131,12 +131,12 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class PasswordColumn(TypeDecorator):
+class PasswordColumn(TypeDecorator[str]):
     impl = VARCHAR
 
     def process_bind_param(self, value: Any, dialect: Dialect) -> str:
         return hash_password(value)
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, override
+from typing import Any, cast, override
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
 from ai.backend.common.exception import (
@@ -67,12 +67,12 @@ class _TaskDefinition[
 
 
 class BackgroundTaskHandlerRegistry:
-    _executor_registry: dict[str, _TaskDefinition]
+    _executor_registry: dict[str, _TaskDefinition]  # type: ignore[type-arg]
 
     def __init__(self) -> None:
         self._executor_registry = {}
 
-    def register(self, handler: BaseBackgroundTaskHandler) -> None:
+    def register(self, handler: BaseBackgroundTaskHandler) -> None:  # type: ignore[type-arg]
         self._executor_registry[handler.name().value] = _TaskDefinition(
             handler=handler,
         )
@@ -92,7 +92,7 @@ class BackgroundTaskHandlerRegistry:
             definition = self._executor_registry[name]
         except KeyError as e:
             raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.") from e
-        return await definition.revive_task(manifest_dict)
+        return cast(BaseBackgroundTaskResult | None, await definition.revive_task(manifest_dict))
 
     async def execute_new_task(
         self, name: BgtaskNameBase, manifest: BaseBackgroundTaskManifest
@@ -101,4 +101,4 @@ class BackgroundTaskHandlerRegistry:
             definition = self._executor_registry[name.value]
         except KeyError as e:
             raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.") from e
-        return await definition.execute_new_task(manifest)
+        return cast(BaseBackgroundTaskResult | None, await definition.execute_new_task(manifest))

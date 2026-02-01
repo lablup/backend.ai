@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -55,7 +55,7 @@ from .base import (
 )
 
 
-class UserInfo(graphene.ObjectType):
+class UserInfo(graphene.ObjectType):  # type: ignore[misc]
     email = graphene.String()
     full_name = graphene.String()
 
@@ -63,7 +63,7 @@ class UserInfo(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> UserInfo | None:
         if row is None:
             return None
@@ -93,7 +93,7 @@ class UserInfo(graphene.ObjectType):
             )
 
 
-class KeyPair(graphene.ObjectType):
+class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -136,7 +136,7 @@ class KeyPair(graphene.ObjectType):
     ) -> UserInfo:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "UserInfo.by_uuid")
-        return await loader.load(self.user)
+        return cast(UserInfo, await loader.load(self.user))
 
     @classmethod
     def from_data(cls, data: KeyPairData) -> Self:
@@ -156,7 +156,7 @@ class KeyPair(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> KeyPair:
         return cls(
             id=row.access_key,
@@ -196,7 +196,7 @@ class KeyPair(graphene.ObjectType):
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
-        return await loader.load(self.access_key)
+        return cast(Sequence[VirtualFolder], await loader.load(self.access_key))
 
     async def resolve_compute_sessions(
         self, info: graphene.ResolveInfo, raw_status: str | None = None
@@ -206,7 +206,7 @@ class KeyPair(graphene.ObjectType):
         if raw_status is not None:
             status = KernelStatus[raw_status]
         loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSession", status=status)
-        return await loader.load(self.access_key)
+        return cast(list[ComputeSession], await loader.load(self.access_key))
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
@@ -454,14 +454,14 @@ class KeyPair(graphene.ObjectType):
             )
 
 
-class KeyPairList(graphene.ObjectType):
+class KeyPairList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(KeyPair, required=True)
 
 
-class KeyPairInput(graphene.InputObjectType):
+class KeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False, default_value=True)
     is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
@@ -480,7 +480,7 @@ class KeyPairInput(graphene.InputObjectType):
         )
 
 
-class ModifyKeyPairInput(graphene.InputObjectType):
+class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False)
     is_admin = graphene.Boolean(required=False)
     resource_policy = graphene.String(required=False)
@@ -488,7 +488,7 @@ class ModifyKeyPairInput(graphene.InputObjectType):
     rate_limit = graphene.Int(required=False)
 
 
-class CreateKeyPair(graphene.Mutation):
+class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -518,7 +518,7 @@ class CreateKeyPair(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
 
-class ModifyKeyPair(graphene.Mutation):
+class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -547,7 +547,7 @@ class ModifyKeyPair(graphene.Mutation):
         return await simple_db_mutate(cls, ctx, update_query)
 
 
-class DeleteKeyPair(graphene.Mutation):
+class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

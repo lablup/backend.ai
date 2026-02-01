@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal, cast
 
 import aiohttp
 import yarl
@@ -123,7 +123,7 @@ class AgentService:
         self._event_producer = event_producer
         self._agent_cache = agent_cache
 
-    async def _get_watcher_info(self, agent_id: AgentId) -> dict:
+    async def _get_watcher_info(self, agent_id: AgentId) -> dict[str, Any]:
         """
         Get watcher information.
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
@@ -158,7 +158,7 @@ class AgentService:
         agent_id: AgentId,
         method: Literal["GET", "POST"],
         endpoint: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         watcher_info = await self._get_watcher_info(agent_id)
         connector = aiohttp.TCPConnector()
 
@@ -169,7 +169,7 @@ class AgentService:
 
                 async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
-                        return await resp.json()
+                        return cast(dict[str, Any], await resp.json())
 
                     error_msg = await resp.text()
                     raise AgentWatcherResponseError(

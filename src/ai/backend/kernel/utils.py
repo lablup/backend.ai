@@ -15,9 +15,9 @@ __all__ = (
 
 
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore
+    current_loop = asyncio.get_running_loop
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore
+    current_loop = asyncio.get_event_loop
 
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
@@ -85,8 +85,8 @@ async def wait_local_port_open(port: int) -> None:
             break
 
 
-def scan_proc_stats() -> dict[int, dict]:
-    pid_set = dict()
+def scan_proc_stats() -> dict[int, dict[str, Any]]:
+    pid_set: dict[int, dict[str, Any]] = {}
     for p in Path("/proc").iterdir():
         if p.name.isdigit():
             pid = int(p.name)

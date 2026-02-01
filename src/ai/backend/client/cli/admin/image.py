@@ -111,7 +111,7 @@ def rescan(registry: str, project: str | None = None) -> None:
                                         f"Finished registry scanning with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     asyncio_run(rescan_images_impl(registry, project))
 

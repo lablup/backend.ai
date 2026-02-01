@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACFieldPurgerTestRow(Base):
+class RBACFieldPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACFieldRowProtocol for field purger testing."""
 
     __tablename__ = "test_rbac_field_purger"
@@ -426,7 +426,7 @@ class TestRBACFieldBatchPurger:
 # =============================================================================
 
 
-class CompositePKFieldPurgerTestRow(Base):
+class CompositePKFieldPurgerTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_field_purger_composite_pk"
@@ -440,7 +440,7 @@ class CompositePKFieldPurgerTestRow(Base):
 class CompositePKFieldBatchPurgerSpec(RBACFieldBatchPurgerSpec[CompositePKFieldPurgerTestRow]):
     """Batch purger spec for composite PK testing."""
 
-    def build_subquery(self) -> sa.Select:
+    def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKFieldPurgerTestRow)
 
     def field_type(self) -> FieldType:

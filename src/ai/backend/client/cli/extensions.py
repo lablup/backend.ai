@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Callable, Mapping
 from functools import update_wrapper
-from typing import Concatenate, ParamSpec, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypeVar
 
 from click import get_current_context
 
@@ -11,7 +11,7 @@ from ai.backend.client.config import APIConfig, set_config
 from ai.backend.client.output import get_output_handler
 
 
-def set_client_config(info: Mapping) -> CLIContext:
+def set_client_config(info: Mapping[str, Any]) -> CLIContext:
     from .announcement import announce
 
     skip_sslcert_validation = info.get("skip_sslcert_validation", False)

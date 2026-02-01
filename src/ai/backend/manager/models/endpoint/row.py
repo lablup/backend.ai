@@ -117,7 +117,7 @@ __all__ = (
 
 type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_tokens_join_condition() -> Any:
@@ -168,7 +168,7 @@ def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):
+class EndpointRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -901,7 +901,7 @@ class EndpointRow(Base):
         )
 
 
-class EndpointTokenRow(Base):
+class EndpointTokenRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -1017,7 +1017,7 @@ class EndpointTokenRow(Base):
         )
 
 
-class EndpointAutoScalingRuleRow(Base):
+class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
@@ -1337,7 +1337,7 @@ class ModelServiceHelper:
         )
 
         for vfolder in vfolder_mounts:
-            if vfolder.kernel_path == model_mount_destination:
+            if str(vfolder.kernel_path) == model_mount_destination:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
@@ -1397,7 +1397,8 @@ class ModelServiceHelper:
             model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
-                    return item["name"]
+                    result: str = item["name"]
+                    return result
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
@@ -1422,7 +1423,8 @@ class ModelServiceHelper:
         )
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
-        return yaml.load(model_definition_yaml)
+        result: dict[str, Any] = yaml.load(model_definition_yaml)
+        return result
 
     @staticmethod
     async def validate_model_definition(
@@ -1446,7 +1448,8 @@ class ModelServiceHelper:
             model_definition = model_definition_iv.check(raw_model_definition)
             if model_definition is None:
                 raise DataTransformationFailed("Model definition validation returned None")
-            return model_definition
+            result: dict[str, Any] = model_definition
+            return result
         except t.DataError as e:
             raise InvalidAPIParameters(
                 f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",

@@ -6,7 +6,7 @@ import textwrap
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 import aiohttp_cors
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     pass
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class WorkerModel(BaseModel):
@@ -198,7 +198,7 @@ async def update_worker(
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         try:
             worker = await Worker.find_by_authority(sess, params.authority)
             worker.frontend_mode = params.frontend_mode
@@ -288,7 +288,7 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         worker = await Worker.get(sess, worker_id)
         worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE

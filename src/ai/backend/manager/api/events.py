@@ -70,7 +70,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.TOKEN
 
-SessionEventInfo = tuple[str, dict, str, int | None]
+SessionEventInfo = tuple[str, dict[str, Any], str, int | None]
 
 
 @server_status_required(READ_ALLOWED)

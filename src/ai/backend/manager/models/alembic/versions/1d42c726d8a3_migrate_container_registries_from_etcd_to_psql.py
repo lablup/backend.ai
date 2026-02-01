@@ -107,14 +107,14 @@ images_table = sa.Table(
 )
 
 
-def get_container_registry_row_schema():
-    class ContainerRegistryRow(Base):
+def get_container_registry_row_schema() -> type[Any]:
+    class ContainerRegistryRow(Base):  # type: ignore[misc]
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
         url = sa.Column("url", sa.String(length=512), index=True)
         registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
+        type: sa.Column[Any] = sa.Column(
             "type",
             StrEnumType(ContainerRegistryType),
             default=ContainerRegistryType.DOCKER,
@@ -153,12 +153,12 @@ def get_async_etcd() -> AsyncEtcd:
 
 
 def delete_old_etcd_container_registries() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
-        def delete_etcd_container_registries():
-            async def _delete_container_registries():
+        def delete_etcd_container_registries() -> None:
+            async def _delete_container_registries() -> None:
                 etcd = get_async_etcd()
                 await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
 
@@ -168,11 +168,11 @@ def delete_old_etcd_container_registries() -> None:
 
 
 def migrate_data_etcd_to_psql() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
-        def backup(etcd_container_registries: Mapping[str, Any]):
+        def backup(etcd_container_registries: Mapping[str, Any]) -> None:
             backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
             backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())  # noqa: DTZ005
             with backup_path.open("w") as f:
@@ -180,8 +180,8 @@ def migrate_data_etcd_to_psql() -> None:
 
         # If there are no container registries, it returns an empty list.
         # If an error occurs while saving backup, it returns error.
-        def get_etcd_container_registries(queue: Queue):
-            async def _get_container_registries():
+        def get_etcd_container_registries(queue: Queue[Any]) -> None:
+            async def _get_container_registries() -> Mapping[str, Any] | Exception:
                 etcd = get_async_etcd()
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 try:
@@ -208,9 +208,7 @@ def migrate_data_etcd_to_psql() -> None:
     registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
-        hostname: etcd_container_registry_iv.check(item)
-        for hostname, item in registries.items()
-        # type: ignore
+        hostname: etcd_container_registry_iv.check(item) for hostname, item in registries.items()
     }
 
     input_configs = []
@@ -298,7 +296,7 @@ def revert_data_psql_to_etcd() -> None:
     # information loss can occur while the reverting process.
     grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
 
-    def merge_items(items):
+    def merge_items(items: list[dict[str, Any]]) -> dict[str, Any]:
         for item in items:
             if "project" not in item:
                 return items[0]
@@ -313,7 +311,7 @@ def revert_data_psql_to_etcd() -> None:
 
     merged_items = [merge_items(items) for items in grouped_items.values()]
 
-    def put_etcd_container_registries(merged_items: list[Any], queue: Queue):
+    def put_etcd_container_registries(merged_items: list[Any], queue: Queue[Any]) -> None:
         etcd = get_async_etcd()
         for item in merged_items:
             hostname = item.pop("hostname")
@@ -321,7 +319,7 @@ def revert_data_psql_to_etcd() -> None:
 
         queue.put(True)
 
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
         executor.submit(put_etcd_container_registries, merged_items, queue)
@@ -486,7 +484,7 @@ def mark_local_images_with_missing_registry_id() -> None:
     )
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
         "container_registries",
@@ -529,7 +527,7 @@ def upgrade():
     delete_old_etcd_container_registries()
 
 
-def downgrade():
+def downgrade() -> None:
     revert_data_psql_to_etcd()
 
     op.drop_table("container_registries")

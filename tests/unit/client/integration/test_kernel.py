@@ -2,7 +2,9 @@ import secrets
 import tempfile
 import textwrap
 import time
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,7 +15,7 @@ from ai.backend.client.session import Session
 pytestmark = pytest.mark.integration
 
 
-def aggregate_console(c):
+def aggregate_console(c: list[Any]) -> dict[str, Any]:
     return {
         "stdout": "".join(item[1] for item in c if item[0] == "stdout"),
         "stderr": "".join(item[1] for item in c if item[0] == "stderr"),
@@ -22,10 +24,16 @@ def aggregate_console(c):
     }
 
 
-def exec_loop(kernel, mode, code, opts=None, user_inputs=None):
+def exec_loop(
+    kernel: Any,
+    mode: str,
+    code: str,
+    opts: dict[str, str] | None = None,
+    user_inputs: list[str] | None = None,
+) -> tuple[dict[str, Any], int]:
     # The server may return continuation if kernel preparation
     # takes a little longer time (a few seconds).
-    console = []
+    console: list[Any] = []
     num_queries = 0
     run_id = secrets.token_hex(8)
     if user_inputs is None:
@@ -50,20 +58,20 @@ def exec_loop(kernel, mode, code, opts=None, user_inputs=None):
 
 
 @pytest.fixture
-def py3_kernel():
+def py3_kernel() -> Iterator[Any]:
     with Session() as sess:
         kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04")
         yield kernel
         kernel.destroy()
 
 
-def test_hello():
+def test_hello() -> None:
     with Session() as sess:
         result = sess.Kernel.hello()
     assert "version" in result
 
 
-def test_kernel_lifecycles():
+def test_kernel_lifecycles() -> None:
     with Session() as sess:
         kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04")
         kernel_id = kernel.kernel_id
@@ -82,7 +90,7 @@ def test_kernel_lifecycles():
         assert e.value.status == 404
 
 
-def test_kernel_execution_query_mode(py3_kernel):
+def test_kernel_execution_query_mode(py3_kernel: Any) -> None:
     code = 'print("hello world"); x = 1 / 0'
     console, n = exec_loop(py3_kernel, "query", code, None)
     assert "hello world" in console["stdout"]
@@ -92,7 +100,7 @@ def test_kernel_execution_query_mode(py3_kernel):
     assert info["numQueriesExecuted"] == n + 1
 
 
-def test_kernel_execution_query_mode_user_input(py3_kernel):
+def test_kernel_execution_query_mode_user_input(py3_kernel: Any) -> None:
     name = secrets.token_hex(8)
     code = 'name = input("your name? "); print(f"hello, {name}!")'
     console, n = exec_loop(py3_kernel, "query", code, None, user_inputs=[name])
@@ -100,7 +108,7 @@ def test_kernel_execution_query_mode_user_input(py3_kernel):
     assert f"hello, {name}!" in console["stdout"]
 
 
-def test_kernel_get_or_create_reuse():
+def test_kernel_get_or_create_reuse() -> None:
     with Session() as sess:
         try:
             # Sessions with same token and same language must be reused.
@@ -112,7 +120,7 @@ def test_kernel_get_or_create_reuse():
             kernel1.destroy()
 
 
-def test_kernel_execution_batch_mode(py3_kernel):
+def test_kernel_execution_batch_mode(py3_kernel: Any) -> None:
     with tempfile.NamedTemporaryFile("w", suffix=".py", dir=Path.cwd()) as f:
         f.write('print("hello world")\nx = 1 / 0\n')
         f.flush()
@@ -132,7 +140,7 @@ def test_kernel_execution_batch_mode(py3_kernel):
     assert len(console["media"]) == 0
 
 
-def test_kernel_execution_batch_mode_user_input(py3_kernel):
+def test_kernel_execution_batch_mode_user_input(py3_kernel: Any) -> None:
     name = secrets.token_hex(8)
     with tempfile.NamedTemporaryFile("w", suffix=".py", dir=Path.cwd()) as f:
         f.write('name = input("your name? "); print(f"hello, {name}!")')
@@ -153,17 +161,17 @@ def test_kernel_execution_batch_mode_user_input(py3_kernel):
     assert f"hello, {name}!" in console["stdout"]
 
 
-def test_kernel_execution_with_vfolder_mounts():
+def test_kernel_execution_with_vfolder_mounts() -> None:
     with Session() as sess:
         vfname = "vftest-" + secrets.token_hex(4)
-        sess.VFolder.create(vfname)
+        sess.VFolder.create(vfname)  # type: ignore[unused-coroutine]
         vfolder = sess.VFolder(vfname)
         try:
             with tempfile.NamedTemporaryFile("w", suffix=".py", dir=Path.cwd()) as f:
                 f.write('print("hello world")\nx = 1 / 0\n')
                 f.flush()
                 f.seek(0)
-                vfolder.upload([f.name])
+                vfolder.upload([f.name])  # type: ignore[unused-coroutine]
             kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04", mounts=[vfname])
             try:
                 console, n = exec_loop(
@@ -181,10 +189,10 @@ def test_kernel_execution_with_vfolder_mounts():
             finally:
                 kernel.destroy()
         finally:
-            vfolder.delete()
+            vfolder.delete()  # type: ignore[unused-coroutine]
 
 
-def test_kernel_restart(py3_kernel):
+def test_kernel_restart(py3_kernel: Any) -> None:
     num_queries = 1  # first query is done by py3_kernel fixture (creation)
     first_code = textwrap.dedent(
         """
@@ -226,7 +234,7 @@ def test_kernel_restart(py3_kernel):
     assert info["numQueriesExecuted"] == num_queries
 
 
-def test_admin_api(py3_kernel):
+def test_admin_api(py3_kernel: Any) -> None:
     sess = py3_kernel.session
     q = """
     query($ak: String!) {

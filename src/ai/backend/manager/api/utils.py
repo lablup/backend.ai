@@ -31,6 +31,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    cast,
 )
 
 import sqlalchemy as sa
@@ -214,7 +215,7 @@ def check_api_params(
         set_handler_attr(wrapped, "request_scheme", checker)
         if request_examples:
             set_handler_attr(wrapped, "request_examples", request_examples)
-        return wrapped
+        return cast(Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]], wrapped)
 
     return wrap
 
@@ -241,7 +242,7 @@ class THandlerFuncWithoutParam[**P, TResponseModel: LegacyBaseResponseModel](Pro
         request: web.Request,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
+    ) -> Awaitable[TPydanticResponse[TResponseModel] | web.StreamResponse]: ...
 
 
 class THandlerFuncWithParam[
@@ -255,7 +256,7 @@ class THandlerFuncWithParam[
         params: TParamModel,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
+    ) -> Awaitable[TPydanticResponse[TResponseModel] | web.StreamResponse]: ...
 
 
 def ensure_stream_response_type[TResponseModel: LegacyBaseResponseModel](
@@ -422,8 +423,10 @@ def prettify_traceback(exc: BaseException | None) -> str:
         return f"Traceback:\n{buf.getvalue()}"
 
 
-def catch_unexpected(log: Any, reraise_cancellation: bool = True, raven: Any = None) -> Callable:
-    def _wrap(func: Callable) -> Callable:
+def catch_unexpected(
+    log: Any, reraise_cancellation: bool = True, raven: Any = None
+) -> Callable[..., Any]:
+    def _wrap(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         async def _wrapped(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -472,7 +475,7 @@ def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamRes
     return deprecated_stub_impl
 
 
-def chunked(iterable: Iterable, n: int) -> Generator[tuple, None, None]:
+def chunked(iterable: Iterable[Any], n: int) -> Generator[tuple[Any, ...], None, None]:
     it = iter(iterable)
     while True:
         chunk = tuple(itertools.islice(it, n))

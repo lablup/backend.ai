@@ -61,7 +61,7 @@ __all__: Sequence[str] = (
 )
 
 
-class AgentRow(Base):
+class AgentRow(Base):  # type: ignore[misc]
     __tablename__ = "agents"
 
     id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
@@ -304,15 +304,17 @@ async def recalc_agent_resource_occupancy_using_orm(
         )
     )
     occupied_slots = ResourceSlot()
-    agent_row = cast(AgentRow, await db_session.scalar(agent_query))
-    kernel_rows = cast(list[KernelRow], agent_row.kernels)
+    agent_row = await db_session.scalar(agent_query)
+    if agent_row is None:
+        return
+    kernel_rows = agent_row.kernels
     for kernel in kernel_rows:
         if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
             occupied_slots += kernel.occupied_slots
     agent_row.occupied_slots = occupied_slots
 
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])
@@ -343,7 +345,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -367,7 +369,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -449,7 +451,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -478,7 +480,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -515,7 +517,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)

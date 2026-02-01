@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import strawberry
@@ -148,7 +148,7 @@ class ModelReplica(Node):
     and traffic weight for load balancing.
     """
 
-    id: NodeID
+    id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     _revision_id: strawberry.Private[UUID]
     readiness_status: ReadinessStatus = strawberry.field(
@@ -165,7 +165,7 @@ class ModelReplica(Node):
     )
     created_at: datetime = strawberry.field(description="Timestamp when the replica was created.")
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
@@ -211,7 +211,7 @@ class ModelReplicaConnection(Connection[ModelReplica]):
 
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

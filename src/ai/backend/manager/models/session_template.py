@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 import trafaret as t
@@ -98,7 +98,7 @@ def check_task_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
             p = p.removeprefix("/home/work/")
             if not verify_vfolder_name(p):
                 raise InvalidArgument(f"Path {p} is reserved for internal operations.")
-    return data
+    return cast(Mapping[str, Any], data)
 
 
 cluster_template_v1 = t.Dict({
@@ -138,7 +138,7 @@ def check_cluster_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
         raise InvalidArgument(
             f"One and only one {DEFAULT_ROLE} node must be created per cluster",
         )
-    return data
+    return cast(Mapping[str, Any], data)
 
 
 async def query_accessible_session_templates(
@@ -191,7 +191,7 @@ async def query_accessible_session_templates(
             })
     if "group" in allowed_types:
         # Query group session_templates
-        if user_role == UserRole.ADMIN or user_role == "admin":
+        if user_role == UserRole.ADMIN:
             query = (
                 sa.select(groups.c.id)
                 .select_from(groups)
@@ -229,7 +229,7 @@ async def query_accessible_session_templates(
         if "user" in allowed_types:
             query = query.where(session_templates.c.user_uuid != user_uuid)
         result = await conn.execute(query)
-        is_owner = user_role == UserRole.ADMIN or user_role == "admin"
+        is_owner = user_role == UserRole.ADMIN
         for row in result:
             entries.append({
                 "name": row.session_templates_name,

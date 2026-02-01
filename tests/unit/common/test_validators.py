@@ -66,21 +66,21 @@ def test_aliased_key() -> None:
 
 def test_multikey() -> None:
     iv = t.Dict({
-        tx.MultiKey("x"): t.List(t.Int),
-        t.Key("y"): t.Int,
+        tx.MultiKey("x"): t.List(t.ToInt),
+        t.Key("y"): t.ToInt,
     })
 
-    data: multidict.MultiDict = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("x", 2)
-    data.add("y", 3)
+    data: multidict.MultiDict[str] = multidict.MultiDict()
+    data.add("x", "1")
+    data.add("x", "2")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1, 2]
     assert result["y"] == 3
 
     data = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("y", 3)
+    data.add("x", "1")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1]
     assert result["y"] == 3
@@ -371,16 +371,16 @@ def test_slug_length() -> None:
     assert iv._max_length == 4  # type: ignore[attr-defined]
 
     iv = tx.Slug(max_length=4)
-    assert iv._min_length is None  # type: ignore[attr-defined]
-    assert iv._max_length == 4  # type: ignore[attr-defined]
+    assert iv._min_length is None
+    assert iv._max_length == 4
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
     iv = tx.Slug(min_length=4)
-    assert iv._min_length == 4  # type: ignore[attr-defined]
-    assert iv._max_length is None  # type: ignore[attr-defined]
+    assert iv._min_length == 4
+    assert iv._max_length is None
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"

@@ -42,7 +42,7 @@ class GlobalTimer:
         self.initial_delay = initial_delay
         self.task_name = task_name
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def generate_tick(self) -> None:
         try:
             await asyncio.sleep(self.initial_delay)

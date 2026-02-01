@@ -15,7 +15,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
 
 
-@strawberry.field(description="Added in 25.15.0")
+@strawberry.field(description="Added in 25.15.0")  # type: ignore[misc]
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL:
     result = await info.context.processors.agent.get_total_resources.wait_for_complete(
         GetTotalResourcesAction()
@@ -30,7 +30,7 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL:
     )
 
 
-@strawberry.field(description="Added in 26.1.0")
+@strawberry.field(description="Added in 26.1.0")  # type: ignore[misc]
 async def agents_v2(
     info: Info[StrawberryGQLContext],
     filter: AgentFilterGQL | None = None,

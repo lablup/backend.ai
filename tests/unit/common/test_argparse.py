@@ -1,5 +1,6 @@
 import argparse
 import ipaddress
+from pathlib import Path
 
 import pytest
 
@@ -18,22 +19,22 @@ localhost_ipv4 = ipaddress.ip_address("127.0.0.1")
 localhost_ipv6 = ipaddress.ip_address("::1")
 
 
-def test_port_no():
-    assert port_no(1) == 1
-    assert port_no(20) == 20
-    assert port_no(65535) == 65535
+def test_port_no() -> None:
+    assert port_no("1") == 1
+    assert port_no("20") == 20
+    assert port_no("65535") == 65535
 
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(-1)
+        port_no("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(0)
+        port_no("0")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(65536)
+        port_no("65536")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_no(65537)
+        port_no("65537")
 
 
-def test_port_range():
+def test_port_range() -> None:
     assert port_range("1-2") == (1, 2)
     assert port_range("1000-2000") == (1000, 2000)
     assert port_range("1-65535") == (1, 65535)
@@ -56,30 +57,30 @@ def test_port_range():
         port_range("10-5")
 
 
-def test_positive_int():
-    assert positive_int(1)
-    assert positive_int(100000)
+def test_positive_int() -> None:
+    assert positive_int("1")
+    assert positive_int("100000")
 
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(0)
+        positive_int("0")
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(-1)
+        positive_int("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        positive_int(-10)
+        positive_int("-10")
 
 
-def test_non_positive_int():
-    assert non_negative_int(1)
-    assert non_negative_int(100000)
-    assert non_negative_int(0) == 0
+def test_non_positive_int() -> None:
+    assert non_negative_int("1")
+    assert non_negative_int("100000")
+    assert non_negative_int("0") == 0
 
     with pytest.raises(argparse.ArgumentTypeError):
-        non_negative_int(-1)
+        non_negative_int("-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        non_negative_int(-10)
+        non_negative_int("-10")
 
 
-def test_host_port_pair_direct_creation():
+def test_host_port_pair_direct_creation() -> None:
     ip = ipaddress.ip_address("1.2.3.4")
     pair = HostPortPair(ip, 8000)
 
@@ -88,7 +89,7 @@ def test_host_port_pair_direct_creation():
     assert str(pair) == "1.2.3.4:8000"
 
 
-def test_host_port_pair_parse():
+def test_host_port_pair_parse() -> None:
     with pytest.raises(argparse.ArgumentTypeError):
         host_port_pair("oihasdfoih")
     with pytest.raises(argparse.ArgumentTypeError):
@@ -121,7 +122,7 @@ def test_host_port_pair_parse():
     assert a.port == 9871
 
 
-def test_host_port_pair_comparison():
+def test_host_port_pair_comparison() -> None:
     a = host_port_pair("oihasdfoih:123")
     b = host_port_pair("oihasdfoih:123")
     assert a == b
@@ -131,7 +132,7 @@ def test_host_port_pair_comparison():
     assert a != b
 
 
-def test_ipaddr():
+def test_ipaddr() -> None:
     assert ipaddr("[192.168.0.1]") == ipaddress.ip_address("192.168.0.1")
     assert ipaddr("192.168.0.1") == ipaddress.ip_address("192.168.0.1")
     assert ipaddr("2001:DB8::1") == ipaddress.ip_address("2001:DB8::1")
@@ -144,7 +145,7 @@ def test_ipaddr():
         ipaddr("1.1.1")
 
 
-def test_path(tmpdir):
+def test_path(tmpdir: Path) -> None:
     assert path(None) is None
     assert path(tmpdir) == tmpdir
     with pytest.raises(argparse.ArgumentTypeError):

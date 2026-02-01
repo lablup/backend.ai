@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import enum
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -57,7 +60,7 @@ class SampleEnum(enum.Enum):
         (datetime(2024, 7, 16, 5, 45, 45, tzinfo=timezone(timedelta(hours=9))), 1721076345.0),
     ],
 )
-def test_ensure_json_serializable(input, expected):
+def test_ensure_json_serializable(input: Any, expected: Any) -> None:
     """
     This test ensures that ensure_json_serializable correctly serializes various
     types of inputs, including dictionaries, lists, UUIDs created in different ways,
@@ -77,7 +80,7 @@ def test_ensure_json_serializable(input, expected):
         (["camelCaseListItem"], ["camelCaseListItem"]),
     ],
 )
-def test_config_key_to_kebab_case(input, expected):
+def test_config_key_to_kebab_case(input: Any, expected: Any) -> None:
     """
     This test ensures that config_key_to_kebab_case correctly converts keys in dictionaries
     to kebab-case format and handles nested dictionaries and lists.
@@ -95,7 +98,7 @@ def test_config_key_to_kebab_case(input, expected):
         ("application/*", "application/json", True, False),
     ],
 )
-def test_mime_match(base_array, compare, strict, expected):
+def test_mime_match(base_array: str, compare: str, strict: bool, expected: bool) -> None:
     """
     This test ensures that mime_match correctly identifies matching MIME types based on
     the base_array and compare inputs, with and without the strict parameter.

@@ -18,7 +18,7 @@ from ai.backend.manager.services.deployment.actions.access_token.create_access_t
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:

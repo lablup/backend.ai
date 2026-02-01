@@ -48,7 +48,7 @@ from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageService:

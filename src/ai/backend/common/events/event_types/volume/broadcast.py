@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -41,7 +41,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
     edit_fstab: bool = False
     fstab_path: str = "/etc/fstab"
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
             self.volume_backend_name,
@@ -55,7 +55,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -87,7 +87,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
     edit_fstab: bool = False
     fstab_path: str | None = None
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
             self.volume_backend_name,
@@ -98,7 +98,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -121,7 +121,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
     quota_scope_id: QuotaScopeID
     err_msg: str | None = None
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.node_id,
             str(self.node_type),
@@ -131,7 +131,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             value[0],
             VolumeMountableNodeType(value[1]),

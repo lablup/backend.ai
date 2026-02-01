@@ -17,7 +17,7 @@ class BraceMessage:
         return self.fmt.format(*self.args)
 
 
-class BraceStyleAdapter(logging.LoggerAdapter):
+class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
     def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None = None) -> None:
         super().__init__(logger, extra)
 

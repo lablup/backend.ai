@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import time
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -321,7 +322,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = sessions
 
         # Add delay to agent calls to verify concurrency
-        async def delayed_destroy(*args, **kwargs):
+        async def delayed_destroy(*args: Any, **kwargs: Any) -> None:
             await asyncio.sleep(0.1)
             return
 

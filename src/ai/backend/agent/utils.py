@@ -68,7 +68,7 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
 
 
@@ -88,7 +88,7 @@ def get_arch_name() -> str:
     return aliases.get(ret, ret)
 
 
-def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
+def update_nested_dict(dest: MutableMapping[str, Any], additions: Mapping[str, Any]) -> None:
     for k, v in additions.items():
         if k not in dest:
             dest[k] = v

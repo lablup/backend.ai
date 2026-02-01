@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from http import HTTPStatus
-from typing import cast
 
 import aiohttp_cors
 from aiohttp import web
@@ -15,7 +14,7 @@ from aiohttp import web
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.notification import NotifiableMessage
-from ai.backend.common.data.notification.types import EmailSpec, NotificationRuleType, WebhookSpec
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -104,7 +103,7 @@ class NotificationAPIHandler:
 
         # Convert request to creator
         # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
-        validated_spec = cast(WebhookSpec | EmailSpec, body.parsed.spec)
+        validated_spec = body.parsed.spec
         creator = Creator(
             spec=NotificationChannelCreatorSpec(
                 name=body.parsed.name,

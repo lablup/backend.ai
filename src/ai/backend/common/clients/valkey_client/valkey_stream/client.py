@@ -12,7 +12,7 @@ from glide import (
     StreamReadGroupOptions,
     TrimByMaxLen,
 )
-from glide.exceptions import TimeoutError as GlideTimeoutError
+from glide.exceptions import TimeoutError as GlideTimeoutError  # type: ignore[import-not-found]
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -403,7 +403,7 @@ class ValkeyStreamClient:
         :return: The payload of the received message.
         """
         message = await self._client.client.get_pubsub_message()
-        return load_json(message.message)
+        return cast(Mapping[str, str], load_json(message.message))
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """

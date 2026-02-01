@@ -1,7 +1,6 @@
 import argparse
 import ipaddress
 import pathlib
-from typing import cast
 
 from .types import HostPortPair
 
@@ -37,7 +36,7 @@ def port_range(s: str) -> tuple[int, int]:
     if not (port_range[0] < port_range[1]):
         msg = f"{port_range[0]} should be less than {port_range[1]}."
         raise argparse.ArgumentTypeError(msg)
-    return cast(tuple[int, int], port_range)
+    return port_range
 
 
 def positive_int(s: str) -> int:
@@ -62,7 +61,7 @@ def non_negative_int(s: str) -> int:
     return val
 
 
-def host_port_pair(s: str) -> tuple[ipaddress._BaseAddress, int]:
+def host_port_pair(s: str) -> HostPortPair:
     host: str | ipaddress._BaseAddress
     pieces = s.rsplit(":", maxsplit=1)
     if len(pieces) == 1:
@@ -97,7 +96,7 @@ def ipaddr(s: str) -> ipaddress._BaseAddress:
     return ip
 
 
-def path(val: str) -> pathlib.Path:
+def path(val: str | pathlib.Path | None) -> pathlib.Path | None:
     if val is None:
         return None
     p = pathlib.Path(val)

@@ -19,12 +19,13 @@ def pbkdf2_hex(data: str, salt: str, iterations: int, keylen: int, hashfunc: str
     return binascii.hexlify(dk).decode("utf-8")
 
 
-def load_dictionary(dictionary_file: str | None = None) -> list:
+def load_dictionary(dictionary_file: str | None = None) -> list[str]:
     if dictionary_file is None:
         dictionary_file = "/opt/kernel/words.json"
 
     with Path(dictionary_file).open() as f:
-        return json.load(f)
+        result: list[str] = json.load(f)
+        return result
 
 
 def default_hasher(data: str) -> str:
@@ -34,7 +35,7 @@ def default_hasher(data: str) -> str:
 def hash_phrase(
     data: str,
     minimum_entropy: int = 90,
-    dictionary: list | None = None,
+    dictionary: list[str] | None = None,
     hashfunc: Callable[[str], str] = default_hasher,
     use_numbers: bool = True,
     separator: str = "",

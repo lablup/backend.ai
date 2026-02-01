@@ -77,7 +77,7 @@ manager_local_config_iv = (
             t.Key("name"): tx.Slug[2:64],
             t.Key("user"): t.String,
             t.Key("password"): t.String,
-            t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+            t.Key("pool-size", default=8): t.ToInt[1:],
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("pool-pre-ping", default=False): t.ToBool,
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
@@ -376,7 +376,7 @@ volume_config_iv = t.Dict({
 ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
-class AbstractConfig(UserDict):
+class AbstractConfig(UserDict[str, Any]):
     """
     Deprecated: Use ai.backend.manager.config.unified instead.
     """

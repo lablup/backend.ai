@@ -69,7 +69,7 @@ async def execute_querier[TRow: Base](
             print(result.row.id)  # Fetched row
     """
     row_class = querier.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
     if len(pk_columns) != 1:
@@ -115,7 +115,7 @@ class BatchQuerierResult[TRow: Base]:
 
 async def _validate_scope(
     db_sess: SASession,
-    checks: list[ExistenceCheck],
+    checks: list[ExistenceCheck[Any]],
 ) -> None:
     """Validate scope existence checks in a single query.
 
@@ -178,7 +178,7 @@ async def execute_batch_querier(
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
     scope: SearchScope | None = None,
-) -> BatchQuerierResult[Row]:
+) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
     For offset pagination, uses count().over() window function for efficient counting.
@@ -238,7 +238,7 @@ async def execute_batch_querier(
         total_count = count_result.scalar() or 0
 
     # Calculate pagination info
-    page_info: PageInfoResult[Row] = querier.pagination.compute_page_info(rows, total_count)
+    page_info: PageInfoResult[Row[Any]] = querier.pagination.compute_page_info(rows, total_count)
 
     return BatchQuerierResult(
         rows=page_info.rows,

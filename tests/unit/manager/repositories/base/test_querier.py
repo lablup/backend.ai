@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class QuerierTestRowInt(Base):
+class QuerierTestRowInt(Base):  # type: ignore[misc]
     """ORM model for querier testing with integer PK."""
 
     __tablename__ = "test_querier_int_pk"
@@ -52,7 +52,7 @@ class QuerierTestRowInt(Base):
     value = sa.Column(sa.String(100), nullable=True)
 
 
-class QuerierTestRowUUID(Base):
+class QuerierTestRowUUID(Base):  # type: ignore[misc]
     """ORM model for querier testing with UUID PK."""
 
     __tablename__ = "test_querier_uuid_pk"
@@ -227,7 +227,7 @@ class TestQuerierUUIDPK:
 # =============================================================================
 
 
-class BatchQuerierTestRow(Base):
+class BatchQuerierTestRow(Base):  # type: ignore[misc]
     """ORM model for batch querier testing."""
 
     __tablename__ = "test_batch_querier_orm"
@@ -375,7 +375,7 @@ class TestScopeValidationError2(BackendAIError):
         )
 
 
-class ScopeValidationTestRow(Base):
+class ScopeValidationTestRow(Base):  # type: ignore[misc]
     """ORM model for scope validation testing."""
 
     __tablename__ = "test_scope_validation"
@@ -390,7 +390,7 @@ class ScopeValidationTestRow(Base):
 class MockSearchScope(SearchScope):
     """Mock SearchScope for testing."""
 
-    checks: Sequence[ExistenceCheck]
+    checks: Sequence[ExistenceCheck[Any]]
     filter_category: str | None = None
 
     def to_condition(self) -> QueryCondition:
@@ -405,7 +405,7 @@ class MockSearchScope(SearchScope):
         return inner
 
     @property
-    def existence_checks(self) -> Sequence[ExistenceCheck]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         """Return existence checks for scope validation."""
         return self.checks
 

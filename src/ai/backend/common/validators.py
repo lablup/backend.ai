@@ -21,6 +21,7 @@ from typing import (
     Any,
     Literal,
     TypeVar,
+    cast,
 )
 
 import dateutil.tz
@@ -75,7 +76,7 @@ class StringLengthMeta(TrafaretMeta):
     """
 
     def __getitem__(cls, slice_: slice) -> t.Trafaret:
-        return cls(min_length=slice_.start, max_length=slice_.stop)
+        return cast(t.Trafaret, cls(min_length=slice_.start, max_length=slice_.stop))
 
 
 class AliasedKey(t.Key):
@@ -87,11 +88,11 @@ class AliasedKey(t.Key):
 
     names: Sequence[str]
 
-    def __init__(self, names: Sequence[str], **kwargs) -> None:
+    def __init__(self, names: Sequence[str], **kwargs: Any) -> None:
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data: Any, context: Any = None) -> Generator[tuple, None, None]:  # type: ignore[override]
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:
         for name in self.names:
             if name in data:
                 key = name
@@ -175,7 +176,7 @@ class DelimiterSeperatedList[TItem](t.Trafaret):
                 f"the number of items should be greater than {self.min_length}",
                 value=value,
             )
-        return [self.trafaret.check_and_return(x) for x in splited]
+        return [self.trafaret.check(x) for x in splited]
 
 
 class StringList(DelimiterSeperatedList[str]):
@@ -213,9 +214,10 @@ class Enum[T_enum: enum.Enum](t.Trafaret):
 
 
 class JSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> dict:
+    def check_and_return(self, value: Any) -> dict[str, Any]:
         try:
-            return json.loads(value)
+            result: dict[str, Any] = json.loads(value)
+            return result
         except (KeyError, ValueError):
             self._failure("value is not a valid JSON string", value=value)
 
@@ -299,7 +301,7 @@ class Path(PurePath):
 
 
 class IPNetwork(t.Trafaret):
-    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork:
+    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork[Any]:
         try:
             return ipaddress.ip_network(value)
         except ValueError:
@@ -669,8 +671,8 @@ if jwt_available:
             try:
                 token_data = jwt.decode(value, self.secret, algorithms=self.algorithms)
                 if self.inner_iv is not None:
-                    return self.inner_iv.check(token_data)
-                return token_data
+                    return cast(Mapping[str, Any], self.inner_iv.check(token_data))
+                return cast(Mapping[str, Any], token_data)
             except jwt.PyJWTError as e:
                 self._failure(f"cannot decode the given value as JWT: {e}", value=value)
 
@@ -697,7 +699,7 @@ class URL(t.Trafaret):
 
 
 class ToSet(t.Trafaret):
-    def check_and_return(self, value: Any) -> set:
+    def check_and_return(self, value: Any) -> set[Any]:
         if isinstance(value, Iterable):
             return set(value)
         self._failure("value must be Iterable")

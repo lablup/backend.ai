@@ -93,7 +93,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ImageService:

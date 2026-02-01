@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -42,7 +42,7 @@ class AgentBackend(enum.StrEnum):
 
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
-    def get_agent_cls(self) -> type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """
@@ -83,7 +83,7 @@ class AbstractAgentDiscovery(ABC):
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
     agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-    return agent_mod.get_agent_discovery()
+    return cast(AbstractAgentDiscovery, agent_mod.get_agent_discovery())
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -173,7 +173,7 @@ class ContainerLifecycleEvent:
     container_id: ContainerId | None
     event: LifecycleEvent
     reason: KernelLifecycleEventReason
-    done_future: asyncio.Future | None = None
+    done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
 

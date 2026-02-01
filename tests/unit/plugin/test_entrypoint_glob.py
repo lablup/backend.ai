@@ -4,7 +4,7 @@ from pathlib import Path
 from ai.backend.plugin.entrypoint import _glob
 
 
-def test_basic_file_search():
+def test_basic_file_search() -> None:
     """Test basic file search without match patterns."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -21,7 +21,7 @@ def test_basic_file_search():
         assert all(r.name == "BUILD" for r in results)
 
 
-def test_excluded_patterns():
+def test_excluded_patterns() -> None:
     """Test exclusion patterns."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -39,7 +39,7 @@ def test_excluded_patterns():
         assert results[0].parent.name == "good"
 
 
-def test_hidden_and_pycache_exclusion():
+def test_hidden_and_pycache_exclusion() -> None:
     """Test automatic exclusion of hidden directories and __pycache__."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -57,7 +57,7 @@ def test_hidden_and_pycache_exclusion():
         assert results[0].parent.name == "visible"
 
 
-def test_search_from_upper_directory_with_match_pattern():
+def test_search_from_upper_directory_with_match_pattern() -> None:
     """Test search starting from an upper directory with a match pattern."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -88,7 +88,7 @@ def test_search_from_upper_directory_with_match_pattern():
         assert results[0].parent.name == "manager"
 
 
-def test_search_from_exact_matching_directory():
+def test_search_from_exact_matching_directory() -> None:
     """Test search starting from a directory that already matches the pattern."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -108,7 +108,7 @@ def test_search_from_exact_matching_directory():
         assert results[0].parent.name == "manager"
 
 
-def test_multiple_match_patterns():
+def test_multiple_match_patterns() -> None:
     """Test multiple match patterns and their interaction."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -139,7 +139,7 @@ def test_multiple_match_patterns():
         assert {result.parent.name for result in results} == {"manager", "agent"}
 
 
-def test_wildcard_match_patterns():
+def test_wildcard_match_patterns() -> None:
     """Test wildcard match patterns and their interaction."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -167,7 +167,7 @@ def test_wildcard_match_patterns():
         assert {result.parent.name for result in results} == {"manager", "agent", "common"}
 
 
-def test_suffix_match_propagation_per_branch():
+def test_suffix_match_propagation_per_branch() -> None:
     """Test how suffix_match flag propagates through directory traversal.
 
     The propagation must be confined within the matching pattern.
@@ -197,7 +197,7 @@ def test_suffix_match_propagation_per_branch():
         assert "manager/BUILD" in str(results[0])
 
 
-def test_empty_directory():
+def test_empty_directory() -> None:
     """Test behavior with empty directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
@@ -206,7 +206,7 @@ def test_empty_directory():
         assert len(results) == 0
 
 
-def test_file_at_root():
+def test_file_at_root() -> None:
     """Test finding file at the root level."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)

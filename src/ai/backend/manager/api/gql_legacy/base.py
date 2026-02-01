@@ -76,7 +76,7 @@ DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 @shareable
-class ResourceLimit(graphene.ObjectType):
+class ResourceLimit(graphene.ObjectType):  # type: ignore[misc]
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
@@ -85,12 +85,12 @@ class ResourceLimit(graphene.ObjectType):
 
 
 @shareable
-class KVPair(graphene.ObjectType):
+class KVPair(graphene.ObjectType):  # type: ignore[misc]
     key = graphene.String()
     value = graphene.String()
 
 
-class ResourceLimitInput(graphene.InputObjectType):
+class ResourceLimitInput(graphene.InputObjectType):  # type: ignore[misc]
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
@@ -98,12 +98,12 @@ class ResourceLimitInput(graphene.InputObjectType):
     )
 
 
-class KVPairInput(graphene.InputObjectType):
+class KVPairInput(graphene.InputObjectType):  # type: ignore[misc]
     key = graphene.String()
     value = graphene.String()
 
 
-class BigInt(Scalar):
+class BigInt(Scalar):  # type: ignore[misc]
     """
     BigInt is an extension of the regular graphene.Int scalar type
     to support integers outside the range of a signed 32-bit integer.
@@ -135,7 +135,7 @@ class BigInt(Scalar):
         return None
 
 
-class Bytes(Scalar):
+class Bytes(Scalar):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.09.1."
 
@@ -154,13 +154,13 @@ class Bytes(Scalar):
         return bytes.fromhex(value)
 
 
-class ImageRefType(graphene.InputObjectType):
+class ImageRefType(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=True)
     registry = graphene.String()
     architecture = graphene.String()
 
 
-class UUIDFloatMap(Scalar):
+class UUIDFloatMap(Scalar):  # type: ignore[misc]
     """
     Added in 25.4.0.
     Verifies that the key is a UUID (represented as a string) and the value is a float.
@@ -308,8 +308,8 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         return type_cache[objtype_name]
 
     def get_loader(
-        self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
-    ) -> DataLoader:
+        self, context: GraphQueryContext, objtype_name: str, *args: Any, **kwargs: Any
+    ) -> DataLoader[Any, Any]:
         k = self._get_key(objtype_name, args, kwargs)
         loader = self.cache.get(k)
         if loader is None:
@@ -332,7 +332,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
             Concatenate[TContext, Sequence[TLoaderKey], ...],
             Awaitable[Sequence[TLoaderResult]],
         ],
-        **kwargs,
+        **kwargs: Any,
     ) -> int:
         func_and_kwargs = (func, *[(k, kwargs[k]) for k in sorted(kwargs.keys())])
         return hash(func_and_kwargs)
@@ -346,7 +346,7 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         ],
         # Using kwargs-only to prevent argument position confusion
         # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
-        **kwargs,
+        **kwargs: Any,
     ) -> DataLoader[TLoaderKey, TLoaderResult]:
         async def batch_load_wrapper(keys: Sequence[TLoaderKey]) -> list[TLoaderResult]:
             # aiodataloader always converts the result via list(),
@@ -364,11 +364,11 @@ class DataLoaderManager[TContext, TLoaderKey, TLoaderResult]:
         return loader
 
 
-class Item(graphene.Interface):
+class Item(graphene.Interface):  # type: ignore[misc]
     id = graphene.ID()
 
 
-class PaginatedList(graphene.Interface):
+class PaginatedList(graphene.Interface):  # type: ignore[misc]
     items = graphene.List(Item, required=True)
     total_count = graphene.Int(required=True)
 
@@ -383,17 +383,17 @@ class _SQLBasedGQLObject(Protocol):
     def from_row(
         cls: type[T_SQLBasedGQLObject],
         ctx: GraphQueryContext,
-        row: Row | DeclarativeMeta,
+        row: Row[Any] | DeclarativeMeta,
     ) -> T_SQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -414,10 +414,10 @@ async def batch_result(
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -438,10 +438,10 @@ async def batch_multiresult(
 async def batch_result_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -459,10 +459,10 @@ async def batch_result_in_session(
 async def batch_result_in_scalar_stream(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[T_SQLBasedGQLObject | None]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
@@ -480,10 +480,10 @@ async def batch_result_in_scalar_stream(
 async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -503,10 +503,10 @@ async def batch_multiresult_in_session(
 async def batch_multiresult_in_scalar_stream(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
-    query: sa.sql.Select,
+    query: sa.sql.Select[Any],
     obj_type: type[T_SQLBasedGQLObject],
     key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
+    key_getter: Callable[[Row[Any]], T_Key],
 ) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
@@ -523,14 +523,14 @@ async def batch_multiresult_in_scalar_stream(
     return [*objs_per_key.values()]
 
 
-def privileged_query(required_role: UserRole) -> Callable:
-    def wrap(func: Callable) -> Callable:
+def privileged_query(required_role: UserRole) -> Callable[..., Any]:
+    def wrap(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         async def wrapped(
             root: Any,
             info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> Any:
             from ai.backend.manager.models.user import UserRole
 
@@ -548,7 +548,7 @@ def scoped_query(
     *,
     autofill_user: bool = False,
     user_key: str = "access_key",
-) -> Callable:
+) -> Callable[..., Any]:
     """
     Prepends checks for domain/group/user access rights depending
     on the client's user and keypair information.
@@ -560,13 +560,13 @@ def scoped_query(
         in the keyword arguments.
     """
 
-    def wrap(resolve_func: Callable) -> Callable:
+    def wrap(resolve_func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(resolve_func)
         async def wrapped(
             root: Any,
             info: graphene.ResolveInfo,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> Any:
             from ai.backend.manager.models.user import UserRole
 
@@ -622,10 +622,14 @@ def scoped_query(
     return wrap
 
 
-def privileged_mutation(required_role: UserRole, target_func: Callable | None = None) -> Callable:
-    def wrap(func: Callable) -> Callable:
+def privileged_mutation(
+    required_role: UserRole, target_func: Callable[..., Any] | None = None
+) -> Callable[..., Any]:
+    def wrap(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
-        async def wrapped(cls: type, root: Any, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
+        async def wrapped(
+            cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
+        ) -> Any:
             from ai.backend.manager.models.group import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
@@ -698,18 +702,18 @@ async def gql_mutation_wrapper(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}")
+        return cast(ResultType, result_cls(False, f"integrity error: {e}"))
     except sa.exc.StatementError as e:
         log.warning(
             "gql_mutation_wrapper(): statement error ({})\n{}", repr(e), e.statement or "(unknown)"
         )
         orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
+        return cast(ResultType, result_cls(False, str(orig_exc), None))
     except (TimeoutError, asyncio.CancelledError):
         raise
     except Exception as e:
         log.exception("gql_mutation_wrapper(): other error")
-        return result_cls(False, f"unexpected error: {e}")
+        return cast(ResultType, result_cls(False, f"unexpected error: {e}"))
 
 
 async def simple_db_mutate[ResultType: graphene.ObjectType](
@@ -721,7 +725,7 @@ async def simple_db_mutate[ResultType: graphene.ObjectType](
     | Callable[[], sa.sql.Update | sa.sql.Insert | sa.sql.Delete],
     *,
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[None]] | None = None,
+    post_func: Callable[[SAConnection, Result[Any]], Awaitable[None]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given
@@ -743,8 +747,8 @@ async def simple_db_mutate[ResultType: graphene.ObjectType](
             if post_func:
                 await post_func(conn, result)
         if result.rowcount > 0:
-            return result_cls(True, "success")
-        return result_cls(False, f"no matching {result_cls.__name__.lower()}")
+            return cast(ResultType, result_cls(True, "success"))
+        return cast(ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}"))
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -759,7 +763,7 @@ async def simple_db_mutate_returning_item[
     *,
     item_cls: type[ItemType],
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
-    post_func: Callable[[SAConnection, Result], Awaitable[Row]] | None = None,
+    post_func: Callable[[SAConnection, Result[Any]], Awaitable[Row[Any]]] | None = None,
 ) -> ResultType:
     """
     Performs a database mutation based on the given
@@ -798,8 +802,12 @@ async def simple_db_mutate_returning_item[
             else:
                 row = result.first()
             if result.rowcount > 0 and row is not None:
-                return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+                return cast(
+                    ResultType, result_cls(True, "success", item_cls.from_row(graph_ctx, row))
+                )
+            return cast(
+                ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+            )
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -858,8 +866,8 @@ def filter_gql_undefined[T](val: T, *, default_value: T | None = None) -> T | No
     return val
 
 
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
+class InferenceSessionError(graphene.ObjectType):  # type: ignore[misc]
+    class InferenceSessionErrorInfo(graphene.ObjectType):  # type: ignore[misc]
         src = graphene.String(required=True)
         name = graphene.String(required=True)
         repr = graphene.String(required=True)
@@ -870,11 +878,11 @@ class InferenceSessionError(graphene.ObjectType):
 
 
 class AsyncPaginatedConnectionField(AsyncListConnectionField):
-    def __init__(self, type: type | str, *args, **kwargs) -> None:
+    def __init__(self, type: type | str, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("offset", graphene.Int())
-        super().__init__(type, *args, **kwargs)  # type: ignore[arg-type]
+        super().__init__(type, *args, **kwargs)
 
 
 PaginatedConnectionField = AsyncPaginatedConnectionField
@@ -937,16 +945,16 @@ def validate_connection_args(
 
 @dataclass
 class _StmtWithConditions:
-    stmt: sa.sql.Select
+    stmt: sa.sql.Select[Any]
     conditions: list[WhereClauseType]
 
 
 def _apply_ordering(
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     pagination_order: ConnectionPaginationOrder | None,
-) -> sa.sql.Select:
+) -> sa.sql.Select[Any]:
     """
     Apply ORDER BY clauses for cursor-based pagination with deterministic ordering.
     This function applies the user-specified ordering columns first, then adds the id column
@@ -986,7 +994,7 @@ def _apply_ordering(
 
 
 def _apply_filter_conditions(
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     orm_class: type[Any],
     filter_expr: FilterExprArg,
 ) -> _StmtWithConditions:
@@ -1005,7 +1013,7 @@ def _apply_filter_conditions(
 
 def _apply_cursor_pagination(
     info: graphene.ResolveInfo,
-    stmt: sa.sql.Select,
+    stmt: sa.sql.Select[Any],
     id_column: sa.Column[Any] | InstrumentedAttribute[Any],
     ordering_item_list: list[OrderingItem],
     cursor_id: str,
@@ -1090,7 +1098,7 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select[Any], sa.sql.Select[Any], list[WhereClauseType]]:
     stmt = sa.select(orm_class)
     count_stmt = sa.select(sa.func.count()).select_from(orm_class)
 
@@ -1138,7 +1146,7 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select[Any], sa.sql.Select[Any], list[WhereClauseType]]:
     stmt = sa.select(orm_class)
     count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
@@ -1166,8 +1174,8 @@ def _build_sql_stmt_from_sql_arg(
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
-    sql_stmt: sa.sql.Select
-    sql_count_stmt: sa.sql.Select
+    sql_stmt: sa.sql.Select[Any]
+    sql_count_stmt: sa.sql.Select[Any]
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
@@ -1236,7 +1244,7 @@ def generate_sql_info_for_gql_connection(
         ret = GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
 
     ctx: GraphQueryContext = info.context
-    max_page_size = cast(int | None, ctx.config_provider.config.api.max_gql_connection_page_size)
+    max_page_size = ctx.config_provider.config.api.max_gql_connection_page_size
     if max_page_size is not None and ret.requested_page_size > max_page_size:
         raise ValueError(
             f"Cannot fetch a page larger than {max_page_size}. "

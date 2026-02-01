@@ -80,7 +80,9 @@ class TestContainerRegistryValidator:
             (ContainerRegistryType.HARBOR2, "https://harbor2.example.com"),
         ],
     )
-    async def test_harbor_project_validation_required(self, registry_type, registry_url) -> None:
+    async def test_harbor_project_validation_required(
+        self, registry_type: ContainerRegistryType, registry_url: str
+    ) -> None:
         """Test that Harbor registries require project names."""
         args = ContainerRegistryValidatorArgs(url=registry_url, type=registry_type, project=None)
         validator = ContainerRegistryValidator(args)
@@ -97,7 +99,7 @@ class TestContainerRegistryValidator:
             "a" * 256,  # Too long (256 characters)
         ],
     )
-    async def test_harbor_project_validation_length(self, project_name) -> None:
+    async def test_harbor_project_validation_length(self, project_name: str) -> None:
         """Test Harbor project name length validation."""
         # Empty string (length 0)
         args = ContainerRegistryValidatorArgs(
@@ -138,7 +140,7 @@ class TestContainerRegistryValidator:
             "project_.name",
         ],
     )
-    async def test_harbor_project_validation_format(self, invalid_project_name) -> None:
+    async def test_harbor_project_validation_format(self, invalid_project_name: str) -> None:
         """Test Harbor project name format validation."""
 
         args = ContainerRegistryValidatorArgs(
@@ -180,7 +182,7 @@ class TestContainerRegistryValidator:
             "a" * 255,
         ],
     )
-    async def test_harbor_project_validation_valid_names(self, valid_project_name) -> None:
+    async def test_harbor_project_validation_valid_names(self, valid_project_name: str) -> None:
         """Test that valid Harbor project names pass validation."""
         args = ContainerRegistryValidatorArgs(
             url="https://harbor.example.com",

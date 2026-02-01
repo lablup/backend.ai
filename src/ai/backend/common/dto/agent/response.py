@@ -8,7 +8,7 @@ T = TypeVar("T")
 @dataclass
 class AbstractAgentResp(ABC):
     @abstractmethod
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         raise NotImplementedError
 
 
@@ -18,7 +18,7 @@ class PurgeImageResp(AbstractAgentResp):
     error: str | None = None
 
     @override
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
@@ -35,21 +35,21 @@ class PurgeImagesResp(AbstractAgentResp):
     responses: list[PurgeImageResp]
 
     @override
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 @dataclass
 class PurgeContainersResp(AbstractAgentResp):
     @override
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return {}
 
 
 @dataclass
 class DropKernelRegistryResp(AbstractAgentResp):
     @override
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return {}
 
 
@@ -81,7 +81,7 @@ class CodeCompletionResult:
     def failure(cls, error_msg: str | None = None) -> Self:
         return cls(status="failed", error=error_msg, suggestions=[])
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "error": self.error,
@@ -94,11 +94,11 @@ class CodeCompletionResp(AbstractAgentResp):
     result: CodeCompletionResult
 
     @classmethod
-    def from_dict(cls, data: dict) -> Self:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(result=CodeCompletionResult.from_dict(data.get("result", {})))
 
     @classmethod
-    def success(cls, completions_data: dict) -> Self:
+    def success(cls, completions_data: dict[str, Any]) -> Self:
         return cls(result=CodeCompletionResult.success(completions_data))
 
     @classmethod
@@ -106,5 +106,5 @@ class CodeCompletionResp(AbstractAgentResp):
         return cls(result=CodeCompletionResult.failure(error_msg))
 
     @override
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return {"result": asdict(self.result)}

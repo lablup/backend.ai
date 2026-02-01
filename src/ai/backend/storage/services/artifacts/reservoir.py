@@ -535,7 +535,7 @@ class ReservoirService:
         artifact_revision_ids: list[uuid.UUID],
         storage_prefix: str | None = None,
     ) -> uuid.UUID:
-        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
+        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult[Any]:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")

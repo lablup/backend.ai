@@ -240,7 +240,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         id=route.route_id,
         revision_id=route.revision_id
         or route.endpoint_id,  # Fallback to endpoint_id if no revision
-        session_id=route.session_id or route.route_id,  # type: ignore[arg-type]  # Fallback if no session
+        session_id=route.session_id or route.route_id,
         readiness_status=ReadinessStatus.HEALTHY,  # Derived from route status
         liveness_status=LivenessStatus.HEALTHY,  # Default
         activeness_status=ActivenessStatus.ACTIVE

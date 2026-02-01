@@ -1,25 +1,39 @@
 import re
+from collections.abc import Callable
+from typing import Any
 
+import click
 import pytest
+from click.testing import CliRunner
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import get_config, set_config
 
 
 @pytest.mark.parametrize("help_arg", ["-h", "--help"])
-def test_print_help(runner, cli_entrypoint, help_arg):
+def test_print_help(
+    runner: CliRunner, cli_entrypoint: Callable[[], click.Group], help_arg: str
+) -> None:
     result = runner.invoke(cli_entrypoint, [help_arg])
     assert result.exit_code == ExitCode.OK
     assert re.match(r"Usage: ([.\w]+) \[OPTIONS\] COMMAND \[ARGS\]", result.output)
 
 
-def test_print_help_for_unknown_command(runner, cli_entrypoint):
+def test_print_help_for_unknown_command(
+    runner: CliRunner, cli_entrypoint: Callable[[], click.Group]
+) -> None:
     result = runner.invoke(cli_entrypoint, ["x-non-existent-command"])
     assert result.exit_code == ExitCode.INVALID_USAGE
     assert re.match(r"Usage: ([.\w]+) \[OPTIONS\] COMMAND \[ARGS\]", result.output)
 
 
-def test_config(runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory):
+def test_config(
+    runner: CliRunner,
+    cli_entrypoint: Callable[[], click.Group],
+    monkeypatch: Any,
+    example_keypair: tuple[str, str],
+    unused_tcp_port_factory: Callable[[], int],
+) -> None:
     api_port = unused_tcp_port_factory()
     api_url = f"http://127.0.0.1:{api_port}"
     set_config(None)
@@ -36,7 +50,9 @@ def test_config(runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp
     assert config.hash_type in result.output
 
 
-def test_config_unset(runner, cli_entrypoint, monkeypatch):
+def test_config_unset(
+    runner: CliRunner, cli_entrypoint: Callable[[], click.Group], monkeypatch: Any
+) -> None:
     monkeypatch.delenv("BACKEND_ACCESS_KEY", raising=False)
     monkeypatch.delenv("BACKEND_SECRET_KEY", raising=False)
     monkeypatch.delenv("BACKEND_ENDPOINT", raising=False)
@@ -62,8 +78,12 @@ def test_config_unset(runner, cli_entrypoint, monkeypatch):
 
 
 def test_run_file_or_code_required(
-    runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory
-):
+    runner: CliRunner,
+    cli_entrypoint: Callable[[], click.Group],
+    monkeypatch: Any,
+    example_keypair: tuple[str, str],
+    unused_tcp_port_factory: Callable[[], int],
+) -> None:
     api_port = unused_tcp_port_factory()
     api_url = f"http://127.0.0.1:{api_port}"
     monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])

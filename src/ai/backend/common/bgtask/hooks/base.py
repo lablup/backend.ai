@@ -32,4 +32,4 @@ class AbstractTaskHook(ABC):
         Yields the context object that can be modified during execution.
         """
         raise NotImplementedError("Subclasses must implement this method")
-        yield context  # type: ignore
+        yield context

@@ -12,7 +12,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import (
+    DefaultForUnspecified,
+    ResourceSlot,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -172,7 +177,10 @@ class TestDomainRepository:
                     {"cpu": "8", "mem": "16g"}, None
                 ),
                 "allowed_vfolder_hosts": VFolderHostPermissionMap({
-                    "local": ["modify-vfolder", "upload-file", "download-file"]
+                    "local": {
+                        VFolderHostPermission(p)
+                        for p in ["modify-vfolder", "upload-file", "download-file"]
+                    }
                 }),
                 "allowed_docker_registries": ["registry.example.com"],
                 "dotfiles": b"test dotfiles",

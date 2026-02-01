@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -16,30 +16,30 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
 
 
-def _get_association_artifact_join_cond() -> sa.sql.elements.ColumnElement:
+def _get_association_artifact_join_cond() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 
     return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
-def _get_association_object_storage_join_cond() -> sa.sql.elements.ColumnElement:
+def _get_association_object_storage_join_cond() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
 
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-def _get_association_vfs_storage_join_cond() -> sa.sql.elements.ColumnElement:
+def _get_association_vfs_storage_join_cond() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-class AssociationArtifactsStorageRow(Base):
+class AssociationArtifactsStorageRow(Base):  # type: ignore[misc]
     """
     Association table for linking artifacts to storage namespace.
     """

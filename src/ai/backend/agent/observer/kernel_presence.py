@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.observer.types import AbstractObserver
@@ -26,7 +26,7 @@ class KernelPresenceObserver(AbstractObserver):
 
     def __init__(
         self,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
         valkey_schedule_client: ValkeyScheduleClient,
     ) -> None:
         self._agent = agent

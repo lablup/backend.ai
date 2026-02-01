@@ -136,7 +136,7 @@ from .proxy.frontend import (
 )
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 REDIS_APPPROXY_DB: Final[int] = 10  # FIXME: move to ai.backend.common.defs
 EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appproxy-worker"
@@ -168,7 +168,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
@@ -363,7 +363,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    handlers: list[EventHandler] = [
+    handlers: list[EventHandler[Any, Any]] = [
         root_ctx.event_dispatcher.subscribe(
             evt, root_ctx, handle_proxy_route_event, name="proxy-worker"
         )
@@ -722,7 +722,7 @@ def build_root_app(
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }

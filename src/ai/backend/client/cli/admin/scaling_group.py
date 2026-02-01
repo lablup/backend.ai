@@ -1,4 +1,5 @@
 import sys
+from typing import Any
 
 import click
 
@@ -241,9 +242,9 @@ def update(
     active: bool | Undefined,
     private: bool | Undefined,
     driver: str | Undefined,
-    driver_opts: dict | Undefined,
+    driver_opts: dict[str, Any] | Undefined,
     scheduler: str | Undefined,
-    scheduler_opts: dict | Undefined,
+    scheduler_opts: dict[str, Any] | Undefined,
     use_host_network: bool | Undefined,
     wsproxy_addr: str | Undefined,
     wsproxy_api_token: str | Undefined,

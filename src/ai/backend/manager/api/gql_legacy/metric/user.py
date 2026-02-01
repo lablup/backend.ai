@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
-class UserUtilizationMetricQueryInput(graphene.InputObjectType):
+class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -54,7 +54,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
         )
 
 
-class UserUtilizationMetric(graphene.ObjectType):
+class UserUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 

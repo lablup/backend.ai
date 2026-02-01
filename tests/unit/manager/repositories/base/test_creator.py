@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class CreatorTestRow(Base):
+class CreatorTestRow(Base):  # type: ignore[misc]
     """ORM model for creator testing using declarative mapping."""
 
     __tablename__ = "test_creator_orm"
@@ -288,7 +288,7 @@ class TestBulkCreator:
 # =============================================================================
 
 
-class CreatorTestRowWithDefaults(Base):
+class CreatorTestRowWithDefaults(Base):  # type: ignore[misc]
     """ORM model with server_default columns for testing.
 
     This model uses server_default for:
@@ -428,7 +428,7 @@ class TestCreatorServerDefaults:
 # =============================================================================
 
 
-class CreatorTestRowWithPythonDefaults(Base):
+class CreatorTestRowWithPythonDefaults(Base):  # type: ignore[misc]
     """ORM model with Python-side default columns for testing.
 
     This model uses Python default for:

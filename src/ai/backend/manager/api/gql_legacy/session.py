@@ -173,7 +173,7 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 
-class SessionPermissionValueField(graphene.Scalar):
+class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.09.0. One of {[val.value for val in ComputeSessionPermission]}."
 
@@ -182,7 +182,9 @@ class SessionPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ComputeSessionPermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ComputeSessionPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
         return None
@@ -193,7 +195,7 @@ class SessionPermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class ComputeSessionNode(graphene.ObjectType):
+class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -299,8 +301,8 @@ class ComputeSessionNode(graphene.ObjectType):
 
     @classmethod
     def _add_basic_options_to_query(
-        cls, stmt: sa.sql.Select, is_count: bool = False
-    ) -> sa.sql.Select:
+        cls, stmt: sa.sql.Select[Any], is_count: bool = False
+    ) -> sa.sql.Select[Any]:
         options = [
             join_by_related_field(SessionRow.user),
             join_by_related_field(SessionRow.group),
@@ -323,7 +325,7 @@ class ComputeSessionNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_queue_position
         )
-        return await loader.load(self.row_id)
+        return cast(int | None, await loader.load(self.row_id))
 
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
@@ -464,7 +466,7 @@ class ComputeSessionNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self.batch_load_idle_checks
         )
-        return await loader.load(self.row_id)
+        return cast(dict[str, Any] | None, await loader.load(self.row_id))
 
     async def resolve_vfolder_nodes(
         self,
@@ -752,7 +754,7 @@ class ComputeSessionConnection(Connection):
         description = "Added in 24.09.0."
 
 
-class TotalResourceSlot(graphene.ObjectType):
+class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
         description = "Added in 25.5.0."
@@ -818,7 +820,7 @@ def _validate_name_input(name: str) -> None:
         raise ValueError(f"Not allowed session name (n:{name})") from e
 
 
-class ModifyComputeSession(graphene.relay.ClientIDMutation):
+class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)  # TODO: check if working
 
     class Meta:
@@ -872,7 +874,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         )
 
 
-class CheckAndTransitStatusInput(graphene.InputObjectType):
+class CheckAndTransitStatusInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.12.0."
 
@@ -880,7 +882,7 @@ class CheckAndTransitStatusInput(graphene.InputObjectType):
     client_mutation_id = graphene.String(required=False)  # input for relay
 
 
-class CheckAndTransitStatus(graphene.Mutation):
+class CheckAndTransitStatus(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Meta:
@@ -924,7 +926,7 @@ class CheckAndTransitStatus(graphene.Mutation):
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
 
 
-class ComputeSession(graphene.ObjectType):
+class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -998,7 +1000,7 @@ class ComputeSession(graphene.ObjectType):
     inference_metrics = graphene.JSONString()
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         if row is None:
             raise DataTransformationFailed("Session row cannot be None")
         email = row.email
@@ -1072,7 +1074,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1085,7 +1087,7 @@ class ComputeSession(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
         )
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_containers(
         self,
@@ -1093,7 +1095,7 @@ class ComputeSession(graphene.ObjectType):
     ) -> Iterable[ComputeContainer]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        return await loader.load(self.session_id)
+        return cast(Iterable[ComputeContainer], await loader.load(self.session_id))
 
     async def resolve_dependencies(
         self,
@@ -1101,14 +1103,14 @@ class ComputeSession(graphene.ObjectType):
     ) -> Iterable[ComputeSession]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
-        return await loader.load(self.id)
+        return cast(Iterable[ComputeSession], await loader.load(self.id))
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "ComputeSession.commit_statuses"
         )
-        return await loader.load(self.main_kernel_id)
+        return cast(str, await loader.load(self.main_kernel_id))
 
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         containers = self.containers
@@ -1365,19 +1367,19 @@ class ComputeSession(graphene.ObjectType):
         return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
 
 
-class ComputeSessionList(graphene.ObjectType):
+class ComputeSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
 
 
-class InferenceSession(graphene.ObjectType):
+class InferenceSession(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
 
-class InferenceSessionList(graphene.ObjectType):
+class InferenceSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

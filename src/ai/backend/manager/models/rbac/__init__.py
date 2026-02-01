@@ -44,7 +44,7 @@ class PredefinedRole(enum.StrEnum):
     MEMBER = enum.auto()
 
 
-_EMPTY_FSET: frozenset = frozenset()
+_EMPTY_FSET: frozenset[Any] = frozenset()
 
 
 async def get_predefined_roles_in_scope(
@@ -545,7 +545,7 @@ class AbstractPermissionContext[PermissionType, ObjectType, ObjectIDType](metacl
         return self
 
     @abstractmethod
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         pass
 
     @abstractmethod
@@ -558,7 +558,7 @@ class AbstractPermissionContext[PermissionType, ObjectType, ObjectIDType](metacl
 
 class AbstractPermissionContextBuilder[
     PermissionType: BasePermission,
-    PermissionContextType: AbstractPermissionContext,
+    PermissionContextType: AbstractPermissionContext[Any, Any, Any],
 ](metaclass=ABCMeta):
     @abstractmethod
     async def calculate_permission(
@@ -681,7 +681,7 @@ class RBACModel[PermissionType: BasePermission]:
         pass
 
 
-T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
+T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel[Any])
 T_PropertyReturn = TypeVar("T_PropertyReturn")
 
 

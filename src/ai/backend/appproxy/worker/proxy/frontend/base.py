@@ -11,7 +11,7 @@ from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass=ABCMeta):

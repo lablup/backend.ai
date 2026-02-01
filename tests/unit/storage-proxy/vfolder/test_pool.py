@@ -14,22 +14,22 @@ from ai.backend.storage.volumes.pool import VolumePool
 
 
 @pytest.fixture
-def mock_etcd():
+def mock_etcd() -> AsyncMock:
     return AsyncMock(spec=AsyncEtcd)
 
 
 @pytest.fixture
-def mock_event_dispatcher():
+def mock_event_dispatcher() -> MagicMock:
     return MagicMock(spec=EventDispatcher)
 
 
 @pytest.fixture
-def mock_event_producer():
+def mock_event_producer() -> MagicMock:
     return MagicMock(spec=EventProducer)
 
 
 @pytest.fixture
-def mock_volume():
+def mock_volume() -> AsyncMock:
     volume = AsyncMock(spec=AbstractVolume)
     volume.info.return_value = VolumeInfo(
         backend="vfs",
@@ -43,7 +43,7 @@ def mock_volume():
 
 
 @pytest.fixture
-def mock_storage_plugin_ctx():
+def mock_storage_plugin_ctx() -> AsyncMock:
     ctx = AsyncMock(spec=StoragePluginContext)
     ctx.init = AsyncMock()
     ctx.cleanup = AsyncMock()
@@ -52,7 +52,7 @@ def mock_storage_plugin_ctx():
 
 
 @pytest.mark.asyncio
-async def test_get_volume(mock_volume, mock_storage_plugin_ctx):
+async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: AsyncMock) -> None:
     # Create a VolumePool with mocked volumes
     volume_id = VolumeID("550e8400-e29b-41d4-a716-446655440000")
     volumes = {volume_id: mock_volume}

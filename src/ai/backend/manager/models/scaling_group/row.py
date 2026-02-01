@@ -151,7 +151,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 # each domain, group, and keypair.
 
 
-class ScalingGroupForDomainRow(Base):
+class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_domains"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -186,7 +186,7 @@ class ScalingGroupForDomainRow(Base):
 sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 
-class ScalingGroupForProjectRow(Base):
+class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_groups"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -222,7 +222,7 @@ class ScalingGroupForProjectRow(Base):
 sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 
-class ScalingGroupForKeypairsRow(Base):
+class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     __tablename__ = "sgroups_for_keypairs"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -263,7 +263,7 @@ def _get_resource_preset_join_condition() -> Any:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ScalingGroupRow(Base):
+class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
@@ -385,7 +385,7 @@ class ScalingGroupRow(Base):
             return list((await db_session.scalars(stmt)).all())
 
 
-def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
+def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
     return lambda query_stmt: query_stmt.where(ScalingGroupRow.name.in_(names))
 
 
@@ -404,7 +404,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     wsproxy_addr: str | None
     wsproxy_api_token: str | None
     driver: str
-    driver_opts: dict
+    driver_opts: dict[str, Any]
     scheduler: str
     use_host_network: bool
     scheduler_opts: ScalingGroupOpts
@@ -442,7 +442,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -451,7 +451,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -460,7 +460,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: str,
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 @overload
@@ -469,7 +469,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[str],
     access_key: str,
-) -> Sequence[Row]: ...
+) -> Sequence[Row[Any]]: ...
 
 
 async def query_allowed_sgroups(
@@ -477,7 +477,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
+) -> Sequence[Row[Any]]:
     query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row.scaling_group for row in result}
@@ -490,7 +490,7 @@ async def query_allowed_sgroups(
             else:
                 group_ids = []
         case list() | tuple() | set():
-            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
+            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable[Any], group))
     from_group: set[str]
     if not group_ids:
         from_group = set()  # empty
@@ -554,7 +554,7 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
 
 ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
 
-type WhereClauseType = sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 @dataclass
@@ -569,7 +569,7 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -583,7 +583,7 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -654,10 +654,10 @@ class ScalingGroupPermissionContextBuilder(
             .where(DomainRow.name == scope.domain_name)
             .options(selectinload(DomainRow.sgroup_for_domains_rows))
         )
-        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
+        domain_row = await self.db_session.scalar(stmt)
         if domain_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
+        scaling_groups = domain_row.sgroup_for_domains_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: permissions for row in scaling_groups
@@ -682,10 +682,10 @@ class ScalingGroupPermissionContextBuilder(
             .where(GroupRow.id == scope.project_id)
             .options(selectinload(GroupRow.sgroup_for_groups_rows))
         )
-        project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
+        project_row = await self.db_session.scalar(stmt)
         if project_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
+        scaling_groups = project_row.sgroup_for_groups_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
                 row.scaling_group: project_permissions for row in scaling_groups
@@ -721,9 +721,7 @@ class ScalingGroupPermissionContextBuilder(
 
         object_id_to_additional_permission_map: dict[str, frozenset[ScalingGroupPermission]] = {}
         for keypair in user_row.keypairs:
-            scaling_groups = cast(
-                list[ScalingGroupForKeypairsRow], keypair.sgroup_for_keypairs_rows
-            )
+            scaling_groups = keypair.sgroup_for_keypairs_rows
             for sg in scaling_groups:
                 if sg.scaling_group not in object_id_to_additional_permission_map:
                     object_id_to_additional_permission_map[sg.scaling_group] = user_permissions

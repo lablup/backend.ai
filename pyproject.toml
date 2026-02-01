@@ -280,14 +280,12 @@ preview = true
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
-ignore_missing_imports = true
-follow_untyped_imports = false
-implicit_reexport = false
+strict = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
-disable_error_code = ["typeddict-unknown-key"]
+disable_error_code = ["typeddict-unknown-key", "import-untyped"]
 
 # Disable errors in client CLI, web server, and tests
 # Client SDK will be rewritten, so defer all type fixes

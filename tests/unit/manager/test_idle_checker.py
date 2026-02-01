@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -229,7 +231,7 @@ class TestNetworkTimeoutIdleChecker:
         test_valkey_live: AsyncMock,
         mock_event_producer: AsyncMock,
         test_valkey_stat: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> NetworkTimeoutIdleChecker:
         """Create NetworkTimeoutIdleChecker based on scenario"""
         # Setup time
@@ -301,7 +303,7 @@ class TestNetworkTimeoutIdleChecker:
         test_valkey_live: AsyncMock,
         mock_event_producer: AsyncMock,
         test_valkey_stat: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> NetworkTimeoutIdleChecker:
         """Create NetworkTimeoutIdleChecker based on scenario"""
         # Setup time
@@ -477,7 +479,7 @@ class TestSessionLifetimeChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> SessionLifetimeChecker:
         """SessionLifetimeChecker with time configured based on test_config"""
         # Setup time: session created at base_time, current time = base_time + elapsed
@@ -832,7 +834,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on grace_test_config"""
         # Time setup: elapsed time since kernel created
@@ -856,7 +858,7 @@ class TestUtilizationIdleChecker:
         # Set it to time_window seconds ago so do_idle_check becomes True
         util_first_collected = now.timestamp() - grace_test_config.time_window_seconds
 
-        async def get_live_data_side_effect(key: str):
+        async def get_live_data_side_effect(key: str) -> bytes | None:
             if key.endswith(".util_first_collected"):
                 return str(util_first_collected).encode()
             if key.endswith(".util_last_collected"):
@@ -1008,7 +1010,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on test_config"""
         # Time setup: elapsed time since kernel created
@@ -1134,7 +1136,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on insufficient_test_config"""
         # Time setup: elapsed time since kernel created

@@ -517,7 +517,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         raise NotImplementedError
 
     @cached(
-        cache=LRUCache(maxsize=32),  # type: ignore
+        cache=LRUCache(maxsize=32),
         key=lambda self: (
             self.image_ref,
             self.distro,
@@ -785,15 +785,15 @@ class RestartTracker:
 def _observe_stat_task(
     stat_scope: StatScope,
 ) -> Callable[
-    [Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]],
-    Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
+    [Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]],
+    Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]],
 ]:
     stat_task_observer = StatTaskObserver.instance()
 
     def decorator(
-        func: Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
-    ) -> Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]:
-        async def wrapper(self: AbstractAgent, *args: P.args, **kwargs: P.kwargs) -> None:
+        func: Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]],
+    ) -> Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]:
+        async def wrapper(self: AbstractAgent[Any, Any], *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
             try:
                 await func(self, *args, **kwargs)
@@ -808,14 +808,14 @@ def _observe_stat_task(
                     agent_id=self.id, stat_scope=stat_scope
                 )
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
 
 class AbstractAgent[
     KernelObjectType: AbstractKernel,
-    KernelCreationContextType: AbstractKernelCreationContext,
+    KernelCreationContextType: AbstractKernelCreationContext[Any],
 ](aobject, metaclass=ABCMeta):
     id: AgentId
     agent_class: AgentClass
@@ -830,23 +830,23 @@ class AbstractAgent[
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    timer_tasks: MutableSequence[asyncio.Task]
+    timer_tasks: MutableSequence[asyncio.Task[Any]]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
 
     stat_ctx: StatContext
     stat_sync_sockpath: Path
-    stat_sync_task: asyncio.Task
+    stat_sync_task: asyncio.Task[Any]
 
     stats_monitor: StatsPluginContext  # unused currently
     error_monitor: ErrorPluginContext  # unused in favor of produce_error_event()
 
     background_task_manager: BackgroundTaskManager
 
-    _pending_creation_tasks: dict[KernelId, set[asyncio.Task]]
-    _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
-    _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _pending_creation_tasks: dict[KernelId, set[asyncio.Task[Any]]]
+    _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task[Any]]
+    _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task[Any]]
     _metric_registry: CommonMetricRegistry
 
     # Health monitoring tracking
@@ -1721,7 +1721,7 @@ class AbstractAgent[
         *,
         container_id: ContainerId | None = None,
         exit_code: int | None = None,
-        done_future: asyncio.Future | None = None,
+        done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
     ) -> None:
         cid: ContainerId | None = None
@@ -2343,7 +2343,7 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
-    ) -> AbstractKernelCreationContext:
+    ) -> AbstractKernelCreationContext[Any]:
         raise NotImplementedError
 
     async def _iterate_batch_result(
@@ -3662,7 +3662,7 @@ class AbstractAgent[
         }
 
     async def get_completions(
-        self, kernel_id: KernelId, text: str, opts: dict
+        self, kernel_id: KernelId, text: str, opts: dict[str, Any]
     ) -> CodeCompletionResp:
         return await self.kernel_registry[kernel_id].get_completions(text, opts)
 
@@ -3672,7 +3672,9 @@ class AbstractAgent[
     async def interrupt_kernel(self, kernel_id: KernelId) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
-    async def start_service(self, kernel_id: KernelId, service: str, opts: dict) -> dict[str, Any]:
+    async def start_service(
+        self, kernel_id: KernelId, service: str, opts: dict[str, Any]
+    ) -> dict[str, Any]:
         return await self.kernel_registry[kernel_id].start_service(service, opts)
 
     async def shutdown_service(self, kernel_id: KernelId, service: str) -> None:
@@ -3725,7 +3727,7 @@ class AbstractAgent[
 
 
 async def handle_volume_mount(
-    context: AbstractAgent,
+    context: AbstractAgent[Any, Any],
     _source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
@@ -3773,7 +3775,7 @@ async def handle_volume_mount(
 
 
 async def handle_volume_umount(
-    context: AbstractAgent,
+    context: AbstractAgent[Any, Any],
     _source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:

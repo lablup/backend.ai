@@ -270,7 +270,7 @@ class ModelRevision(Node):
     """
 
     _image_id: strawberry.Private[UUID]
-    id: NodeID
+    id: NodeID[str]
     name: str = strawberry.field(description="The name identifier for this revision.")
     cluster_config: ClusterConfig = strawberry.field(
         description="Cluster configuration for replica distribution."
@@ -665,7 +665,7 @@ ModelRevisionEdge = Edge[ModelRevision]
 class ModelRevisionConnection(Connection[ModelRevision]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

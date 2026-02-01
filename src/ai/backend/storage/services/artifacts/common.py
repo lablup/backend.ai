@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import cast, override
+from typing import override
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import (
@@ -118,7 +118,6 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             raise ArtifactVerifyStorageTypeInvalid(
                 "Verify step requires VFS or VFolderStorage storage type"
             )
-        dst_storage = cast(VFSStorage | VFolderStorage, dst_storage)
 
         # Collect verification results from all verifiers
         verifier_results: dict[str, VerifierResult] = {}

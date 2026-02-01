@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -191,7 +191,7 @@ class VFolderDep(BaseDependencyModel):
     )
 
     @model_validator(mode="after")
-    def validate(self):
+    def validate_permissions(self) -> Self:
         if self.permission == self.share_permission:
             raise ValueError("permission and share_permission must be different")
         return self

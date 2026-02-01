@@ -12,7 +12,7 @@ from ai.backend.manager.models.base import (
 )
 
 
-class EntityFieldRow(Base):
+class EntityFieldRow(Base):  # type: ignore[misc]
     __tablename__ = "entity_fields"
     __table_args__ = (
         sa.UniqueConstraint(

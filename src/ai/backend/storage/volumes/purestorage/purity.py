@@ -53,7 +53,7 @@ class PurityClient:
             self._lock.release()
             raise
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: object) -> None:
         self._auth_token = None
         self._lock.release()
 

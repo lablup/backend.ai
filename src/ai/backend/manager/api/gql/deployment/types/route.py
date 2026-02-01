@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
@@ -55,7 +55,7 @@ RouteTrafficStatusGQL = strawberry.enum(
     description="Added in 25.19.0. Represents a route for a model deployment.",
 )
 class Route(Node):
-    id: NodeID
+    id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     _session_id: strawberry.Private[UUID | None]
     _revision_id: strawberry.Private[UUID | None]
@@ -75,7 +75,7 @@ class Route(Node):
         description="Error data if the route is in a failed state.",
     )
 
-    @strawberry.field(description="The deployment this route belongs to.")
+    @strawberry.field(description="The deployment this route belongs to.")  # type: ignore[misc]
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
@@ -89,7 +89,7 @@ class Route(Node):
             raise EndpointNotFound(extra_msg=f"id={self._deployment_id}")
         return ModelDeployment.from_dataclass(deployment_data)
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session associated with the route. Can be null if the route is still provisioning."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
@@ -101,7 +101,7 @@ class Route(Node):
         )
         return ID(session_global_id)
 
-    @strawberry.field(description="The revision associated with the route.")
+    @strawberry.field(description="The revision associated with the route.")  # type: ignore[misc]
     async def revision(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
@@ -139,7 +139,7 @@ class RouteConnection(Connection[Route]):
         description="Total number of routes matching the filter criteria."
     )
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

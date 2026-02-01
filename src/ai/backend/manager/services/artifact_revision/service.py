@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Final, cast
+from typing import Final
 from uuid import UUID
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -36,8 +36,6 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
     ReservoirConfig,
-    ReservoirObjectStorageConfig,
-    ReservoirVFSStorageConfig,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
@@ -127,7 +125,7 @@ from ai.backend.manager.services.artifact_revision.actions.search import (
 _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 30  # seconds
 _REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRevisionService:
@@ -180,9 +178,9 @@ class ArtifactRevisionService:
         """
         match reservoir_config.config.storage_type:
             case ArtifactStorageType.OBJECT_STORAGE.value:
-                return cast(ReservoirObjectStorageConfig, reservoir_config.config).bucket_name
+                return reservoir_config.config.bucket_name
             case ArtifactStorageType.VFS_STORAGE.value:
-                return cast(ReservoirVFSStorageConfig, reservoir_config.config).subpath
+                return reservoir_config.config.subpath
             case _:
                 raise UnsupportedStorageTypeError(
                     f"Unsupported storage type: {reservoir_config.config.storage_type}"

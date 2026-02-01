@@ -5,7 +5,7 @@ from pathlib import Path
 from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript, match_plugin_list
 
 
-def test_parse_build():
+def test_parse_build() -> None:
     with tempfile.NamedTemporaryFile("w") as f:
         f.write(
             tw.dedent(
@@ -88,7 +88,7 @@ def test_parse_build():
         )
 
 
-def test_match_blocklist():
+def test_match_blocklist() -> None:
     assert match_plugin_list("ai.backend.manager:abc", {"ai.backend.manager"})
     assert not match_plugin_list("ai.backend.manager:abc", {"ai.backend.agent"})
     assert match_plugin_list(

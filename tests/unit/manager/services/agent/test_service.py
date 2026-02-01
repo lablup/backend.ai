@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import asyncio
+from collections.abc import Generator
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -391,8 +395,10 @@ class TestWatcher:
         return AgentId("test-agent-watcher")
 
     @pytest.fixture
-    def _setup_http_mock(self, mock_etcd: AsyncMock):
-        def _setup(agent_id: AgentId, status: int, data: dict | str):
+    def _setup_http_mock(self, mock_etcd: AsyncMock) -> Any:
+        def _setup(
+            agent_id: AgentId, status: int, data: dict[str, Any] | str
+        ) -> tuple[AsyncMock, AsyncMock]:
             # Setup etcd
             mock_etcd.get.side_effect = lambda key: {
                 f"nodes/agents/{agent_id}/ip": "192.168.1.100",
@@ -421,7 +427,9 @@ class TestWatcher:
         return _setup
 
     @pytest.fixture
-    def watcher_service_ok(self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock):
+    def watcher_service_ok(
+        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock: Any
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"})
 
         with patch(
@@ -432,8 +440,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_ok_get(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(
             agent_id,
             HTTPStatus.OK,
@@ -448,8 +459,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_forbidden(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.FORBIDDEN, "Invalid token")
 
         with patch(
@@ -460,8 +474,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_error(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(
             agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed"
         )

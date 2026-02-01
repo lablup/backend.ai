@@ -892,7 +892,7 @@ def clone(name: str, target_name: str, target_host: str, usage_mode: str, permis
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     if bgtask_id is None:
         print_done("Cloning the vfolder is complete.")

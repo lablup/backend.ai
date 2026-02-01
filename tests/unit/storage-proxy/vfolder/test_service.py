@@ -23,23 +23,23 @@ UUID2 = uuid.UUID("12345678-1234-5678-1234-567812345680")
 
 
 @pytest.fixture
-def mock_volume_pool():
+def mock_volume_pool() -> MagicMock:
     return MagicMock(spec=VolumePool)
 
 
 @pytest.fixture
-def mock_service(mock_volume_pool):
+def mock_service(mock_volume_pool: MagicMock) -> VolumeService:
     service = VolumeService(volume_pool=mock_volume_pool, event_producer=MagicMock())
-    service._get_capabilities = AsyncMock(return_value=["capability1", "capability2"])
-
-    service.log = service_log
+    service._get_capabilities = AsyncMock(return_value=["capability1", "capability2"])  # type: ignore[method-assign]
 
     return service
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_volume(mock_log, mock_service, mock_volume_pool):
+async def test_get_volume(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume_info = MagicMock()
     mock_volume_info.backend = "mock-backend"
     mock_volume_info.path = "/mock/path"
@@ -52,25 +52,29 @@ async def test_get_volume(mock_log, mock_service, mock_volume_pool):
 
     mock_log.assert_called_once_with(service_log, "get_volume", volume_id)
     mock_volume_pool.get_volume_info.assert_called_once_with(volume_id)
+    assert isinstance(mock_service._get_capabilities, AsyncMock)
     mock_service._get_capabilities.assert_called_once_with(volume_id)
 
     assert isinstance(result, VolumeMeta)
     assert result.volume_id == volume_id
     assert result.backend == "mock-backend"
-    assert result.path == "/mock/path"
-    assert result.fsprefix == "mock-fsprefix"
+    assert str(result.path) == "/mock/path"
+    assert str(result.fsprefix) == "mock-fsprefix"
     assert result.capabilities == ["capability1", "capability2"]
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_volumes(mock_log, mock_service, mock_volume_pool):
+async def test_get_volumes(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volumes = {
         str(UUID1): MagicMock(backend="backend1", path="/path1", fsprefix="fsprefix1"),
         str(UUID2): MagicMock(backend="backend2", path="/path2", fsprefix="fsprefix2"),
     }
     mock_volume_pool.list_volumes.return_value = mock_volumes
 
+    assert isinstance(mock_service._get_capabilities, AsyncMock)
     mock_service._get_capabilities.side_effect = [
         ["capability1", "capability2"],
         ["capability3"],
@@ -84,28 +88,31 @@ async def test_get_volumes(mock_log, mock_service, mock_volume_pool):
     assert len(result) == 2
     assert result[0].volume_id == UUID1
     assert result[0].backend == "backend1"
-    assert result[0].path == "/path1"
-    assert result[0].fsprefix == "fsprefix1"
+    assert str(result[0].path) == "/path1"
+    assert str(result[0].fsprefix) == "fsprefix1"
     assert result[0].capabilities == ["capability1", "capability2"]
 
     assert result[1].volume_id == UUID2
     assert result[1].backend == "backend2"
-    assert result[1].path == "/path2"
-    assert result[1].fsprefix == "fsprefix2"
+    assert str(result[1].path) == "/path2"
+    assert str(result[1].fsprefix) == "fsprefix2"
     assert result[1].capabilities == ["capability3"]
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_create_quota_scope(mock_log, mock_service, mock_volume_pool):
+async def test_create_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(
         volume_id=uuid.UUID("12345678-1234-5678-1234-567812345678"),
-        quota_scope_id=UUID,
+        quota_scope_id=quota_scope_id,
     )
     options = QuotaConfig(limit_bytes=1024 * 1024 * 1024)
 
@@ -113,25 +120,28 @@ async def test_create_quota_scope(mock_log, mock_service, mock_volume_pool):
 
     mock_log.assert_called_once_with(service_log, "create_quota_scope", quota_scope_key)
     mock_volume.quota_model.create_quota_scope.assert_called_once_with(
-        quota_scope_id=UUID, options=options, extra_args=None
+        quota_scope_id=quota_scope_id, options=options, extra_args=None
     )
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_quota_scope(mock_log, mock_service, mock_volume_pool):
+async def test_get_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     quota_scope_meta = QuotaScopeMeta(used_bytes=500, limit_bytes=1000)
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
 
     result = await mock_service.get_quota_scope(quota_scope_key)
 
     mock_log.assert_called_once_with(service_log, "get_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
 
     assert result.used_bytes == 500
     assert result.limit_bytes == 1000
@@ -139,7 +149,9 @@ async def test_get_quota_scope(mock_log, mock_service, mock_volume_pool):
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_update_quota_scope(mock_log, mock_service, mock_volume_pool):
+async def test_update_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     quota_scope_meta = QuotaScopeMeta(used_bytes=500, limit_bytes=1000)
     mock_volume.quota_model.describe_quota_scope = AsyncMock(return_value=quota_scope_meta)
@@ -147,21 +159,24 @@ async def test_update_quota_scope(mock_log, mock_service, mock_volume_pool):
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
     options = QuotaConfig(limit_bytes=2000)
 
     await mock_service.update_quota_scope(quota_scope_key, options)
 
     mock_log.assert_called_once_with(service_log, "update_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
     mock_volume.quota_model.update_quota_scope.assert_called_once_with(
-        quota_scope_id=UUID, config=options
+        quota_scope_id=quota_scope_id, config=options
     )
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_delete_quota_scope(mock_log, mock_service, mock_volume_pool):
+async def test_delete_quota_scope(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.quota_model.describe_quota_scope = AsyncMock(
         return_value=MagicMock(used_bytes=500, limit_bytes=1000)
@@ -170,18 +185,21 @@ async def test_delete_quota_scope(mock_log, mock_service, mock_volume_pool):
 
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=UUID)
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
 
     await mock_service.delete_quota_scope(quota_scope_key)
 
     mock_log.assert_called_once_with(service_log, "delete_quota_scope", quota_scope_key)
-    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(UUID)
-    mock_volume.quota_model.unset_quota.assert_called_once_with(UUID)
+    mock_volume.quota_model.describe_quota_scope.assert_called_once_with(quota_scope_id)
+    mock_volume.quota_model.unset_quota.assert_called_once_with(quota_scope_id)
 
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_create_vfolder(mock_log, mock_service, mock_volume_pool):
+async def test_create_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.create_vfolder = AsyncMock()
     mock_volume.quota_model.create_quota_scope = AsyncMock()
@@ -202,7 +220,9 @@ async def test_create_vfolder(mock_log, mock_service, mock_volume_pool):
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_clone_vfolder(mock_log, mock_service, mock_volume_pool):
+async def test_clone_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.clone_vfolder = AsyncMock()
 
@@ -226,7 +246,9 @@ async def test_clone_vfolder(mock_log, mock_service, mock_volume_pool):
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_get_vfolder_info(mock_log, mock_service, mock_volume_pool):
+async def test_get_vfolder_info(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.get_vfolder_mount = AsyncMock(return_value=Path("/mock/mount"))
 
@@ -267,7 +289,9 @@ async def test_get_vfolder_info(mock_log, mock_service, mock_volume_pool):
 
 @pytest.mark.asyncio
 @patch("ai.backend.storage.services.service.log_manager_api_entry_new", new_callable=AsyncMock)
-async def test_delete_vfolder(mock_log, mock_service, mock_volume_pool):
+async def test_delete_vfolder(
+    mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
+) -> None:
     mock_volume = MagicMock()
     mock_volume.get_vfolder_mount = AsyncMock(side_effect=VFolderNotFoundError)
 

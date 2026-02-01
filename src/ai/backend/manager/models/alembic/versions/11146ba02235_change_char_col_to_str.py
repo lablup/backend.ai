@@ -17,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
     op.alter_column("agents", column_name="architecture", type_=sa.String(length=32))
     query = """
@@ -27,5 +27,5 @@ def upgrade():
     conn.execute(text(query))
 
 
-def downgrade():
+def downgrade() -> None:
     op.alter_column("agents", column_name="architecture", type_=sa.CHAR(length=32))

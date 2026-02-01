@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 import strawberry
 from strawberry import Info
@@ -54,7 +55,7 @@ ResourceGroupEdge = Edge[ResourceGroupGQL]
 class ResourceGroupConnection(Connection[ResourceGroupGQL]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
@@ -62,7 +63,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 # Query fields
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.2.0. List resource groups (admin only)",
 )
 async def admin_resource_groups(
@@ -115,7 +116,7 @@ async def admin_resource_groups(
     )
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description="Added in 26.2.0. List resource groups",
     deprecation_reason=(
         "Use admin_resource_groups instead. This API will be removed after v26.3.0. "
@@ -173,7 +174,7 @@ async def resource_groups(
 # Mutation fields
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Update fair share configuration for a resource group (admin only). "
         "Only provided fields are updated; others retain their existing values. "
@@ -217,7 +218,7 @@ async def admin_update_resource_group_fair_share_spec(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=(
         "Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). "
         "Only provided fields are updated; others retain their existing values. "

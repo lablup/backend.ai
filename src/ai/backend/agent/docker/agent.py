@@ -192,7 +192,7 @@ deeplearning_sample_volume = VolumeInfo(
 
 
 async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
-    avail_volumes = (await docker.volumes.list())["Volumes"]
+    avail_volumes = (await docker.volumes.list())["Volumes"]  # type: ignore[no-untyped-call]
     if not avail_volumes:
         return []
     avail_volume_names = {v["Name"] for v in avail_volumes}
@@ -1371,9 +1371,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_info: Mapping[str, Any]
-    monitor_docker_task: asyncio.Task
+    monitor_docker_task: asyncio.Task[Any]
     agent_sockpath: Path
-    agent_sock_task: asyncio.Task
+    agent_sock_task: asyncio.Task[Any]
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: str | None
     checked_invalid_images: set[str]
@@ -1571,13 +1571,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     def get_cgroup_version(self) -> str:
-        return self.docker_info["CgroupVersion"]
+        return cast(str, self.docker_info["CgroupVersion"])
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
-            return result["Config"].get("Cmd")
+            return cast(str | None, result["Config"].get("Cmd"))
 
     @override
     async def enumerate_containers(
@@ -2146,7 +2146,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
@@ -2195,7 +2195,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         while True:
             async with closing_async(Docker()) as docker:
-                subscriber = docker.events.subscribe(create_task=True)
+                subscriber = docker.events.subscribe(create_task=True)  # type: ignore[no-untyped-call]
                 try:
                     while True:
                         try:
@@ -2255,6 +2255,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 finally:
                     await asyncio.shield(
                         self.docker_ptask_group.create_task(
-                            docker.events.stop(),
+                            docker.events.stop(),  # type: ignore[no-untyped-call]
                         )
                     )

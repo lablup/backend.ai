@@ -1,3 +1,5 @@
+from typing import cast
+
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
 
@@ -68,7 +70,7 @@ async def verify_bgtask_events(
         async for ev in response:
             if ev.event == expected_event:
                 data = load_json(ev.data)
-                return data.get("message")
+                return cast(str | None, data.get("message"))
 
             if ev.event in failure_events:
                 raise RuntimeError(

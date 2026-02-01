@@ -30,7 +30,7 @@ __all__ = (
     "RollingUpdateSpec",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RollingUpdateSpec(BaseModel):
@@ -53,7 +53,7 @@ def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentPolicyRow(Base):
+class DeploymentPolicyRow(Base):  # type: ignore[misc]
     """
     Represents a deployment policy for a deployment.
 

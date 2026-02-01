@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -378,7 +378,7 @@ class AgentV2GQL(Node):
         """)
     )
 
-    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")
+    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")  # type: ignore[misc]
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
@@ -433,6 +433,6 @@ AgentV2Edge = Edge[AgentV2GQL]
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count

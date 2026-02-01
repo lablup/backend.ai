@@ -12,7 +12,7 @@ import struct
 import sys
 import termios
 import traceback
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import zmq
 import zmq.asyncio
@@ -40,7 +40,7 @@ class Terminal:
         auto_restart: bool = True,
         loop: AbstractEventLoop | None = None,
     ) -> None:
-        self._sorna_media: list = []
+        self._sorna_media: list[Any] = []
         self.zctx = sock_out.context
 
         self.ev_term = ev_term
@@ -97,8 +97,10 @@ class Terminal:
             if code_txt.startswith("%"):
                 args = self.cmdparser.parse_args(shlex.split(code_txt[1:], comments=True))
                 if asyncio.iscoroutine(args.func) or asyncio.iscoroutinefunction(args.func):
-                    return await args.func(args)
-                return args.func(args)
+                    result_async: int = await args.func(args)
+                    return result_async
+                result_sync: int = args.func(args)
+                return result_sync
             await self.sock_out.send_multipart([b"stderr", b"Invalid command."])
             return 127
         except Exception:

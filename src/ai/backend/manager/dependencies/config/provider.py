@@ -58,7 +58,7 @@ class ConfigProviderDependency(
             Initialized ManagerConfigProvider
         """
         # Create loader chain following server.py pattern
-        loaders: list = []
+        loaders: list[Any] = []
 
         # Add file loader if config path is provided
         if setup_input.config_path:

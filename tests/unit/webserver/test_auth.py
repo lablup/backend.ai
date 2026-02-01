@@ -7,20 +7,21 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 from aiohttp import web
+from pytest_mock import MockerFixture
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.web.auth import get_anonymous_session, get_api_session
 
 
 class DummyApiConfig:
-    def __init__(self, domain: str, endpoint: list, ssl_verify: bool):
+    def __init__(self, domain: str, endpoint: list[yarl.URL], ssl_verify: bool) -> None:
         self.domain = domain
         self.endpoint = endpoint
         self.ssl_verify = ssl_verify
 
 
 class DummyConfig:
-    def __init__(self, api_config: DummyApiConfig):
+    def __init__(self, api_config: DummyApiConfig) -> None:
         self.api = api_config
 
 
@@ -41,7 +42,7 @@ async def client_pool() -> ClientPool:
 
 
 @pytest.mark.asyncio
-async def test_get_api_session(mocker, client_pool: ClientPool) -> None:
+async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -92,7 +93,9 @@ async def test_get_api_session(mocker, client_pool: ClientPool) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_api_session_with_specific_api_endpoint(mocker, client_pool: ClientPool) -> None:
+async def test_get_api_session_with_specific_api_endpoint(
+    mocker: MockerFixture, client_pool: ClientPool
+) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -118,7 +121,7 @@ async def test_get_api_session_with_specific_api_endpoint(mocker, client_pool: C
 
 
 @pytest.mark.asyncio
-async def test_get_anonymous_session(mocker, client_pool: ClientPool) -> None:
+async def test_get_anonymous_session(mocker: MockerFixture, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
             DummyApiConfig(
@@ -143,7 +146,7 @@ async def test_get_anonymous_session(mocker, client_pool: ClientPool) -> None:
 
 @pytest.mark.asyncio
 async def test_get_anonymous_session_with_specific_api_endpoint(
-    mocker, client_pool: ClientPool
+    mocker: MockerFixture, client_pool: ClientPool
 ) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(

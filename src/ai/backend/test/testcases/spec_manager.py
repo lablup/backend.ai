@@ -47,10 +47,10 @@ class TestSpec:
     template: TestTemplate
     parametrizes: Mapping[ContextName, Sequence[Any]] | None = None
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, TestSpec):
             return NotImplemented
         # If name is the same, consider them equal

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -118,7 +118,7 @@ class NotificationDBSource:
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationChannelRow).where(NotificationChannelRow.id == channel_id)
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def create_rule(
         self,
@@ -162,7 +162,7 @@ class NotificationDBSource:
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationRuleRow).where(NotificationRuleRow.id == rule_id)
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def get_channel_by_id(self, channel_id: UUID) -> NotificationChannelData:
         """Retrieves a notification channel by ID."""

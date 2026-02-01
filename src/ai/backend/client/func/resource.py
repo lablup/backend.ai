@@ -23,7 +23,9 @@ class Resource(BaseFunction):
         """
         rqst = Request("GET", "/resource/presets")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -40,7 +42,9 @@ class Resource(BaseFunction):
             data["scaling_group"] = scaling_group
         rqst.set_json(data)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -61,7 +65,9 @@ class Resource(BaseFunction):
         """
         rqst = Request("GET", "/resource/container-registries")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -82,7 +88,9 @@ class Resource(BaseFunction):
         )
 
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -109,7 +117,9 @@ class Resource(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -119,32 +129,42 @@ class Resource(BaseFunction):
         """
         rqst = Request("GET", "/config/resource-slots")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
     async def get_vfolder_types(cls) -> dict[str, Any]:
         rqst = Request("GET", "/config/vfolder-types")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
     async def recalculate_usage(cls) -> dict[str, Any]:
         rqst = Request("POST", "/resource/recalculate-usage")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
     async def user_monthly_stats(cls) -> dict[str, Any]:
         rqst = Request("GET", "/resource/stats/user/month")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
     async def admin_monthly_stats(cls) -> dict[str, Any]:
         rqst = Request("GET", "/resource/stats/admin/month")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

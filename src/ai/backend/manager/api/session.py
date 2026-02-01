@@ -361,7 +361,7 @@ async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
-) -> tuple[UUID, UUID, dict]:
+) -> tuple[UUID, UUID, dict[str, Any]]:
     try:
         return await _query_userinfo(
             conn,
@@ -1329,7 +1329,7 @@ async def _find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-) -> dict[str, list | str]:
+) -> dict[str, list[Any] | str]:
     sessions = await SessionRow.match_sessions(
         db_session,
         session_name_or_id,
@@ -1365,7 +1365,7 @@ async def _find_dependency_sessions(
     if kernel_query_result is None:
         raise ValueError(f"Kernel not found for session {session_id}")
 
-    session_info: dict[str, list | str] = {
+    session_info: dict[str, list[Any] | str] = {
         "session_id": session_id,
         "session_name": session_name,
         "status": str(kernel_query_result[0]),
@@ -1383,7 +1383,7 @@ async def find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-) -> dict[str, list | str]:
+) -> dict[str, list[Any] | str]:
     return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
 
 
@@ -1613,7 +1613,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             request=request,
         )
     )
-    return result.response
+    return cast(web.StreamResponse, result.response)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1631,7 +1631,7 @@ async def get_status_history(request: web.Request, params: Any) -> web.Response:
         "GET_STATUS_HISTORY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
 
-    resp: dict[str, Mapping] = {"result": {}}
+    resp: dict[str, Mapping[str, Any]] = {"result": {}}
     result = await root_ctx.processors.session.get_status_history.wait_for_complete(
         GetStatusHistoryAction(
             session_name=session_name,

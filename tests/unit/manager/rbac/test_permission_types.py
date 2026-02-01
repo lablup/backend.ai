@@ -2,7 +2,7 @@ from ai.backend.manager.data.permission.types import EntityType, OperationType
 
 
 class TestOperationType:
-    def test_owner_operations_contains_all(self):
+    def test_owner_operations_contains_all(self) -> None:
         """Test that owner_operations contains all operation types."""
         owner_ops = OperationType.owner_operations()
         all_ops = set(OperationType)
@@ -21,7 +21,7 @@ class TestOperationType:
         assert OperationType.GRANT_SOFT_DELETE in owner_ops
         assert OperationType.GRANT_HARD_DELETE in owner_ops
 
-    def test_admin_operations_contains_all(self):
+    def test_admin_operations_contains_all(self) -> None:
         """Test that admin_operations contains all operation types."""
         admin_ops = OperationType.admin_operations()
         all_ops = set(OperationType)
@@ -40,7 +40,7 @@ class TestOperationType:
         assert OperationType.GRANT_SOFT_DELETE in admin_ops
         assert OperationType.GRANT_HARD_DELETE in admin_ops
 
-    def test_member_operations_contains_only_read(self):
+    def test_member_operations_contains_only_read(self) -> None:
         """Test that member_operations contains only READ operation."""
         member_ops = OperationType.member_operations()
 
@@ -60,7 +60,7 @@ class TestOperationType:
 
 
 class TestEntityType:
-    def test_owner_accessible_entity_types_in_user(self):
+    def test_owner_accessible_entity_types_in_user(self) -> None:
         """Test that owner_accessible_entity_types_in_user contains resource types."""
         owner_accessible = EntityType.owner_accessible_entity_types_in_user()
 
@@ -77,7 +77,7 @@ class TestEntityType:
         # Verify it equals _resource_types()
         assert owner_accessible == EntityType._resource_types()
 
-    def test_admin_accessible_entity_types_in_project(self):
+    def test_admin_accessible_entity_types_in_project(self) -> None:
         """Test that admin_accessible_entity_types_in_project contains resource types and USER."""
         admin_accessible = EntityType.admin_accessible_entity_types_in_project()
 
@@ -97,7 +97,7 @@ class TestEntityType:
         expected = {*EntityType._resource_types(), EntityType.USER}
         assert admin_accessible == expected
 
-    def test_member_accessible_entity_types_in_project(self):
+    def test_member_accessible_entity_types_in_project(self) -> None:
         """Test that member_accessible_entity_types_in_project contains resource types and USER."""
         member_accessible = EntityType.member_accessible_entity_types_in_project()
 
@@ -117,7 +117,7 @@ class TestEntityType:
         expected = {*EntityType._resource_types(), EntityType.USER}
         assert member_accessible == expected
 
-    def test_all_entity_types_are_categorized(self):
+    def test_all_entity_types_are_categorized(self) -> None:
         """Test that all EntityType values are in either _scope_types or _resource_types."""
         all_entity_types = set(EntityType)
         scope_types = EntityType._scope_types()

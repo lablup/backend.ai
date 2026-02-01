@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -337,7 +339,7 @@ class BackendAIError(web.HTTPError, ABC):
     body_dict: dict[str, Any]
 
     def __init__(
-        self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs
+        self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs: Any
     ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
@@ -379,7 +381,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use

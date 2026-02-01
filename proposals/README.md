@@ -129,6 +129,7 @@ BEP numbers start from 1000.
 | [1039](BEP-1039-image-id-based-service-logic-migration.md) | Image ID Based Service Logic Migration | Gyubong Lee | Draft |
 | [1040](BEP-1040-multiple-path-zip-download-implementation.md) | Multiple Files Download in ZIP | TaekYoung Kwon | Draft |
 | [1041](BEP-1041-scope-based-graphql-api-naming.md) | Scope-Based GraphQL API Naming Convention | HyeokJin Kim | Draft |
+| [1042](BEP-1042-mypy-strict-mode-migration.md) | MyPy Strict Mode Migration | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

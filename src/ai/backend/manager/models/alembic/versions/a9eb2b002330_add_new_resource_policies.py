@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     conn = op.get_bind()
     op.create_table(
@@ -74,7 +74,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.execute(text("UPDATE vfolders SET quota_scope_id = SPLIT_PART(quota_scope_id, ':', 2);"))
     op.drop_column("users", "resource_policy")
     op.drop_column("groups", "resource_policy")

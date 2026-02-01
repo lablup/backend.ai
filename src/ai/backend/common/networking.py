@@ -76,4 +76,5 @@ def find_free_port(bind_addr: str = "127.0.0.1") -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind((bind_addr, 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
+        result: int = s.getsockname()[1]
+        return result

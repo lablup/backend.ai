@@ -705,7 +705,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         # Note: kernel_id is used as session_id key here for connection tracking
                         # The idle checker operates on session granularity
                         await root_ctx.idle_checker_host.update_app_streaming_status(
-                            SessionId(session_id),  # type: ignore[arg-type]
+                            SessionId(session_id),
                             AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
             await asyncio.sleep(10)
@@ -715,13 +715,13 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    stream_pty_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_execute_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
-    stream_proxy_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task]]
+    stream_pty_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
+    stream_execute_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
+    stream_proxy_handlers: defaultdict[KernelId, weakref.WeakSet[asyncio.Task[Any]]]
     stream_stdin_socks: defaultdict[KernelId, weakref.WeakSet[zmq.asyncio.Socket]]
     zctx: zmq.asyncio.Context
     conn_tracker_lock: asyncio.Lock
-    conn_tracker_gc_task: asyncio.Task
+    conn_tracker_gc_task: asyncio.Task[Any]
     active_session_ids: defaultdict[KernelId, int]
 
 
@@ -753,7 +753,7 @@ async def stream_shutdown(app: web.Application) -> None:
     rpc_ptask_group: aiotools.PersistentTaskGroup = app["rpc_ptask_group"]
     await database_ptask_group.shutdown()
     await rpc_ptask_group.shutdown()
-    cancelled_tasks: list[asyncio.Task] = []
+    cancelled_tasks: list[asyncio.Task[Any]] = []
     app_ctx: PrivateContext = app["stream.context"]
     app_ctx.conn_tracker_gc_task.cancel()
     cancelled_tasks.append(app_ctx.conn_tracker_gc_task)

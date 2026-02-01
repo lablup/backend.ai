@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 import msgpack
 import psutil
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 
 class RelayHandler(logging.Handler):
-    _sock: zmq.Socket | None
+    _sock: zmq.Socket[Any] | None
 
     def __init__(self, *, endpoint: str, msgpack_options: MsgpackOptions) -> None:
         super().__init__()
         self.endpoint = endpoint
         self.msgpack_options = msgpack_options
-        self._zctx = zmq.Context[zmq.Socket]()
+        self._zctx = zmq.Context[zmq.Socket[Any]]()
         self._pid = os.getpid()
         self._process_name = psutil.Process().name()
         # We should use PUSH-PULL socket pairs to avoid

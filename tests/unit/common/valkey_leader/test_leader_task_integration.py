@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,7 +28,7 @@ class MockLeaderTask(LeaderTask):
         self.stop_called = False
         self.leadership_checker: LeadershipChecker | None = None
         self.execution_count = 0
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[Any] | None = None
         self._stopped = False
 
     async def start(self, leadership_checker: LeadershipChecker) -> None:
@@ -55,7 +56,7 @@ class MockLeaderTask(LeaderTask):
 
 
 @pytest.fixture
-async def mock_leader_client():
+async def mock_leader_client() -> AsyncMock:
     """Create a mock ValkeyLeaderClient."""
     client = AsyncMock(spec=ValkeyLeaderClient)
     client.acquire_or_renew_leadership = AsyncMock(return_value=False)
@@ -65,7 +66,7 @@ async def mock_leader_client():
 
 
 @pytest.fixture
-async def mock_event_producer():
+async def mock_event_producer() -> AsyncMock:
     """Create a mock EventProducer."""
     producer = AsyncMock(spec=EventProducer)
     producer.anycast_event = AsyncMock()
@@ -73,7 +74,7 @@ async def mock_event_producer():
 
 
 @pytest.fixture
-async def leader_election_config():
+async def leader_election_config() -> ValkeyLeaderElectionConfig:
     """Create a ValkeyLeaderElectionConfig."""
     return ValkeyLeaderElectionConfig(
         server_id="test-server-001",
@@ -84,7 +85,9 @@ async def leader_election_config():
 
 
 @pytest.fixture
-async def leader_election(mock_leader_client, leader_election_config):
+async def leader_election(
+    mock_leader_client: AsyncMock, leader_election_config: ValkeyLeaderElectionConfig
+) -> ValkeyLeaderElection:
     """Create a ValkeyLeaderElection instance."""
     return ValkeyLeaderElection(
         leader_client=mock_leader_client,
@@ -95,7 +98,7 @@ async def leader_election(mock_leader_client, leader_election_config):
 class TestLeaderTaskIntegration:
     """Test cases for LeaderTask integration with ValkeyLeaderElection."""
 
-    async def test_task_registration(self, leader_election):
+    async def test_task_registration(self, leader_election: ValkeyLeaderElection) -> None:
         """Test registering LeaderTask instances."""
         task1 = MockLeaderTask()
         task2 = MockLeaderTask()
@@ -107,7 +110,9 @@ class TestLeaderTaskIntegration:
         assert task1 in leader_election._leader_tasks
         assert task2 in leader_election._leader_tasks
 
-    async def test_task_registration_after_start_fails(self, leader_election):
+    async def test_task_registration_after_start_fails(
+        self, leader_election: ValkeyLeaderElection
+    ) -> None:
         """Test that registering tasks after start() raises RuntimeError."""
         task1 = MockLeaderTask()
 
@@ -127,7 +132,9 @@ class TestLeaderTaskIntegration:
         # Stop the election
         await leader_election.stop()
 
-    async def test_tasks_start_on_election_start(self, leader_election):
+    async def test_tasks_start_on_election_start(
+        self, leader_election: ValkeyLeaderElection
+    ) -> None:
         """Test that all registered tasks start when election starts."""
         task1 = MockLeaderTask()
         task2 = MockLeaderTask()
@@ -147,7 +154,7 @@ class TestLeaderTaskIntegration:
         # Stop election
         await leader_election.stop()
 
-    async def test_tasks_stop_on_election_stop(self, leader_election):
+    async def test_tasks_stop_on_election_stop(self, leader_election: ValkeyLeaderElection) -> None:
         """Test that all tasks stop when election stops."""
         task1 = MockLeaderTask()
         task2 = MockLeaderTask()
@@ -163,7 +170,9 @@ class TestLeaderTaskIntegration:
         assert task1.stop_called
         assert task2.stop_called
 
-    async def test_tasks_execute_when_leader(self, leader_election, mock_leader_client):
+    async def test_tasks_execute_when_leader(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that tasks execute only when instance is leader."""
         # Configure to become leader
         mock_leader_client.acquire_or_renew_leadership.return_value = True
@@ -183,7 +192,9 @@ class TestLeaderTaskIntegration:
         # Stop election
         await leader_election.stop()
 
-    async def test_tasks_dont_execute_when_not_leader(self, leader_election, mock_leader_client):
+    async def test_tasks_dont_execute_when_not_leader(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that tasks don't execute when instance is not leader."""
         # Configure to never become leader
         mock_leader_client.acquire_or_renew_leadership.return_value = False
@@ -204,8 +215,11 @@ class TestLeaderTaskIntegration:
         await leader_election.stop()
 
     async def test_leader_cron_integration(
-        self, leader_election, mock_leader_client, mock_event_producer
-    ):
+        self,
+        leader_election: ValkeyLeaderElection,
+        mock_leader_client: AsyncMock,
+        mock_event_producer: AsyncMock,
+    ) -> None:
         """Test LeaderCron integration with ValkeyLeaderElection."""
         # Configure to become leader
         mock_leader_client.acquire_or_renew_leadership.return_value = True
@@ -241,8 +255,11 @@ class TestLeaderTaskIntegration:
         await leader_election.stop()
 
     async def test_multiple_leader_tasks(
-        self, leader_election, mock_leader_client, mock_event_producer
-    ):
+        self,
+        leader_election: ValkeyLeaderElection,
+        mock_leader_client: AsyncMock,
+        mock_event_producer: AsyncMock,
+    ) -> None:
         """Test managing multiple different LeaderTask types."""
         # Configure to become leader
         mock_leader_client.acquire_or_renew_leadership.return_value = True
@@ -282,7 +299,9 @@ class TestLeaderTaskIntegration:
         # Verify both stopped
         assert mock_task.stop_called
 
-    async def test_leadership_change_affects_tasks(self, leader_election, mock_leader_client):
+    async def test_leadership_change_affects_tasks(
+        self, leader_election: ValkeyLeaderElection, mock_leader_client: AsyncMock
+    ) -> None:
         """Test that leadership changes affect task execution."""
         # Start as non-leader, then become leader, then lose leadership
         mock_leader_client.acquire_or_renew_leadership.side_effect = [

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -106,7 +106,7 @@ AccessTokenEdge = Edge[AccessToken]
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

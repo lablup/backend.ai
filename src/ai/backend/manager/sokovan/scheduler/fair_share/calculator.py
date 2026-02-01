@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot
@@ -35,6 +35,15 @@ if TYPE_CHECKING:
     )
 
 from ai.backend.manager.data.fair_share import UserProjectKey
+
+
+class DecayedUsagesByLevel(TypedDict):
+    """Decayed usage aggregated by hierarchy level."""
+
+    domain: dict[str, ResourceSlot]
+    project: dict[UUID, ResourceSlot]
+    user: dict[UserProjectKey, ResourceSlot]
+
 
 # Default resource weights for fair share calculation
 DEFAULT_RESOURCE_WEIGHTS: ResourceSlot = ResourceSlot({
@@ -262,7 +271,7 @@ class FairShareFactorCalculator:
         raw_buckets: RawUsageBucketsByLevel,
         today: date,
         half_life_days: int,
-    ) -> dict[str, dict]:
+    ) -> DecayedUsagesByLevel:
         """Aggregate raw usage buckets with time decay applied.
 
         Args:

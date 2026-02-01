@@ -29,7 +29,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PeerInvoker(Peer):
     class _CallStub:
-        _cached_funcs: dict[str, Callable]
+        _cached_funcs: dict[str, Callable[..., Any]]
         order_key: ContextVar[str | None]
 
         def __init__(self, peer: Peer) -> None:
@@ -37,11 +37,11 @@ class PeerInvoker(Peer):
             self.peer = peer
             self.order_key = ContextVar("order_key", default=None)
 
-        def __getattr__(self, name: str) -> Callable:
+        def __getattr__(self, name: str) -> Callable[..., Any]:
             if f := self._cached_funcs.get(name, None):
                 return f
 
-            async def _wrapped(*args, **kwargs) -> Any:
+            async def _wrapped(*args: Any, **kwargs: Any) -> Any:
                 request_body = {
                     "args": args,
                     "kwargs": kwargs,
@@ -57,7 +57,7 @@ class PeerInvoker(Peer):
     call: _CallStub
     last_used: float
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.call = self._CallStub(self)
         self.last_used = time.monotonic()
@@ -96,7 +96,7 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row | None:
+        async def _fetch_agent() -> Row[Any] | None:
             async with self.db.begin_readonly() as conn:
                 query = (
                     sa.select(agents.c.addr, agents.c.public_key)

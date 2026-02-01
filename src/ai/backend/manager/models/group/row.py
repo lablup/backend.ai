@@ -10,7 +10,6 @@ from typing import (
     Any,
     Self,
     TypedDict,
-    cast,
     overload,
     override,
 )
@@ -122,7 +121,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):
+class AssocGroupUserRow(Base):  # type: ignore[misc]
     __tablename__ = "association_groups_users"
     __table_args__ = (
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
@@ -153,7 +152,7 @@ class AssocGroupUserRow(Base):
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(Base):
+class GroupRow(Base):  # type: ignore[misc]
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -211,7 +210,7 @@ class GroupRow(Base):
         nullable=False,
         default=ProjectType.GENERAL,
     )
-    container_registry: Mapped[dict | None] = mapped_column(
+    container_registry: Mapped[dict[str, Any] | None] = mapped_column(
         "container_registry",
         StructuredJSONColumn(container_registry_iv),
         nullable=True,
@@ -356,8 +355,8 @@ groups = GroupRow.__table__
 
 def by_id(project_id: uuid.UUID) -> QueryCondition:
     def _by_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(GroupRow.id == project_id)
 
     return _by_id
@@ -414,7 +413,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict | None:
+    def container_registry(self) -> dict[str, Any] | None:
         return self._container_registry
 
     @classmethod
@@ -463,7 +462,8 @@ async def resolve_group_name_or_id(
         case _:
             raise TypeError("unexpected type for group_name_or_id")
     query = _build_group_query(cond, domain_name)
-    return await db_conn.scalar(query)
+    result: uuid.UUID | None = await db_conn.scalar(query)
+    return result
 
 
 @overload
@@ -510,7 +510,7 @@ class GroupDotfile(TypedDict):
 
 async def query_group_dotfiles(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
     query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
@@ -522,7 +522,7 @@ async def query_group_dotfiles(
 
 async def query_group_domain(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> str | None:
     query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
@@ -591,7 +591,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -599,7 +599,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
-        project_id = cast(uuid.UUID, project_row.id)
+        project_id = project_row.id
         permissions: frozenset[ProjectPermission] = frozenset()
 
         if (

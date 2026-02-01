@@ -30,7 +30,7 @@ class LoaderChain(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        base_config = cast(MutableMapping, deepcopy(self._base_config))
+        base_config = cast(MutableMapping[str, Any], deepcopy(self._base_config))
         merged: MutableMapping[str, Any] = base_config
         for loader in self._loaders:
             cfg = await loader.load()

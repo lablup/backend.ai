@@ -1,4 +1,5 @@
 import sys
+from typing import Any, cast
 
 import click
 
@@ -30,7 +31,7 @@ def get_image_id(
         return name_or_id
     except Exception:
         image = session.Image.get(name_or_id, architecture, fields=[image_fields["id"]])
-        return image["id"]
+        return cast(str, image["id"])
 
 
 @image.command()
@@ -42,7 +43,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
     """
     with Session() as session:
         try:
-            fields: tuple
+            fields: tuple[Any, ...]
             if customized:
                 fields = (
                     image_fields["id"],

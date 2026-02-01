@@ -16,4 +16,5 @@ def encode_commands(cmdlist: Sequence[Any]) -> str:
 
 def decode_commands(data: str | bytes) -> list[Any]:
     bindata = base64.b64decode(data)
-    return msgpack.unpackb(bindata, raw=False)
+    result: list[Any] = msgpack.unpackb(bindata, raw=False)
+    return result

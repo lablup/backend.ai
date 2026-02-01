@@ -73,11 +73,11 @@ def main(
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_example_configuration(output: Path) -> None:
+def generate_example_configuration(output: Path | None) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Coordinator.
     """
@@ -87,10 +87,10 @@ def generate_example_configuration(output: Path) -> None:
     from ai.backend.appproxy.common.utils import ensure_json_serializable
     from ai.backend.appproxy.coordinator.config import ServerConfig
 
-    if output == "-" or output is None:
+    if output is None:
         print(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
 
 
@@ -104,7 +104,7 @@ async def _generate() -> dict[str, Any]:
     from ai.backend.appproxy.coordinator.server import global_subapp_pkgs
 
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -112,7 +112,7 @@ async def _generate() -> dict[str, Any]:
     subapps: list[web.Application] = []
     for subapp in global_subapp_pkgs:
         pkg = importlib.import_module("ai.backend.appproxy.coordinator.api" + subapp)
-        app, _ = pkg.create_app(cors_options)  # type: ignore
+        app, _ = pkg.create_app(cors_options)
         subapps.append(app)
     return generate_openapi("Proxy Coordinator", subapps, verbose=True)
 
@@ -121,11 +121,11 @@ async def _generate() -> dict[str, Any]:
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_openapi_spec(output: Path) -> None:
+def generate_openapi_spec(output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
@@ -133,10 +133,10 @@ def generate_openapi_spec(output: Path) -> None:
     import json
 
     openapi = asyncio.run(_generate())
-    if output == "-" or output is None:
+    if output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
     else:
-        with Path(output).open(mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 

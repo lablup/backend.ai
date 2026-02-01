@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -257,7 +257,7 @@ class PermissionDBSource:
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        result = cast(RoleRow | None, role_row)
+        result = role_row
         if result is None:
             raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
         return result
@@ -288,8 +288,7 @@ class PermissionDBSource:
             PermissionGroupRow.scope_type == scope_id.scope_type,
             PermissionGroupRow.scope_id == scope_id.scope_id,
         )
-        result = await db_session.scalar(stmt)
-        return cast(PermissionGroupRow | None, result)
+        return cast(PermissionGroupRow | None, await db_session.scalar(stmt))
 
     async def _find_permission_groups_by_scopes(
         self,
@@ -464,7 +463,7 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
             try:
-                db_session.add(user_role_row)  # type: ignore[arg-type]
+                db_session.add(user_role_row)
                 await db_session.flush()
                 await db_session.refresh(user_role_row)
                 return user_role_row
@@ -680,7 +679,7 @@ class PermissionDBSource:
         self,
         user_id: uuid.UUID,
         object_ids: Iterable[ObjectId],
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
         return (
             sa.select(RoleRow)
@@ -699,8 +698,8 @@ class PermissionDBSource:
                     UserRoleRow.user_id == user_id,
                     sa.or_(
                         PermissionGroupRow.scope_type == ScopeType.GLOBAL,
-                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
-                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                        AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
+                        ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                     ),
                 )
             )
@@ -718,7 +717,7 @@ class PermissionDBSource:
         user_id: uuid.UUID,
         object_ids: Iterable[ObjectId],
         operation: OperationType,
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
         return (
             sa.select(RoleRow)
@@ -742,11 +741,11 @@ class PermissionDBSource:
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
-                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
-                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                             ObjectPermissionRow.operation == operation,
                         ),
                     ),

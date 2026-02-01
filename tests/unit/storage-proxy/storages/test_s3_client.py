@@ -24,7 +24,7 @@ _DEFAULT_DOWNLOAD_STREAM_CHUNK_SIZE = 8192
 
 
 @pytest.mark.asyncio
-async def test_upload_stream_success(s3_client: S3Client):
+async def test_upload_stream_success(s3_client: S3Client) -> None:
     """Test successful stream upload"""
 
     test_stream = TestStreamReader([b"chunk1", b"chunk2", b"chunk3"])
@@ -45,7 +45,7 @@ async def test_upload_stream_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_download_stream_success(s3_client: S3Client):
+async def test_download_stream_success(s3_client: S3Client) -> None:
     """Test successful stream download"""
     test_data = b"This is test file content"
 
@@ -68,7 +68,7 @@ async def test_download_stream_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_download_stream_not_found(s3_client: S3Client):
+async def test_download_stream_not_found(s3_client: S3Client) -> None:
     """Test download stream with object not found"""
     with pytest.raises(ClientError) as exc_info:
         download_stream = s3_client.download_stream(
@@ -81,7 +81,7 @@ async def test_download_stream_not_found(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_success(s3_client: S3Client):
+async def test_generate_presigned_upload_url_success(s3_client: S3Client) -> None:
     """Test successful presigned upload URL generation"""
     result = await s3_client.generate_presigned_upload_url(
         "test/presigned_upload.txt",
@@ -99,7 +99,7 @@ async def test_generate_presigned_upload_url_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_success(s3_client: S3Client):
+async def test_generate_presigned_download_url_success(s3_client: S3Client) -> None:
     """Test successful presigned download URL generation"""
     # First upload a file to download
     test_data = b"File for presigned download test"
@@ -122,7 +122,7 @@ async def test_generate_presigned_download_url_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_success(s3_client: S3Client):
+async def test_get_object_info_success(s3_client: S3Client) -> None:
     """Test successful object info retrieval"""
     test_data = b"Test file content for object info"
 
@@ -142,14 +142,14 @@ async def test_get_object_info_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_not_found(s3_client: S3Client):
+async def test_get_object_info_not_found(s3_client: S3Client) -> None:
     """Test object info retrieval with object not found"""
     with pytest.raises(ClientError):
         await s3_client.get_object_meta("nonexistent/key.txt")
 
 
 @pytest.mark.asyncio
-async def test_delete_object_success(s3_client: S3Client):
+async def test_delete_object_success(s3_client: S3Client) -> None:
     """Test successful object deletion"""
     # First upload a file to delete
     test_data = b"File to be deleted"
@@ -173,14 +173,14 @@ async def test_delete_object_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_delete_object_nonexistent(s3_client: S3Client):
+async def test_delete_object_nonexistent(s3_client: S3Client) -> None:
     """Test deletion of nonexistent object (should succeed in S3)"""
     # In S3, deleting a nonexistent object is considered successful
     await s3_client.delete_object("nonexistent/file.txt")
 
 
 @pytest.mark.asyncio
-async def test_delete_folder_success(s3_client: S3Client):
+async def test_delete_folder_success(s3_client: S3Client) -> None:
     """Test successful folder (prefix) deletion"""
     # Upload multiple files under a common prefix
     folder_prefix = "test/folder"
@@ -222,7 +222,7 @@ async def test_delete_folder_empty(s3_client: S3Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_bucket_success(s3_client: S3Client):
+async def test_create_bucket_success(s3_client: S3Client) -> None:
     """Test successful bucket creation"""
     test_bucket_name = "test-create-bucket-new"
 
@@ -260,7 +260,7 @@ async def test_create_bucket_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_create_bucket_already_exists(s3_client: S3Client):
+async def test_create_bucket_already_exists(s3_client: S3Client) -> None:
     """Test creating a bucket that already exists (should not fail)"""
     # The s3_client fixture already has a "test-bucket" created
     # Creating it again should handle the error gracefully
@@ -278,7 +278,7 @@ async def test_create_bucket_already_exists(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_delete_bucket_success(s3_client: S3Client):
+async def test_delete_bucket_success(s3_client: S3Client) -> None:
     """Test successful bucket deletion"""
     test_bucket_name = "test-delete-bucket-new"
 
@@ -307,7 +307,7 @@ async def test_delete_bucket_success(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
-async def test_delete_bucket_nonexistent(s3_client: S3Client):
+async def test_delete_bucket_nonexistent(s3_client: S3Client) -> None:
     """Test deletion of nonexistent bucket (should handle error gracefully)"""
     # Deleting a nonexistent bucket will raise an error in MinIO/S3
     try:

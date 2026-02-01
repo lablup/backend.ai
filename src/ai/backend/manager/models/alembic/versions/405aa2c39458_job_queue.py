@@ -56,7 +56,7 @@ kernelstatus_old_values = [
 kernelstatus_old = postgresql.ENUM(*kernelstatus_old_values, name="kernelstatus")
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
     sessionresult.create(conn)
     sessiontypes.create(conn)
@@ -145,7 +145,7 @@ def upgrade():
     op.create_index(op.f("ix_kernels_type"), "kernels", ["type"], unique=False)
 
 
-def downgrade():
+def downgrade() -> None:
     conn = op.get_bind()
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;"))
     kernelstatus_old.create(conn)

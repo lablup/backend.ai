@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -146,35 +147,49 @@ class TestDeleteModelService:
         )
 
     @pytest.fixture
-    def mock_get_endpoint_by_id(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_by_id",
-            new_callable=AsyncMock,
+    def mock_get_endpoint_by_id(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_by_id",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_get_endpoint_access_validation_data(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
+    def mock_get_endpoint_access_validation_data(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_update_endpoint_lifecycle(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "update_endpoint_lifecycle",
-            new_callable=AsyncMock,
+    def mock_update_endpoint_lifecycle(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "update_endpoint_lifecycle",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_check_user_access(self, mocker, model_serving_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            model_serving_service,
-            "check_user_access",
-            new_callable=AsyncMock,
+    def mock_check_user_access(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                model_serving_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
@@ -206,10 +221,10 @@ class TestDeleteModelService:
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],
         user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_get_endpoint_by_id,
-        mock_get_endpoint_access_validation_data,
-        mock_update_endpoint_lifecycle,
-        mock_check_user_access,
+        mock_get_endpoint_by_id: AsyncMock,
+        mock_get_endpoint_access_validation_data: AsyncMock,
+        mock_update_endpoint_lifecycle: AsyncMock,
+        mock_check_user_access: AsyncMock,
     ) -> None:
         mock_validation_data = MagicMock(
             session_owner_id=user_data.user_id,
@@ -229,7 +244,9 @@ class TestDeleteModelService:
             mock_get_endpoint_access_validation_data.return_value = None
             mock_get_endpoint_by_id.return_value = None
 
-        async def delete_model_service(action: DeleteModelServiceAction):
+        async def delete_model_service(
+            action: DeleteModelServiceAction,
+        ) -> DeleteModelServiceActionResult:
             return await model_serving_processors.delete_model_service.wait_for_complete(action)
 
         await scenario.test(delete_model_service)

@@ -12,12 +12,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: AsyncMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
@@ -29,7 +33,7 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
 async def test_signout_successful_with_valid_credentials(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test successful signout with valid credentials"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -58,7 +62,7 @@ async def test_signout_successful_with_valid_credentials(
 @pytest.mark.asyncio
 async def test_signout_fails_when_not_account_owner(
     auth_service: AuthService,
-):
+) -> None:
     """Test signout fails when requester is not the account owner"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -76,7 +80,7 @@ async def test_signout_fails_when_not_account_owner(
 async def test_signout_fails_with_invalid_credentials(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test signout fails with invalid credentials"""
     action = SignoutAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),

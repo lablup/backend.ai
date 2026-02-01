@@ -6,6 +6,7 @@ Tests the repository layer with mocked database operations.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -95,7 +96,9 @@ class TestProjectResourcePolicyRepository:
             yield database_connection
 
     @pytest.fixture
-    def project_resource_policy_repository(self, mock_db_engine) -> ProjectResourcePolicyRepository:
+    def project_resource_policy_repository(
+        self, mock_db_engine: Any
+    ) -> ProjectResourcePolicyRepository:
         """Create ProjectResourcePolicyRepository instance with mocked database"""
         return ProjectResourcePolicyRepository(db=mock_db_engine)
 
@@ -132,7 +135,10 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_success(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        new_policy_creator: Creator[ProjectResourcePolicyRow],
     ) -> None:
         """Test successful project resource policy creation"""
         # Mock database session
@@ -172,7 +178,10 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name(
-        self, project_resource_policy_repository, mock_db_engine, new_policy_creator
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        new_policy_creator: Creator[ProjectResourcePolicyRow],
     ) -> None:
         """Test project resource policy creation with duplicate name"""
         # Mock database session
@@ -191,10 +200,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_get_by_name_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy retrieval by name"""
         # Mock database session
@@ -207,7 +216,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         result = await project_resource_policy_repository.get_by_name("test-policy")
 
@@ -216,7 +225,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_name_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy retrieval when policy not found"""
         # Mock database session
@@ -238,10 +249,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy update"""
         # Mock database session
@@ -254,7 +265,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.execute = AsyncMock(return_value=mock_result)
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         # Create updater with the new pattern
         spec = ProjectResourcePolicyUpdaterSpec(
@@ -274,7 +285,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_update_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy update when policy not found"""
         # Mock database session
@@ -301,10 +314,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_partial_fields(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test partial update of policy fields"""
         # Mock database session
@@ -318,7 +331,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.flush = AsyncMock()
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         # Update only one field using Updater pattern
         spec = ProjectResourcePolicyUpdaterSpec(
@@ -336,10 +349,10 @@ class TestProjectResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_delete_success(
         self,
-        project_resource_policy_repository,
-        mock_db_engine,
-        sample_policy_row,
-        sample_policy_data,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
+        sample_policy_row: ProjectResourcePolicyRow,
+        sample_policy_data: ProjectResourcePolicyData,
     ) -> None:
         """Test successful policy deletion"""
         # Mock database session
@@ -353,7 +366,7 @@ class TestProjectResourcePolicyRepository:
         mock_session.delete = AsyncMock()
 
         # Mock to_dataclass method
-        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)
+        sample_policy_row.to_dataclass = MagicMock(return_value=sample_policy_data)  # type: ignore[method-assign]
 
         result = await project_resource_policy_repository.delete("test-policy")
 
@@ -363,7 +376,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_delete_not_found(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test policy deletion when policy not found"""
         # Mock database session
@@ -384,7 +399,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_create_with_all_fields(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test creating policy with all possible fields"""
         # Mock database session
@@ -427,7 +444,9 @@ class TestProjectResourcePolicyRepository:
 
     @pytest.mark.asyncio
     async def test_repository_with_transaction_rollback(
-        self, project_resource_policy_repository, mock_db_engine
+        self,
+        project_resource_policy_repository: ProjectResourcePolicyRepository,
+        mock_db_engine: MagicMock,
     ) -> None:
         """Test repository handles transaction rollback properly"""
         # Mock database session

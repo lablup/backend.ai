@@ -362,7 +362,7 @@ class AgentRegistry:
         image_ref: ImageRef,
         user_scope: UserScope,
         owner_access_key: AccessKey,
-        resource_policy: dict,
+        resource_policy: dict[str, Any],
         session_type: SessionTypes,
         config: dict[str, Any],
         cluster_mode: ClusterMode,
@@ -663,7 +663,7 @@ class AgentRegistry:
         session_name: str,
         user_scope: UserScope,
         owner_access_key: AccessKey,
-        resource_policy: dict,
+        resource_policy: dict[str, Any],
         scaling_group: str,
         sess_type: SessionTypes,
         tag: str,
@@ -795,7 +795,7 @@ class AgentRegistry:
             for i in range(node["replicas"]):
                 kernel_config["cluster_idx"] = i + 1
                 kernel_configs.append(
-                    check_type(kernel_config, KernelEnqueueingConfig),  # type: ignore
+                    check_type(kernel_config, KernelEnqueueingConfig),
                 )
 
         session_creation_id = secrets.token_urlsafe(16)
@@ -907,7 +907,7 @@ class AgentRegistry:
         session_enqueue_configs: SessionEnqueueingConfig,
         scaling_group: str | None,
         session_type: SessionTypes,
-        resource_policy: dict,
+        resource_policy: dict[str, Any],
         *,
         user_scope: UserScope,
         priority: int,
@@ -915,7 +915,7 @@ class AgentRegistry:
         cluster_mode: ClusterMode,
         cluster_size: int,
         session_tag: str | None,
-        internal_data: dict | None,
+        internal_data: dict[str, Any] | None,
         starts_at: datetime | None,
         batch_timeout: timedelta | None,
         agent_list: Sequence[str] | None,
@@ -970,7 +970,7 @@ class AgentRegistry:
         session_enqueue_configs: SessionEnqueueingConfig,
         scaling_group: str | None,
         session_type: SessionTypes,
-        resource_policy: dict,
+        resource_policy: dict[str, Any],
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
@@ -978,7 +978,7 @@ class AgentRegistry:
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
         session_tag: str | None = None,
-        internal_data: dict | None = None,
+        internal_data: dict[str, Any] | None = None,
         starts_at: datetime | None = None,
         batch_timeout: timedelta | None = None,
         agent_list: Sequence[str] | None = None,
@@ -1259,9 +1259,8 @@ class AgentRegistry:
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
-                        session_status = cast(SessionStatus, session_row.status)
+                        session_status = session_row.status
                         if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             if kernel.agent is not None:
                                 occupied_slots_per_agent[kernel.agent] += ResourceSlot(
@@ -1439,10 +1438,10 @@ class AgentRegistry:
                     .where(SessionRow.id == session_id)
                     .options(selectinload(SessionRow.kernels))
                 )
-                session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+                session_row = await db_session.scalar(_stmt)
                 if session_row is None:
                     raise SessionNotFound(f"Session not found (id: {session_id})")
-                kernel_rows = cast(list[KernelRow], session_row.kernels)
+                kernel_rows = session_row.kernels
                 kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
                 for kern in kernel_rows:
                     kern.status = kernel_target_status
@@ -1506,8 +1505,6 @@ class AgentRegistry:
                 target_session = (await db_session.scalars(query)).first()
             if not target_session:
                 raise SessionNotFound
-
-            target_session = cast(SessionRow, target_session)
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
                 await self.valkey_stat.decrement_keypair_concurrency(
@@ -2510,7 +2507,7 @@ class AgentRegistry:
             health_check=health_check_config,
         )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
-        return endpoint_json["endpoint"]
+        return cast(str, endpoint_json["endpoint"])
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (

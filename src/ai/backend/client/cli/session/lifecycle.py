@@ -158,7 +158,7 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        bootstrap_script: IO | None,
+        bootstrap_script: IO[str] | None,
         tag: str | None,  # click_start_option
         architecture: str,
         # resource spec
@@ -307,7 +307,7 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
 
     if docs is not None:
         create.__doc__ = docs
-    return create
+    return create  # type: ignore[no-any-return]
 
 
 main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
@@ -592,7 +592,7 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
 
     if docs is not None:
         create_from_template.__doc__ = docs
-    return create_from_template
+    return create_from_template  # type: ignore[no-any-return]
 
 
 main.command(aliases=["start-from-template"])(
@@ -1045,7 +1045,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
                 sys.exit()
 
     asyncio.run(export_tracker(result["task_id"]))
@@ -1501,12 +1501,12 @@ def _watch_cmd(docs: str | None = None) -> Callable[..., None]:
     return watch
 
 
-def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
-    ts: TopologicalSorter = TopologicalSorter()
+def get_dependency_session_table(root_node: OrderedDict[str, Any]) -> list[OrderedDict[str, Any]]:
+    ts: TopologicalSorter[str] = TopologicalSorter()
     session_info_dict = {}
     visited = {}
 
-    def construct_topological_sorter(session: OrderedDict) -> None:
+    def construct_topological_sorter(session: OrderedDict[str, Any]) -> None:
         visited[session["session_id"]] = True
         session_info_dict[session["session_id"]] = session
         ts.add(
@@ -1522,7 +1522,7 @@ def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
     return [*map(lambda session_id: session_info_dict[session_id], [*ts.static_order()])]
 
 
-def show_dependency_session_table(root_node: OrderedDict) -> None:
+def show_dependency_session_table(root_node: OrderedDict[str, Any]) -> None:
     table = get_dependency_session_table(root_node)
     header_keys = ["session_name", "session_id", "status", "status_changed"]
 
@@ -1542,17 +1542,17 @@ def show_dependency_session_table(root_node: OrderedDict) -> None:
     )
 
 
-def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:  # type: ignore[name-defined]
-    dependency_tree = treelib.Tree()  # type: ignore[attr-defined]
+def get_dependency_session_tree(root_node: OrderedDict[str, Any]) -> treelib.Tree:  # type: ignore[name-defined]
+    dependency_tree = treelib.Tree()
 
     root_session_name = root_node["session_name"]
-    session_name_counter: defaultdict = defaultdict(lambda: 1)
+    session_name_counter: defaultdict[str, int] = defaultdict(lambda: 1)
     session_name_counter[root_session_name] += 1
 
     def discard_below_dot(time_str: str) -> str:
         return time_str.split(".")[0]
 
-    def get_node_name(session: OrderedDict) -> str:
+    def get_node_name(session: OrderedDict[str, Any]) -> str:
         task_name = session["session_name"].split("-")[-2]
         status = session["status"].split("KernelStatus.")[1]
         delta = ""
@@ -1570,7 +1570,9 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:  # type
 
     dependency_tree.create_node(get_node_name(root_node), get_node_id(root_session_name))
 
-    def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
+    def construct_dependency_tree(
+        session_name: str, dependency_sessions: OrderedDict[str, Any]
+    ) -> None:
         for dependency_session in dependency_sessions:
             dependency_session_name = dependency_session["session_name"]
             session_name_counter[dependency_session_name] += 1

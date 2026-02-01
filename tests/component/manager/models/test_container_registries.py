@@ -28,13 +28,13 @@ def client() -> Client:
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
     return GraphQueryContext(
-        schema=None,  # type: ignore
+        schema=None,
         dataloader_manager=None,  # type: ignore
         config_provider=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
-        db=database_engine,  # type: ignore
+        db=database_engine,
         network_plugin_ctx=None,  # type: ignore
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
@@ -57,7 +57,9 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
-async def test_create_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
+async def test_create_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine
+) -> None:
     context = get_graphquery_context(database_engine)
 
     query = """
@@ -100,7 +102,9 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
 @pytest.mark.asyncio
-async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
+async def test_modify_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine
+) -> None:
     context = get_graphquery_context(database_engine)
 
     query = """
@@ -154,7 +158,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine
-):
+) -> None:
     context = get_graphquery_context(database_engine)
 
     query = """
@@ -191,7 +195,7 @@ async def test_modify_container_registry_allows_empty_string(
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine
-):
+) -> None:
     context = get_graphquery_context(database_engine)
 
     query = """
@@ -226,7 +230,9 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
-async def test_delete_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
+async def test_delete_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine
+) -> None:
     context = get_graphquery_context(database_engine)
 
     query = """

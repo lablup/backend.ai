@@ -11,6 +11,7 @@ from typing import (
     Any,
     NamedTuple,
     Protocol,
+    cast,
 )
 
 import graphene
@@ -114,8 +115,8 @@ class ConnectionConstructor(Protocol):
     ) -> Connection: ...
 
 
-class AsyncNodeField(NodeField):
-    def wrap_resolve(self, parent_resolver: Callable) -> functools.partial:
+class AsyncNodeField(NodeField):  # type: ignore[misc]
+    def wrap_resolve(self, parent_resolver: Callable[..., Any]) -> functools.partial[Any]:
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 
@@ -125,7 +126,7 @@ def _resolve_global_id(global_id: str) -> tuple[str, str]:
     return type_, id_
 
 
-class AsyncNode(Node):
+class AsyncNode(Node):  # type: ignore[misc]
     """
     This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/node.py
@@ -182,7 +183,7 @@ class AsyncNode(Node):
         raise Exception(f'ObjectType "{_type}" does not implement `get_node` method.')
 
 
-class Connection(graphene.ObjectType):
+class Connection(graphene.ObjectType):  # type: ignore[misc]
     """
     This GraphQL Relay Connection has been implemented to have additional fields, such as `count`.
     Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/connection.py
@@ -243,7 +244,7 @@ class Connection(graphene.ObjectType):
 
         if "edges" not in _meta.fields:
             connection_description = options.get("description")
-            edge_class = get_edge_class(cls, node, base_name, strict_types, connection_description)  # type: ignore
+            edge_class = get_edge_class(cls, node, base_name, strict_types, connection_description)
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
                 graphene.NonNull(
@@ -259,7 +260,8 @@ class Connection(graphene.ObjectType):
                 description="Total count of the GQL nodes of the query.",
             )
 
-        return super().__init_subclass_with_meta__(_meta=_meta, **options)
+        super().__init_subclass_with_meta__(_meta=_meta, **options)
+        return
 
 
 class ConnectionPaginationOrder(enum.Enum):
@@ -276,11 +278,12 @@ class ConnectionResolverResult[T_Node: ObjectType](NamedTuple):
 
 
 Resolver = (
-    Callable[..., Awaitable[ConnectionResolverResult]] | Callable[..., ConnectionResolverResult]
+    Callable[..., Awaitable[ConnectionResolverResult[Any]]]
+    | Callable[..., ConnectionResolverResult[Any]]
 )
 
 
-class AsyncListConnectionField(IterableConnectionField):
+class AsyncListConnectionField(IterableConnectionField):  # type: ignore[misc]
     """
     This GraphQL Relay Connection field extension is for getting paginated list data from asynchronous resolvers.
     The resolver function of graphene.relay.Connection is implemented
@@ -310,7 +313,7 @@ class AsyncListConnectionField(IterableConnectionField):
         cls,
         connection_type: Any,
         args: dict[str, Any] | None,
-        resolver_result: ConnectionResolverResult,
+        resolver_result: ConnectionResolverResult[Any],
     ) -> Connection:
         resolved = resolver_result.node_list
         page_size = resolver_result.requested_page_size
@@ -331,31 +334,34 @@ class AsyncListConnectionField(IterableConnectionField):
             resolved = resolved[:page_size]
         if pagination_order == ConnectionPaginationOrder.BACKWARD:
             resolved = resolved[::-1]
-        edge_type = connection_type.Edge  # type: ignore[attr-defined]
+        edge_type = connection_type.Edge
         edges = [
             edge_type(
                 node=value,
-                cursor=AsyncNode.to_global_id(str(connection_type._meta.node), value.id),  # type: ignore[attr-defined]
+                cursor=AsyncNode.to_global_id(str(connection_type._meta.node), value.id),
             )
             for value in resolved
         ]
-        return connection_type(  # type: ignore[operator]
-            edges=edges,
-            page_info=PageInfo(
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-                has_previous_page=(
-                    pagination_order == ConnectionPaginationOrder.BACKWARD
-                    and page_size is not None
-                    and page_size < orig_resolved_len
+        return cast(
+            Connection,
+            connection_type(
+                edges=edges,
+                page_info=PageInfo(
+                    start_cursor=edges[0].cursor if edges else None,
+                    end_cursor=edges[-1].cursor if edges else None,
+                    has_previous_page=(
+                        pagination_order == ConnectionPaginationOrder.BACKWARD
+                        and page_size is not None
+                        and page_size < orig_resolved_len
+                    ),
+                    has_next_page=(
+                        pagination_order == ConnectionPaginationOrder.FORWARD
+                        and page_size is not None
+                        and page_size < orig_resolved_len
+                    ),
                 ),
-                has_next_page=(
-                    pagination_order == ConnectionPaginationOrder.FORWARD
-                    and page_size is not None
-                    and page_size < orig_resolved_len
-                ),
+                count=count,
             ),
-            count=count,
         )
 
     @classmethod
@@ -398,7 +404,7 @@ def _from_str(value: str) -> ResolvedGlobalID:
     return type_, id_
 
 
-class GlobalIDField(graphene.Scalar):
+class GlobalIDField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = (
             "Added in 24.09.0. Global ID of GQL relay spec. "

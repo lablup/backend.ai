@@ -24,7 +24,7 @@ class CreateClusterAction(SessionAction):
     owner_access_key: AccessKey
     tag: str
     enqueue_only: bool
-    keypair_resource_policy: dict | None
+    keypair_resource_policy: dict[str, Any] | None
     max_wait_seconds: int
 
     @override

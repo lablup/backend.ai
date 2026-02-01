@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_fields
@@ -56,7 +56,7 @@ class KeyPair(BaseFunction):
         resource_policy: str | Undefined = undefined,
         rate_limit: int | Undefined = undefined,
         fields: Sequence[FieldSpec] = _default_result_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair with the given options.
         You need an admin privilege for this operation.
@@ -83,7 +83,7 @@ class KeyPair(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["create_keypair"]
+        return cast(dict[str, Any], data["create_keypair"])
 
     @api_function
     @classmethod
@@ -94,7 +94,7 @@ class KeyPair(BaseFunction):
         is_admin: bool | Undefined = undefined,
         resource_policy: str | Undefined = undefined,
         rate_limit: int | Undefined = undefined,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair with the given options.
         You need an admin privilege for this operation.
@@ -116,11 +116,11 @@ class KeyPair(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])
 
     @api_function
     @classmethod
-    async def delete(cls, access_key: str) -> dict:
+    async def delete(cls, access_key: str) -> dict[str, Any]:
         """
         Deletes an existing keypair with given ACCESSKEY.
         """
@@ -135,7 +135,7 @@ class KeyPair(BaseFunction):
             "access_key": access_key,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_keypair"]
+        return cast(dict[str, Any], data["delete_keypair"])
 
     @api_function
     @classmethod
@@ -144,7 +144,7 @@ class KeyPair(BaseFunction):
         user_id: int | str | None = None,
         is_active: bool | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -175,7 +175,7 @@ class KeyPair(BaseFunction):
         if user_id is not None:
             variables["email"] = user_id
         data = await api_session.get().Admin._query(q, variables)
-        return data["keypairs"]
+        return cast(Sequence[dict[str, Any]], data["keypairs"])
 
     @api_function
     @classmethod
@@ -190,7 +190,7 @@ class KeyPair(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -212,7 +212,7 @@ class KeyPair(BaseFunction):
         )
 
     @api_function
-    async def info(self, fields: Sequence[FieldSpec] = _default_detail_fields) -> dict:
+    async def info(self, fields: Sequence[FieldSpec] = _default_detail_fields) -> dict[str, Any]:
         """
         Returns the keypair's information such as resource limits.
 
@@ -223,11 +223,11 @@ class KeyPair(BaseFunction):
         q = "query { keypair { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["keypair"]
+        return cast(dict[str, Any], data["keypair"])
 
     @api_function
     @classmethod
-    async def activate(cls, access_key: str) -> dict:
+    async def activate(cls, access_key: str) -> dict[str, Any]:
         """
         Activates this keypair.
         You need an admin privilege for this operation.
@@ -246,11 +246,11 @@ class KeyPair(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])
 
     @api_function
     @classmethod
-    async def deactivate(cls, access_key: str) -> dict:
+    async def deactivate(cls, access_key: str) -> dict[str, Any]:
         """
         Deactivates this keypair.
         Deactivated keypairs cannot make any API requests
@@ -271,4 +271,4 @@ class KeyPair(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])

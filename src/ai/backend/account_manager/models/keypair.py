@@ -6,7 +6,7 @@ from .base import GUID, Base, IDColumn
 __all__: tuple[str, ...] = ("KeypairRow",)
 
 
-class KeypairRow(Base):
+class KeypairRow(Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
     id = IDColumn()
     # user_id is nullable to allow creating spare keypairs.

@@ -1,6 +1,6 @@
 import enum
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -37,11 +37,15 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement
+    column: (
+        sa.Column[Any]
+        | sa.orm.attributes.InstrumentedAttribute[Any]
+        | sa.sql.elements.KeyedColumnElement[Any]
+    )
     order_direction: OrderDirection
 
 
-class QueryOrderTransformer(Transformer):
+class QueryOrderTransformer(Transformer[Any, Any]):
     def __init__(
         self, sa_table: sa.Table | sa.sql.Join | type, column_map: ColumnMapType | None = None
     ) -> None:
@@ -51,7 +55,11 @@ class QueryOrderTransformer(Transformer):
 
     def _get_col(
         self, col_name: str
-    ) -> sa.Column | sa.orm.attributes.InstrumentedAttribute | sa.sql.elements.KeyedColumnElement:
+    ) -> (
+        sa.Column[Any]
+        | sa.orm.attributes.InstrumentedAttribute[Any]
+        | sa.sql.elements.KeyedColumnElement[Any]
+    ):
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]
@@ -66,11 +74,11 @@ class QueryOrderTransformer(Transformer):
                 col = func(matched_col) if func is not None else matched_col  # type: ignore[arg-type]
             else:
                 col = get_col_from_table(self._sa_table, col_name)
-            return col  # type: ignore[return-value]
+            return col
         except KeyError as e:
             raise ValueError("Unknown/unsupported field name", col_name) from e
 
-    def col(self, *args) -> OrderingItem:
+    def col(self, *args: Any) -> OrderingItem:
         children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value
@@ -97,15 +105,18 @@ class QueryOrderParser:
     ) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
-            return QueryOrderTransformer(table, self._column_map).transform(ast)
+            result: list[OrderingItem] = QueryOrderTransformer(table, self._column_map).transform(
+                ast
+            )
+            return result
         except LarkError as e:
             raise ValueError(f"Query ordering parsing error: {e}") from e
 
     def append_ordering(
         self,
-        sa_query: sa.sql.Select,
+        sa_query: sa.sql.Select[Any],
         order_expr: str,
-    ) -> sa.sql.Select:
+    ) -> sa.sql.Select[Any]:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.

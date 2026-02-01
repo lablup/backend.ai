@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import ipaddress
 import json
 import logging
 import uuid
@@ -18,7 +19,6 @@ from typing import (
     Self,
     TypeVar,
     cast,
-    overload,
 )
 
 import sqlalchemy as sa
@@ -118,7 +118,7 @@ T_StrEnum = TypeVar("T_StrEnum", bound=enum.Enum, covariant=True)
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
+class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -129,7 +129,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_Enum], **opts: Any) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -151,7 +151,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls[value] if value else None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -159,7 +159,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
         return self._enum_cls
 
 
-class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
+class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
@@ -170,7 +170,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     impl = ENUM
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_Enum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_Enum], **opts: Any) -> None:
         if "name" not in opts:
             opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
@@ -192,7 +192,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls(value) if value else None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -200,7 +200,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator, SchemaType):
         return self._enum_cls
 
 
-class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
+class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
     """
     Maps Postgres VARCHAR(64) column with a Python enum.StrEnum type.
     """
@@ -209,7 +209,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
     cache_ok = True
 
     def __init__(
-        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts
+        self, enum_cls: type[T_StrEnum], use_name: bool = False, length: int = 64, **opts: Any
     ) -> None:
         self._opts = opts
         super().__init__(length=length, **opts)
@@ -225,7 +225,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return None
         if self._use_name:
             return value.name
-        return value.value
+        return cast(str, value.value)
 
     def process_result_value(
         self,
@@ -238,7 +238,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
@@ -246,7 +246,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator):
         return self._enum_cls
 
 
-class CurvePublicKeyColumn(TypeDecorator):
+class CurvePublicKeyColumn(TypeDecorator[PublicKey]):
     """
     A column type wrapper for string-based Z85-encoded CURVE public key.
 
@@ -261,7 +261,7 @@ class CurvePublicKeyColumn(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(40))
 
     def process_bind_param(
@@ -281,7 +281,7 @@ class CurvePublicKeyColumn(TypeDecorator):
         return PublicKey(value.encode("ascii"))
 
 
-class QuotaScopeIDType(TypeDecorator):
+class QuotaScopeIDType(TypeDecorator[QuotaScopeID]):
     """
     A column type wrapper for string-based quota scope ID.
     """
@@ -289,7 +289,7 @@ class QuotaScopeIDType(TypeDecorator):
     impl = sa.String
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(64))
 
     def process_bind_param(
@@ -307,7 +307,7 @@ class QuotaScopeIDType(TypeDecorator):
         return QuotaScopeID.parse(value) if value else None
 
 
-class ResourceSlotColumn(TypeDecorator):
+class ResourceSlotColumn(TypeDecorator[ResourceSlot]):
     """
     A column type wrapper for ResourceSlot from JSONB.
     """
@@ -340,7 +340,7 @@ class ResourceSlotColumn(TypeDecorator):
             return ResourceSlot.from_user_input(value, None)
 
 
-class StructuredJSONColumn(TypeDecorator):
+class StructuredJSONColumn(TypeDecorator[Any]):
     """
     A column type to convert JSON values back and forth using a Trafaret.
     """
@@ -352,7 +352,7 @@ class StructuredJSONColumn(TypeDecorator):
         super().__init__()
         self._schema = schema
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
@@ -382,11 +382,11 @@ class StructuredJSONColumn(TypeDecorator):
             return self._schema.check({})
         return self._schema.check(value)
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
 
-class StructuredJSONObjectColumn(TypeDecorator):
+class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
     """
     A column type to convert JSON values back and forth using JSONSerializableMixin.
     """
@@ -400,23 +400,23 @@ class StructuredJSONObjectColumn(TypeDecorator):
 
     def process_bind_param(
         self, value: JSONSerializableMixin | None, _dialect: Dialect
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         if value is None:
             return None
-        return self._schema.to_json(value)  # type: ignore[arg-type]
+        return self._schema.to_json(value)
 
     def process_result_value(
-        self, value: dict | None, _dialect: Dialect
+        self, value: dict[str, Any] | None, dialect: Dialect
     ) -> JSONSerializableMixin | None:
         if value is None:
             return None
-        return self._schema.from_json(value)  # type: ignore[arg-type]
+        return self._schema.from_json(value)
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
 
-class StructuredJSONObjectListColumn(TypeDecorator):
+class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]]):
     """
     A column type to convert JSON values back and forth using JSONSerializableMixin,
     but store and load a list of the objects.
@@ -434,21 +434,21 @@ class StructuredJSONObjectListColumn(TypeDecorator):
 
     def process_bind_param(
         self, value: list[JSONSerializableMixin] | None, _dialect: Dialect
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         return [self._schema.to_json(item) for item in value] if value is not None else []
 
     def process_result_value(
-        self, value: list | None, _dialect: Dialect
+        self, value: list[Any] | None, _dialect: Dialect
     ) -> list[JSONSerializableMixin]:
         if value is None:
             return []
         return [self._schema.from_json(item) for item in value]
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
+class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     """
     A column type for storing a single Pydantic model in JSONB.
     Handles nullable columns - returns None for null values.
@@ -481,11 +481,11 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator):
             return self._schema.model_validate(value)
         return None
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
 
-class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
+class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
     """
     A column type for storing a list of Pydantic models in JSONB.
     Always returns empty list instead of None for null values.
@@ -501,13 +501,17 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
     def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
-    def process_bind_param(self, value: list[TBaseModel] | None, _dialect: Dialect) -> list:
+    def process_bind_param(
+        self, value: list[TBaseModel] | None, _dialect: Dialect
+    ) -> list[dict[str, Any]]:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
             return [item.model_dump(mode="json") for item in value]
         return []
 
-    def process_result_value(self, value: list | str | None, _dialect: Dialect) -> list[TBaseModel]:
+    def process_result_value(
+        self, value: list[dict[str, Any]] | str | None, _dialect: Dialect
+    ) -> list[TBaseModel]:
         # JSONB returns already parsed Python objects, not strings
         # Handle case where value is stored as JSON string (legacy data)
         if value is not None:
@@ -516,11 +520,11 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator):
             return [self._schema.model_validate(item) for item in value]
         return []
 
-    def copy(self, **_kw) -> Self:
+    def copy(self, **_kw: Any) -> Self:
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
-class URLColumn(TypeDecorator):
+class URLColumn(TypeDecorator[yarl.URL]):
     """
     A column type for URL strings
     """
@@ -537,7 +541,7 @@ class URLColumn(TypeDecorator):
         return yarl.URL(value)
 
 
-class IPColumn(TypeDecorator):
+class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]):
     """
     A column type to convert IP string values back and forth to CIDR.
     """
@@ -545,7 +549,11 @@ class IPColumn(TypeDecorator):
     impl = CIDR
     cache_ok = True
 
-    def process_bind_param(self, value: str | ReadableCIDR | None, _dialect: Dialect) -> str | None:
+    def process_bind_param(
+        self,
+        value: str | ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None,
+        _dialect: Dialect,
+    ) -> str | None:
         if value is None:
             return value
         try:
@@ -555,15 +563,17 @@ class IPColumn(TypeDecorator):
                 cidr = value.address
         except InvalidIpAddressValue as e:
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
-        return cidr
+        return str(cidr)
 
-    def process_result_value(self, value: str | None, _dialect: Dialect) -> ReadableCIDR | None:
+    def process_result_value(
+        self, value: str | None, _dialect: Dialect
+    ) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
         if value is None:
             return None
         return ReadableCIDR(value)
 
 
-class PermissionListColumn(TypeDecorator):
+class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
     """
     A column type to convert Permission values back and forth.
     """
@@ -575,24 +585,13 @@ class PermissionListColumn(TypeDecorator):
         super().__init__(sa.String)
         self._perm_type = perm_type
 
-    @overload
-    def process_bind_param(
-        self, value: Sequence[AbstractPermission], dialect: Dialect
-    ) -> list[str]: ...
-
-    @overload
-    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> list[str]: ...
-
-    @overload
-    def process_bind_param(self, value: None, dialect: Dialect) -> list[str]: ...
-
     def process_bind_param(
         self,
-        value: Sequence[AbstractPermission] | Sequence[str] | None,
+        value: set[AbstractPermission] | None,
         dialect: Dialect,
-    ) -> list[str]:
+    ) -> list[str] | None:
         if value is None:
-            return []
+            return None
         try:
             return [self._perm_type(perm).value for perm in value]
         except ValueError as e:
@@ -608,7 +607,7 @@ class PermissionListColumn(TypeDecorator):
         return {self._perm_type(perm) for perm in value}
 
 
-class VFolderHostPermissionColumn(TypeDecorator):
+class VFolderHostPermissionColumn(TypeDecorator[VFolderHostPermissionMap]):
     """
     A column type to convert vfolder host permission back and forth.
     """
@@ -636,7 +635,7 @@ class VFolderHostPermissionColumn(TypeDecorator):
         if value is None:
             return VFolderHostPermissionMap()
         return VFolderHostPermissionMap({
-            host: self.perm_col.process_result_value(perms, dialect)
+            host: self.perm_col.process_result_value(perms, dialect)  # type: ignore[misc]
             for host, perms in value.items()
         })
 
@@ -649,7 +648,7 @@ class CurrencyTypes(enum.Enum):
 TUUIDSubType = TypeVar("TUUIDSubType", bound=uuid.UUID)
 
 
-class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
+class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
@@ -659,7 +658,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
 
-    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine:
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
@@ -692,7 +691,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator):
         return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
-class SlugType(TypeDecorator):
+class SlugType(TypeDecorator[str]):
     """
     A type wrapper for slug type string
     """
@@ -726,7 +725,7 @@ class SlugType(TypeDecorator):
             self._tx_slug.check(value)
         except t.DataError as e:
             raise ValueError(e.error, value) from e
-        return value
+        return cast(str, value)
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
@@ -744,29 +743,29 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-def IDColumn(name: str = "id") -> sa.Column:
+def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def EndpointIDColumn(name: str = "id") -> sa.Column:
+def EndpointIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def SessionIDColumn(name: str = "id") -> sa.Column:
+def SessionIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def KernelIDColumn(name: str = "id") -> sa.Column:
+def KernelIDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(
         name, KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
 
 
-def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column:
+def ForeignKeyIDColumn(name: str, fk_field: str, nullable: bool = True) -> sa.Column[Any]:
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
@@ -854,7 +853,7 @@ async def populate_fixture(
                     # (Therefore a fixture dataset for a single table in the udpate mode should
                     # have consistent set of attributes!)
                     try:
-                        datacols: list[sa.Column] = [
+                        datacols: list[sa.Column[Any]] = [
                             getattr(table.columns, name)
                             for name in set(rows[0].keys()) - {pkcol.name for pkcol in pkcols}
                         ]
@@ -888,7 +887,7 @@ async def populate_fixture(
                     await conn.execute(update_stmt, update_data)
 
 
-class DecimalType(TypeDecorator, Decimal):
+class DecimalType(TypeDecorator[Decimal], Decimal):
     """
     Database type adaptor for Decimal
     """

@@ -97,7 +97,7 @@ __all__ = (
 )
 
 
-class DomainPermissionValueField(graphene.Scalar):
+class DomainPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.12.0. One of {[val.value for val in DomainPermission]}."
 
@@ -106,7 +106,9 @@ class DomainPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> DomainPermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> DomainPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return DomainPermission(node.value)
         return None
@@ -136,7 +138,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 
 
 @graphene_federation.key("id")
-class DomainNode(graphene.ObjectType):
+class DomainNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.12.0."
@@ -358,7 +360,7 @@ async def _ensure_sgroup_permission(
         )
 
 
-class CreateDomainNodeInput(graphene.InputObjectType):
+class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.12.0."
 
@@ -401,7 +403,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
         )
 
 
-class CreateDomainNode(graphene.Mutation):
+class CreateDomainNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
@@ -439,7 +441,7 @@ class CreateDomainNode(graphene.Mutation):
         return CreateDomainNode(ok=True, msg="", item=DomainNode.from_dto(res.domain_data))
 
 
-class ModifyDomainNodeInput(graphene.InputObjectType):
+class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.12.0."
 
@@ -500,7 +502,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         )
 
 
-class ModifyDomainNode(graphene.Mutation):
+class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
 
     class Meta:
@@ -539,7 +541,7 @@ class ModifyDomainNode(graphene.Mutation):
         )
 
 
-class Domain(graphene.ObjectType):
+class Domain(graphene.ObjectType):  # type: ignore[misc]
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
@@ -558,7 +560,7 @@ class Domain(graphene.ObjectType):
         return [sg.name for sg in sgroups]
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Domain | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Domain | None:
         if row is None:
             return None
         return cls(
@@ -630,7 +632,7 @@ class Domain(graphene.ObjectType):
             )
 
 
-class DomainInput(graphene.InputObjectType):
+class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
     total_resource_slots = graphene.JSONString(required=False, default_value={})
@@ -660,7 +662,7 @@ class DomainInput(graphene.InputObjectType):
         )
 
 
-class ModifyDomainInput(graphene.InputObjectType):
+class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=False)
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
@@ -706,7 +708,7 @@ class ModifyDomainInput(graphene.InputObjectType):
         )
 
 
-class CreateDomain(graphene.Mutation):
+class CreateDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -742,7 +744,7 @@ class CreateDomain(graphene.Mutation):
         )
 
 
-class ModifyDomain(graphene.Mutation):
+class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -778,7 +780,7 @@ class ModifyDomain(graphene.Mutation):
         )
 
 
-class DeleteDomain(graphene.Mutation):
+class DeleteDomain(graphene.Mutation):  # type: ignore[misc]
     """
     Instead of deleting the domain, just mark it as inactive.
     """
@@ -806,7 +808,7 @@ class DeleteDomain(graphene.Mutation):
         return cls(ok=True, msg=f"domain {action.name} deleted successfully")
 
 
-class PurgeDomain(graphene.Mutation):
+class PurgeDomain(graphene.Mutation):  # type: ignore[misc]
     """
     Completely delete domain from DB.
 

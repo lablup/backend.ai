@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
@@ -8,7 +10,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_list_images_by_admin():
+async def test_list_images_by_admin() -> None:
     with Session() as sess:
         images = sess.Image.list()
         image = images[0]
@@ -19,7 +21,7 @@ async def test_list_images_by_admin():
 
 
 @pytest.mark.asyncio
-async def test_list_images_by_user(userconfig):
+async def test_list_images_by_user(userconfig: Any) -> None:
     with Session() as sess:
         images = sess.Image.list()
         image = images[0]
@@ -30,14 +32,14 @@ async def test_list_images_by_user(userconfig):
 
 
 @pytest.mark.asyncio
-async def test_alias_dealias_image_by_admin():
+async def test_alias_dealias_image_by_admin() -> None:
     with Session() as sess:
 
-        def get_test_image_info():
+        def get_test_image_info() -> dict[str, Any] | None:
             items = sess.Image.list(fields=("name", "registry", "tag", "aliases"))
             for item in items:
                 if "lua" in item["name"] and "5.1-alpine3.8" in item["tag"]:
-                    return item
+                    return cast(dict[str, Any], item)
             return None
 
         img_info = get_test_image_info()
@@ -51,7 +53,7 @@ async def test_alias_dealias_image_by_admin():
 
 
 @pytest.mark.asyncio
-async def test_user_cannot_mutate_alias_dealias(userconfig):
+async def test_user_cannot_mutate_alias_dealias(userconfig: Any) -> None:
     with Session() as sess:
         test_alias = "testalias-b9f1ce136f584ca892d5fef3e78dd11d"
         with pytest.raises(BackendAPIError):

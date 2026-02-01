@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACFieldCreatorTestRow(Base):
+class RBACFieldCreatorTestRow(Base):  # type: ignore[misc]
     """ORM model implementing RBACFieldRow protocol for field creator testing."""
 
     __tablename__ = "test_rbac_field_creator"
@@ -88,7 +88,7 @@ class SimpleFieldCreatorSpec(CreatorSpec[RBACFieldCreatorTestRow]):
         self._field_id = field_id
 
     def build_row(self) -> RBACFieldCreatorTestRow:
-        row_kwargs: dict = {
+        row_kwargs: dict[str, Any] = {
             "name": self._name,
             "owner_scope_type": self._scope_type.value,
             "owner_scope_id": self._scope_id,
@@ -395,7 +395,7 @@ class TestRBACBulkFieldCreator:
 # =============================================================================
 
 
-class CompositePKFieldCreatorTestRow(Base):
+class CompositePKFieldCreatorTestRow(Base):  # type: ignore[misc]
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_field_creator_composite_pk"

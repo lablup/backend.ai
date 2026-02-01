@@ -45,7 +45,7 @@ __all__ = [
 ]
 
 
-class Circuit(Base, BaseMixin):
+class Circuit(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "circuits"
 
     """

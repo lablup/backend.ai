@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -84,12 +85,12 @@ class TestCreateGroupMutation:
     def mutation_schema(self) -> graphene.Schema:
         """Create GraphQL schema with CreateGroup mutation."""
 
-        class Query(graphene.ObjectType):
+        class Query(graphene.ObjectType):  # type: ignore[misc]
             """Dummy query required by graphene.Schema."""
 
             ok = graphene.Boolean(default_value=True)
 
-        class Mutation(graphene.ObjectType):
+        class Mutation(graphene.ObjectType):  # type: ignore[misc]
             create_group = CreateGroup.Field()
 
         return graphene.Schema(query=Query, mutation=Mutation)
@@ -97,10 +98,10 @@ class TestCreateGroupMutation:
     @pytest.fixture
     async def graphql_client(
         self,
-        aiohttp_client,
+        aiohttp_client: Any,
         mutation_schema: graphene.Schema,
         mock_graph_ctx: MagicMock,
-    ) -> TestClient:
+    ) -> TestClient[Any]:  # type: ignore[type-arg]
         """Create test client with GraphQL endpoint."""
 
         async def graphql_handler(request: web.Request) -> web.Response:
@@ -117,7 +118,7 @@ class TestCreateGroupMutation:
                 context_value=mock_graph_ctx,
             )
 
-            response_data: dict = {}
+            response_data: dict[str, Any] = {}
             if result.data:
                 response_data["data"] = result.data
             if result.errors:
@@ -128,11 +129,12 @@ class TestCreateGroupMutation:
         app = web.Application()
         app.router.add_post("/graphql", graphql_handler)
 
-        return await aiohttp_client(app)
+        client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
+        return client
 
     async def test_create_group_response_is_json_serializable(
         self,
-        graphql_client: TestClient,
+        graphql_client: TestClient[Any],  # type: ignore[type-arg]
     ) -> None:
         """CreateGroup mutation response should have JSON-serializable allowed_vfolder_hosts."""
         # Act: Make HTTP POST request to GraphQL endpoint
@@ -209,7 +211,7 @@ class TestGroupNodeQuery:
     def query_schema(self, mock_group_row: MagicMock) -> graphene.Schema:
         """Create GraphQL schema with GroupNode query."""
 
-        class Query(graphene.ObjectType):
+        class Query(graphene.ObjectType):  # type: ignore[misc]
             group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
 
             async def resolve_group_node(self, info: graphene.ResolveInfo, id: str) -> GroupNode:
@@ -221,9 +223,9 @@ class TestGroupNodeQuery:
     @pytest.fixture
     async def graphql_client(
         self,
-        aiohttp_client,
+        aiohttp_client: Any,
         query_schema: graphene.Schema,
-    ) -> TestClient:
+    ) -> TestClient[Any]:  # type: ignore[type-arg]
         """Create test client with GraphQL endpoint."""
         mock_ctx = MagicMock()
 
@@ -238,7 +240,7 @@ class TestGroupNodeQuery:
                 context_value=mock_ctx,
             )
 
-            response_data: dict = {}
+            response_data: dict[str, Any] = {}
             if result.data:
                 response_data["data"] = result.data
             if result.errors:
@@ -249,11 +251,12 @@ class TestGroupNodeQuery:
         app = web.Application()
         app.router.add_post("/graphql", graphql_handler)
 
-        return await aiohttp_client(app)
+        client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
+        return client
 
     async def test_group_node_response_is_json_serializable(
         self,
-        graphql_client: TestClient,
+        graphql_client: TestClient[Any],  # type: ignore[type-arg]
     ) -> None:
         """GroupNode query response should have JSON-serializable allowed_vfolder_hosts."""
         # Act: Make HTTP POST request to GraphQL endpoint

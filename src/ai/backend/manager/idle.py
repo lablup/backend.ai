@@ -130,7 +130,7 @@ class UtilizationExtraInfo(NamedTuple):
     threshold: float
 
 
-class UtilizationResourceReport(UserDict):
+class UtilizationResourceReport(UserDict[str, UtilizationExtraInfo]):
     __slots__ = ("data",)
 
     data: dict[str, UtilizationExtraInfo]
@@ -276,7 +276,7 @@ class IdleCheckerHost:
 
     async def do_idle_check(self) -> None:
         log.debug("do_idle_check(): triggered")
-        policy_cache: dict[AccessKey, Row] = {}
+        policy_cache: dict[AccessKey, Row[Any]] = {}
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
@@ -398,7 +398,7 @@ class IdleCheckerHost:
                     remaining_time_type=checker.remaining_time_type.value,
                     extra=None,
                 )
-            raw_report = cast(bytes | None, report)
+            raw_report = report
             if raw_report is None:
                 continue
 
@@ -470,9 +470,9 @@ class AbstractIdleChecker(ABC):
     @abstractmethod
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -524,7 +524,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 
     async def get_grace_period_end(
         self,
-        kernel: Row,
+        kernel: Row[Any],
     ) -> datetime | None:
         """
         Calculate the user's initial grace period for idle checkers.
@@ -750,9 +750,9 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -770,7 +770,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             return True
         now = await self._redis_live.get_server_time()
         raw_last_access = await self._redis_live.get_live_data(f"session.{session_id}.last_access")
-        if raw_last_access is None or raw_last_access == "0":
+        if raw_last_access is None or raw_last_access == b"0":
             return True
         last_access = float(raw_last_access)
         # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
@@ -825,9 +825,9 @@ class SessionLifetimeChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -1003,7 +1003,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         data = await redis_obj.get_live_data(key)
         return msgpack.unpackb(data) if data is not None else None
 
-    def get_time_window(self, policy: Row) -> timedelta:
+    def get_time_window(self, policy: Row[Any]) -> timedelta:
         # Respect idle_timeout, from keypair resource policy, over time_window.
         if (idle_timeout := policy.idle_timeout) >= 0:
             return timedelta(seconds=idle_timeout)
@@ -1018,9 +1018,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
     @override
     async def check_idleness(
         self,
-        kernel: Row,
+        kernel: Row[Any],
         dbconn: SAConnection,
-        policy: Row,
+        policy: Row[Any],
         *,
         grace_period_end: datetime | None = None,
     ) -> bool:
@@ -1056,10 +1056,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if util_now - util_last_collected < interval:
             return True
 
-        raw_util_first_collected = cast(
-            bytes | None,
-            await self._redis_live.get_live_data(util_first_collected_key),
-        )
+        raw_util_first_collected = await self._redis_live.get_live_data(util_first_collected_key)
         if raw_util_first_collected is None:
             util_first_collected = util_now
             await self._redis_live.store_live_data(
@@ -1095,7 +1092,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             if Decimal(slot_val) == 0:
                 # The resource is not allocated to this session.
                 continue
-            _slot_name = cast(str, slot_name)
+            _slot_name = slot_name
             resource_name, _, _ = _slot_name.partition(".")
             if resource_name:
                 requested_resource_names.add(resource_name)
@@ -1120,10 +1117,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Update utilization time-series data.
-        raw_util_series = cast(
-            bytes | None,
-            await self._redis_live.get_live_data(util_series_key),
-        )
+        raw_util_series = await self._redis_live.get_live_data(util_series_key)
 
         def default_util_series() -> dict[str, list[float]]:
             return {resource: [] for resource in current_utilizations.keys()}

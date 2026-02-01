@@ -348,13 +348,13 @@ async def handle_kernel_exception(
 
 
 # Defined for avoiding circular import
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
+def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return sa.and_(
@@ -363,7 +363,7 @@ def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement:
     )
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel
@@ -1157,8 +1157,8 @@ def by_status(
     status: Iterable[KernelStatus],
 ) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.status.in_(status))
 
     return _by_status
@@ -1168,8 +1168,8 @@ def by_agent_id(
     agent_id: str,
 ) -> QueryCondition:
     def _by_agent_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.agent == agent_id)
 
     return _by_agent_id
@@ -1179,8 +1179,8 @@ def by_kernel_ids(
     kernel_ids: Iterable[KernelId],
 ) -> QueryCondition:
     def _by_kernel_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.id.in_(kernel_ids))
 
     return _by_kernel_id

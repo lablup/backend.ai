@@ -91,7 +91,7 @@ __all__ = (
 
 
 @graphene_federation.key("id")
-class GroupNode(graphene.ObjectType):
+class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -311,7 +311,7 @@ class GroupNode(graphene.ObjectType):
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> GroupNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> GroupNode:
         return await GroupNode.get_node(info, self.id)
 
 
@@ -321,7 +321,7 @@ class GroupConnection(Connection):
         description = "Added in 24.03.0"
 
 
-class GroupPermissionField(graphene.Scalar):
+class GroupPermissionField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 25.3.0. One of {[val.value for val in ProjectPermission]}."
 
@@ -330,7 +330,9 @@ class GroupPermissionField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables: dict | None = None) -> ProjectPermission | None:
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ProjectPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ProjectPermission(node.value)
         return None
@@ -340,7 +342,7 @@ class GroupPermissionField(graphene.Scalar):
         return ProjectPermission(value)
 
 
-class Group(graphene.ObjectType):
+class Group(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String()
     description = graphene.String()
@@ -358,7 +360,7 @@ class Group(graphene.ObjectType):
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Group | None:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any]) -> Group | None:
         if row is None:
             return None
         return cls(
@@ -538,7 +540,7 @@ class Group(graphene.ObjectType):
             ]
 
 
-class GroupInput(graphene.InputObjectType):
+class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     type = graphene.String(
         required=False,
         default_value="GENERAL",
@@ -596,7 +598,7 @@ class GroupInput(graphene.InputObjectType):
         )
 
 
-class ModifyGroupInput(graphene.InputObjectType):
+class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=False)
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
@@ -654,7 +656,7 @@ class ModifyGroupInput(graphene.InputObjectType):
         )
 
 
-class CreateGroup(graphene.Mutation):
+class CreateGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -692,7 +694,7 @@ class CreateGroup(graphene.Mutation):
         )
 
 
-class ModifyGroup(graphene.Mutation):
+class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -726,7 +728,7 @@ class ModifyGroup(graphene.Mutation):
         )
 
 
-class DeleteGroup(graphene.Mutation):
+class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
     """
     Instead of deleting the group, just mark it as inactive.
     """
@@ -750,7 +752,7 @@ class DeleteGroup(graphene.Mutation):
         return cls(ok=True, msg="success")
 
 
-class PurgeGroup(graphene.Mutation):
+class PurgeGroup(graphene.Mutation):  # type: ignore[misc]
     """
     Completely deletes a group from DB.
 

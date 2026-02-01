@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -83,39 +86,51 @@ class TestModifyAutoScalingRule:
         )
 
     @pytest.fixture
-    def mock_check_user_access_modify(self, mocker, auto_scaling_service) -> AsyncMock:
-        mock = mocker.patch.object(
-            auto_scaling_service,
-            "check_user_access",
-            new_callable=AsyncMock,
+    def mock_check_user_access_modify(self, mocker: Any, auto_scaling_service: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                auto_scaling_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
         )
         mock.return_value = None
         return mock
 
     @pytest.fixture
-    def mock_get_auto_scaling_rule_by_id(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_auto_scaling_rule_by_id",
-            new_callable=AsyncMock,
+    def mock_get_auto_scaling_rule_by_id(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_auto_scaling_rule_by_id",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
     def mock_get_endpoint_access_validation_data_modify(
-        self, mocker, mock_repositories
+        self, mocker: Any, mock_repositories: Any
     ) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "get_endpoint_access_validation_data",
-            new_callable=AsyncMock,
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.fixture
-    def mock_modify_auto_scaling_rule(self, mocker, mock_repositories) -> AsyncMock:
-        return mocker.patch.object(
-            mock_repositories.repository,
-            "update_auto_scaling_rule",
-            new_callable=AsyncMock,
+    def mock_modify_auto_scaling_rule(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "update_auto_scaling_rule",
+                new_callable=AsyncMock,
+            ),
         )
 
     @pytest.mark.parametrize(
@@ -191,10 +206,10 @@ class TestModifyAutoScalingRule:
         ],
         user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_user_access_modify,
-        mock_get_auto_scaling_rule_by_id,
-        mock_get_endpoint_access_validation_data_modify,
-        mock_modify_auto_scaling_rule,
+        mock_check_user_access_modify: AsyncMock,
+        mock_get_auto_scaling_rule_by_id: AsyncMock,
+        mock_get_endpoint_access_validation_data_modify: AsyncMock,
+        mock_modify_auto_scaling_rule: AsyncMock,
     ) -> None:
         action = scenario.input
 
@@ -234,7 +249,9 @@ class TestModifyAutoScalingRule:
             mock_get_auto_scaling_rule_by_id.return_value = None
             mock_modify_auto_scaling_rule.return_value = None
 
-        async def modify_auto_scaling_rule(action: ModifyEndpointAutoScalingRuleAction):
+        async def modify_auto_scaling_rule(
+            action: ModifyEndpointAutoScalingRuleAction,
+        ) -> ModifyEndpointAutoScalingRuleActionResult:
             return (
                 await auto_scaling_processors.modify_endpoint_auto_scaling_rule.wait_for_complete(
                     action
