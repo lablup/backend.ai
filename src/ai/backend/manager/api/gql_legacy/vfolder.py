@@ -218,9 +218,9 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             return self.created_at
 
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except ParserError:
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     @classmethod
     def from_row(
@@ -542,18 +542,18 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except (TypeError, ParserError):
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     def resolve_modified_at(
         self,
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.modified_at)
+            return dtparse(cast(str, self.modified_at))
         except (TypeError, ParserError):
-            return self.modified_at
+            return cast(datetime, self.modified_at)
 
     @classmethod
     def parse_model(

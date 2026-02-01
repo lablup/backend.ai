@@ -233,7 +233,7 @@ class BaseResourceUsageGroup:
 @attrs.define(slots=True, kw_only=True)
 class KernelResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
-    # child_usage_group: dict = attrs.field(factory=dict)
+    # child_usage_group intentionally not redefined as kernels have no children
     agent: str
     kernel_id: UUID
     project_row: GroupRow
@@ -284,7 +284,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
 @attrs.define(slots=True, kw_only=True)
 class SessionResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.SESSION
-    child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)
+    child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     session_id: UUID
     project_row: GroupRow
     session_row: SessionRow
@@ -352,7 +352,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
 @attrs.define(slots=True, kw_only=True)
 class ProjectResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.PROJECT
-    child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)
+    child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)  # type: ignore[assignment]
     project_id: UUID
     project_row: GroupRow
 

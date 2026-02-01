@@ -1613,7 +1613,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             request=request,
         )
     )
-    return result.response
+    return cast(web.StreamResponse, result.response)
 
 
 @server_status_required(READ_ALLOWED)

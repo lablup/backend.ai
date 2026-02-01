@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -179,7 +179,7 @@ class AuthDBSource:
             password_changed_at = result.scalar()
             if password_changed_at is None:
                 raise UserNotFound(extra_data={"user_uuid": str(user_uuid)})
-            return password_changed_at
+            return cast(datetime, password_changed_at)
 
     @auth_db_source_resilience.apply()
     async def mark_user_and_keypairs_inactive(self, email: str) -> None:

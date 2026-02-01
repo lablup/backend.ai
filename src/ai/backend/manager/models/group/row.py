@@ -463,7 +463,8 @@ async def resolve_group_name_or_id(
         case _:
             raise TypeError("unexpected type for group_name_or_id")
     query = _build_group_query(cond, domain_name)
-    return await db_conn.scalar(query)
+    result: uuid.UUID | None = await db_conn.scalar(query)
+    return result
 
 
 @overload

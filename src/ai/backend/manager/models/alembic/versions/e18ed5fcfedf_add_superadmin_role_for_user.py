@@ -55,7 +55,7 @@ def upgrade() -> None:
     # domain and groups as well.
     query = "SELECT uuid FROM users where email = 'admin@lablup.com';"
     result = conn.execute(text(query)).first()
-    uuid = result.uuid if hasattr(result, "uuid") else None
+    uuid = result.uuid if result is not None else None
     if uuid is not None:  # update only when admin@lablup.com user exist
         query = textwrap.dedent(
             """\

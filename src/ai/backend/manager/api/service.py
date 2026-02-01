@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import aiohttp_cors
 import aiotools
@@ -122,8 +122,8 @@ async def is_user_allowed_to_access_resource(
         user = result.scalar()
         if user is None:
             return False
-        return user.domain_name == request["user"]["domain_name"]
-    return request["user"]["uuid"] == resource_owner
+        return cast(bool, user.domain_name == request["user"]["domain_name"])
+    return cast(bool, request["user"]["uuid"] == resource_owner)
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):

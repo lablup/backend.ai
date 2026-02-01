@@ -145,7 +145,8 @@ class QueryFilterTransformer(Transformer[Any, Any]):
                     expr = col.ilike(val)
                 case _:
                     raise ValueError(f"Unknown operator: {op}")
-            return expr
+            result: sa.sql.elements.ColumnElement[Any] = expr
+            return result
 
         expr: sa.sql.elements.ColumnElement[Any]
         try:
@@ -161,7 +162,8 @@ class QueryFilterTransformer(Transformer[Any, Any]):
                             .select_from(unnested_col)
                             .where(build_expr(op, sa.column("item"), val))
                         )
-                        expr = sa.exists(subq)
+                        result_expr: sa.sql.elements.ColumnElement[Any] = sa.exists(subq)
+                        expr = result_expr
                     case JSONFieldItem(col_name, obj_key):
                         # For json columns, we additionally indicate the object key
                         # to retrieve the value used in the expression.
@@ -196,7 +198,8 @@ class QueryFilterTransformer(Transformer[Any, Any]):
         op = children[0].value
         expr = children[1]
         if op in ("not", "!"):
-            return sa.not_(expr)
+            result: sa.sql.elements.ColumnElement[Any] = sa.not_(expr)
+            return result
         return args
 
     def combine_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any] | tuple[Any, ...]:
@@ -212,7 +215,8 @@ class QueryFilterTransformer(Transformer[Any, Any]):
 
     def paren_expr(self, *args: Any) -> sa.sql.elements.ColumnElement[Any]:
         children = args[0]
-        return children[0]
+        result: sa.sql.elements.ColumnElement[Any] = children[0]
+        return result
 
 
 class QueryFilterParser:
@@ -227,7 +231,8 @@ class QueryFilterParser:
     ) -> WhereClauseType:
         try:
             ast = self._parser.parse(filter_expr)
-            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            where_clause_result: WhereClauseType = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            where_clause = where_clause_result
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}") from e
         return where_clause

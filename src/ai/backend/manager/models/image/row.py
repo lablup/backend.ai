@@ -660,7 +660,8 @@ class ImageRow(Base):  # type: ignore[misc]
                     filter_by_statuses=filter_by_statuses,
                     loading_options=loading_options,
                 ):
-                    return row
+                    result: Self = row
+                    return result
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
@@ -765,7 +766,8 @@ class ImageRow(Base):  # type: ignore[misc]
                             merged_spec["min"] = max(mins, key=BinarySize.from_str)
 
             merged_resources[label_key_str] = merged_spec
-        return ImageRow._resources.type._schema.check(merged_resources)
+        result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(merged_resources)
+        return result
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
@@ -784,7 +786,8 @@ class ImageRow(Base):  # type: ignore[misc]
             res_key = k[len(RESOURCE_LABEL_PREFIX) :]
             resources[res_key] = {"min": v}
 
-        return ImageRow._resources.type._schema.check(resources)
+        result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
+        return result
 
     async def get_min_slot(self, etcd_loader: LegacyEtcdLoader) -> ResourceSlot:
         slot_units = await etcd_loader.get_resource_slots()
@@ -875,7 +878,8 @@ class ImageRow(Base):  # type: ignore[misc]
     def is_owned_by(self, user_id: UUID) -> bool:
         if not self.customized:
             return False
-        return self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
+        result: bool = self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
+        return result
 
     def to_dataclass(self) -> ImageData:
         from ai.backend.manager.data.image.types import ImageData

@@ -1879,7 +1879,7 @@ class DeploymentDBSource:
 
             architecture_counts = Counter(architectures)
             most_common_architecture, _ = architecture_counts.most_common(1)[0]
-            return most_common_architecture
+            return cast(str, most_common_architecture)
 
     # Deployment Revision Methods
 

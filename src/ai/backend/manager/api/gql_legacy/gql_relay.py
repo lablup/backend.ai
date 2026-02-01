@@ -11,6 +11,7 @@ from typing import (
     Any,
     NamedTuple,
     Protocol,
+    cast,
 )
 
 import graphene
@@ -259,7 +260,8 @@ class Connection(graphene.ObjectType):  # type: ignore[misc]
                 description="Total count of the GQL nodes of the query.",
             )
 
-        return super().__init_subclass_with_meta__(_meta=_meta, **options)
+        super().__init_subclass_with_meta__(_meta=_meta, **options)
+        return None
 
 
 class ConnectionPaginationOrder(enum.Enum):
@@ -339,23 +341,26 @@ class AsyncListConnectionField(IterableConnectionField):  # type: ignore[misc]
             )
             for value in resolved
         ]
-        return connection_type(
-            edges=edges,
-            page_info=PageInfo(
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-                has_previous_page=(
-                    pagination_order == ConnectionPaginationOrder.BACKWARD
-                    and page_size is not None
-                    and page_size < orig_resolved_len
+        return cast(
+            Connection,
+            connection_type(
+                edges=edges,
+                page_info=PageInfo(
+                    start_cursor=edges[0].cursor if edges else None,
+                    end_cursor=edges[-1].cursor if edges else None,
+                    has_previous_page=(
+                        pagination_order == ConnectionPaginationOrder.BACKWARD
+                        and page_size is not None
+                        and page_size < orig_resolved_len
+                    ),
+                    has_next_page=(
+                        pagination_order == ConnectionPaginationOrder.FORWARD
+                        and page_size is not None
+                        and page_size < orig_resolved_len
+                    ),
                 ),
-                has_next_page=(
-                    pagination_order == ConnectionPaginationOrder.FORWARD
-                    and page_size is not None
-                    and page_size < orig_resolved_len
-                ),
+                count=count,
             ),
-            count=count,
         )
 
     @classmethod

@@ -156,7 +156,7 @@ def _create_resource_slot_from_policy(
         "total_resource_slots": total_resource_slots or ResourceSlot(),
         "default_for_unspecified": default_for_unspecified or DefaultForUnspecified.LIMITED,
     }
-    return ResourceSlot.from_policy(resource_policy_map, known_slot_types)
+    return ResourceSlot.from_policy(resource_policy_map, cast(Mapping[str, Any], known_slot_types))
 
 
 class ScheduleDBSource:

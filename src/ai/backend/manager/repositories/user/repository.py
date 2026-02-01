@@ -370,7 +370,7 @@ class UserRepository:
         res = result.first()
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
-        return res
+        return cast(UserRow, res)
 
     def _validate_user_access(self, _user_row: UserRow, _requester_uuid: UUID | None) -> bool:
         """Private method to validate user access - can be extended for ownership logic."""
@@ -756,7 +756,7 @@ class UserRepository:
         row = result.first()
         if not row:
             raise UserNotFound()
-        return row.uuid
+        return cast(UUID, row.uuid)
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,

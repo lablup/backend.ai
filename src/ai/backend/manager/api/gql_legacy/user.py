@@ -556,7 +556,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         manager = ctx.dataloader_manager
         loader = manager.get_loader(ctx, "UserGroup.by_user_id")
-        return await loader.load(self.id)
+        return cast(Iterable[UserGroup], await loader.load(self.id))
 
     @classmethod
     def from_dto(cls, dto: UserData) -> Self:

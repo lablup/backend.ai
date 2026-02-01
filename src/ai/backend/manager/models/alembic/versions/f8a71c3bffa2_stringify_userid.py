@@ -8,6 +8,7 @@ Create Date: 2018-06-17 13:52:13.346856
 
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -53,12 +54,12 @@ def upgrade() -> None:
 
     if choice == "b":
         # query all unique user ids
-        q = sa.select([keypairs.c.user_id]).group_by(keypairs.c.user_id)
+        q = sa.select(keypairs.c.user_id).group_by(keypairs.c.user_id)
         rows = op.get_bind().execute(q)
-        user_ids = {int(row.user_id) for row in rows}
+        user_ids = {int(cast(str, row.user_id)) for row in rows}
         print(f"There are {len(user_ids)} unique user IDs.")
 
-        user_id_map = {}
+        user_id_map: dict[int, str] = {}
         with Path("user_id_map.txt").open() as f:
             for line in f:
                 num_id, str_id = line.split(maxsplit=1)
@@ -68,11 +69,11 @@ def upgrade() -> None:
         map_diff = user_ids - set(user_id_map.keys())
         assert len(map_diff) == 0, f"There are unmapped user IDs!\n{map_diff}"
 
-        for num_id, str_id in user_id_map.items():
+        for num_id_int, str_id_val in user_id_map.items():
             op.execute(
                 keypairs.update()
-                .values({"user_id": str_id})
-                .where(keypairs.c.user_id == str(num_id))
+                .values({"user_id": str_id_val})
+                .where(keypairs.c.user_id == str(num_id_int))
             )
 
 

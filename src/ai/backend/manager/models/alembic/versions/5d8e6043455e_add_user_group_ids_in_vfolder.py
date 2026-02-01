@@ -6,6 +6,8 @@ Create Date: 2019-06-06 15:02:58.804516
 
 """
 
+from typing import Any, cast
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.sql.expression import bindparam
@@ -66,39 +68,39 @@ def upgrade() -> None:
 
     # Migrate vfolders' belongs_to keypair into user.
     j = vfolders.join(keypairs, vfolders.c.belongs_to == keypairs.c.access_key)
-    query = sa.select([vfolders.c.id, keypairs.c.user]).select_from(j)
+    query = sa.select(vfolders.c.id, keypairs.c.user).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [{"vid": row.id, "user": row.user} for row in results]
     if updates:
-        query = (
+        update_query = (
             sa.update(vfolders)
             .values(user=bindparam("user"))
             .where(vfolders.c.id == bindparam("vid"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     # Migrate vfolder_permissions' access_key into user.
     j = vfolder_permissions.join(
         keypairs, vfolder_permissions.c.access_key == keypairs.c.access_key
     )
-    query = sa.select([
+    query = sa.select(
         vfolder_permissions.c.vfolder,
         keypairs.c.access_key,
         keypairs.c.user,
-    ]).select_from(j)
+    ).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [
         {"_vfolder": row.vfolder, "_access_key": row.access_key, "_user": row.user}
         for row in results
     ]
     if updates:
-        query = (
+        update_query = (
             sa.update(vfolder_permissions)
             .values(user=bindparam("_user"))
             .where(vfolder_permissions.c.vfolder == bindparam("_vfolder"))
             .where(vfolder_permissions.c.access_key == bindparam("_access_key"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     op.drop_constraint("fk_vfolders_belongs_to_keypairs", "vfolders", type_="foreignkey")
     op.drop_column("vfolders", "belongs_to")
@@ -166,37 +168,37 @@ def downgrade() -> None:
 
     # Migrate vfolders' user_id into belongs_to.
     j = vfolders.join(keypairs, vfolders.c.user == keypairs.c.user)
-    query = sa.select([vfolders.c.id, keypairs.c.access_key]).select_from(j)
+    query = sa.select(vfolders.c.id, keypairs.c.access_key).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [{"vid": row.id, "belongs_to": row.access_key} for row in results]
     if updates:
-        query = (
+        update_query = (
             sa.update(vfolders)
             .values(belongs_to=bindparam("belongs_to"))
             .where(vfolders.c.id == bindparam("vid"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     # Migrate vfolder_permissions' used into access_key.
     j = vfolder_permissions.join(keypairs, vfolder_permissions.c.user == keypairs.c.user)
-    query = sa.select([
+    query = sa.select(
         vfolder_permissions.c.vfolder,
         keypairs.c.user,
         keypairs.c.access_key,
-    ]).select_from(j)
+    ).select_from(j)
     results = connection.execute(query).fetchall()
     updates = [
         {"_vfolder": row.vfolder, "_access_key": row.access_key, "_user": row.user}
         for row in results
     ]
     if updates:
-        query = (
+        update_query = (
             sa.update(vfolder_permissions)
             .values(access_key=bindparam("_access_key"))
             .where(vfolder_permissions.c.vfolder == bindparam("_vfolder"))
             .where(vfolder_permissions.c.user == bindparam("_user"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     op.alter_column("vfolders", "belongs_to", nullable=False)
     op.alter_column("vfolder_permissions", "access_key", nullable=False)

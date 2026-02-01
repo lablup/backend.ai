@@ -178,7 +178,7 @@ class PermissionContextBuilder(
         host_permissions = domain_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                host: _legacy_vf_perms_to_host_rbac_perms(list(perms))
                 for host, perms in host_permissions.items()
             }
         )
@@ -207,7 +207,7 @@ class PermissionContextBuilder(
         host_permissions = project_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                host: _legacy_vf_perms_to_host_rbac_perms(list(perms))
                 for host, perms in host_permissions.items()
             }
         )
@@ -229,7 +229,7 @@ class PermissionContextBuilder(
             .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
-                    joinedload(KeyPairRow.resource_policy).options(
+                    joinedload(KeyPairRow.resource_policy_row).options(
                         load_only(KeyPairResourcePolicyRow.allowed_vfolder_hosts)
                     )
                 )
@@ -244,13 +244,13 @@ class PermissionContextBuilder(
         ] = defaultdict(frozenset)
 
         for keypair in user_row.keypairs:
-            resource_policy = keypair.resource_policy
-            if resource_policy is None:
+            resource_policy_row: KeyPairResourcePolicyRow | None = keypair.resource_policy_row
+            if resource_policy_row is None:
                 continue
-            host_permissions = resource_policy.allowed_vfolder_hosts
+            host_permissions = resource_policy_row.allowed_vfolder_hosts
             for host, perms in host_permissions.items():
                 object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_rbac_perms(
-                    perms
+                    list(perms)
                 )
 
         return PermissionContext(

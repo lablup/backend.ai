@@ -154,19 +154,22 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         user_repository=root_ctx.repositories.user.repository,
         agent_repository=root_ctx.repositories.agent.repository,
     )
-    result = await app_ctx.gql_schema.execute_async(
-        params["query"],
-        None,  # root
-        variable_values=params["variables"],
-        operation_name=params["operation_name"],
-        context_value=gql_ctx,
-        middleware=[
-            GQLMutationPrivilegeCheckMiddleware(),
-            GQLMutationUnfrozenRequiredMiddleware(),
-            GQLMetricMiddleware(),
-            GQLExceptionMiddleware(),
-            GQLLoggingMiddleware(),
-        ],
+    result = cast(
+        ExecutionResult,
+        await app_ctx.gql_schema.execute_async(
+            params["query"],
+            None,  # root
+            variable_values=params["variables"],
+            operation_name=params["operation_name"],
+            context_value=gql_ctx,
+            middleware=[
+                GQLMutationPrivilegeCheckMiddleware(),
+                GQLMutationUnfrozenRequiredMiddleware(),
+                GQLMetricMiddleware(),
+                GQLExceptionMiddleware(),
+                GQLLoggingMiddleware(),
+            ],
+        ),
     )
 
     if result.errors:

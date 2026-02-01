@@ -31,6 +31,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    cast,
 )
 
 import sqlalchemy as sa
@@ -214,7 +215,7 @@ def check_api_params(
         set_handler_attr(wrapped, "request_scheme", checker)
         if request_examples:
             set_handler_attr(wrapped, "request_examples", request_examples)
-        return wrapped
+        return cast(Callable[Concatenate[web.Request, P], Awaitable[TAnyResponse]], wrapped)
 
     return wrap
 

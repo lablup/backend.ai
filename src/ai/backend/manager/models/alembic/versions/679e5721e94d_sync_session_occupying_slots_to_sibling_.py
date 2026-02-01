@@ -90,7 +90,7 @@ def _sync_multi_kernel_cluster_session() -> None:
                 & (SessionRow.status_history.op("?")("RUNNING"))
             )
             .limit(PAGE_SIZE)
-            .options(selectinload(SessionRow.kernels).options(load_only(KernelRow.occupied_slots)))
+            .options(selectinload(SessionRow.kernels).options(load_only("occupied_slots")))  # type: ignore[arg-type]
         )
         session_list = cast(list[SessionRow], db_sess.scalars(select_stmt).all())
         if not session_list:

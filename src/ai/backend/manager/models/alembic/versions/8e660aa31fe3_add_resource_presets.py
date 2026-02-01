@@ -7,6 +7,7 @@ Create Date: 2019-03-30 01:45:07.525096
 """
 
 from decimal import Decimal
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -77,20 +78,21 @@ def upgrade() -> None:
     result = connection.execute(text(query))
     updates = []
     for row in result:
-        converted = ResourceSlot(row["total_resource_slots"])
+        row_mapping = cast(dict[str, Any], row._mapping)
+        converted = ResourceSlot(row_mapping["total_resource_slots"])
         if "mem" in converted:
             converted["mem"] = Decimal(BinarySize.from_str(converted["mem"]))
             updates.append((
-                row["name"],
+                row_mapping["name"],
                 converted,
             ))
     for name, slots in updates:
-        query = (
+        update_query = (
             sa.update(keypair_resource_policies)
             .values(total_resource_slots=slots)
             .where(keypair_resource_policies.c.name == name)
         )
-        connection.execute(query)
+        connection.execute(update_query)
 
     # ### end Alembic commands ###
 

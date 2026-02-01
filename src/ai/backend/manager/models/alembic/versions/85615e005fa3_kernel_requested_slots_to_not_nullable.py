@@ -6,9 +6,13 @@ Create Date: 2023-09-22 12:37:31.725324
 
 """
 
+from typing import Any, cast
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine import Row
 
 from ai.backend.manager.models.base import GUID, mapper_registry
 
@@ -39,17 +43,17 @@ def upgrade() -> None:
 
     while True:
         select_stmt = (
-            sa.select([kernels.c.id]).where(kernels.c.requested_slots.is_(None)).limit(BATCH_SIZE)
+            sa.select(kernels.c.id).where(kernels.c.requested_slots.is_(None)).limit(BATCH_SIZE)
         )
-        result = connection.execute(select_stmt).fetchall()
-        kernel_ids_to_update = [row.id for row in result]
+        fetch_result: Sequence[Row[Any]] = connection.execute(select_stmt).fetchall()
+        kernel_ids_to_update = [row.id for row in fetch_result]
 
         stmt = (
             sa.update(kernels)
             .where(kernels.c.id.in_(kernel_ids_to_update))
             .values(requested_slots={})
         )
-        result = connection.execute(stmt)
+        connection.execute(stmt)
         if len(kernel_ids_to_update) < BATCH_SIZE:
             break
     op.alter_column("kernels", "requested_slots", nullable=False)

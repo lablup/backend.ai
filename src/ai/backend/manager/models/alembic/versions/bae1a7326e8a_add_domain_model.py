@@ -7,6 +7,7 @@ Create Date: 2019-05-08 08:29:29.588817
 """
 
 import textwrap
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -61,22 +62,19 @@ def upgrade() -> None:
     # Fill in users' domain_name column with default domain.
     # Create default domain if not exist.
     connection = op.get_bind()
-    query = sa.select([domains]).select_from(domains).where(domains.c.name == "default")
+    query = sa.select(domains).select_from(domains).where(domains.c.name == "default")
     results = connection.execute(query).first()
     if results is None:
-        query = sa.insert(domains).values(
-            name="default", description="Default domain", is_active=True, total_resource_slots="{}"
-        )
-        query = textwrap.dedent(
+        insert_query = textwrap.dedent(
             """\
             INSERT INTO domains (name, description, is_active, total_resource_slots)
             VALUES ('default', 'Default domain', True, '{}'::jsonb);"""
         )
-        connection.execute(text(query))
+        connection.execute(text(insert_query))
 
     # Fill in users' domain_name field.
-    query = "UPDATE users SET domain_name = 'default' WHERE email != 'admin@lablup.com';"
-    connection.execute(text(query))
+    update_query = "UPDATE users SET domain_name = 'default' WHERE email != 'admin@lablup.com';"
+    connection.execute(text(update_query))
 
 
 def downgrade() -> None:

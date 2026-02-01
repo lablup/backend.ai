@@ -230,8 +230,10 @@ class WebSocketProxy:
             try:
                 if self.up_conn and not self.up_conn.closed:
                     if tp == aiohttp.WSMsgType.TEXT:
+                        assert isinstance(msg, str)
                         await self.up_conn.send_str(msg)
                     elif tp == aiohttp.WSMsgType.binary:
+                        assert isinstance(msg, bytes)
                         await self.up_conn.send_bytes(msg)
                 else:
                     await self.close_downstream()

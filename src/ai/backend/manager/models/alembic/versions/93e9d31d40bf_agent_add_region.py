@@ -30,7 +30,7 @@ def upgrade() -> None:
         "is_admin",
         existing_type=sa.BOOLEAN(),
         nullable=True,
-        existing_server_default=sa.text("false"),
+        existing_server_default="false",
     )
     # ### end Alembic commands ###
 
@@ -42,7 +42,7 @@ def downgrade() -> None:
         "is_admin",
         existing_type=sa.BOOLEAN(),
         nullable=False,
-        existing_server_default=sa.text("false"),
+        existing_server_default="false",
     )
     op.drop_index(op.f("ix_agents_region"), table_name="agents")
     op.drop_column("agents", "region")

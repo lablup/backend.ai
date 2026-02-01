@@ -23,7 +23,7 @@ def upgrade() -> None:
         "scaling_group",
         existing_type=sa.VARCHAR(length=64),
         nullable=True,
-        existing_server_default=sa.text("'default'::character varying"),
+        existing_server_default="'default'::character varying",
     )
     # ### end Alembic commands ###
 
@@ -35,6 +35,6 @@ def downgrade() -> None:
         "scaling_group",
         existing_type=sa.VARCHAR(length=64),
         nullable=False,
-        existing_server_default=sa.text("'default'::character varying"),
+        existing_server_default="'default'::character varying",
     )
     # ### end Alembic commands ###

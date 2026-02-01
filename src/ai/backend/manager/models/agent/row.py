@@ -305,6 +305,8 @@ async def recalc_agent_resource_occupancy_using_orm(
     )
     occupied_slots = ResourceSlot()
     agent_row = await db_session.scalar(agent_query)
+    if agent_row is None:
+        return
     kernel_rows = agent_row.kernels
     for kernel in kernel_rows:
         if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:

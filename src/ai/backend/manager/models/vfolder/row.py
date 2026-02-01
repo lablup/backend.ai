@@ -764,7 +764,8 @@ async def get_allowed_vfolder_hosts_by_group(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts = allowed_hosts | values
+        result_hosts: VFolderHostPermissionMap = allowed_hosts | values
+        allowed_hosts = result_hosts
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
         query = sa.select(groups.c.allowed_vfolder_hosts).where(
@@ -773,9 +774,11 @@ async def get_allowed_vfolder_hosts_by_group(
             & (groups.c.is_active),
         )
         if values := await conn.scalar(query):
-            allowed_hosts = allowed_hosts | values
+            result_hosts = allowed_hosts | values
+            allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    return final_result
 
 
 async def get_allowed_vfolder_hosts_by_user(
@@ -799,7 +802,8 @@ async def get_allowed_vfolder_hosts_by_user(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts = allowed_hosts | values
+        result_hosts: VFolderHostPermissionMap = allowed_hosts | values
+        allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
@@ -827,9 +831,11 @@ async def get_allowed_vfolder_hosts_by_user(
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
-            allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
+            result_hosts = allowed_hosts | row.allowed_vfolder_hosts
+            allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    return allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    return final_result
 
 
 @overload
@@ -1232,12 +1238,12 @@ async def filter_host_allowed_permission(
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
             db_conn, resource_policy, domain_name, user_uuid, group_id
         )
-        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+        allowed_hosts = VFolderHostPermissionMap(allowed_hosts | allowed_hosts_by_user)
     if "group" in allowed_vfolder_types and group_id is not None:
         allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
             db_conn, resource_policy, domain_name, group_id
         )
-        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+        allowed_hosts = VFolderHostPermissionMap(allowed_hosts | allowed_hosts_by_group)
     return allowed_hosts
 
 

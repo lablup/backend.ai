@@ -38,14 +38,14 @@ def upgrade() -> None:
             name="kernelstatus",
         ),
         nullable=False,
-        existing_server_default=sa.text("'PENDING'::kernelstatus"),
+        existing_server_default="'PENDING'::kernelstatus",
     )
     op.alter_column(
         "kernels",
         "type",
         existing_type=postgresql.ENUM("INTERACTIVE", "BATCH", name="sessiontypes"),
         nullable=False,
-        existing_server_default=sa.text("'INTERACTIVE'::sessiontypes"),
+        existing_server_default="'INTERACTIVE'::sessiontypes",
     )
     op.create_index(op.f("ix_kernels_status_changed"), "kernels", ["status_changed"], unique=False)
     op.create_index(
@@ -66,7 +66,7 @@ def downgrade() -> None:
         "type",
         existing_type=postgresql.ENUM("INTERACTIVE", "BATCH", name="sessiontypes"),
         nullable=True,
-        existing_server_default=sa.text("'INTERACTIVE'::sessiontypes"),
+        existing_server_default="'INTERACTIVE'::sessiontypes",
     )
     op.alter_column(
         "kernels",
@@ -87,6 +87,6 @@ def downgrade() -> None:
             name="kernelstatus",
         ),
         nullable=True,
-        existing_server_default=sa.text("'PENDING'::kernelstatus"),
+        existing_server_default="'PENDING'::kernelstatus",
     )
     # ### end Alembic commands ###

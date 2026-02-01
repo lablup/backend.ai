@@ -6,6 +6,8 @@ Create Date: 2020-07-01 14:02:11.022032
 
 """
 
+from typing import Any, cast
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.sql.expression import bindparam
@@ -71,30 +73,32 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     # Set user's modified_at with the value of created_at.
-    query = sa.select([users.c.uuid, users.c.created_at]).select_from(users)
+    query = sa.select(users.c.uuid, users.c.created_at).select_from(users)
     updates = []
     for row in conn.execute(query).fetchall():
-        updates.append({"b_uuid": row["uuid"], "modified_at": row["created_at"]})
+        row_mapping = cast(dict[str, Any], row._mapping)
+        updates.append({"b_uuid": row_mapping["uuid"], "modified_at": row_mapping["created_at"]})
     if updates:
-        query = (
+        update_query = (
             sa.update(users)
             .values(modified_at=bindparam("modified_at"))
             .where(users.c.uuid == bindparam("b_uuid"))
         )
-        conn.execute(query, updates)
+        conn.execute(update_query, updates)
 
     # Set keypairs's modified_at with the value of created_at.
-    query = sa.select([keypairs.c.access_key, keypairs.c.created_at]).select_from(keypairs)
+    query = sa.select(keypairs.c.access_key, keypairs.c.created_at).select_from(keypairs)
     updates = []
     for row in conn.execute(query).fetchall():
-        updates.append({"b_access_key": row["access_key"], "modified_at": row["created_at"]})
+        row_mapping = cast(dict[str, Any], row._mapping)
+        updates.append({"b_access_key": row_mapping["access_key"], "modified_at": row_mapping["created_at"]})
     if updates:
-        query = (
+        update_query = (
             sa.update(keypairs)
             .values(modified_at=bindparam("modified_at"))
             .where(keypairs.c.access_key == bindparam("b_access_key"))
         )
-        conn.execute(query, updates)
+        conn.execute(update_query, updates)
 
 
 def downgrade() -> None:

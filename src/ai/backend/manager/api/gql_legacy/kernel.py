@@ -192,7 +192,7 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self.batch_load_live_stat
         )
-        return await loader.load(self.row_id)
+        return cast(dict[str, Any] | None, await loader.load(self.row_id))
 
     @classmethod
     async def batch_load_live_stat(

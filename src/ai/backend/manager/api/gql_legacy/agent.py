@@ -7,6 +7,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
+    cast,
 )
 
 import graphene
@@ -215,7 +216,7 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_container_count)
-        return await loader.load(self.id)
+        return cast(int, await loader.load(self.id))
 
     @classmethod
     async def batch_load_live_stat(
@@ -402,7 +403,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             ComputeContainer.batch_load_by_agent_id,
             status=_status,
         )
-        return await loader.load(self.id)
+        return cast(list[ComputeContainer], await loader.load(self.id))
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
@@ -438,7 +439,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
-        return await loader.load(self.id)
+        return cast(int, await loader.load(self.id))
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
         return await _resolve_gpu_alloc_map(info.context, self.id)

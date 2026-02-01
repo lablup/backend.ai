@@ -106,7 +106,8 @@ class ResourcePresetRow(Base):  # type: ignore[misc]
             .execution_options(populate_existing=True)
         )
         try:
-            return await db_session.scalar(stmt)
+            result: Self | None = await db_session.scalar(stmt)
+            return result
         except sa.exc.IntegrityError:
             return None
 

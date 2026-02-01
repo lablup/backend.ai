@@ -38,9 +38,11 @@ def get_col_from_table(
     table: sa.Table | sa.sql.Join | type, column_name: str
 ) -> sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any]:
     if isinstance(table, (sa.Table, sa.sql.Join)):
-        return table.c[column_name]
+        col: sa.Column[Any] | sa.sql.elements.KeyedColumnElement[Any] = table.c[column_name]
+        return col
     # For ORM class table
-    return getattr(table, column_name)
+    attr: sa.orm.attributes.InstrumentedAttribute[Any] = getattr(table, column_name)
+    return attr
 
 
 class ExternalTableFilterSpec:

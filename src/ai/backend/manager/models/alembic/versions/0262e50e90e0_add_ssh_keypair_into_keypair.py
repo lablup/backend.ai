@@ -6,6 +6,8 @@ Create Date: 2019-12-12 07:19:48.052928
 
 """
 
+from typing import Any, cast
+
 import sqlalchemy as sa
 from alembic import op
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
@@ -56,16 +58,16 @@ def upgrade() -> None:
 
     # Fill in SSH keypairs in every keypairs.
     conn = op.get_bind()
-    query = sa.select([keypairs.c.access_key]).select_from(keypairs)
+    query = sa.select(keypairs.c.access_key).select_from(keypairs)
     rows = conn.execute(query).fetchall()
     for row in rows:
         pubkey, privkey = generate_ssh_keypair()
-        query = (
+        update_query = (
             sa.update(keypairs)
             .values(ssh_public_key=pubkey, ssh_private_key=privkey)
             .where(keypairs.c.access_key == row.access_key)
         )
-        conn.execute(query)
+        conn.execute(update_query)
 
 
 def downgrade() -> None:

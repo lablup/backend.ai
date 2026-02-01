@@ -1180,7 +1180,8 @@ class SessionRow(Base):  # type: ignore[misc]
     ) -> SessionId | None:
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
-            return await db_session.scalar(query)
+            result: SessionId | None = await db_session.scalar(query)
+            return result
 
     @classmethod
     async def get_sessions_by_status(
@@ -1612,7 +1613,8 @@ class SessionRow(Base):  # type: ignore[misc]
     def get_status_elapsed_time(
         cls, status: SessionStatus, until: datetime
     ) -> sa.sql.elements.BinaryExpression[Any]:
-        return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+        return result
 
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:

@@ -97,7 +97,8 @@ class QueryOrderParser:
     ) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
-            return QueryOrderTransformer(table, self._column_map).transform(ast)
+            result: list[OrderingItem] = QueryOrderTransformer(table, self._column_map).transform(ast)
+            return result
         except LarkError as e:
             raise ValueError(f"Query ordering parsing error: {e}") from e
 

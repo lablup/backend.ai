@@ -7,6 +7,7 @@ Create Date: 2020-04-09 16:37:35.460936
 """
 
 import textwrap
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -92,21 +93,22 @@ def upgrade() -> None:
     conn.execute(text(query))
 
     # Set vfolders.c.ownership_type field based on user and group column.
-    query = sa.select([vfolders.c.id, vfolders.c.user, vfolders.c.group]).select_from(vfolders)
+    select_query = sa.select(vfolders.c.id, vfolders.c.user, vfolders.c.group).select_from(vfolders)
     updates = []
-    for row in conn.execute(query).fetchall():
-        if row["group"]:
+    for row in conn.execute(select_query).fetchall():
+        row_mapping = cast(dict[str, Any], row._mapping)
+        if row_mapping["group"]:
             ownership_type = VFolderOwnershipType.GROUP
         else:
             ownership_type = VFolderOwnershipType.USER
-        updates.append({"vfid": row["id"], "otype": ownership_type})
+        updates.append({"vfid": row_mapping["id"], "otype": ownership_type})
     if updates:
-        query = (
+        update_query = (
             sa.update(vfolders)
             .values(ownership_type=bindparam("otype"))
             .where(vfolders.c.id == bindparam("vfid"))
         )
-        conn.execute(query, updates)
+        conn.execute(update_query, updates)
 
     # Create indexes for name.
     op.create_index(op.f("ix_vfolders_name"), "vfolders", ["name"], unique=False)

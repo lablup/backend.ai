@@ -6,7 +6,7 @@ Create Date: 2024-02-27 20:18:55.524946
 
 """
 
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -72,7 +72,7 @@ def downgrade() -> None:
 
     def _delete(table: sa.Table, null_field: sa.Column[Any]) -> None:
         while True:
-            subq = sa.select([table.c.id]).where(null_field.is_(sa.null())).limit(BATCH_SIZE)
+            subq = sa.select(table.c.id).where(null_field.is_(sa.null())).limit(BATCH_SIZE)
             delete_stmt = sa.delete(table).where(table.c.id.in_(subq))
             result = conn.execute(delete_stmt)
             if result.rowcount == 0:

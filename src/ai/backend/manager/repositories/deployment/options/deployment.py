@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from typing import Any, cast
 
 import sqlalchemy as sa
 
@@ -322,5 +323,5 @@ class DeploymentOrders:
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return EndpointRow.updated_at.asc()
-        return EndpointRow.updated_at.desc()
+            return cast(sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.asc())
+        return cast(sa.UnaryExpression[Any] | sa.ColumnElement[Any], EndpointRow.updated_at.desc())

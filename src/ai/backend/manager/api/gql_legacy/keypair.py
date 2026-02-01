@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -136,7 +136,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserInfo:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "UserInfo.by_uuid")
-        return await loader.load(self.user)
+        return cast(UserInfo, await loader.load(self.user))
 
     @classmethod
     def from_data(cls, data: KeyPairData) -> Self:
@@ -196,7 +196,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
-        return await loader.load(self.access_key)
+        return cast(Sequence[VirtualFolder], await loader.load(self.access_key))
 
     async def resolve_compute_sessions(
         self, info: graphene.ResolveInfo, raw_status: str | None = None
@@ -206,7 +206,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         if raw_status is not None:
             status = KernelStatus[raw_status]
         loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSession", status=status)
-        return await loader.load(self.access_key)
+        return cast(list[ComputeSession], await loader.load(self.access_key))
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context

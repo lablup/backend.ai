@@ -1397,7 +1397,8 @@ class ModelServiceHelper:
             model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
-                    return item["name"]
+                    result: str = item["name"]
+                    return result
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
@@ -1422,7 +1423,8 @@ class ModelServiceHelper:
         )
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
-        return yaml.load(model_definition_yaml)
+        result: dict[str, Any] = yaml.load(model_definition_yaml)
+        return result
 
     @staticmethod
     async def validate_model_definition(
@@ -1446,7 +1448,8 @@ class ModelServiceHelper:
             model_definition = model_definition_iv.check(raw_model_definition)
             if model_definition is None:
                 raise DataTransformationFailed("Model definition validation returned None")
-            return model_definition
+            result: dict[str, Any] = model_definition
+            return result
         except t.DataError as e:
             raise InvalidAPIParameters(
                 f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",

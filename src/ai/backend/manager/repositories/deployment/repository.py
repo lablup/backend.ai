@@ -439,7 +439,7 @@ class DeploymentRepository:
             model_definition_candidates,
         )
         yaml = YAML()
-        return yaml.load(model_definition_bytes)
+        return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
     @deployment_repository_resilience.apply()
     async def fetch_service_definition(

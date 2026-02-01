@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, cast
 
 import graphene
 
@@ -57,7 +57,8 @@ class ContainerUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_max_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:
             return None
-        return max(self.values, key=lambda x: Decimal(x.value)).value
+        max_item = max(self.values, key=lambda x: Decimal(x.value))
+        return cast(str, max_item.value)
 
     async def resolve_avg_value(self, info: graphene.ResolveInfo) -> str | None:
         if not self.values:

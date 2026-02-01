@@ -545,7 +545,8 @@ async def check_credential_with_migration(
                 .values(password=target_password_info)
             )
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping
 
 
 async def check_credential(
@@ -590,4 +591,5 @@ async def check_credential(
     except ValueError as e:
         raise AuthorizationFailed("User credential mismatch.") from e
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping

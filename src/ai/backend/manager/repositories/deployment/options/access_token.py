@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection
 from datetime import datetime
+from typing import cast
 
 import sqlalchemy as sa
 
@@ -48,21 +49,21 @@ class AccessTokenConditions:
     @staticmethod
     def by_valid_until_before(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.valid_until < dt
+            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until < dt)
 
         return inner
 
     @staticmethod
     def by_valid_until_after(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.valid_until > dt
+            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until > dt)
 
         return inner
 
     @staticmethod
     def by_valid_until_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.valid_until == dt
+            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until == dt)
 
         return inner
 
