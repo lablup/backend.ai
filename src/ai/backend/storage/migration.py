@@ -283,6 +283,8 @@ async def check_and_upgrade(
         backends={**DEFAULT_BACKENDS},
         volumes={},
         health_probe=health_probe,
+        volume_stats_observer=None,  # type: ignore[arg-type]
+        volume_stats_state=None,  # type: ignore[arg-type]
     )
 
     volumes_to_upgrade = await check_latest(ctx)

@@ -414,6 +414,65 @@ class DebugConfig(BaseConfigSchema):
     ]
 
 
+class VolumeStatsConfig(BaseConfigSchema):
+    """Configuration for volume performance metrics observation and caching."""
+
+    observe_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            ge=1.0,
+            validation_alias=AliasChoices("observe-interval", "observe_interval"),
+            serialization_alias="observe-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between volume stats observations. The background observer "
+                "collects performance metrics from all volumes at this interval and caches them "
+                "in Redis for quick API responses."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    observe_timeout: Annotated[
+        float,
+        Field(
+            default=5.0,
+            ge=1.0,
+            validation_alias=AliasChoices("observe-timeout", "observe_timeout"),
+            serialization_alias="observe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for each volume's performance metric API call. If a volume's "
+                "external API does not respond within this time, the observation is marked as "
+                "failed and the observer moves on to the next volume."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="5.0", prod="5.0"),
+        ),
+    ]
+    cache_ttl: Annotated[
+        float,
+        Field(
+            default=30.0,
+            ge=1.0,
+            validation_alias=AliasChoices("cache-ttl", "cache_ttl"),
+            serialization_alias="cache-ttl",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Time-to-live in seconds for cached volume stats in Redis. Cached metrics "
+                "expire after this duration, ensuring stale data is not served. Should be "
+                "longer than the observe interval to provide cache coverage between observations."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
 class StorageProxyConfig(BaseConfigSchema):
     ipc_base_path: Annotated[
         AutoDirectoryPath,
@@ -723,6 +782,22 @@ class StorageProxyConfig(BaseConfigSchema):
             ),
             added_version="25.19.0",
             example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    volume_stats: Annotated[
+        VolumeStatsConfig,
+        Field(
+            default_factory=lambda: VolumeStatsConfig(),
+            validation_alias=AliasChoices("volume-stats", "volume_stats"),
+            serialization_alias="volume-stats",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for volume performance metrics observation and caching. "
+                "Controls the background observer that periodically collects metrics from "
+                "storage volumes and caches them in Redis."
+            ),
+            added_version="25.12.0",
         ),
     ]
 
