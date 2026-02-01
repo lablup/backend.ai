@@ -17,6 +17,7 @@ from typing import (
     Annotated,
     Any,
     Self,
+    cast,
 )
 from uuid import uuid4
 
@@ -1775,7 +1776,7 @@ class ResourceConfig(BaseConfigSchema):
                 return AffinityPolicy[v.upper()]
             except KeyError as e:
                 raise ValueError(f"Invalid affinity policy: {v}") from e
-        return v
+        return cast(AffinityPolicy, v)
 
 
 class ContainerLogsConfig(BaseConfigSchema):

@@ -239,6 +239,7 @@ async def test_batch_load_by_id(
         if expected_id is None:
             assert res is None
         else:
+            assert res is not None
             assert res.id == expected_id
 
 

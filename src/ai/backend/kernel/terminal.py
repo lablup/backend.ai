@@ -97,10 +97,10 @@ class Terminal:
             if code_txt.startswith("%"):
                 args = self.cmdparser.parse_args(shlex.split(code_txt[1:], comments=True))
                 if asyncio.iscoroutine(args.func) or asyncio.iscoroutinefunction(args.func):
-                    result: int = await args.func(args)
-                    return result
-                result: int = args.func(args)
-                return result
+                    result_async: int = await args.func(args)
+                    return result_async
+                result_sync: int = args.func(args)
+                return result_sync
             await self.sock_out.send_multipart([b"stderr", b"Invalid command."])
             return 127
         except Exception:

@@ -2,7 +2,7 @@ import asyncio
 import functools
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, overload
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -64,33 +64,13 @@ def mock_entrypoints_with_instance(
     )
 
 
-@overload
-def mock_entrypoints_with_class(
-    plugin_group_name: str,
-    allowlist: set[str] | None = None,
-    blocklist: set[str] | None = None,
-    *,
-    plugin_cls: list[type[AbstractPlugin]],
-) -> Iterator[DummyEntrypoint]: ...
-
-
-@overload
-def mock_entrypoints_with_class(
-    plugin_group_name: str,
-    allowlist: set[str] | None = None,
-    blocklist: set[str] | None = None,
-    *,
-    plugin_cls: type[AbstractPlugin],
-) -> DummyEntrypoint: ...
-
-
 def mock_entrypoints_with_class(
     plugin_group_name: str,
     allowlist: set[str] | None = None,
     blocklist: set[str] | None = None,
     *,
     plugin_cls: type[AbstractPlugin] | list[type[AbstractPlugin]],
-) -> DummyEntrypoint | Iterator[DummyEntrypoint]:
+) -> Iterator[DummyEntrypoint]:
     if isinstance(plugin_cls, list):
         yield from (
             DummyEntrypoint(
@@ -121,10 +101,10 @@ async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixtur
         assert not ctx.plugins
         await ctx.init()
         assert ctx.plugins
-        ctx.plugins["dummy"].init.assert_awaited_once()
+        ctx.plugins["dummy"].init.assert_awaited_once()  # type: ignore[attr-defined]
     finally:
         await ctx.cleanup()
-        ctx.plugins["dummy"].cleanup.assert_awaited_once()
+        ctx.plugins["dummy"].cleanup.assert_awaited_once()  # type: ignore[attr-defined]
 
 
 @pytest.mark.asyncio

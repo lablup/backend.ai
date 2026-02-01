@@ -275,7 +275,7 @@ def get_redis_object(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: ConnectionPool[bytes] = ConnectionPool.from_url(
+    connection_pool: ConnectionPool[bytes] = ConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,
@@ -364,7 +364,7 @@ def get_redis_object_for_lock(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: BlockingConnectionPool[bytes] = BlockingConnectionPool.from_url(
+    connection_pool: BlockingConnectionPool[bytes] = BlockingConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,

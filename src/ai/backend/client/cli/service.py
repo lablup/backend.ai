@@ -584,7 +584,7 @@ def try_start(
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     asyncio_run(try_start_tracker(result["task_id"]))
 

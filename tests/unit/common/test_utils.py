@@ -10,6 +10,7 @@ from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
+from pytest_mock import MockerFixture
 
 from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
@@ -207,7 +208,7 @@ class TestAsyncBarrier:
         assert barrier.cond is not None  # default condition
 
     @pytest.mark.asyncio
-    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker: pytest.fixture) -> None:
+    async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker: MockerFixture) -> None:
         mock_cond = mocker.patch.object(asyncio, "Condition")
         mock_resp = {
             "notify_all": mock.Mock(),
@@ -267,9 +268,9 @@ async def test_run_through() -> None:
     assert i == 4
 
     await run_through(
-        do,  # coroutine-function
-        do_sync,  # function
-        lambda: do_sync(),  # function wrapped with lambda
+        do(),  # coroutine
+        do(),  # coroutine
+        do(),  # coroutine
         do(),  # coroutine
         ignored_exceptions=(ZeroDivisionError,),
     )

@@ -42,7 +42,7 @@ from ai.backend.manager.types import UserScope
 
 
 @pytest.fixture
-async def mock_repository() -> None:
+async def mock_repository() -> AsyncMock:
     """Create a mock repository."""
     repo = AsyncMock()
     repo.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
@@ -60,7 +60,7 @@ async def mock_repository() -> None:
 
 
 @pytest.fixture
-async def mock_config_provider() -> None:
+async def mock_config_provider() -> MagicMock:
     """Create a mock config provider."""
     provider = MagicMock()
     provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(

@@ -30,10 +30,10 @@ def test_deep_merge_overrides() -> None:
 
 
 async def test_env_loader() -> None:
-    env_map = [
-        (["db", "user"], "TEST_DB_USER"),
-        (["db", "password"], "TEST_DB_PASSWORD"),
-        (["manager", "num-proc"], "TEST_MANAGER_NPROC"),
+    env_map: list[tuple[tuple[str, ...], str]] = [
+        (("db", "user"), "TEST_DB_USER"),
+        (("db", "password"), "TEST_DB_PASSWORD"),
+        (("manager", "num-proc"), "TEST_MANAGER_NPROC"),
     ]
 
     loader = EnvLoader(env_map)

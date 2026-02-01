@@ -310,8 +310,8 @@ class TestUpdateRoute:
         # Mock repository to return None (route not found)
         mock_update_route_traffic.return_value = None
 
-        async def update_route(action: UpdateRouteAction) -> UpdateRouteActionResult:
-            return await model_serving_processors.update_route.wait_for_complete(action)
+        async def update_route(action: UpdateRouteAction) -> None:
+            await model_serving_processors.update_route.wait_for_complete(action)
 
         await scenario.test(update_route)
 

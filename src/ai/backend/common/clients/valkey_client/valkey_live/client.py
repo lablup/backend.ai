@@ -203,7 +203,7 @@ class ValkeyLiveClient:
         batch.incr(key)
         batch.expire(key, expiration_sec)
         results = await self._execute_batch(batch)
-        return results[0]
+        return cast(int, results[0])
 
     @valkey_live_resilience.apply()
     async def replace_schedule_data(self, key: str, values: Mapping[str, str]) -> None:

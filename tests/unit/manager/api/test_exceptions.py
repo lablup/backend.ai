@@ -16,7 +16,10 @@ class TestError(BackendAIError):
 def test_backend_error_obj() -> None:
     eobj = TestError()
     assert eobj.args == (eobj.status_code, eobj.reason, eobj.error_type)
-    assert json.loads(eobj.body) == json.loads(
+    body_bytes = eobj.body
+    assert body_bytes is not None
+    assert isinstance(body_bytes, bytes)
+    assert json.loads(body_bytes) == json.loads(
         json.dumps(
             odict(
                 ("error_code", str(ErrorCode.default())),

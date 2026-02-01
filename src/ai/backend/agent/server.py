@@ -1299,7 +1299,7 @@ def build_root_server() -> web.Application:
     cors = aiohttp_cors.setup(
         app,
         defaults={
-            "*": aiohttp_cors.ResourceOptions(
+            "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         },

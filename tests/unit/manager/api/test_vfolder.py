@@ -22,7 +22,7 @@ async def test_uuid_or_name_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_resolver = AsyncMock()
     monkeypatch.setattr(vfolder, "resolve_vfolder_rows", mock_resolver)
 
-    @with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)  # type: ignore
+    @with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)  # type: ignore[arg-type]
     async def dummy_handler(request: Any, row: Any) -> None:
         return
 
@@ -52,9 +52,9 @@ async def test_uuid_or_name_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
 )
 async def test_too_many_vfolders(vfolder_status: VFolderStatusSet) -> None:
-    @with_vfolder_status_checked(vfolder_status)
+    @with_vfolder_status_checked(vfolder_status)  # type: ignore[arg-type]
     async def too_many_vfolders_handler(request: Any, row: VFolderRow) -> None:
-        return AsyncMock(return_value=web.Response(text="no response"))
+        return
 
     mock_entry = {
         "id": "fake-vfolder-id",
@@ -82,9 +82,9 @@ async def test_too_many_vfolders(vfolder_status: VFolderStatusSet) -> None:
     ],
 )
 async def test_no_vfolders(vfolder_status: VFolderStatusSet) -> None:
-    @with_vfolder_status_checked(vfolder_status)
+    @with_vfolder_status_checked(vfolder_status)  # type: ignore[arg-type]
     async def no_vfolders_handler(request: Any, row: VFolderRow) -> None:
-        return AsyncMock(return_value=web.Response(text="no response"))
+        return
 
     with pytest.raises(VFolderNotFound):
         await no_vfolders_handler(Mock(), [])

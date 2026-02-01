@@ -528,7 +528,7 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
 
 async def generate() -> dict[str, Any]:
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }

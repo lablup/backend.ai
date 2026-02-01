@@ -72,7 +72,8 @@ class TestExtendedAsyncSAEngineReadCommitted:
         )
         row = result.fetchone()
         assert row is not None
-        return row[0]
+        row_id: int = row[0]
+        return row_id
 
     async def _get_row_data_by_id(
         self,

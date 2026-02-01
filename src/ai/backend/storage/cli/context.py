@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.logging.types import LogLevel
 
 
-class CLIContext(AbstractContextManager[Self]):
+class CLIContext(AbstractContextManager[CLIContext]):
     _logger: AbstractLogger
 
     def __init__(self, log_level: LogLevel, config_path: Path | None = None) -> None:
@@ -19,7 +19,7 @@ class CLIContext(AbstractContextManager[Self]):
         self.config_path = config_path
         self.log_level = log_level
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> CLIContext:
         from ai.backend.logging import LocalLogger
 
         # The "start-server" command is injected by ai.backend.cli from the entrypoint

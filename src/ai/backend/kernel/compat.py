@@ -17,7 +17,7 @@ all_tasks: Callable[[asyncio.AbstractEventLoop | None], Collection[asyncio.Task[
 if hasattr(asyncio, "all_tasks"):
     all_tasks = asyncio.all_tasks
 else:
-    all_tasks = asyncio.Task.all_tasks
+    all_tasks = asyncio.Task.all_tasks  # type: ignore[attr-defined]
 
 
 def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
@@ -61,7 +61,7 @@ run: Callable[[Awaitable[_T], bool | None], _T]
 if hasattr(asyncio, "run"):
     asyncio_run = asyncio.run
 else:
-    asyncio_run = _asyncio_run
+    asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
 def asyncio_run_forever(

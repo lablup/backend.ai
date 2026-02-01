@@ -694,7 +694,7 @@ async def server_main(
             watcher=watcher_client,
             metric_registry=metric_registry,
             cors_options={
-                "*": aiohttp_cors.ResourceOptions(
+                "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },

@@ -85,12 +85,12 @@ class TestCreateGroupMutation:
     def mutation_schema(self) -> graphene.Schema:
         """Create GraphQL schema with CreateGroup mutation."""
 
-        class Query(graphene.ObjectType):
+        class Query(graphene.ObjectType):  # type: ignore[misc]
             """Dummy query required by graphene.Schema."""
 
             ok = graphene.Boolean(default_value=True)
 
-        class Mutation(graphene.ObjectType):
+        class Mutation(graphene.ObjectType):  # type: ignore[misc]
             create_group = CreateGroup.Field()
 
         return graphene.Schema(query=Query, mutation=Mutation)
@@ -211,7 +211,7 @@ class TestGroupNodeQuery:
     def query_schema(self, mock_group_row: MagicMock) -> graphene.Schema:
         """Create GraphQL schema with GroupNode query."""
 
-        class Query(graphene.ObjectType):
+        class Query(graphene.ObjectType):  # type: ignore[misc]
             group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
 
             async def resolve_group_node(self, info: graphene.ResolveInfo, id: str) -> GroupNode:

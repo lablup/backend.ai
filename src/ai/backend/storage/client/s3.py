@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, cast, override
 
 import aioboto3
 
@@ -324,10 +324,13 @@ class S3Client:
             if response_content_type:
                 params["ResponseContentType"] = response_content_type
 
-            return await s3_client.generate_presigned_url(
-                "get_object",
-                Params=params,
-                ExpiresIn=expiration,
+            return cast(
+                str,
+                await s3_client.generate_presigned_url(
+                    "get_object",
+                    Params=params,
+                    ExpiresIn=expiration,
+                ),
             )
 
     async def get_object_meta(self, s3_key: str) -> ObjectMetaResponse:

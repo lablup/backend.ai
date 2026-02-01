@@ -173,9 +173,9 @@ def create_mock_computers(
                 })
             raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
 
-        mock_plugin.create_alloc_map = _create_alloc_map
-        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)
-        mock_plugin.cleanup = AsyncMock(return_value=None)
+        mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
+        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
+        mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         result[device_name] = mock_plugin
     return result

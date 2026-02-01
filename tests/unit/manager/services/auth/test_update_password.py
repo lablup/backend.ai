@@ -99,7 +99,7 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {  # type: ignore[attr-defined]
         "uuid": "12345678-1234-5678-1234-567812345678",
         "email": action.email,
         "role": UserRole.USER,
@@ -111,9 +111,9 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     assert result.success is False
     assert result.message == "new password mismatch"
     # When passwords don't match, we return early without checking old password
-    mock_auth_repository.check_credential_without_migration.assert_not_called()
+    mock_auth_repository.check_credential_without_migration.assert_not_called()  # type: ignore[attr-defined]
     # Password update should not be called when passwords don't match
-    mock_auth_repository.update_user_password.assert_not_called()
+    mock_auth_repository.update_user_password.assert_not_called()  # type: ignore[attr-defined]
 
 
 @pytest.mark.asyncio

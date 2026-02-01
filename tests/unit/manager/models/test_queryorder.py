@@ -32,10 +32,10 @@ async def virtual_grid_db(database_connection: Any) -> AsyncGenerator[tuple[Any,
     )
 
     def _create_tables(conn: Any, *args: Any, **kwargs: Any) -> None:
-        return metadata.create_all(conn, [grid, foreign_grid])
+        metadata.create_all(conn, [grid, foreign_grid])
 
     def _drop_tables(conn: Any, *args: Any, **kwargs: Any) -> None:
-        return metadata.drop_all(conn, [grid, foreign_grid])
+        metadata.drop_all(conn, [grid, foreign_grid])
 
     async with database_connection.begin() as conn:
         await conn.run_sync(_create_tables)

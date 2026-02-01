@@ -76,7 +76,7 @@ class DevSetup(Static):
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
         ctx = DevContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info, install_variable, self.app, non_interactive=self._non_interactive  # type: ignore[arg-type]
         )
         try:
             # prerequisites
@@ -154,7 +154,7 @@ class PackageSetup(Static):
                     raise ValueError("Target path input was cancelled")
                 dist_info.target_path = Path(value)
         ctx = PackageContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info, install_variable, self.app, non_interactive=self._non_interactive  # type: ignore[arg-type]
         )
         try:
             await ctx.check_prerequisites()

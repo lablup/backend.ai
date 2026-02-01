@@ -145,7 +145,7 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
     )
 
     # Invalid current password - raises AuthorizationFailed
-    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(
+    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(  # type: ignore[attr-defined]
         "User credential mismatch."
     )
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.etcd import AsyncEtcd
 
@@ -23,4 +23,4 @@ def convert_to_etcd_dict(item: Any) -> dict[str, Any]:
             return {k: _convert(v) for k, v in obj.items()}
         return obj
 
-    return _convert(item)
+    return cast(dict[str, Any], _convert(item))

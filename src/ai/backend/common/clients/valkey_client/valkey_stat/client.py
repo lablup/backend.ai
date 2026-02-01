@@ -191,7 +191,7 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return json.loads(result)
+            return cast(dict[str, float], json.loads(result))
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
                 "Failed to decode GPU allocation map for agent {}: {}",
@@ -225,7 +225,7 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return msgpack.unpackb(result, raw=False)
+            return cast(dict[str, Any], msgpack.unpackb(result, raw=False))
         except (ExtraData, UnpackException, ValueError):
             log.warning(
                 "Failed to unpack kernel statistics for ID {}: {}",

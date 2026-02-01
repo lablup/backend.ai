@@ -21,6 +21,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
+    HostPortPair,
     RedisConnectionInfo,
     RedisHelperConfig,
     RedisTarget,
@@ -44,9 +45,12 @@ async def etcd_discovery(etcd: AsyncEtcd) -> AsyncIterator[ETCDServiceDiscovery]
 @pytest.fixture
 async def redis_conn(redis_container: tuple[str, HostPortPairModel]) -> AsyncIterator[RedisConnectionInfo]:
     # Configure test Redis connection
+    # Convert HostPortPairModel to HostPortPair namedtuple
+    hostport_model = redis_container[1]
+    hostport = HostPortPair(hostport_model.host, hostport_model.port)
     conn = redis_helper.get_redis_object(
         RedisTarget(
-            addr=redis_container[1],
+            addr=hostport,
             redis_helper_config=RedisHelperConfig(
                 socket_timeout=1.0,
                 socket_connect_timeout=1.0,

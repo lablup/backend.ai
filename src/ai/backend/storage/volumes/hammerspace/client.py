@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from pydantic_core._pydantic_core import ValidationError
@@ -154,7 +154,7 @@ class HammerspaceAPIClient:
             ssl=self._connection_info.ssl_enabled,
         ) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            return cast(list[dict[str, Any]], await resp.json())
 
     async def get_share(
         self,

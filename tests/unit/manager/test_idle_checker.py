@@ -858,7 +858,7 @@ class TestUtilizationIdleChecker:
         # Set it to time_window seconds ago so do_idle_check becomes True
         util_first_collected = now.timestamp() - grace_test_config.time_window_seconds
 
-        async def get_live_data_side_effect(key: str) -> None:
+        async def get_live_data_side_effect(key: str) -> bytes | None:
             if key.endswith(".util_first_collected"):
                 return str(util_first_collected).encode()
             if key.endswith(".util_last_collected"):

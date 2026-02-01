@@ -807,7 +807,7 @@ async def webapp_ctx(
     )
 
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
         ),
     }

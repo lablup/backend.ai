@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import override
+from typing import cast, override
 
 from ai.backend.client.func.user import UserRole, UserStatus
 from ai.backend.client.output.fields import group_fields, keypair_fields, user_fields
@@ -36,7 +36,7 @@ class UserTemplate(WrapperTestTemplate):
                 f"Cannot find the group {group_dep.name!r} in the domain {domain_dep.name!r}"
             )
         assert len(group_data) == 1, f"Expected exactly one group, found {len(group_data)}"
-        return group_data[0]["id"]
+        return cast(str, group_data[0]["id"])
 
     async def _create_user_with_keypair(
         self,

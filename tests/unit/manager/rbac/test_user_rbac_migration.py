@@ -20,7 +20,7 @@ from ai.backend.manager.models.rbac_models.migration.user import (
 
 
 @pytest.fixture
-def user_data() -> None:
+def user_data() -> UserData:
     """Create UserData for testing."""
     return UserData(
         id=uuid.uuid4(),
@@ -31,7 +31,7 @@ def user_data() -> None:
 
 
 @pytest.fixture
-def admin_user_data() -> None:
+def admin_user_data() -> UserData:
     """Create admin UserData for testing."""
     return UserData(
         id=uuid.uuid4(),
@@ -42,7 +42,7 @@ def admin_user_data() -> None:
 
 
 @pytest.fixture
-def project_data() -> None:
+def project_data() -> ProjectData:
     """Create ProjectData for testing."""
     return ProjectData(id=uuid.uuid4())
 

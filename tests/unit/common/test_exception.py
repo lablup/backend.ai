@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import Any
 
 import pytest
 from aiohttp import web
@@ -68,7 +69,7 @@ class TestBackendAIErrorCode:
     )
     async def test_passthrough_error_propagation_through_handler(
         self,
-        aiohttp_client: pytest.fixture,
+        aiohttp_client: Callable[[Any], Awaitable[Any]],
         status_code: HTTPStatus,
         error_code: ErrorCode,
         error_message: str,

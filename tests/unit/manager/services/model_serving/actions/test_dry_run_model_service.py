@@ -148,8 +148,8 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def mock_get_vfolder_by_id_dry_run(self, mocker: Any, mock_repositories: Any)-> MagicMock:
-        mock = mocker.patch.object(
+    def mock_get_vfolder_by_id_dry_run(self, mocker: Any, mock_repositories: Any) -> MagicMock:
+        mock: MagicMock = mocker.patch.object(
             mock_repositories.repository,
             "get_vfolder_by_id",
             new_callable=MagicMock,

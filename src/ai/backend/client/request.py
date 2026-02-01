@@ -450,8 +450,11 @@ class SyncResponseMixin:
 
     def text(self) -> str:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.text(),
+        return cast(
+            str,
+            sync_session.worker_thread.execute(
+                self._raw_response.text(),
+            ),
         )
 
     def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
@@ -463,14 +466,20 @@ class SyncResponseMixin:
 
     def read(self, n: int = -1) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(n),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(n),
+            ),
         )
 
     def readall(self) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(-1),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(-1),
+            ),
         )
 
 

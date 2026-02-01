@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import types
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -320,8 +320,8 @@ class ConfigInspector:
             args = getattr(annotation, "__args__", ())
             # Check for Optional (Union with None)
             if len(args) == 2 and type(None) in args:
-                return [a for a in args if a is not type(None)][0]
-        return annotation
+                return cast(type, [a for a in args if a is not type(None)][0])
+        return cast(type, annotation)
 
     def _get_composite_target_type(
         self,

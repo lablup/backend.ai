@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -185,7 +185,7 @@ addr = { host = "127.0.0.1", port = 2379 }
         def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
-            return runtime.agents[agent_id]
+            return cast(Mock, runtime.agents[agent_id])
 
         runtime.get_agent = get_agent_impl
 
@@ -243,7 +243,7 @@ scaling-group = "default"
         def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
-            return runtime.agents[agent_id]
+            return cast(Mock, runtime.agents[agent_id])
 
         runtime.get_agent = get_agent_impl
 

@@ -1,13 +1,15 @@
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
 from pathlib import PosixPath
+from typing import cast
 
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
+from ai.backend.common.types import BinarySize, ResourceSlot, SlotName, SlotTypes
 
 
 def test_msgpack_with_unicode() -> None:
@@ -158,12 +160,16 @@ def test_msgpack_resource_slot() -> None:
     unpacked = msgpack.unpackb(packed)
     assert unpacked == resource_slot
 
-    resource_slot = ResourceSlot({"cpu": 2, "mem": Decimal(1024**5)})
+    resource_slot = ResourceSlot(
+        cast(Mapping[SlotName, int | float | str | Decimal | BinarySize | None], {"cpu": 2, "mem": Decimal(1024**5)})
+    )
     packed = msgpack.packb(resource_slot)
     unpacked = msgpack.unpackb(packed)
     assert unpacked == resource_slot
 
-    resource_slot = ResourceSlot({"cpu": 3, "mem": "1125899906842624"})
+    resource_slot = ResourceSlot(
+        cast(Mapping[SlotName, int | float | str | Decimal | BinarySize | None], {"cpu": 3, "mem": "1125899906842624"})
+    )
     packed = msgpack.packb(resource_slot)
     unpacked = msgpack.unpackb(packed)
     assert unpacked == resource_slot

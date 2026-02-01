@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 @pytest.fixture
-def mock_authenticated_request() -> None:
+def mock_authenticated_request() -> MagicMock:
     mock_request = MagicMock()
     mock_request.__getitem__.side_effect = {
         "user": {

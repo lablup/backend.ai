@@ -894,7 +894,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
-            return msgpack.unpackb(result)
+            return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
             return None
 
@@ -933,7 +933,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             async with timeout(timeout_seconds):
                 result = await self.model_service_queue.get()
             self.model_service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
@@ -949,7 +949,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
@@ -972,7 +972,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:

@@ -307,7 +307,7 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
 
     if docs is not None:
         create.__doc__ = docs
-    return create
+    return create  # type: ignore[return-value, no-any-return]
 
 
 main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
@@ -592,7 +592,7 @@ def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
 
     if docs is not None:
         create_from_template.__doc__ = docs
-    return create_from_template
+    return create_from_template  # type: ignore[return-value, no-any-return]
 
 
 main.command(aliases=["start-from-template"])(
@@ -1045,7 +1045,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
                 sys.exit()
 
     asyncio.run(export_tracker(result["task_id"]))

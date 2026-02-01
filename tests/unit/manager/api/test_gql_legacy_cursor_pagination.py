@@ -48,12 +48,11 @@ class ExpectedStatements:
 
 def compile_to_sql(stmt: sa.sql.Select[Any]) -> str:
     """Compile SQLAlchemy statement to PostgreSQL SQL string."""
-    return str(
-        stmt.compile(
-            dialect=postgresql.dialect(),
-            compile_kwargs={"literal_binds": True},
-        )
+    compiled = stmt.compile(
+        dialect=postgresql.dialect(),  # type: ignore[no-untyped-call]
+        compile_kwargs={"literal_binds": True},
     )
+    return str(compiled)
 
 
 def verify_statements(

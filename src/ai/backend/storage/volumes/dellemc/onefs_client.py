@@ -85,7 +85,7 @@ class OneFSClient:
     async def get_list_lnn(self) -> list[int]:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
-        return data["storagepools"][0]["lnns"]
+        return cast(list[int], data["storagepools"][0]["lnns"])
 
     async def get_node_hardware_info_by_lnn(self, lnn: int) -> Mapping[str, Any]:
         async with self._request("GET", f"cluster/nodes/{lnn}/hardware") as resp:
@@ -131,7 +131,7 @@ class OneFSClient:
     async def get_cluster_interface(self) -> list[Mapping[str, Any]]:
         async with self._request("GET", "network/interfaces") as resp:
             data = await resp.json()
-        return data["interfaces"]
+        return cast(list[Mapping[str, Any]], data["interfaces"])
 
     async def get_node_metadata(self) -> list[dict[str, Mapping[str, Any]]]:
         try:

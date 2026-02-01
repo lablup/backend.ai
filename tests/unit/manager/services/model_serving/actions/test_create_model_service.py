@@ -476,7 +476,7 @@ class TestCreateModelService:
             mock_endpoint_data = MagicMock(id=expected.data.endpoint_id)
             mock_create_endpoint_validated.return_value = mock_endpoint_data
 
-        async def create_model_service(action: CreateModelServiceAction) -> None:
+        async def create_model_service(action: CreateModelServiceAction) -> CreateModelServiceActionResult:
             return await model_serving_processors.create_model_service.wait_for_complete(action)
 
         await scenario.test(create_model_service)
