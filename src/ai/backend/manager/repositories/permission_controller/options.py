@@ -15,6 +15,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
     ObjectPermissionRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import (
     PermissionGroupRow,
 )
@@ -588,3 +589,199 @@ class EntityScopeConditions:
             return AssociationScopesEntitiesRow.entity_type == entity_type
 
         return inner
+
+
+class PermissionGroupConditions:
+    """Query conditions for permission groups (scopes)."""
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.scope_type == scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.scope_id == scope_id
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses id-based comparison since PermissionGroupRow has no created_at.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses id-based comparison since PermissionGroupRow has no created_at.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionGroupRow.id < cursor_uuid
+
+        return inner
+
+
+class PermissionGroupOrders:
+    """Query orders for permission groups (scopes)."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionGroupRow.id.asc()
+        return PermissionGroupRow.id.desc()
+
+    @staticmethod
+    def scope_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionGroupRow.scope_type.asc()
+        return PermissionGroupRow.scope_type.desc()
+
+
+class ScopedPermissionConditions:
+    """Query conditions for scoped permissions."""
+
+    @staticmethod
+    def by_permission_group_id(permission_group_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.permission_group_id == permission_group_id
+
+        return inner
+
+    @staticmethod
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_operation(operation: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.id < cursor_uuid
+
+        return inner
+
+
+class ScopedPermissionOrders:
+    """Query orders for scoped permissions."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionRow.id.asc()
+        return PermissionRow.id.desc()
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionRow.entity_type.asc()
+        return PermissionRow.entity_type.desc()
+
+
+class ObjectPermissionConditions:
+    """Query conditions for object permissions."""
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_id(entity_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.entity_id == entity_id
+
+        return inner
+
+    @staticmethod
+    def by_operation(operation: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.id < cursor_uuid
+
+        return inner
+
+
+class ObjectPermissionOrders:
+    """Query orders for object permissions."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ObjectPermissionRow.id.asc()
+        return ObjectPermissionRow.id.desc()
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ObjectPermissionRow.entity_type.asc()
+        return ObjectPermissionRow.entity_type.desc()
