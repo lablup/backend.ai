@@ -47,7 +47,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             )
         try:
             with final_file_path.open("rb") as f:
-                return cast(MutableMapping[KernelId, AbstractKernel], pickle.load(f))
+                return cast("MutableMapping[KernelId, AbstractKernel]", pickle.load(f))
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
             raise KernelRegistryLoadError from e

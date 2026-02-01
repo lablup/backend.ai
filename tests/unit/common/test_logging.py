@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import threading
@@ -52,7 +54,7 @@ class NotUnpicklableClass:
         if x == 1:
             raise TypeError("this is not unpicklable")
 
-    def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:  # noqa: F821
+    def __reduce__(self) -> tuple[type[NotUnpicklableClass], tuple[int, ...]]:
         return type(self), (1,)
 
 

@@ -215,7 +215,7 @@ def show_warning(
     )
 
 
-class ProgressBarWithSpinner(tqdm[Any]):
+class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
     """
     A simple extension to tqdm adding a spinner.
 

@@ -58,7 +58,12 @@ class TestCreateModelService:
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
-        return MagicMock(spec=StorageSessionManager)
+        mock = MagicMock(spec=StorageSessionManager)
+        mock.get_proxy_and_volume.return_value = ("proxy", "volume")
+        mock_client = MagicMock()
+        mock_client.fetch_file_content = AsyncMock(return_value=b"")
+        mock.get_manager_facing_client.return_value = mock_client
+        return mock
 
     @pytest.fixture
     def mock_action_monitor(self) -> MagicMock:

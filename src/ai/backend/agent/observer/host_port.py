@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, override
@@ -17,12 +19,12 @@ PORT_USAGE_THRESHOLD = 4
 
 
 class HostPortObserver(AbstractObserver):
-    _agent: "AbstractAgent[Any, Any]"
+    _agent: AbstractAgent[Any, Any]
     _port_unused_counts: defaultdict[int, int]
 
     def __init__(
         self,
-        agent: "AbstractAgent[Any, Any]",
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         self._agent = agent
         self._port_unused_counts: defaultdict[int, int] = defaultdict(int)

@@ -14,18 +14,17 @@ from ai.backend.common.types import (
     RedisHelperConfig,
     RedisTarget,
 )
-from ai.backend.common.utils import addr_to_hostport_pair
 
 
 @pytest.fixture
 async def redis_conn(
-    redis_container: tuple[str, str],
+    redis_container: tuple[str, HostPortPair],
 ) -> AsyncGenerator[RedisConnectionInfo, None]:
     # Configure test Redis connection
-    host, port = addr_to_hostport_pair(redis_container[1])
+    addr = redis_container[1]
     conn = redis_helper.get_redis_object(
         RedisTarget(
-            addr=HostPortPair(host, port),
+            addr=addr,
             redis_helper_config=RedisHelperConfig(
                 socket_timeout=1.0,
                 socket_connect_timeout=1.0,
@@ -61,12 +60,12 @@ def queue_args() -> RedisMQArgs:
 
 @pytest.fixture(scope="function")
 async def redis_queue(
-    redis_container: tuple[str, str], queue_args: RedisMQArgs
+    redis_container: tuple[str, HostPortPair], queue_args: RedisMQArgs
 ) -> AsyncGenerator[RedisQueue, None]:
     # Create consumer group if not exists
-    host, port = addr_to_hostport_pair(redis_container[1])
+    addr = redis_container[1]
     redis_target = RedisTarget(
-        addr=HostPortPair(host, port),
+        addr=addr,
         redis_helper_config={
             "socket_timeout": 5.0,
             "socket_connect_timeout": 2.0,

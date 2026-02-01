@@ -66,8 +66,8 @@ def test_aliased_key() -> None:
 
 def test_multikey() -> None:
     iv = t.Dict({
-        tx.MultiKey("x"): t.List(t.Int),
-        t.Key("y"): t.Int,
+        tx.MultiKey("x"): t.List(t.ToInt),
+        t.Key("y"): t.ToInt,
     })
 
     data: multidict.MultiDict[str] = multidict.MultiDict()

@@ -29,7 +29,7 @@ def test_deep_merge_overrides() -> None:
     }
 
 
-async def test_env_loader() -> None:
+async def test_env_loader(env_vars: None) -> None:
     env_map: list[tuple[tuple[str, ...], str]] = [
         (("db", "user"), "TEST_DB_USER"),
         (("db", "password"), "TEST_DB_PASSWORD"),

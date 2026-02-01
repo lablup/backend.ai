@@ -126,6 +126,7 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none(
 @pytest.mark.asyncio
 async def test_update_password_no_auth_fails_with_incorrect_current_password(
     mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
     auth_service: AuthService,
 ) -> None:
     """Test update password fails with incorrect current password"""
@@ -145,7 +146,7 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
     )
 
     # Invalid current password - raises AuthorizationFailed
-    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(  # type: ignore[attr-defined]
+    mock_auth_repository.check_credential_without_migration.side_effect = AuthorizationFailed(
         "User credential mismatch."
     )
 

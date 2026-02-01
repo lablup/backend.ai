@@ -25,7 +25,7 @@ async def test_call_non_bursty() -> None:
     # check run as coroutine
     execution_count = 0
     with pytest.raises(TypeError):
-        await call_non_bursty(key, execute)
+        await call_non_bursty(key, execute())  # type: ignore[arg-type]
 
     # check run as coroutinefunction
     execution_count = 0

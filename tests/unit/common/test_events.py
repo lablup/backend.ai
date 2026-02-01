@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
@@ -29,7 +31,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
         return (self.value + 1,)
 
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:  # noqa: F821
+    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
         return cls(value[0] + 1)
 
     @classmethod

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -379,7 +381,7 @@ class BackendAIError(web.HTTPError, ABC):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:  # noqa: F821
+    def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use
