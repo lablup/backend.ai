@@ -110,6 +110,9 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
@@ -133,6 +136,7 @@ class ServiceArgs:
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
+    revision_generator_registry: RevisionGeneratorRegistry
     event_producer: EventProducer
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
@@ -281,8 +285,10 @@ class Services:
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
+            deployment_repository=args.deployment_controller._deployment_repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
+            revision_generator_registry=args.revision_generator_registry,
         )
 
         model_serving_auto_scaling = AutoScalingService(

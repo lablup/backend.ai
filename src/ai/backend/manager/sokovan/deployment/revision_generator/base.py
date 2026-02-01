@@ -32,7 +32,6 @@ class BaseRevisionGenerator(RevisionGenerator):
         self,
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
-        model_definition_path: str | None,
         default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
@@ -40,7 +39,6 @@ class BaseRevisionGenerator(RevisionGenerator):
         """
         service_definition = await self.load_service_definition(
             vfolder_id=vfolder_id,
-            model_definition_path=model_definition_path,
             runtime_variant=draft_revision.execution.runtime_variant.value,
         )
         revision = self.merge_revision(draft_revision, service_definition, default_architecture)
@@ -52,7 +50,6 @@ class BaseRevisionGenerator(RevisionGenerator):
     async def load_service_definition(
         self,
         vfolder_id: UUID,
-        model_definition_path: str | None,
         runtime_variant: str,
     ) -> ModelServiceDefinition | None:
         """
