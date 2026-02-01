@@ -45,6 +45,7 @@ from .volumes.netapp import NetAppVolume
 from .volumes.noop import NoopVolume
 from .volumes.pool import VolumePool
 from .volumes.purestorage import FlashBladeVolume
+from .volumes.stats import VolumeState, VolumeStatsObserver
 from .volumes.vast import VASTVolume
 from .volumes.vfs import BaseVolume
 from .volumes.weka import WekaVolume
@@ -106,6 +107,8 @@ class RootContext:
     manager_client_pool: ManagerHTTPClientPool
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     health_probe: HealthProbe
+    volume_stats_observer: VolumeStatsObserver
+    volume_stats_state: VolumeState
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]

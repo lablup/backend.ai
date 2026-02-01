@@ -30,6 +30,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
     ConfigurationError,
 )
@@ -55,6 +56,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin import BasePluginContext
+from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -109,6 +111,7 @@ from .plugin import (
 from .storages.storage_pool import StoragePool
 from .volumes.noop import init_noop_volume
 from .volumes.pool import VolumePool
+from .volumes.stats import VolumeState, VolumeStatsObserver, VolumeStatsObserverOptions
 from .watcher import WatcherClient, main_job
 
 if TYPE_CHECKING:
@@ -633,6 +636,35 @@ async def server_main(
         await health_probe.start()
         storage_init_stack.push_async_callback(health_probe.stop)
 
+        # Initialize volume stats observer
+        volume_stats_options = VolumeStatsObserverOptions(
+            observe_interval=local_config.storage_proxy.volume_stats.observe_interval,
+            timeout_per_volume=local_config.storage_proxy.volume_stats.observe_timeout,
+            cache_ttl=local_config.storage_proxy.volume_stats.cache_ttl,
+        )
+        valkey_volume_stats_client = await ValkeyVolumeStatsClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name=f"storage-proxy-volume-stats-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_volume_stats_client.close)
+
+        volume_stats_observer = VolumeStatsObserver(
+            volume_pool=volume_pool,
+            valkey_client=valkey_volume_stats_client,
+            options=volume_stats_options,
+        )
+        volume_stats_runner = Runner(resources=[])
+        await volume_stats_runner.register_observer(volume_stats_observer)
+        await volume_stats_runner.start()
+        storage_init_stack.push_async_callback(volume_stats_runner.close)
+
+        volume_stats_state = VolumeState(
+            volume_pool=volume_pool,
+            valkey_client=valkey_volume_stats_client,
+            options=volume_stats_options,
+        )
+
         # Build reservoir registry configs for ManagerHTTPClientPool
         reservoir_registry_configs: dict[str, ReservoirConfig] = {
             name: r.reservoir
@@ -669,6 +701,8 @@ async def server_main(
             manager_client_pool=manager_client_pool,
             valkey_artifact_client=valkey_artifact_client,
             health_probe=health_probe,
+            volume_stats_observer=volume_stats_observer,
+            volume_stats_state=volume_stats_state,
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
