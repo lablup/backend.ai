@@ -53,7 +53,10 @@ async def test_update_full_name_successful(
 
 
 @pytest.mark.asyncio
-async def test_update_full_name_fails_for_nonexistent_user() -> None:
+async def test_update_full_name_fails_for_nonexistent_user(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test updating full name fails for non-existent user"""
     action = UpdateFullNameAction(
         user_id="12345678-1234-5678-1234-567812345678",
@@ -77,7 +80,10 @@ async def test_update_full_name_fails_for_nonexistent_user() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_full_name_repository_call() -> None:
+async def test_update_full_name_repository_call(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
     """Test that update full name calls repository with correct parameters"""
     action = UpdateFullNameAction(
         user_id="12345678-1234-5678-1234-567812345678",

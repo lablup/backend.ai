@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_fields
@@ -83,7 +83,7 @@ class KeyPair(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["create_keypair"]
+        return cast(dict[str, Any], data["create_keypair"])
 
     @api_function
     @classmethod
@@ -116,7 +116,7 @@ class KeyPair(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])
 
     @api_function
     @classmethod
@@ -135,7 +135,7 @@ class KeyPair(BaseFunction):
             "access_key": access_key,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_keypair"]
+        return cast(dict[str, Any], data["delete_keypair"])
 
     @api_function
     @classmethod
@@ -175,7 +175,7 @@ class KeyPair(BaseFunction):
         if user_id is not None:
             variables["email"] = user_id
         data = await api_session.get().Admin._query(q, variables)
-        return data["keypairs"]
+        return cast(Sequence[dict[str, Any]], data["keypairs"])
 
     @api_function
     @classmethod
@@ -223,7 +223,7 @@ class KeyPair(BaseFunction):
         q = "query { keypair { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["keypair"]
+        return cast(dict[str, Any], data["keypair"])
 
     @api_function
     @classmethod
@@ -246,7 +246,7 @@ class KeyPair(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])
 
     @api_function
     @classmethod
@@ -271,4 +271,4 @@ class KeyPair(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair"]
+        return cast(dict[str, Any], data["modify_keypair"])

@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.auth import AuthTokenTypes
@@ -147,7 +147,7 @@ class User(BaseFunction):
             "group": group,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["users"]
+        return cast(Sequence[dict[str, Any]], data["users"])
 
     @api_function
     @classmethod
@@ -212,7 +212,7 @@ class User(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
-        return data["user"]
+        return cast(Sequence[dict[str, Any]], data["user"])
 
     @api_function
     @classmethod
@@ -245,7 +245,7 @@ class User(BaseFunction):
         data = await api_session.get().Admin._query(
             query, variables if user_uuid is not None else None
         )
-        return data["user_from_uuid"]
+        return cast(Sequence[dict[str, Any]], data["user_from_uuid"])
 
     @api_function
     @classmethod
@@ -311,7 +311,7 @@ class User(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_user"]
+        return cast(dict[str, Any], data["create_user"])
 
     @api_function
     @classmethod
@@ -370,7 +370,7 @@ class User(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_user"]
+        return cast(dict[str, Any], data["modify_user"])
 
     @api_function
     @classmethod
@@ -387,7 +387,7 @@ class User(BaseFunction):
         """)
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_user"]
+        return cast(dict[str, Any], data["delete_user"])
 
     @api_function
     @classmethod
@@ -419,4 +419,4 @@ class User(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_user"]
+        return cast(dict[str, Any], data["purge_user"])

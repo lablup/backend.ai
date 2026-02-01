@@ -1,4 +1,6 @@
+import copy
 import json
+import os
 import tempfile
 import textwrap
 from typing import Any
@@ -102,12 +104,12 @@ async def test_get_available_cores_without_docker(monkeypatch: Any) -> None:
             }),
         )
 
-        monkeypatch.setattr(linux.os, "sched_getaffinity", mock_sched_getaffinity, raising=False)
-        monkeypatch.setattr(linux.os, "cpu_count", lambda: 4)
+        monkeypatch.setattr(os, "sched_getaffinity", mock_sched_getaffinity, raising=False)
+        monkeypatch.setattr(os, "cpu_count", lambda: 4)
         numa.get_available_cores.cache_clear()
         assert (await numa.get_available_cores()) == {0, 1, 2, 3}
 
-        monkeypatch.setattr(linux.os, "sched_getaffinity", mock_sched_getaffinity2, raising=False)
+        monkeypatch.setattr(os, "sched_getaffinity", mock_sched_getaffinity2, raising=False)
         numa.get_available_cores.cache_clear()
         assert (await numa.get_available_cores()) == {0, 1}
 
@@ -194,7 +196,7 @@ async def test_scan_resource_usage_per_slot() -> None:
 
 @pytest.mark.asyncio
 async def test_allow_fractional_resource_fragmentation(monkeypatch: Any) -> None:
-    def mock_read_from_file(path: Any, daemon_name: Any) -> dict[str, Any]:
+    def mock_read_from_file(path: Any, daemon_name: Any) -> tuple[dict[str, Any], Path]:
         return {
             "slot_name": "cuda",
             "device_plugin_name": "CUDADevice",
@@ -458,7 +460,7 @@ async def test_allocate_rollback(monkeypatch: Any) -> None:
     computers[DeviceName("mem")].alloc_map.clear()
 
     # Make deepcopy a no-op returning the target object's reference as-is
-    monkeypatch.setattr(resources.copy, "deepcopy", lambda o: o)
+    monkeypatch.setattr(copy, "deepcopy", lambda o: o)
 
     resource_spec = resources.KernelResourceSpec(
         ResourceSlot.from_json({

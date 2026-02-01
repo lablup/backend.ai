@@ -698,18 +698,18 @@ async def gql_mutation_wrapper(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}")
+        return cast(ResultType, result_cls(False, f"integrity error: {e}"))
     except sa.exc.StatementError as e:
         log.warning(
             "gql_mutation_wrapper(): statement error ({})\n{}", repr(e), e.statement or "(unknown)"
         )
         orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
+        return cast(ResultType, result_cls(False, str(orig_exc), None))
     except (TimeoutError, asyncio.CancelledError):
         raise
     except Exception as e:
         log.exception("gql_mutation_wrapper(): other error")
-        return result_cls(False, f"unexpected error: {e}")
+        return cast(ResultType, result_cls(False, f"unexpected error: {e}"))
 
 
 async def simple_db_mutate[ResultType: graphene.ObjectType](
@@ -743,8 +743,8 @@ async def simple_db_mutate[ResultType: graphene.ObjectType](
             if post_func:
                 await post_func(conn, result)
         if result.rowcount > 0:
-            return result_cls(True, "success")
-        return result_cls(False, f"no matching {result_cls.__name__.lower()}")
+            return cast(ResultType, result_cls(True, "success"))
+        return cast(ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}"))
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 
@@ -798,8 +798,8 @@ async def simple_db_mutate_returning_item[
             else:
                 row = result.first()
             if result.rowcount > 0 and row is not None:
-                return result_cls(True, "success", item_cls.from_row(graph_ctx, row))
-            return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
+                return cast(ResultType, result_cls(True, "success", item_cls.from_row(graph_ctx, row)))
+            return cast(ResultType, result_cls(False, f"no matching {result_cls.__name__.lower()}", None))
 
     return await gql_mutation_wrapper(result_cls, _do_mutate)
 

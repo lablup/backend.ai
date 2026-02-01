@@ -63,7 +63,7 @@ def get_logger_thread() -> threading.Thread | None:
     return None
 
 
-def test_logger(unused_tcp_port: int, capsys: pytest.CaptureFixture) -> None:
+def test_logger(unused_tcp_port: int, capsys: pytest.CaptureFixture[str]) -> None:
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(
@@ -82,7 +82,7 @@ def test_logger(unused_tcp_port: int, capsys: pytest.CaptureFixture) -> None:
     assert "blizzard warning 123" in captured.err
 
 
-def test_local_logger(capsys: pytest.CaptureFixture) -> None:
+def test_local_logger(capsys: pytest.CaptureFixture[str]) -> None:
     logger = LocalLogger(test_log_config)
     with logger:
         log.warning("blizzard warning {}", 456)
@@ -92,7 +92,7 @@ def test_local_logger(capsys: pytest.CaptureFixture) -> None:
     assert "blizzard warning 456" in captured.err
 
 
-def test_logger_not_picklable(capsys: pytest.CaptureFixture) -> None:
+def test_logger_not_picklable(capsys: pytest.CaptureFixture[str]) -> None:
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(
@@ -110,7 +110,7 @@ def test_logger_not_picklable(capsys: pytest.CaptureFixture) -> None:
     assert "NotPicklableClass" in captured.err
 
 
-def test_logger_trafaret_dataerror(capsys: pytest.CaptureFixture) -> None:
+def test_logger_trafaret_dataerror(capsys: pytest.CaptureFixture[str]) -> None:
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(
@@ -133,7 +133,7 @@ def test_logger_trafaret_dataerror(capsys: pytest.CaptureFixture) -> None:
     assert "value can't be converted to int" in captured.err
 
 
-def test_logger_not_unpicklable(capsys: pytest.CaptureFixture) -> None:
+def test_logger_not_unpicklable(capsys: pytest.CaptureFixture[str]) -> None:
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
     logger = Logger(

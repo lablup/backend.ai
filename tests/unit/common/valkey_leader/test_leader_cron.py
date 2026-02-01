@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, create_autospec
 
 import pytest
@@ -65,9 +65,9 @@ async def mock_event_producer() -> AsyncMock:
 
 
 @pytest.fixture
-async def mock_event() -> AbstractAnycastEvent:
+async def mock_event() -> MagicMock:
     """Create a mock event."""
-    return create_autospec(AbstractAnycastEvent, instance=True)
+    return cast(MagicMock, create_autospec(AbstractAnycastEvent, instance=True))
 
 
 @pytest.fixture
@@ -80,9 +80,9 @@ async def mock_tasks() -> list[MockTask]:
 
 
 @pytest.fixture
-async def leader_cron(mock_tasks: Sequence[PeriodicTask]) -> LeaderCron:
+async def leader_cron(mock_tasks: list[MockTask]) -> LeaderCron:
     """Create a LeaderCron instance with mock tasks."""
-    return LeaderCron(tasks=mock_tasks)
+    return LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))
 
 
 @pytest.fixture
@@ -104,18 +104,18 @@ async def event_tasks(
 
 @pytest.fixture
 async def leader_cron_with_event_tasks(
-    event_tasks: Sequence[EventProducerTask],
+    event_tasks: list[EventProducerTask],
 ) -> LeaderCron:
     """Create a LeaderCron with EventTasks."""
-    return LeaderCron(tasks=event_tasks)
+    return LeaderCron(tasks=cast(list[PeriodicTask], event_tasks))
 
 
 class TestLeaderCron:
     """Test cases for LeaderCron."""
 
-    async def test_initialization(self, mock_tasks: Sequence[MockTask]) -> None:
+    async def test_initialization(self, mock_tasks: list[MockTask]) -> None:
         """Test LeaderCron initialization."""
-        leader_cron = LeaderCron(tasks=mock_tasks)
+        leader_cron = LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))
 
         assert leader_cron._stopped is False
         assert len(leader_cron._tasks) == 2
@@ -148,7 +148,7 @@ class TestLeaderCron:
     async def test_tasks_execute_as_leader(self, mock_tasks: list[MockTask]) -> None:
         """Test that tasks execute when server is leader."""
         # Create LeaderCron with mock tasks
-        leader_cron = LeaderCron(tasks=mock_tasks)
+        leader_cron = LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))
 
         # Set up leadership checker to return True
         leadership_checker = MagicMock(spec=LeadershipChecker)
@@ -170,7 +170,7 @@ class TestLeaderCron:
     async def test_no_task_execution_as_follower(self, mock_tasks: list[MockTask]) -> None:
         """Test that tasks don't execute when server is not leader."""
         # Create LeaderCron with mock tasks
-        leader_cron = LeaderCron(tasks=mock_tasks)
+        leader_cron = LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))
 
         # Set up leadership checker to return False
         leadership_checker = MagicMock(spec=LeadershipChecker)
@@ -216,7 +216,7 @@ class TestLeaderCron:
     ) -> None:
         """Test behavior when leadership changes during execution."""
         # Create LeaderCron with mock tasks
-        leader_cron = LeaderCron(tasks=mock_tasks)
+        leader_cron = LeaderCron(tasks=cast(list[PeriodicTask], mock_tasks))
 
         # Create a mock leadership checker with mutable state
         leadership_checker = MagicMock(spec=LeadershipChecker)
