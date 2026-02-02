@@ -1,4 +1,3 @@
-import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -7,14 +6,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 import aiohttp_cors
-import aiotools
 import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClient
 from ai.backend.manager.errors.common import (
-    InternalServerError,
     ObjectNotFound,
     ServerMisconfiguredError,
 )
@@ -35,27 +33,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 @dataclass(unsafe_hash=True)
 class WSProxyVersionQueryParams:
     db_ctx: ExtendedAsyncSAEngine = field(hash=False)
-
-
-@aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
-async def query_wsproxy_status(
-    wsproxy_addr: str,
-) -> dict[str, Any]:
-    async with (
-        aiohttp.ClientSession() as session,
-        session.get(
-            wsproxy_addr + "/status",
-            headers={"Accept": "application/json"},
-        ) as resp,
-    ):
-        try:
-            result = await resp.json()
-        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-            log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
-            raise InternalServerError(
-                "Got invalid response from wsproxy when querying status"
-            ) from e
-        return cast(dict[str, Any], result)
 
 
 @auth_required
@@ -109,7 +86,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                     wsproxy_version = "v1"
                 else:
                     try:
-                        wsproxy_status = await query_wsproxy_status(wsproxy_addr)
+                        wsproxy_status = await AppProxyClient.query_status(wsproxy_addr)
                         wsproxy_version = wsproxy_status["api_version"]
                     except aiohttp.ClientConnectorError:
                         log.error(
