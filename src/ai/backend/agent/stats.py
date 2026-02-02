@@ -450,9 +450,10 @@ class StatContext:
         if sys.platform == "darwin":
             return
 
-        # On Linux, sys.platform != "darwin" so this code is reachable.
-        # mypy evaluates sys.platform at type-check time (macOS), making this appear unreachable.
-        if container_id is None:  # type: ignore[unreachable]
+        # mypy evaluates sys.platform at type-check time, so:
+        # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
+        # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
+        if container_id is None:  # type: ignore[unreachable,unused-ignore]
             log.warning(
                 "Skipping process metric removal for kernel {}: container_id is None", kernel_id
             )
@@ -886,9 +887,10 @@ class StatContext:
         if sys.platform == "darwin":
             return
 
-        # On Linux, sys.platform != "darwin" so this code is reachable.
-        # mypy evaluates sys.platform at type-check time (macOS), making this appear unreachable.
-        self._stage_observer.observe_stage(  # type: ignore[unreachable]
+        # mypy evaluates sys.platform at type-check time, so:
+        # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
+        # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
+        self._stage_observer.observe_stage(  # type: ignore[unreachable,unused-ignore]
             stage="before_lock",
             upper_layer="collect_per_container_process_stat",
         )
