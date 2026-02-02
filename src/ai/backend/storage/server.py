@@ -11,7 +11,7 @@ import signal
 import ssl
 import sys
 import traceback
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from pprint import pformat, pprint
@@ -824,6 +824,7 @@ def main(
                 if local_config.debug.enabled:
                     print("== Storage proxy configuration ==")
                     pprint(local_config.model_dump())
+                runner: Callable[..., Any]
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:
                         if uvloop is None:

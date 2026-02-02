@@ -640,6 +640,7 @@ def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
         print_wait("Terminating the session(s)...")
         with Session() as session:
             has_failure = False
+            ret: dict[str, Any] | None = None
             for session_name in session_names:
                 try:
                     compute_session = session.ComputeSession(session_name, owner)
@@ -666,9 +667,9 @@ def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
                             "Manual cleanup of actual containers may be required."
                         )
                 if stats:
-                    stats = ret.get("stats", None) if ret else None
-                    if stats:
-                        print(format_stats(stats))
+                    stats_data = ret.get("stats", None) if ret else None
+                    if stats_data:
+                        print(format_stats(stats_data))
                     else:
                         print("Statistics is not available.")
             if has_failure:

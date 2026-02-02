@@ -14,7 +14,7 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
 from pathlib import Path
@@ -992,6 +992,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.worker.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match server_config.proxy_worker.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run

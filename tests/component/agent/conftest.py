@@ -223,6 +223,7 @@ def prepare_images() -> None:
     # Here we cannot just use "event_loop" fixture because this fixture
     # is session-scoped and pytest does not allow calling function-scoped fixtuers
     # from session-scoped fixtures.
+    old_loop: asyncio.AbstractEventLoop | None = None
     try:
         old_loop = asyncio.get_event_loop()
     except RuntimeError as exc:
@@ -231,7 +232,8 @@ def prepare_images() -> None:
     try:
         asyncio.run(pull())
     finally:
-        asyncio.set_event_loop(old_loop)
+        if old_loop is not None:
+            asyncio.set_event_loop(old_loop)
 
 
 @pytest.fixture(scope="session")

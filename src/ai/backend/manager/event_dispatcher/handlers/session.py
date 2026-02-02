@@ -157,11 +157,14 @@ class SessionEventHandler:
         """
         Update the database according to the batch-job completion results
         """
+        reason: KernelLifecycleEventReason
         match event:
-            case SessionSuccessAnycastEvent(session_id=session_id, reason=reason, exit_code=_):
+            case SessionSuccessAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
                 await SessionRow.set_session_result(self._db, session_id, success=True)
-            case SessionFailureAnycastEvent(session_id=session_id, reason=reason, exit_code=_):
+                reason = _reason
+            case SessionFailureAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
                 await SessionRow.set_session_result(self._db, session_id, success=False)
+                reason = _reason
         async with self._db.begin_session() as db_sess:
             try:
                 session = await SessionRow.get_session(

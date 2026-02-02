@@ -182,6 +182,8 @@ def parse_docker_host_url(
     docker_host: yarl.URL,
 ) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    path: Path
+    decoded_path: str
     match docker_host.scheme:
         case "http" | "https":
             return None, docker_host, aiohttp.TCPConnector()
@@ -212,6 +214,7 @@ def _search_docker_socket_files_impl() -> tuple[
     Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
 ]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    search_paths: list[Path]
     match sys.platform:
         case "linux" | "darwin":
             search_paths = [

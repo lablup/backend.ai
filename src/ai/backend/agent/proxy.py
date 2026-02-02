@@ -66,6 +66,7 @@ async def proxy_connection(
     # docker commands are usually disconnected by the client first, but the connections for
     # long-running streaming commands are disconnected by the server first when the server-side
     # processing finishes.
+    pending: set[Future[Any]] = set()
     try:
         task_results: tuple[set[Future[Any]], set[Future[Any]]] = await asyncio.wait(
             tasks, return_when=asyncio.FIRST_COMPLETED

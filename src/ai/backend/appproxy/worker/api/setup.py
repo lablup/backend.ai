@@ -45,6 +45,7 @@ def generate_proxy_url(
     redirect_path: str | None = None,
 ) -> str:
     # Generate base URL based on config type
+    base_url: str
     match config:
         case PortProxyConfig():
             base_url = f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"

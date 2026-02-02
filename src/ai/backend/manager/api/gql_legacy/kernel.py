@@ -758,6 +758,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         access_key: AccessKey | None = None,
         status: str | None = None,
     ) -> int:
+        status_list: list[KernelStatus] = []
         if isinstance(status, str):
             status_list = [KernelStatus[s] for s in status.split(",")]
         elif isinstance(status, KernelStatus):
@@ -773,7 +774,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
-        if status is not None:
+        if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
@@ -793,6 +794,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         order_key: str | None = None,
         order_asc: bool = True,
     ) -> Sequence[LegacyComputeSession]:
+        status_list: list[KernelStatus] = []
         if isinstance(status, str):
             status_list = [KernelStatus[s] for s in status.split(",")]
         elif isinstance(status, KernelStatus):
@@ -819,7 +821,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
-        if status is not None:
+        if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
             return [

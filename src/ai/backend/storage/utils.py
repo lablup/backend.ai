@@ -40,6 +40,7 @@ async def check_params(
     read_from: CheckParamSource = CheckParamSource.BODY,
     _auth_required: bool = True,
 ) -> AsyncIterator[Any]:
+    raw_params: Any = None
     if checker is None:
         if request.can_read_body:
             raise web.HTTPBadRequest(

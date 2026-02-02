@@ -46,10 +46,10 @@ async def aexecute_interactive(
     output_hook = output_hook if output_hook else kernel_client._output_hook_default  # type: ignore[assignment]
 
     # set deadline based on timeout
+    deadline: float = 0.0
+    timeout_ms: float | None = None
     if timeout_seconds is not None:
         deadline = monotonic() + timeout_seconds
-    else:
-        timeout_ms = None
 
     poller = zmq.asyncio.Poller()
     iopub_socket = kernel_client.iopub_channel.socket

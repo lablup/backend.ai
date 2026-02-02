@@ -1281,6 +1281,7 @@ class SessionService:
             list[dict[str, Any]], session.main_kernel.service_ports or []
         )
         sport: dict[str, Any] = {}
+        host_port: int
         for sport in service_ports:
             if sport["name"] == service:
                 if sport["is_inference"]:

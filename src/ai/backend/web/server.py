@@ -11,7 +11,14 @@ import ssl
 import sys
 import time
 import traceback
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping, MutableMapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from functools import partial
@@ -623,6 +630,8 @@ async def token_login_handler(request: web.Request) -> web.Response:
                         "details": "You must authenticate using Two-Factor Authentication.",
                     }
                     return web.json_response(result)
+                case _:
+                    raise RuntimeError(f"Unexpected auth result type: {type(auth_result)}")
             stored_token = {
                 "type": "keypair",
                 "access_key": token.access_key,
@@ -1032,6 +1041,7 @@ def main(
                     print("== Web Server configuration ==")
                     pprint(server_config.model_dump())
                 log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                runner: Callable[..., Any]
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run

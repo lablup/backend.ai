@@ -201,6 +201,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             # -N: without header
             ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
         )
+        report = ""
         for line in full_report.splitlines():
             if quota_scope_id.pathname in line:
                 report = line

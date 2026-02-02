@@ -285,6 +285,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             #    'python', 'mnist.py'],
             #   ... (processes with the same COMMAND)
             # ]
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 # Get process table from host (docker top information). Filter processes which have
@@ -310,7 +311,8 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotContainerPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgroup = get_cgroup_of_pid("pids", host_pid)
@@ -334,6 +336,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
         kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # reverse implementation of host_pid_to_container_pid().
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 container_procs = await get_container_process_table(docker, container_id)
@@ -352,7 +355,8 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotHostPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgtasks = await get_container_pids(ContainerId(container_id))

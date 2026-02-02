@@ -95,6 +95,7 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
         except ValueError:
             value = value.lower()
             dec_expr: Decimal
+            suffix: str = ""
             try:
                 for ending in self.endings:
                     if (stem := value.removesuffix(ending)) != value:

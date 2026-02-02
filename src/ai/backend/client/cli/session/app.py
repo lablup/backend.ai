@@ -302,10 +302,12 @@ def app(session_name: str, app: str, bind: str, arg: tuple[str, ...], env: tuple
     APP: The name of service provided by the given session.
     """
     bind_parts = bind.rsplit(":", maxsplit=1)
+    host: str
+    port: int
     if len(bind_parts) == 1:
         host = "127.0.0.1"
         port = int(bind_parts[0])
-    elif len(bind_parts) == 2:
+    else:
         host = bind_parts[0]
         port = int(bind_parts[1])
     try:

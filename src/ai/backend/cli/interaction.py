@@ -35,6 +35,7 @@ def convert_str_into_numeric(user_reply: str) -> Numeric:
 
 
 def ask_number(prompt: str, default: Numeric, min_value: Numeric, max_value: Numeric) -> Numeric:
+    user_reply_numeric: Numeric = default
     while True:
         user_reply = input(f"{prompt} (default: {default}): ")
         try:

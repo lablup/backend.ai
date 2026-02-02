@@ -395,6 +395,7 @@ class VFolderByName(BaseFunction):
                                         )
                                         await asyncio.sleep(0)
                                         max_attempts = 10
+                                        chunk: bytes = b""
                                         while True:
                                             try:
                                                 async for attempt in AsyncRetrying(

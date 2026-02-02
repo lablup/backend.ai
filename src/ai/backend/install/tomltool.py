@@ -20,6 +20,7 @@ def toml_get(filepath: str, key: str) -> str:
     keytree = key.split(".")
     keytree_traversed = keytree[:]
     table = doc
+    k: str = ""
     try:
         while True:
             try:
@@ -64,6 +65,7 @@ def toml_set(filepath: str, key: str, value: str) -> None:
         keytree = key.split(".")
         keytree_traversed = keytree[:-1]
         current_table = doc
+        k = ""
         try:
             while True:
                 try:

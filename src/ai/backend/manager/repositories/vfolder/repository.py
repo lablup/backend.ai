@@ -268,6 +268,8 @@ class VfolderRepository:
         """
         async with self._db.begin_session() as session:
             # Determine scope based on ownership type
+            scope_type: ScopeType
+            scope_id: str
             match params.ownership_type:
                 case VFolderOwnershipType.USER:
                     scope_type = ScopeType.USER

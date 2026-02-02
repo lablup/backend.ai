@@ -229,6 +229,7 @@ async def stream_pty(
     async def stream_stdout() -> None:
         nonlocal socks
         log.debug("stream_stdout({0}): started", stream_key)
+        data: list[bytes] = []
         try:
             while True:
                 try:
@@ -460,13 +461,20 @@ async def stream_proxy(
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
+    kernel_host: str
     if kernel.kernel_host is None:
         hostname = urlparse(kernel.agent_addr).hostname
+        if hostname is None:
+            raise InvalidAPIParameters(
+                f"Cannot determine kernel host from agent address: {kernel.agent_addr}"
+            )
         kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
     else:
         kernel_host = kernel.kernel_host
     service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], kernel.service_ports or [])
     sport: dict[str, Any] = {}
+    host_port: int = 0
+    dest: tuple[str, int] = ("", 0)
     for sport in service_ports:
         if sport["name"] == service:
             if params["port"]:
@@ -684,8 +692,8 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         "stream_conn_tracker_gc(): error while connecting to Etcd server,"
                         " retrying..."
                     )
-                else:
-                    raise e
+                    continue
+                raise e
             async with app_ctx.conn_tracker_lock:
                 now = await valkey_live.get_server_time()
                 for session_id in app_ctx.active_session_ids.keys():

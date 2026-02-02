@@ -701,9 +701,12 @@ class FractionAllocMap(AbstractAllocMap):
             allocation: dict[DeviceId, Decimal],
         ) -> None:
             n_devices = len(dev_allocs)
+            if n_devices == 0:
+                return
+            dev_allocation = (remaining_alloc / n_devices).quantize(
+                self.digits, rounding=ROUND_DOWN
+            )
             for dev_id, _ in dev_allocs:
-                dev_allocation = remaining_alloc / n_devices
-                dev_allocation = dev_allocation.quantize(self.digits, rounding=ROUND_DOWN)
                 allocation[dev_id] = dev_allocation
 
             # need to take care of decimals

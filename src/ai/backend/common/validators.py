@@ -93,12 +93,11 @@ class AliasedKey(t.Key):
         self.names = names
 
     def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:
+        key: str | None = None
         for name in self.names:
             if name in data:
                 key = name
                 break
-        else:
-            key = None
 
         if key is None:  # not specified
             if self.default is not _empty:  # type: ignore[attr-defined]
