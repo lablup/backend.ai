@@ -76,6 +76,15 @@ class ResourceLimit:
 
 
 @dataclass
+class ResourceLimitInput:
+    """Input for setting a resource limit with optional min/max values."""
+
+    slot_name: str
+    min_value: Decimal | None
+    max_value: Decimal | None
+
+
+@dataclass
 class ImageDataWithDetails:
     id: ImageID = field(compare=False)
     name: ImageCanonical

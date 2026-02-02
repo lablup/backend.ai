@@ -21,6 +21,7 @@ from ai.backend.manager.data.image.types import (
     ImageListResult,
     ImageStatus,
     RescanImagesResult,
+    ResourceLimitInput,
 )
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
@@ -39,8 +40,10 @@ from ai.backend.manager.models.image import (
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -122,6 +125,9 @@ class ImageDBSource:
         canonicals: list[str],
         status_filter: list[ImageStatus] | None = None,
     ) -> dict[ImageID, ImageDataWithDetails]:
+        """
+        Deprecated. Use query_images_by_ids instead.
+        """
         query = (
             sa.select(ImageRow)
             .where(ImageRow.name.in_(canonicals))
@@ -140,6 +146,9 @@ class ImageDBSource:
         identifier: ImageIdentifier,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
+        """
+        Deprecated. Use query_image_details_by_id instead.
+        """
         try:
             async with self._db.begin_readonly_session() as session:
                 image_row = await ImageRow.resolve(
@@ -181,7 +190,7 @@ class ImageDBSource:
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
     ) -> ImageData:
         """
-        Marks an image record as deleted in the database.
+        Deprecated. Use mark_image_deleted_by_id instead.
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
@@ -222,6 +231,9 @@ class ImageDBSource:
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
+        """
+        Deprecated. Use insert_image_alias_by_id instead.
+        """
         try:
             async with self._db.begin_session() as session:
                 image_row = await ImageRow.resolve(
@@ -254,8 +266,7 @@ class ImageDBSource:
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
         """
-        Scans a single image and upserts it into the database.
-        Returns RescanImagesResult with the scanned image data.
+        Deprecated. Use scan_images_by_ids instead.
         """
 
         async with self._db.begin_session() as session:
@@ -301,11 +312,87 @@ class ImageDBSource:
     async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
+        """
+        Deprecated. Use clear_image_resource_limits_by_id instead.
+        """
         async with self._db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session, [ImageIdentifier(image_canonical, architecture)]
             )
             image_row._resources = {}
+            return image_row.to_dataclass()
+
+    async def insert_image_alias_by_id(self, creator: Creator[ImageAliasRow]) -> ImageAliasData:
+        """
+        Creates an image alias using the Creator pattern.
+        """
+        spec = cast(ImageAliasCreatorSpec, creator.spec)
+        try:
+            async with self._db.begin_session() as session:
+                # Validate that the image exists
+                await self._get_image_by_id(session, spec.image_id)
+                result = await execute_creator(session, creator)
+                return ImageAliasData(id=result.row.id, alias=result.row.alias or "")
+        except ValueError as e:
+            raise AliasImageActionValueError from e
+        except DBAPIError as e:
+            raise AliasImageActionDBError(str(e)) from e
+
+    async def query_images_by_ids(
+        self,
+        image_ids: list[UUID],
+        status_filter: list[ImageStatus] | None = None,
+    ) -> dict[ImageID, ImageDataWithDetails]:
+        """
+        Queries images by their IDs with optional status filter.
+        Returns a dictionary mapping ImageID to ImageDataWithDetails.
+        """
+        if not image_ids:
+            return {}
+
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.id.in_(image_ids))
+            .options(selectinload(ImageRow.aliases))
+        )
+        if status_filter:
+            query = query.where(ImageRow.status.in_(status_filter))
+
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(query)
+            image_rows = list(result.scalars().all())
+            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
+
+    async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:
+        """
+        Clears image resource limits by image ID.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            image_row._resources = {}
+            return image_row.to_dataclass()
+
+    async def set_image_resource_limit_by_id(
+        self,
+        image_id: UUID,
+        resource_limit: ResourceLimitInput,
+    ) -> ImageData:
+        """
+        Sets resource limit for an image by its ID.
+        """
+        async with self._db.begin_session() as session:
+            image_row = await self._get_image_by_id(session, image_id)
+            resources = dict(image_row._resources) if image_row._resources else {}
+
+            if resource_limit.slot_name not in resources:
+                resources[resource_limit.slot_name] = {"min": None, "max": None}
+
+            if resource_limit.min_value is not None:
+                resources[resource_limit.slot_name]["min"] = str(resource_limit.min_value)
+            if resource_limit.max_value is not None:
+                resources[resource_limit.slot_name]["max"] = str(resource_limit.max_value)
+
+            image_row._resources = resources
             return image_row.to_dataclass()
 
     async def remove_image_and_aliases(

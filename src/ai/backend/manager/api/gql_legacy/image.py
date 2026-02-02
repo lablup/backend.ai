@@ -73,23 +73,21 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
+    ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
-from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
-from ai.backend.manager.services.image.actions.get_image_by_identifier import (
-    GetImageByIdentifierAction,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+from ai.backend.manager.services.image.actions.get_images import (
+    GetImageByIdAction,
+    GetImageByIdentifierAction,
     GetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -242,7 +240,6 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
             GetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
-                user_role=graph_ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -274,8 +271,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=id,
-                user_role=ctx.user["role"],
+                image_id=ImageID(id),
                 image_status=filter_by_statuses,
             )
         )
@@ -294,7 +290,6 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
             GetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
-                user_role=ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -738,8 +733,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=UUID(image_id),
-                user_role=ctx.user["role"],
+                image_id=ImageID(UUID(image_id)),
                 image_status=None,
             )
         )
@@ -781,11 +775,7 @@ class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
-            ForgetImageByIdAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
-            )
+            ForgetImageByIdAction(image_id=ImageID(image_uuid))
         )
 
         return ForgetImageById(
@@ -828,8 +818,6 @@ class ForgetImage(graphene.Mutation):  # type: ignore[misc]
 
         result = await ctx.processors.image.forget_image.wait_for_complete(
             ForgetImageAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 reference=reference,
                 architecture=arch,
             )
@@ -883,18 +871,14 @@ class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.wait_for_complete(
                 UntagImageFromRegistryAction(
-                    user_id=ctx.user["uuid"],
-                    client_role=ctx.user["role"],
-                    image_id=image_uuid,
+                    image_id=ImageID(image_uuid),
                 )
             )
 
@@ -929,9 +913,7 @@ class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
             UntagImageFromRegistryAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 
