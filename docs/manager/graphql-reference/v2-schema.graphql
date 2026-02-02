@@ -3769,19 +3769,19 @@ type Query {
   adminDomainAppConfig(domainName: String!): AppConfig
 
   """Added in 26.2.0. Get domain fair share data (admin only)."""
-  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare
+  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare!
 
   """Added in 26.2.0. List domain fair shares (admin only)."""
   adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
 
   """Added in 26.2.0. Get project fair share data (admin only)."""
-  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare
+  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare!
 
   """Added in 26.2.0. List project fair shares (admin only)."""
   adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 
   """Added in 26.2.0. Get user fair share data (admin only)."""
-  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
+  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare!
 
   """Added in 26.2.0. List user fair shares (admin only)."""
   adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
@@ -3796,33 +3796,25 @@ type Query {
   adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 
   """
-  Added in 26.2.0. Get domain fair share data within resource group scope. This API is not yet implemented.
+  Added in 26.2.0. Get domain fair share data within resource group scope.
   """
-  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare
+  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare!
 
-  """
-  Added in 26.2.0. List domain fair shares within resource group scope. This API is not yet implemented.
-  """
+  """Added in 26.2.0. List domain fair shares within resource group scope."""
   rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
 
   """
-  Added in 26.2.0. Get project fair share data within resource group scope. This API is not yet implemented.
+  Added in 26.2.0. Get project fair share data within resource group scope.
   """
-  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare
+  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare!
 
-  """
-  Added in 26.2.0. List project fair shares within resource group scope. This API is not yet implemented.
-  """
+  """Added in 26.2.0. List project fair shares within resource group scope."""
   rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 
-  """
-  Added in 26.2.0. Get user fair share data within resource group scope. This API is not yet implemented.
-  """
-  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare
+  """Added in 26.2.0. Get user fair share data within resource group scope."""
+  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare!
 
-  """
-  Added in 26.2.0. List user fair shares within resource group scope. This API is not yet implemented.
-  """
+  """Added in 26.2.0. List user fair shares within resource group scope."""
   rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
 
   """
@@ -3855,19 +3847,19 @@ type Query {
   domainAppConfig(domainName: String!): AppConfig @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare! @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List domain fair shares (superadmin only)."""
   domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare! @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List project fair shares (superadmin only)."""
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List user fair shares (superadmin only)."""
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
