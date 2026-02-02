@@ -35,6 +35,28 @@ appproxy_client_resilience = Resilience(
 )
 
 
+@aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
+async def query_appproxy_status(
+    appproxy_addr: str,
+) -> dict[str, Any]:
+    """Query the status of an app-proxy (wsproxy) at the given address."""
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(
+            appproxy_addr + "/status",
+            headers={"Accept": "application/json"},
+        ) as resp,
+    ):
+        try:
+            result = await resp.json()
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error("Failed to parse app-proxy status response from {}: {}", appproxy_addr, e)
+            raise InternalServerError(
+                "Got invalid response from app-proxy when querying status"
+            ) from e
+        return result
+
+
 class AppProxyClient:
     _client_session: aiohttp.ClientSession
     _address: str
@@ -44,28 +66,6 @@ class AppProxyClient:
         self._client_session = client_session
         self._address = address
         self._token = token
-
-    @staticmethod
-    @aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
-    async def query_status(
-        appproxy_addr: str,
-    ) -> dict[str, Any]:
-        """Query the status of an app-proxy (wsproxy) at the given address."""
-        async with (
-            aiohttp.ClientSession() as session,
-            session.get(
-                appproxy_addr + "/status",
-                headers={"Accept": "application/json"},
-            ) as resp,
-        ):
-            try:
-                result = await resp.json()
-            except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-                log.error("Failed to parse app-proxy status response from {}: {}", appproxy_addr, e)
-                raise InternalServerError(
-                    "Got invalid response from app-proxy when querying status"
-                ) from e
-            return result
 
     @appproxy_client_resilience.apply()
     async def create_endpoint(

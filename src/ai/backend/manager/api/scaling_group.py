@@ -11,7 +11,7 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.appproxy.client import AppProxyClient
+from ai.backend.manager.clients.appproxy.client import query_appproxy_status
 from ai.backend.manager.errors.common import (
     ObjectNotFound,
     ServerMisconfiguredError,
@@ -86,7 +86,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                     wsproxy_version = "v1"
                 else:
                     try:
-                        wsproxy_status = await AppProxyClient.query_status(wsproxy_addr)
+                        wsproxy_status = await query_appproxy_status(wsproxy_addr)
                         wsproxy_version = wsproxy_status["api_version"]
                     except aiohttp.ClientConnectorError:
                         log.error(

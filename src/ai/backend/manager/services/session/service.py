@@ -39,7 +39,7 @@ from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.clients.appproxy.client import AppProxyClient
+from ai.backend.manager.clients.appproxy.client import query_appproxy_status
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
@@ -1256,7 +1256,7 @@ class SessionService:
         )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        wsproxy_status = await AppProxyClient.query_status(wsproxy_addr)
+        wsproxy_status = await query_appproxy_status(wsproxy_addr)
         if advertise_addr := wsproxy_status.get("advertise_address"):
             wsproxy_advertise_addr = advertise_addr
         else:
