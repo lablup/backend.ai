@@ -86,7 +86,7 @@ _default_session_node_detail_fields = (
     session_node_fields["scaling_group"],
     session_node_fields["vfolder_mounts"],
     session_node_fields["image_references"],
-    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),  # type: ignore
+    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),
 )
 
 
@@ -1119,7 +1119,7 @@ class ComputeSession(BaseFunction):
             reader = aiohttp.MultipartReader.from_response(resp.raw_response)
             with tqdm_obj as pbar:
                 while True:
-                    part = cast(aiohttp.BodyPartReader, await reader.next())
+                    part = await reader.next()
                     if part is None:
                         break
                     content_encoding = part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower()

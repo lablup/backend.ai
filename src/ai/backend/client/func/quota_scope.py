@@ -40,7 +40,7 @@ class QuotaScope(BaseFunction):
         domain_name: str,
         email: str,
         fields: Sequence[FieldSpec] = _default_user_fields,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         query = _d("""
             query($domain_name: String!, $email: String!) {
                 user(domain_name: $domain_name, email: $email) { $fields }
@@ -52,7 +52,7 @@ class QuotaScope(BaseFunction):
             "email": email,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return cast(dict[str, Any], data["user"])
+        return cast(dict[str, Any] | None, data["user"])
 
     @api_function
     @classmethod
@@ -61,7 +61,7 @@ class QuotaScope(BaseFunction):
         domain_name: str,
         name: str,
         fields: Sequence[FieldSpec] = _default_project_fields,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         query = _d("""
             query($domain_name: String!, $name: String!) {
                 groups_by_name(domain_name: $domain_name, name: $name) { $fields }
@@ -73,7 +73,10 @@ class QuotaScope(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return cast(dict[str, Any], data["groups_by_name"][0])
+        groups = data["groups_by_name"]
+        if not groups:
+            return None
+        return cast(dict[str, Any], groups[0])
 
     @api_function
     @classmethod

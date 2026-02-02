@@ -131,12 +131,19 @@ class HTTPBackend(BaseBackend):
     async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:
         protocol = self.get_x_forwarded_proto(frontend_request)
         host = self.get_x_forwarded_host(frontend_request)
-        remote_host, remote_port = (
+        peername = (
             frontend_request.transport.get_extra_info("peername")
             if frontend_request.transport
-            else None,
-            None,
+            else None
         )
+        remote_host: tuple[str, int] | None
+        remote_port: str | None
+        if peername:
+            remote_host = peername
+            remote_port = str(peername[1])
+        else:
+            remote_host = None
+            remote_port = None
         backend_rqst_hdrs = {}
         # copy frontend request headers without hop-by-hop headers
         for key, value in frontend_request.headers.items():

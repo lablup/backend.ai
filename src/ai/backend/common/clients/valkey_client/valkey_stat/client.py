@@ -614,9 +614,6 @@ class ValkeyStatClient:
         :return: Dictionary of slot name to metadata JSON string.
         """
         result = await self._client.client.hgetall(_COMPUTER_METADATA_KEY)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         metadata: dict[str, bytes] = {}
         for key, value in result.items():

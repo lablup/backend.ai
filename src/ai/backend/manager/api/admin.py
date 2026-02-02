@@ -176,11 +176,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 
     if result.errors:
         for e in result.errors:
-            if isinstance(e, GraphQLError):
-                errmsg = e.formatted
-            else:
-                errmsg = {"message": str(e)}
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.error("ADMIN.GQL Exception: {}", e.formatted)
             log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
@@ -212,13 +208,8 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     if result.errors:
         errors = []
         for e in result.errors:
-            if isinstance(e, GraphQLError):
-                errmsg = e.formatted
-                errors.append(errmsg)
-            else:
-                errmsg = {"message": str(e)}
-                errors.append(errmsg)
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            errors.append(e.formatted)
+            log.error("ADMIN.GQL Exception: {}", e.formatted)
         raise BackendGQLError(extra_data=errors)
     return web.json_response(result.data, status=HTTPStatus.OK)
 

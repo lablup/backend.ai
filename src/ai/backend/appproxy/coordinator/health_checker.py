@@ -939,9 +939,6 @@ class HealthCheckEngine:
             # Update health status for each circuit
             for endpoint_id, circuit_routes in endpoint_routes.items():
                 for circuit, route_id in circuit_routes:
-                    if circuit is None:
-                        continue
-
                     status, last_check_time, consecutive_failures = route_health_results[route_id]
 
                     # Update the route in circuit's route_info

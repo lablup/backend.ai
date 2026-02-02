@@ -529,10 +529,6 @@ async def check_credential_with_migration(
 
     # Password is valid, check if we need to migrate the hash
     current_hash_info = HashInfo.from_hash_string(row.password)
-    if current_hash_info is None:
-        # Shouldn't happen since password was just verified
-        return row._mapping
-
     if target_password_info.need_migration(current_hash_info):
         # Re-hash the password with the new algorithm using the provided PasswordInfo
         # Update the user's password hash asynchronously

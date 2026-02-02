@@ -876,15 +876,6 @@ class DeploymentRepository:
                             )
                             continue
 
-            else:
-                log.warning(
-                    "AUTOSCALE(e:{}, rule:{}): unknown metric source {}",
-                    deployment.id,
-                    rule.id,
-                    rule.condition.metric_source,
-                )
-                continue
-
             # Evaluate threshold comparison
             if current_value is not None:
                 threshold = Decimal(rule.condition.threshold)

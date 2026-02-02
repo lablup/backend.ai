@@ -63,7 +63,7 @@ class UserInfo(graphene.ObjectType):  # type: ignore[misc]
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row[Any],
+        row: Row[Any] | None,
     ) -> UserInfo | None:
         if row is None:
             return None

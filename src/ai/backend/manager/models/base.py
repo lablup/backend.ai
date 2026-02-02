@@ -322,9 +322,7 @@ class ResourceSlotColumn(TypeDecorator[ResourceSlot]):
     ) -> Mapping[str, str] | None:
         if value is None:
             return None
-        if isinstance(value, ResourceSlot):
-            return value.to_json()
-        return value
+        return value.to_json()
 
     def process_result_value(
         self,

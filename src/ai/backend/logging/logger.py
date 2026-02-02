@@ -383,8 +383,6 @@ def log_processor(
                 if not unpacked_data:
                     break
                 rec = logging.makeLogRecord(unpacked_data)
-                if rec is None:
-                    break
                 if console_handler:
                     console_handler.emit(rec)
                 try:

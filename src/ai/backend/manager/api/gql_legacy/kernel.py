@@ -742,7 +742,9 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         }
 
     @classmethod
-    def from_row(cls, context: GraphQueryContext, row: Row[Any]) -> LegacyComputeSession | None:
+    def from_row(
+        cls, context: GraphQueryContext, row: Row[Any] | None
+    ) -> LegacyComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(context, row)
@@ -756,13 +758,13 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
-        status: str | None = None,
+        status: str | KernelStatus | None = None,
     ) -> int:
         status_list: list[KernelStatus] = []
-        if isinstance(status, str):
-            status_list = [KernelStatus[s] for s in status.split(",")]
-        elif isinstance(status, KernelStatus):
+        if isinstance(status, KernelStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [KernelStatus[s] for s in status.split(",")]
         query = (
             sa.select(sa.func.count())
             .select_from(kernels)
@@ -790,15 +792,15 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
-        status: str | None = None,
+        status: str | KernelStatus | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
     ) -> Sequence[LegacyComputeSession]:
         status_list: list[KernelStatus] = []
-        if isinstance(status, str):
-            status_list = [KernelStatus[s] for s in status.split(",")]
-        elif isinstance(status, KernelStatus):
+        if isinstance(status, KernelStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [KernelStatus[s] for s in status.split(",")]
         if order_key is None:
             _ordering = DEFAULT_KERNEL_ORDERING
         else:
@@ -884,13 +886,13 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
-        status: str | None = None,
+        status: str | KernelStatus | None = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
-        status_list = []
-        if isinstance(status, str):
-            status_list = [KernelStatus[s] for s in status.split(",")]
-        elif isinstance(status, KernelStatus):
+        status_list: list[KernelStatus] = []
+        if isinstance(status, KernelStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [KernelStatus[s] for s in status.split(",")]
         elif status is None:
             status_list = [KernelStatus["RUNNING"]]
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(

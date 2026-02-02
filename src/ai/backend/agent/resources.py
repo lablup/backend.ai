@@ -891,8 +891,6 @@ async def scan_resource_usage_per_slot(
         except FileNotFoundError:
             # there may be races with container destruction
             return
-        if resource_spec is None:
-            return
         for raw_slot_name in resource_spec.slots.keys():
             slot_name = SlotName(raw_slot_name)
             slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])

@@ -1759,7 +1759,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         *,
         is_installed: bool | None = None,
-        is_operation: bool = False,
+        is_operation: bool | None = False,
         filter_by_statuses: list[ImageStatus] | None = None,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,

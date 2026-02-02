@@ -348,20 +348,13 @@ async def stream_execute(
                 session, api_version, run_id, mode, code, opts, flush_timeout=0.2
             )
             if ws.closed:
-                log.debug("STREAM_EXECUTE: client disconnected (interrupted)")
+                log.debug("STREAM_EXECUTE: client disconnected (interrupted)")  # type: ignore[unreachable]
                 await asyncio.shield(
                     rpc_ptask_group.create_task(
                         registry.interrupt_session(session),
                     )
                 )
                 break
-            if raw_result is None:
-                # repeat until we get finished
-                log.debug("STREAM_EXECUTE: none returned, continuing...")
-                mode = "continue"
-                code = ""
-                opts.clear()
-                continue
             await ws.send_json({
                 "status": raw_result["status"],
                 "console": raw_result.get("console"),

@@ -702,7 +702,7 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] = [],
+    subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
     root_ctx.metrics = WorkerMetricRegistry.instance()
@@ -791,8 +791,6 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"/", hello))
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
-    if subapp_pkgs is None:
-        subapp_pkgs = []
     for pkg_name in subapp_pkgs:
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])

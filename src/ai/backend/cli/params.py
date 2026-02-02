@@ -22,7 +22,7 @@ class BoolExprType(click.ParamType):
     @override
     def convert(
         self,
-        value: str,
+        value: str | bool,
         param: click.Parameter | None,
         ctx: click.Context | None,
     ) -> bool:
@@ -51,18 +51,12 @@ class ByteSizeParamType(click.ParamType):
     @override
     def convert(
         self,
-        value: str,
+        value: str | int,
         param: click.Parameter | None,
         ctx: click.Context | None,
-    ) -> Any:
+    ) -> int:
         if isinstance(value, int):
             return value
-        if not isinstance(value, str):
-            self.fail(
-                f"expected string, got {value!r} of type {type(value).__name__}",
-                param,
-                ctx,
-            )
         m = self._rx_digits.search(value)
         if m is None:
             self.fail(f"{value!r} is not a valid byte-size expression", param, ctx)
@@ -71,24 +65,20 @@ class ByteSizeParamType(click.ParamType):
         return int(size * self._scales.get(unit, 1))
 
 
-class ByteSizeParamCheckType(ByteSizeParamType):
+class ByteSizeParamCheckType(click.ParamType):
     name = "byte-check"
+
+    _rx_digits = re.compile(r"^(\d+(?:\.\d*)?)([kmgtpe]?)$", re.IGNORECASE)
 
     @override
     def convert(
         self,
-        value: str,
+        value: str | int,
         param: click.Parameter | None,
         ctx: click.Context | None,
-    ) -> str:
+    ) -> str | int:
         if isinstance(value, int):
             return value
-        if not isinstance(value, str):
-            self.fail(
-                f"expected string, got {value!r} of type {type(value).__name__}",
-                param,
-                ctx,
-            )
         m = self._rx_digits.search(value)
         if m is None:
             self.fail(f"{value!r} is not a valid byte-size expression", param, ctx)
@@ -101,19 +91,13 @@ class CommaSeparatedKVListParamType(click.ParamType):
     @override
     def convert(
         self,
-        value: str,
+        value: str | dict[str, str],
         param: click.Parameter | None,
         ctx: click.Context | None,
     ) -> Mapping[str, str]:
         if isinstance(value, dict):
             return value
-        if not isinstance(value, str):
-            self.fail(
-                f"expected string, got {value!r} of type {type(value).__name__}",
-                param,
-                ctx,
-            )
-        override_map = {}
+        override_map: dict[str, str] = {}
         for assignment in value.split(","):
             try:
                 k, _, v = assignment.partition("=")
@@ -146,7 +130,7 @@ class JSONParamType(click.ParamType):
     @override
     def convert(
         self,
-        value: str,
+        value: str | None,
         param: click.Parameter | None,
         ctx: click.Context | None,
     ) -> Any:
@@ -228,15 +212,15 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
         self.type_ = type_ if type_ is not None else str
 
     def convert(
-        self, arg: str | int, param: click.Parameter | None, ctx: click.Context | None
+        self, value: str | int, param: click.Parameter | None, ctx: click.Context | None
     ) -> int | list[Any]:
         try:
-            match arg:
+            match value:
                 case int():
-                    return arg
+                    return value
                 case str():
                     result = []
-                    for elem in arg.split(","):
+                    for elem in value.split(","):
                         if isinstance(self.type_, type) and issubclass(self.type_, click.ParamType):
                             param_type_cls = cast(type[click.ParamType], self.type_)
                             result.append(param_type_cls().convert(elem, param, ctx))
@@ -244,8 +228,6 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
                             constructor = cast(type[SingleValueConstructorType], self.type_)
                             result.append(constructor(elem))
                     return result
-                case _:
-                    self.fail(f"Invalid type for argument: {type(arg)}", param, ctx)
         except ValueError as e:
             self.fail(repr(e), param, ctx)
 
@@ -266,14 +248,10 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
         try:
             if value is undefined:
                 return undefined
-            result: TScalar | Undefined
-            match self.type_:
-                case click.ParamType():
-                    result = self.type_(value)
-                case type() if issubclass(self.type_, click.ParamType):
-                    result = self.type_()(value)
-                case _:
-                    result = self.type_(value)
-            return result
+            if isinstance(self.type_, click.ParamType):
+                return cast(TScalar, self.type_.convert(value, param, ctx))
+            if isinstance(self.type_, type) and issubclass(self.type_, click.ParamType):
+                return cast(TScalar, self.type_().convert(value, param, ctx))
+            return self.type_(value)
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

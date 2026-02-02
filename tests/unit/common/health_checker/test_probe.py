@@ -344,7 +344,7 @@ async def test_probe_start_and_stop(
 
     await health_probe.start()
     assert health_probe._running is True
-    assert health_probe._loop_task is not None
+    assert health_probe._loop_task is not None  # type: ignore[unreachable]
 
     await health_probe.stop()
     assert health_probe._running is False

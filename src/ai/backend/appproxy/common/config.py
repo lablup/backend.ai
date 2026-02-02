@@ -723,7 +723,7 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseModel] | types.GenericAlias,
+    schema: type[BaseModel] | types.GenericAlias | types.UnionType,
     parent: list[str] | None = None,
 ) -> dict[str, Any] | list[Any]:
     if parent is None:

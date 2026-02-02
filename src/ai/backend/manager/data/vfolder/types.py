@@ -70,7 +70,6 @@ class VFolderMountPermission(enum.StrEnum):
                 return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
             case VFolderMountPermission.RW_DELETE | VFolderMountPermission.OWNER_PERM:
                 return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
-        return set()
 
 
 class VFolderInvitationState(enum.StrEnum):
@@ -228,7 +227,7 @@ class VFolderAccessInfo:
 
     vfolder_data: VFolderData
     is_owner: bool
-    effective_permission: VFolderMountPermission
+    effective_permission: VFolderMountPermission | None
 
 
 @dataclass

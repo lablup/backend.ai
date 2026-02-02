@@ -215,7 +215,7 @@ class ConfigInspector:
 
         return str(annotation)
 
-    def _is_nullable_type(self, annotation: type | None) -> bool:
+    def _is_nullable_type(self, annotation: type | types.UnionType | None) -> bool:
         """Check if a type annotation is nullable (Type | None).
 
         Args:
@@ -304,7 +304,7 @@ class ConfigInspector:
 
         return None
 
-    def _unwrap_optional(self, annotation: type) -> type:
+    def _unwrap_optional(self, annotation: type | types.UnionType) -> type | types.UnionType:
         """Unwrap Optional[T] to get T."""
         # Handle Python 3.10+ UnionType (X | None syntax)
         if isinstance(annotation, types.UnionType):

@@ -479,27 +479,23 @@ class CreateDeploymentAdapter:
         strategy = DeploymentStrategy(strategy_input.type)
 
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
-        if strategy == DeploymentStrategy.ROLLING:
-            if strategy_input.rolling_update is None:
-                # Use defaults
-                strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-            else:
-                strategy_spec = RollingUpdateSpec(
-                    max_surge=strategy_input.rolling_update.max_surge,
-                    max_unavailable=strategy_input.rolling_update.max_unavailable,
-                )
-        elif strategy == DeploymentStrategy.BLUE_GREEN:
-            if strategy_input.blue_green is None:
-                # Use defaults
-                strategy_spec = BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
-            else:
-                strategy_spec = BlueGreenSpec(
-                    auto_promote=strategy_input.blue_green.auto_promote,
-                    promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
-                )
-        else:
-            # Default to rolling update
-            strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        match strategy:
+            case DeploymentStrategy.ROLLING:
+                if strategy_input.rolling_update is None:
+                    strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+                else:
+                    strategy_spec = RollingUpdateSpec(
+                        max_surge=strategy_input.rolling_update.max_surge,
+                        max_unavailable=strategy_input.rolling_update.max_unavailable,
+                    )
+            case DeploymentStrategy.BLUE_GREEN:
+                if strategy_input.blue_green is None:
+                    strategy_spec = BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
+                else:
+                    strategy_spec = BlueGreenSpec(
+                        auto_promote=strategy_input.blue_green.auto_promote,
+                        promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
+                    )
 
         return DeploymentPolicyConfig(
             strategy=strategy,

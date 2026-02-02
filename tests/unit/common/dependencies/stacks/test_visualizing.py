@@ -273,7 +273,7 @@ class TestVisualizingDependencyStack:
                 provider1 = SimpleDependencyProvider("dep1", cleanup_tracker)
                 await stack.enter_dependency(provider1, setup_input)
                 raise RuntimeError("Composer internal error")
-                yield  # Never reached but required for async generator
+                yield  # type: ignore[unreachable]  # Never reached but required for async generator
 
         with pytest.raises(RuntimeError, match="Composer internal error"):
             async with VisualizingDependencyStack(output=output, show_timestamps=False) as stack:

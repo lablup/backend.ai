@@ -522,8 +522,8 @@ class EventDispatcher(EventDispatcherGroup):
             await start_reporter.prepare_event_report(event, PrepareEventReportArgs())
         try:
             if await coalescing_state.rate_control(coalescing_opts):
-                if self._closed:
-                    return
+                if self._closed:  # _closed can change during await
+                    return  # type: ignore[unreachable]
                 if self._log_events:
                     log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
 

@@ -714,10 +714,9 @@ async def scan_artifact_models(
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
 ) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
-    # Mock implementation
-    # In real implementation, this would yield artifacts when status changes
-    if False:  # Placeholder to make this a generator
-        yield ArtifactStatusChangedPayload(artifact=Artifact())
+    # TODO: Implement actual subscription logic using pub/sub system
+    raise NotImplementedError("Subscription not implemented")
+    yield  # type: ignore[unreachable]  # Makes this an async generator
 
 
 @strawberry.subscription(  # type: ignore[misc]
@@ -734,7 +733,6 @@ async def artifact_status_changed(
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,
 ) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:
-    # Mock implementation
-    # In real implementation, this would yield progress updates
-    if False:  # Placeholder to make this a generator
-        yield ArtifactImportProgressUpdatedPayload()
+    # TODO: Implement actual subscription logic using pub/sub system
+    raise NotImplementedError("Subscription not implemented")
+    yield  # type: ignore[unreachable]  # Makes this an async generator

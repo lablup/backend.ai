@@ -23,10 +23,8 @@ class Vec2D(tuple[float, float]):
             return self[0] * other[0] + self[1] * other[1]
         return Vec2D(self[0] * other, self[1] * other)
 
-    def __rmul__(self, other: float | int) -> Vec2D | None:  # type: ignore[override]
-        if isinstance(other, (int, float)):
-            return Vec2D(self[0] * other, self[1] * other)
-        return None
+    def __rmul__(self, other: float | int) -> Vec2D:  # type: ignore[override]
+        return Vec2D(self[0] * other, self[1] * other)
 
     def __sub__(self, other: Vec2D) -> Vec2D:
         return Vec2D(self[0] - other[0], self[1] - other[1])

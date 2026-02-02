@@ -560,7 +560,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
         return [sg.name for sg in sgroups]
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Domain | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> Domain | None:
         if row is None:
             return None
         return cls(

@@ -12,7 +12,9 @@ def dedent(text: str) -> str:
     return textwrap.dedent(text).strip()
 
 
-def create_connection_field(field_name: str, node_fields: FieldSet) -> FieldSpec:
+def create_connection_field(
+    field_name: str, node_fields: FieldSet | tuple[FieldSpec, ...] | list[FieldSpec]
+) -> FieldSpec:
     """
     Creates a GraphQL connection field specification with standard 'edges' and 'node' structure.
     Useful for building paginated queries where each edge contains a node with specified fields.
@@ -41,7 +43,7 @@ def flatten_connection(connection_data: dict[str, Any]) -> list[dict[str, Any]]:
     return [edge["node"] for edge in connection_data["edges"]]
 
 
-def flatten_connections_in_data(data: dict[str, Any]) -> dict[str, Any]:
+def flatten_connections_in_data(data: dict[str, Any] | None) -> dict[str, Any]:
     """
     Flattens all connection fields in a nested dictionary.
     If a value is a dictionary containing an 'edges' key, it is flattened using flatten_connection().
