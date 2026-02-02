@@ -173,6 +173,7 @@ class ErrorDomain(enum.StrEnum):
     ROLE = "role"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
+    APPPROXY = "appproxy"
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"

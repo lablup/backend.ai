@@ -168,6 +168,12 @@ def mock_scheduling_controller() -> MagicMock:
 
 
 @pytest.fixture
+def mock_appproxy_client_pool() -> MagicMock:
+    """Create mocked AppProxy client pool."""
+    return MagicMock()
+
+
+@pytest.fixture
 async def session_service(
     mock_session_repository: MagicMock,
     mock_agent_registry: MagicMock,
@@ -177,6 +183,7 @@ async def session_service(
     mock_error_monitor: MagicMock,
     mock_idle_checker_host: MagicMock,
     mock_scheduling_controller: MagicMock,
+    mock_appproxy_client_pool: MagicMock,
 ) -> SessionService:
     """Create SessionService with mocked dependencies."""
     args = SessionServiceArgs(
@@ -188,6 +195,7 @@ async def session_service(
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
         scheduling_controller=mock_scheduling_controller,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     return SessionService(args)
 

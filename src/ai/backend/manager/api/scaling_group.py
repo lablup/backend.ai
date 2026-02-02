@@ -2,20 +2,15 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-import aiohttp
 import aiohttp_cors
 import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.appproxy.client import query_appproxy_status
-from ai.backend.manager.errors.common import (
-    ObjectNotFound,
-    ServerMisconfiguredError,
-)
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -77,29 +72,26 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
     log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
+    # remove appproxy client pool from root_ctx when db query migrated to service layer.
     async with root_ctx.db.begin_readonly() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
-        for sgroup in sgroups:
-            if sgroup.name == scaling_group_name:
-                wsproxy_addr = sgroup.wsproxy_addr
-                if not wsproxy_addr:
-                    wsproxy_version = "v1"
-                else:
-                    try:
-                        wsproxy_status = await query_appproxy_status(wsproxy_addr)
-                        wsproxy_version = wsproxy_status["api_version"]
-                    except aiohttp.ClientConnectorError:
-                        log.error(
-                            "Failed to query the wsproxy {1} configured for sg:{0}",
-                            scaling_group_name,
-                            wsproxy_addr,
-                        )
-                        return ServerMisconfiguredError()
-                return web.json_response({
-                    "wsproxy_version": wsproxy_version,
-                })
-        else:
+        sgroup_filtered = [sg for sg in sgroups if sg.name == scaling_group_name]
+        if not sgroup_filtered:
             raise ObjectNotFound(object_name="scaling group")
+        sgroup = sgroup_filtered[0]
+
+        if not sgroup.wsproxy_addr:
+            wsproxy_version = "v1"  # raise error
+        else:
+            client = root_ctx.appproxy_client_pool.load_client(
+                sgroup.wsproxy_addr, sgroup.wsproxy_api_token or ""
+            )
+            status = await client.fetch_status()
+            wsproxy_version = status.get("api_version", "v1")
+
+        return web.json_response({
+            "wsproxy_version": wsproxy_version,
+        })
 
 
 async def init(app: web.Application) -> None:
