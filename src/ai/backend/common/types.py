@@ -472,6 +472,8 @@ class ServicePortProtocols(enum.StrEnum):
     TCP = "tcp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
+    VNC = "vnc"
+    RDP = "rdp"
 
 
 class SessionTypes(CIStrEnum):
