@@ -344,9 +344,12 @@ class SessionService:
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-        image_row = await self._session_repository.resolve_image([
-            ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
-        ])
+        # Validate image exists
+        if session.main_kernel.image and session.main_kernel.architecture:
+            await self._session_repository.resolve_image(
+                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
+                alive_only=False,
+            )
 
         base_image_ref = image_row.image_ref
 
