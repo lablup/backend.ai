@@ -508,7 +508,7 @@ async def stream_proxy(
         proxy_cls = TCPProxy
     elif sport["protocol"] == "pty":
         raise NotImplementedError
-    elif sport["protocol"] == "http" or sport["protocol"] == "preopen":
+    elif sport["protocol"] in ("http", "preopen", "vnc", "rdp"):
         proxy_cls = TCPProxy
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
