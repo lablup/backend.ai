@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -14,6 +16,11 @@ if TYPE_CHECKING:
 class ImageStatus(enum.StrEnum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
+
+
+class ImageOrderField(enum.StrEnum):
+    NAME = "NAME"
+    CREATED_AT = "CREATED_AT"
 
 
 class ImageType(CIStrEnum):
@@ -38,7 +45,22 @@ class ImageLabelsData:
 
 @dataclass
 class ImageResourcesData:
-    resources_data: "Resources"
+    resources_data: Resources
+
+
+@dataclass
+class ImageTagEntry:
+    """A single parsed tag component from the image reference."""
+
+    key: str
+    value: str
+
+
+@dataclass
+class ResourceLimit:
+    key: str
+    min: Decimal
+    max: Decimal
 
 
 @dataclass
@@ -59,6 +81,8 @@ class ImageData:
     accelerators: str | None
     labels: ImageLabelsData
     resources: ImageResourcesData
+    resource_limits: list[ResourceLimit]
+    tags: list[ImageTagEntry]
     status: ImageStatus
 
 
@@ -66,13 +90,6 @@ class ImageData:
 class KVPair:
     key: str
     value: str
-
-
-@dataclass
-class ResourceLimit:
-    key: str
-    min: Decimal
-    max: Decimal
 
 
 @dataclass
@@ -107,6 +124,7 @@ class ImageDataWithDetails:
     labels: list[KVPair] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
+    created_at: datetime | None = field(default=None)
     # legacy
     hash: str | None = field(default=None)
 

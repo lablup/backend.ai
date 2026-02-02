@@ -2023,13 +2023,245 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.2.0.
+
+Relay-style connection for paginated image queries.
+Includes total count for pagination UI.
+"""
+type ImageConnectionV2 {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ImageV2Edge!]!
+
+  """Total count of images matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.2.0.
+
+Filter options for images based on various criteria such as status,
+name, and architecture.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
+input ImageFilterGQL {
+  status: [ImageStatus!] = null
+  name: StringFilter = null
+  architecture: StringFilter = null
+  AND: [ImageFilterGQL!] = null
+  OR: [ImageFilterGQL!] = null
+  NOT: [ImageFilterGQL!] = null
+}
+
+"""
+Added in 26.2.0.
+
+Identity information for an image.
+Contains the canonical name, namespace, and architecture.
+"""
+type ImageIdentityInfo {
+  """Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."""
+  canonicalName: String!
+
+  """Image namespace/path within the registry (e.g., 'stable/python')."""
+  namespace: String!
+
+  """CPU architecture (e.g., 'x86_64', 'aarch64')."""
+  architecture: String!
+}
+
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
 }
 
+"""
+Added in 26.2.0.
+
+A key-value pair representing a Docker label on the image.
+Labels contain metadata about the image such as maintainer, version, etc.
+"""
+type ImageLabelEntry {
+  """The label key (e.g., 'maintainer')."""
+  key: String!
+
+  """The label value."""
+  value: String!
+}
+
+"""
+Added in 26.2.0.
+
+Metadata information for an image.
+Contains tags, labels, digest, size, status, and creation timestamp.
+"""
+type ImageMetadataInfo {
+  """
+  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
+  """
+  tags: [ImageTagEntry!]!
+
+  """Docker labels."""
+  labels: [ImageLabelEntry!]!
+
+  """Config digest (image hash) for verification."""
+  digest: String
+
+  """Image size in bytes."""
+  sizeBytes: Int!
+
+  """Image status (ALIVE or DELETED)."""
+  status: ImageStatus!
+
+  """Timestamp when the image was created/registered."""
+  createdAt: DateTime
+}
+
 extend type ImageNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in 26.2.0.
+
+Specifies the field and direction for ordering images in queries.
+"""
+input ImageOrderByGQL {
+  field: ImageOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.2.0.
+
+Fields available for ordering image queries.
+"""
+enum ImageOrderField {
+  NAME
+  CREATED_AT
+}
+
+"""
+Added in 26.2.0.
+
+Permission types for image operations.
+"""
+enum ImagePermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_CONTAINER
+  FORGET_IMAGE
+}
+
+"""
+Added in 26.2.0.
+
+Permission information for an image.
+Contains the list of permissions the current user has on this image.
+"""
+type ImagePermissionInfo {
+  """List of permissions the user has on this image."""
+  permissions: [ImagePermission!]!
+}
+
+"""
+Added in 26.2.0.
+
+Runtime requirements information for an image.
+Contains resource limits and supported accelerators.
+"""
+type ImageRequirementsInfo {
+  """Resource slot limits (cpu, memory, accelerators, etc.)."""
+  resourceLimits: [ImageResourceLimit!]!
+
+  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
+  supportedAccelerators: [String!]!
+}
+
+"""
+Added in 26.2.0.
+
+Resource limit specification for an image.
+Defines minimum and maximum values for a resource slot.
+"""
+type ImageResourceLimit {
+  """Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."""
+  key: String!
+
+  """Minimum required amount."""
+  min: String!
+
+  """Maximum allowed amount."""
+  max: String!
+}
+
+"""
+Added in 26.2.0.
+
+Status of an image in the system.
+"""
+enum ImageStatus {
+  ALIVE
+  DELETED
+}
+
+"""
+Added in 26.2.0.
+
+A key-value pair representing a parsed tag component.
+Tags are extracted from the image reference (e.g., py311, cuda12.1).
+"""
+type ImageTagEntry {
+  """The tag key (e.g., 'python', 'cuda')."""
+  key: String!
+
+  """The tag value (e.g., '3.11', '12.1')."""
+  value: String!
+}
+
+"""
+Added in 26.2.0.
+
+Represents a container image in Backend.AI.
+
+Images are container specifications that define the runtime environment
+for compute sessions. Each image has identity information, metadata,
+resource requirements, and permission settings.
+
+This is the V2 implementation using Strawberry GraphQL with Relay-style
+connections as part of BEP-1010 migration.
+"""
+type ImageV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Image identity information (name, architecture)."""
+  identity: ImageIdentityInfo!
+
+  """Image metadata (labels, digest, size, status, created_at)."""
+  metadata: ImageMetadataInfo!
+
+  """Runtime requirements (supported_accelerators)."""
+  requirements: ImageRequirementsInfo!
+
+  """Permission info for the current user. May be null."""
+  permission: ImagePermissionInfo
+
+  """UUID of the container registry where this image is stored."""
+  registryId: UUID!
+}
+
+"""An edge in a connection."""
+type ImageV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ImageV2!
 }
 
 """
@@ -3485,6 +3717,29 @@ type Query {
 
   """List route history (superadmin only)"""
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image by its ID.
+  
+  Returns detailed information about the image including its identity,
+  metadata, resource requirements, and permission settings.
+  """
+  imageV2(id: ID!): ImageV2
+
+  """
+  Added in 26.2.0.
+  
+  Query images with optional filtering, ordering, and pagination.
+  
+  Returns container images available in the system. Images are container
+  specifications that define runtime environments for compute sessions.
+  
+  Use filters to narrow down results by status, name, or architecture.
+  Supports both cursor-based and offset-based pagination.
+  """
+  imagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
 }
 
 """
