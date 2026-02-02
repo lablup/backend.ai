@@ -345,9 +345,10 @@ class SessionService:
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
-            await self._session_repository.resolve_image([
-                ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
-            ])
+            await self._session_repository.resolve_image(
+                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
+                alive_only=False,
+            )
 
         # Create manifest for background task
         manifest = CommitSessionManifest(
