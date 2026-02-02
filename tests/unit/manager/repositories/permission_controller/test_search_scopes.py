@@ -10,10 +10,13 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -31,17 +34,23 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.permission_controller.options import (
+    ArtifactRegistryScopeConditions,
+    ArtifactRegistryScopeOrders,
+    ContainerRegistryScopeConditions,
+    ContainerRegistryScopeOrders,
     DomainScopeConditions,
     DomainScopeOrders,
     ProjectScopeConditions,
     ProjectScopeOrders,
+    ResourceGroupScopeConditions,
+    ResourceGroupScopeOrders,
     UserScopeConditions,
     UserScopeOrders,
 )
@@ -885,3 +894,719 @@ class TestSearchScopesEmptyResult:
         assert len(result.items) == 0
         assert result.has_next_page is False
         assert result.has_previous_page is False
+
+
+class TestSearchResourceGroupScopes:
+    """Tests for searching resource group (scaling group) scopes."""
+
+    @pytest.fixture
+    async def db_with_scope_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables required for scope search tests."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def permission_controller_repository(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        """Create PermissionControllerRepository instance."""
+        return PermissionControllerRepository(db_with_scope_tables)
+
+    @pytest.fixture
+    async def sample_resource_groups(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[str]:
+        """Create sample resource groups for testing."""
+        group_names = ["rg-alpha", "rg-beta", "prod-rg"]
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for name in group_names:
+                sg = ScalingGroupRow(
+                    name=name,
+                    driver="static",
+                    scheduler="fifo",
+                    driver_opts={},
+                    scheduler_opts=ScalingGroupOpts(),
+                )
+                db_sess.add(sg)
+            await db_sess.flush()
+
+        return group_names
+
+    @pytest.fixture
+    async def sample_resource_groups_for_pagination(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[str]:
+        """Create 15 sample resource groups for pagination testing."""
+        group_names = [f"rg-{i:02d}" for i in range(15)]
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for name in group_names:
+                sg = ScalingGroupRow(
+                    name=name,
+                    driver="static",
+                    scheduler="fifo",
+                    driver_opts={},
+                    scheduler_opts=ScalingGroupOpts(),
+                )
+                db_sess.add(sg)
+            await db_sess.flush()
+
+        return group_names
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_returns_all(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups: list[str],
+    ) -> None:
+        """Test basic resource group scope search returns all resource groups."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier
+        )
+
+        assert result.total_count == len(sample_resource_groups)
+        assert len(result.items) == len(sample_resource_groups)
+        for item in result.items:
+            assert item.id.scope_type == ScopeType.RESOURCE_GROUP
+            assert item.name in sample_resource_groups
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_with_name_contains_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups: list[str],
+    ) -> None:
+        """Test resource group search with name contains filter."""
+        spec = StringMatchSpec(value="rg-", case_insensitive=True, negated=False)
+        querier = BatchQuerier(
+            conditions=[ResourceGroupScopeConditions.by_name_contains(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier
+        )
+
+        # "rg-alpha" and "rg-beta" contain "rg-"; "prod-rg" does not contain "rg-"
+        assert result.total_count == 2
+        for item in result.items:
+            assert "rg-" in item.name.lower()
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_with_name_equals_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups: list[str],
+    ) -> None:
+        """Test resource group search with exact name match filter."""
+        target_name = sample_resource_groups[0]
+        spec = StringMatchSpec(value=target_name, case_insensitive=False, negated=False)
+        querier = BatchQuerier(
+            conditions=[ResourceGroupScopeConditions.by_name_equals(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier
+        )
+
+        assert result.total_count == 1
+        assert result.items[0].name == target_name
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_with_ordering_name_ascending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups: list[str],
+    ) -> None:
+        """Test resource group search with name ascending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ResourceGroupScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names)
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_with_ordering_name_descending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups: list[str],
+    ) -> None:
+        """Test resource group search with name descending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ResourceGroupScopeOrders.name(ascending=False)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_search_resource_group_scopes_with_pagination(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_resource_groups_for_pagination: list[str],
+    ) -> None:
+        """Test resource group search with offset pagination."""
+        querier_page1 = BatchQuerier(
+            conditions=[],
+            orders=[ResourceGroupScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=0),
+        )
+        result_page1 = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier_page1
+        )
+
+        assert len(result_page1.items) == 5
+        assert result_page1.total_count == 15
+        assert result_page1.has_next_page is True
+        assert result_page1.has_previous_page is False
+
+        querier_page2 = BatchQuerier(
+            conditions=[],
+            orders=[ResourceGroupScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=5),
+        )
+        result_page2 = await permission_controller_repository.search_scopes(
+            ScopeType.RESOURCE_GROUP, querier_page2
+        )
+
+        assert len(result_page2.items) == 5
+        assert result_page2.has_next_page is True
+        assert result_page2.has_previous_page is True
+
+        page1_names = {item.name for item in result_page1.items}
+        page2_names = {item.name for item in result_page2.items}
+        assert page1_names.isdisjoint(page2_names)
+
+
+class TestSearchContainerRegistryScopes:
+    """Tests for searching container registry scopes."""
+
+    @pytest.fixture
+    async def db_with_scope_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables required for scope search tests."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ContainerRegistryRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def permission_controller_repository(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        """Create PermissionControllerRepository instance."""
+        return PermissionControllerRepository(db_with_scope_tables)
+
+    @pytest.fixture
+    async def sample_container_registries(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[uuid.UUID]:
+        """Create sample container registries for testing."""
+        registry_data = [
+            ("cr-alpha", "https://alpha.example.com"),
+            ("cr-beta", "https://beta.example.com"),
+            ("prod-registry", "https://prod.example.com"),
+        ]
+        registry_ids: list[uuid.UUID] = []
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for name, url in registry_data:
+                rid = uuid.uuid4()
+                cr = ContainerRegistryRow(
+                    id=rid,
+                    url=url,
+                    registry_name=name,
+                    type=ContainerRegistryType.DOCKER,
+                )
+                db_sess.add(cr)
+                registry_ids.append(rid)
+            await db_sess.flush()
+
+        return registry_ids
+
+    @pytest.fixture
+    async def sample_container_registries_for_pagination(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[uuid.UUID]:
+        """Create 15 sample container registries for pagination testing."""
+        registry_ids: list[uuid.UUID] = []
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for i in range(15):
+                rid = uuid.uuid4()
+                cr = ContainerRegistryRow(
+                    id=rid,
+                    url=f"https://cr-{i:02d}.example.com",
+                    registry_name=f"cr-{i:02d}",
+                    type=ContainerRegistryType.DOCKER,
+                )
+                db_sess.add(cr)
+                registry_ids.append(rid)
+            await db_sess.flush()
+
+        return registry_ids
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_returns_registries(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries: list[uuid.UUID],
+    ) -> None:
+        """Test basic container registry scope search returns all registries."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier
+        )
+
+        assert result.total_count == len(sample_container_registries)
+        assert len(result.items) == len(sample_container_registries)
+        for item in result.items:
+            assert item.id.scope_type == ScopeType.CONTAINER_REGISTRY
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_with_name_contains_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries: list[uuid.UUID],
+    ) -> None:
+        """Test container registry search with name contains filter."""
+        spec = StringMatchSpec(value="cr-", case_insensitive=True, negated=False)
+        querier = BatchQuerier(
+            conditions=[ContainerRegistryScopeConditions.by_name_contains(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier
+        )
+
+        assert result.total_count == 2
+        for item in result.items:
+            assert "cr-" in item.name.lower()
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_with_name_equals_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries: list[uuid.UUID],
+    ) -> None:
+        """Test container registry search with exact name match filter."""
+        spec = StringMatchSpec(value="cr-alpha", case_insensitive=False, negated=False)
+        querier = BatchQuerier(
+            conditions=[ContainerRegistryScopeConditions.by_name_equals(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier
+        )
+
+        assert result.total_count == 1
+        assert result.items[0].name == "cr-alpha"
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_with_ordering_name_ascending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries: list[uuid.UUID],
+    ) -> None:
+        """Test container registry search with name ascending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ContainerRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names)
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_with_ordering_name_descending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries: list[uuid.UUID],
+    ) -> None:
+        """Test container registry search with name descending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ContainerRegistryScopeOrders.name(ascending=False)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_search_container_registry_scopes_with_pagination(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_container_registries_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test container registry search with offset pagination."""
+        querier_page1 = BatchQuerier(
+            conditions=[],
+            orders=[ContainerRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=0),
+        )
+        result_page1 = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier_page1
+        )
+
+        assert len(result_page1.items) == 5
+        assert result_page1.total_count == 15
+        assert result_page1.has_next_page is True
+        assert result_page1.has_previous_page is False
+
+        querier_page2 = BatchQuerier(
+            conditions=[],
+            orders=[ContainerRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=5),
+        )
+        result_page2 = await permission_controller_repository.search_scopes(
+            ScopeType.CONTAINER_REGISTRY, querier_page2
+        )
+
+        assert len(result_page2.items) == 5
+        assert result_page2.has_next_page is True
+        assert result_page2.has_previous_page is True
+
+        page1_names = {item.name for item in result_page1.items}
+        page2_names = {item.name for item in result_page2.items}
+        assert page1_names.isdisjoint(page2_names)
+
+
+class TestSearchArtifactRegistryScopes:
+    """Tests for searching artifact registry scopes."""
+
+    @pytest.fixture
+    async def db_with_scope_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables required for scope search tests."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ContainerRegistryRow,
+                ArtifactRegistryRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def permission_controller_repository(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        """Create PermissionControllerRepository instance."""
+        return PermissionControllerRepository(db_with_scope_tables)
+
+    @pytest.fixture
+    async def sample_artifact_registries(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[uuid.UUID]:
+        """Create sample artifact registries for testing."""
+        registry_data = [
+            ("ar-alpha", "huggingface"),
+            ("ar-beta", "huggingface"),
+            ("prod-artifact", "reservoir"),
+        ]
+        registry_ids: list[uuid.UUID] = []
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for name, reg_type in registry_data:
+                rid = uuid.uuid4()
+                ar = ArtifactRegistryRow(
+                    id=rid,
+                    name=name,
+                    registry_id=uuid.uuid4(),
+                    type=reg_type,
+                )
+                db_sess.add(ar)
+                registry_ids.append(rid)
+            await db_sess.flush()
+
+        return registry_ids
+
+    @pytest.fixture
+    async def sample_artifact_registries_for_pagination(
+        self,
+        db_with_scope_tables: ExtendedAsyncSAEngine,
+    ) -> list[uuid.UUID]:
+        """Create 15 sample artifact registries for pagination testing."""
+        registry_ids: list[uuid.UUID] = []
+
+        async with db_with_scope_tables.begin_session() as db_sess:
+            for i in range(15):
+                rid = uuid.uuid4()
+                ar = ArtifactRegistryRow(
+                    id=rid,
+                    name=f"ar-{i:02d}",
+                    registry_id=uuid.uuid4(),
+                    type="huggingface",
+                )
+                db_sess.add(ar)
+                registry_ids.append(rid)
+            await db_sess.flush()
+
+        return registry_ids
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_returns_registries(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries: list[uuid.UUID],
+    ) -> None:
+        """Test basic artifact registry scope search returns all registries."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier
+        )
+
+        assert result.total_count == len(sample_artifact_registries)
+        assert len(result.items) == len(sample_artifact_registries)
+        for item in result.items:
+            assert item.id.scope_type == ScopeType.ARTIFACT_REGISTRY
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_with_name_contains_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries: list[uuid.UUID],
+    ) -> None:
+        """Test artifact registry search with name contains filter."""
+        spec = StringMatchSpec(value="ar-", case_insensitive=True, negated=False)
+        querier = BatchQuerier(
+            conditions=[ArtifactRegistryScopeConditions.by_name_contains(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier
+        )
+
+        assert result.total_count == 2
+        for item in result.items:
+            assert "ar-" in item.name.lower()
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_with_name_equals_filter(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries: list[uuid.UUID],
+    ) -> None:
+        """Test artifact registry search with exact name match filter."""
+        spec = StringMatchSpec(value="ar-alpha", case_insensitive=False, negated=False)
+        querier = BatchQuerier(
+            conditions=[ArtifactRegistryScopeConditions.by_name_equals(spec)],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier
+        )
+
+        assert result.total_count == 1
+        assert result.items[0].name == "ar-alpha"
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_with_ordering_name_ascending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries: list[uuid.UUID],
+    ) -> None:
+        """Test artifact registry search with name ascending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ArtifactRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names)
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_with_ordering_name_descending(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries: list[uuid.UUID],
+    ) -> None:
+        """Test artifact registry search with name descending order."""
+        querier = BatchQuerier(
+            conditions=[],
+            orders=[ArtifactRegistryScopeOrders.name(ascending=False)],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier
+        )
+
+        names = [item.name for item in result.items]
+        assert names == sorted(names, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_search_artifact_registry_scopes_with_pagination(
+        self,
+        permission_controller_repository: PermissionControllerRepository,
+        sample_artifact_registries_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test artifact registry search with offset pagination."""
+        querier_page1 = BatchQuerier(
+            conditions=[],
+            orders=[ArtifactRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=0),
+        )
+        result_page1 = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier_page1
+        )
+
+        assert len(result_page1.items) == 5
+        assert result_page1.total_count == 15
+        assert result_page1.has_next_page is True
+        assert result_page1.has_previous_page is False
+
+        querier_page2 = BatchQuerier(
+            conditions=[],
+            orders=[ArtifactRegistryScopeOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=5),
+        )
+        result_page2 = await permission_controller_repository.search_scopes(
+            ScopeType.ARTIFACT_REGISTRY, querier_page2
+        )
+
+        assert len(result_page2.items) == 5
+        assert result_page2.has_next_page is True
+        assert result_page2.has_previous_page is True
+
+        page1_names = {item.name for item in result_page1.items}
+        page2_names = {item.name for item in result_page2.items}
+        assert page1_names.isdisjoint(page2_names)
