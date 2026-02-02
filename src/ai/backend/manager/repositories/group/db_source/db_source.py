@@ -435,7 +435,7 @@ class GroupDBSource:
                     if vfolder_id in group_vfolder_ids:
                         return True
                 except Exception:
-                    pass
+                    log.warning("Malformed mount entry in group {}, skipping: {}", group_id, _mount)
         return False
 
     async def _check_group_has_active_kernels(
