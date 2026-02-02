@@ -156,6 +156,151 @@ class FairShare(BaseFunction):
             data = await resp.json()
             return SearchUserFairSharesResponse.model_validate(data)
 
+    # RG-Scoped Domain Fair Share (Resource Group Scope)
+
+    @api_function
+    @classmethod
+    async def rg_get_domain_fair_share(
+        cls,
+        resource_group: str,
+        domain_name: str,
+    ) -> GetDomainFairShareResponse:
+        """
+        Get a single domain fair share within resource group scope.
+
+        :param resource_group: Resource group name
+        :param domain_name: Domain name
+        :returns: Domain fair share data
+        """
+        rqst = Request("GET", f"/fair-share/rg/{resource_group}/domains/{domain_name}")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetDomainFairShareResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def rg_search_domain_fair_shares(
+        cls,
+        resource_group: str,
+        request: SearchDomainFairSharesRequest,
+    ) -> SearchDomainFairSharesResponse:
+        """
+        Search domain fair shares within resource group scope.
+
+        :param resource_group: Resource group name
+        :param request: Domain fair share search request
+        :returns: List of domain fair shares
+        """
+        rqst = Request("POST", f"/fair-share/rg/{resource_group}/domains/search")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchDomainFairSharesResponse.model_validate(data)
+
+    # RG-Scoped Project Fair Share (Resource Group Scope)
+
+    @api_function
+    @classmethod
+    async def rg_get_project_fair_share(
+        cls,
+        resource_group: str,
+        domain_name: str,
+        project_id: UUID,
+    ) -> GetProjectFairShareResponse:
+        """
+        Get a single project fair share within resource group scope.
+
+        :param resource_group: Resource group name
+        :param domain_name: Domain name
+        :param project_id: Project ID
+        :returns: Project fair share data
+        """
+        rqst = Request(
+            "GET", f"/fair-share/rg/{resource_group}/domains/{domain_name}/projects/{project_id}"
+        )
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetProjectFairShareResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def rg_search_project_fair_shares(
+        cls,
+        resource_group: str,
+        domain_name: str,
+        request: SearchProjectFairSharesRequest,
+    ) -> SearchProjectFairSharesResponse:
+        """
+        Search project fair shares within resource group scope.
+
+        :param resource_group: Resource group name
+        :param domain_name: Domain name
+        :param request: Project fair share search request
+        :returns: List of project fair shares
+        """
+        rqst = Request(
+            "POST", f"/fair-share/rg/{resource_group}/domains/{domain_name}/projects/search"
+        )
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchProjectFairSharesResponse.model_validate(data)
+
+    # RG-Scoped User Fair Share (Resource Group Scope)
+
+    @api_function
+    @classmethod
+    async def rg_get_user_fair_share(
+        cls,
+        resource_group: str,
+        domain_name: str,
+        project_id: UUID,
+        user_uuid: UUID,
+    ) -> GetUserFairShareResponse:
+        """
+        Get a single user fair share within resource group scope.
+
+        :param resource_group: Resource group name
+        :param domain_name: Domain name
+        :param project_id: Project ID
+        :param user_uuid: User UUID
+        :returns: User fair share data
+        """
+        rqst = Request(
+            "GET",
+            f"/fair-share/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/users/{user_uuid}",
+        )
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetUserFairShareResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def rg_search_user_fair_shares(
+        cls,
+        resource_group: str,
+        domain_name: str,
+        project_id: UUID,
+        request: SearchUserFairSharesRequest,
+    ) -> SearchUserFairSharesResponse:
+        """
+        Search user fair shares within resource group scope.
+
+        :param resource_group: Resource group name
+        :param domain_name: Domain name
+        :param project_id: Project ID
+        :param request: User fair share search request
+        :returns: List of user fair shares
+        """
+        rqst = Request(
+            "POST",
+            f"/fair-share/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/users/search",
+        )
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchUserFairSharesResponse.model_validate(data)
+
     # Upsert Weight Methods
 
     @api_function

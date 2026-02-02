@@ -11,6 +11,12 @@ from .request import (
     GetUserFairSharePathParam,
     GetUserFairShareRequest,
     ResourceWeightEntryInput,
+    RGDomainFairSharePathParam,
+    RGDomainFairShareSearchPathParam,
+    RGProjectFairSharePathParam,
+    RGProjectFairShareSearchPathParam,
+    RGUserFairSharePathParam,
+    RGUserFairShareSearchPathParam,
     SearchDomainFairSharesRequest,
     SearchDomainUsageBucketsRequest,
     SearchProjectFairSharesRequest,
@@ -118,6 +124,13 @@ __all__ = (
     "GetResourceGroupFairShareSpecPathParam",
     # Request - Path Parameters (Update Spec)
     "UpdateResourceGroupFairShareSpecPathParam",
+    # Request - Path Parameters (RG Scoped)
+    "RGDomainFairSharePathParam",
+    "RGDomainFairShareSearchPathParam",
+    "RGProjectFairSharePathParam",
+    "RGProjectFairShareSearchPathParam",
+    "RGUserFairSharePathParam",
+    "RGUserFairShareSearchPathParam",
     # Request - Get (deprecated, use PathParam)
     "GetDomainFairShareRequest",
     "GetProjectFairShareRequest",
