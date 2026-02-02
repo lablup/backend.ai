@@ -36,10 +36,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.scaling_group import query_wsproxy_status
-from ai.backend.manager.api.session import (
-    drop_undefined,
-    overwritten_param_check,
-)
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
@@ -193,7 +189,12 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
 )
-from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
+from ai.backend.manager.services.session.types import (
+    CommitStatusInfo,
+    LegacySessionInfo,
+    overwritten_param_check,
+)
+from ai.backend.manager.services.session.utils import drop_undefined
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 

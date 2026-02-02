@@ -118,7 +118,6 @@ from .types import CORSOptions, WebMiddleware
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
-    Undefined,
     catch_unexpected,
     check_api_params,
     deprecated_stub,
@@ -312,49 +311,6 @@ creation_config_v7 = t.Dict({
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
     tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
 })
-
-overwritten_param_check = t.Dict({
-    t.Key("template_id"): tx.UUID,
-    t.Key("session_name"): tx.SessionName,
-    t.Key("image", default=None): t.Null | t.String,
-    tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
-    t.Key("group", default=None): t.Null | t.String,
-    t.Key("domain", default=None): t.Null | t.String,
-    t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
-    t.Key("tag", default=None): t.Null | t.String,
-    t.Key("enqueue_only", default=False): t.ToBool,
-    t.Key("max_wait_seconds", default=0): t.Int[0:],
-    t.Key("reuse", default=True): t.ToBool,
-    t.Key("startup_command", default=None): t.Null | t.String,
-    t.Key("bootstrap_script", default=None): t.Null | t.String,
-    t.Key("owner_access_key", default=None): t.Null | t.String,
-    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-    tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-    tx.AliasedKey(["cluster_mode", "clusterMode"], default="SINGLE_NODE"): tx.Enum(ClusterMode),
-    tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-    tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
-}).allow_extra("*")
-
-
-def sub(d: dict[Any, Any], old: Any, new: Any) -> dict[Any, Any]:
-    for k, v in d.items():
-        if isinstance(v, (Mapping, dict)):
-            d[k] = sub(dict(v), old, new)
-        elif d[k] == old:
-            d[k] = new
-    return d
-
-
-def drop_undefined(d: dict[Any, Any]) -> dict[Any, Any]:
-    newd: dict[Any, Any] = {}
-    for k, v in d.items():
-        if isinstance(v, (Mapping, dict)):
-            newval = drop_undefined(dict(v))
-            if len(newval.keys()) > 0:  # exclude empty dict always
-                newd[k] = newval
-        elif not isinstance(v, Undefined):
-            newd[k] = v
-    return newd
 
 
 async def query_userinfo(
