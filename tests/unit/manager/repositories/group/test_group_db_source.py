@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -39,6 +40,18 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.testutils.db import with_tables
+
+
+@dataclasses.dataclass
+class EndpointWithSessionFixtureData:
+    endpoint_id: uuid.UUID
+    session_id: uuid.UUID
+
+
+@dataclasses.dataclass
+class MultipleEndpointsWithSessionsFixtureData:
+    endpoint_ids: list[uuid.UUID]
+    session_ids: list[uuid.UUID]
 
 
 class TestGroupDBSourceDeleteEndpoints:
@@ -272,7 +285,7 @@ class TestGroupDBSourceDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> dict[str, uuid.UUID]:
+    ) -> EndpointWithSessionFixtureData:
         """Create one inactive endpoint with a session and routing entry"""
         endpoint_id = uuid.uuid4()
         session_id = uuid.uuid4()
@@ -345,7 +358,7 @@ class TestGroupDBSourceDeleteEndpoints:
 
             await session.commit()
 
-        return {"endpoint_id": endpoint_id, "session_id": session_id}
+        return EndpointWithSessionFixtureData(endpoint_id=endpoint_id, session_id=session_id)
 
     @pytest.fixture
     async def active_endpoint(
@@ -402,7 +415,7 @@ class TestGroupDBSourceDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> dict[str, list[uuid.UUID]]:
+    ) -> MultipleEndpointsWithSessionsFixtureData:
         """Create 3 inactive endpoints, each with a session and routing entry"""
         endpoint_ids = []
         session_ids = []
@@ -480,7 +493,9 @@ class TestGroupDBSourceDeleteEndpoints:
 
             await session.commit()
 
-        return {"endpoint_ids": endpoint_ids, "session_ids": session_ids}
+        return MultipleEndpointsWithSessionsFixtureData(
+            endpoint_ids=endpoint_ids, session_ids=session_ids
+        )
 
     # Test cases
 
@@ -512,11 +527,11 @@ class TestGroupDBSourceDeleteEndpoints:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
         test_group: uuid.UUID,
-        inactive_endpoint_with_session_and_routing: dict[str, uuid.UUID],
+        inactive_endpoint_with_session_and_routing: EndpointWithSessionFixtureData,
     ) -> None:
         """Test deletion of endpoints with associated sessions"""
-        endpoint_id = inactive_endpoint_with_session_and_routing["endpoint_id"]
-        session_id = inactive_endpoint_with_session_and_routing["session_id"]
+        endpoint_id = inactive_endpoint_with_session_and_routing.endpoint_id
+        session_id = inactive_endpoint_with_session_and_routing.session_id
 
         async with db_with_cleanup.begin_session() as session:
             await group_db_source._delete_group_endpoints(session, test_group)
@@ -572,7 +587,7 @@ class TestGroupDBSourceDeleteEndpoints:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
         test_group: uuid.UUID,
-        multiple_endpoints_with_sessions: dict[str, list[uuid.UUID]],
+        multiple_endpoints_with_sessions: MultipleEndpointsWithSessionsFixtureData,
     ) -> None:
         """
         Test that the fix prevents synchronize_session errors.
@@ -580,8 +595,8 @@ class TestGroupDBSourceDeleteEndpoints:
         This test verifies the bug fix where execution_options={"synchronize_session": False}
         was added to prevent SQLAlchemy errors during bulk delete operations.
         """
-        endpoint_ids = multiple_endpoints_with_sessions["endpoint_ids"]
-        session_ids = multiple_endpoints_with_sessions["session_ids"]
+        endpoint_ids = multiple_endpoints_with_sessions.endpoint_ids
+        session_ids = multiple_endpoints_with_sessions.session_ids
 
         async with db_with_cleanup.begin_session() as session:
             await group_db_source._delete_group_endpoints(session, test_group)
