@@ -4,7 +4,7 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import msgpack
@@ -161,7 +161,7 @@ class UserRepository:
     async def get_admin_time_binned_monthly_stats(
         self,
         valkey_stat_client: ValkeyStatClient,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get time-binned monthly statistics for all users."""
         return await self._get_time_binned_monthly_stats(None, valkey_stat_client)
 

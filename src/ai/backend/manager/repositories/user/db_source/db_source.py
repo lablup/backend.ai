@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Any, Optional, cast
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -118,7 +118,7 @@ class UserDBSource:
             return UserData.from_row(user_row)
 
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: Optional[list[str]]
+        self, creator: Creator[UserRow], group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
@@ -358,7 +358,7 @@ class UserDBSource:
 
     async def get_kernel_rows_for_monthly_stats(
         self,
-        user_uuid: Optional[UUID],
+        user_uuid: UUID | None,
     ) -> Sequence[Row[Any]]:
         """Fetch kernel rows for time-binned monthly stats."""
         now = datetime.now(tzutc())
@@ -405,7 +405,7 @@ class UserDBSource:
                     )
                 ),
             )
-            rows = cast(list[VFolderRow], result.fetchall())
+            rows = result.fetchall()
             for vf in rows:
                 target_vfs.append(
                     VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
@@ -472,7 +472,6 @@ class UserDBSource:
             sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
-        result = cast(Optional[UUID], result)
         return result is not None
 
     async def _check_username_exists_for_other_user(
@@ -483,7 +482,6 @@ class UserDBSource:
             sa.and_(UserRow.username == username, UserRow.email != exclude_email)
         )
         result = await conn.scalar(query)
-        result = cast(Optional[UUID], result)
         return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
@@ -506,7 +504,7 @@ class UserDBSource:
         res = result.first()
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
-        return res
+        return cast(UserRow, res)
 
     async def _add_user_to_groups(
         self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
@@ -655,7 +653,7 @@ class UserDBSource:
         row = result.first()
         if not row:
             raise UserNotFound()
-        return row.uuid
+        return cast(UUID, row.uuid)
 
     async def _user_vfolder_mounted_to_active_kernels(
         self,
