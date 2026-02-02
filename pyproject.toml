@@ -286,6 +286,7 @@ namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key", "import-untyped"]
+enable_error_code = ["possibly-undefined"]
 
 # Disable errors in client CLI, web server, and tests
 # Client SDK will be rewritten, so defer all type fixes

@@ -203,6 +203,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[ComputeSession]:
         ctx: GraphQueryContext = info.context
 
+        status: KernelStatus | None = None
         if raw_status is not None:
             status = KernelStatus[raw_status]
         loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSession", status=status)

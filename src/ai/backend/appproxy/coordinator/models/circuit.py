@@ -269,6 +269,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
             case _:
                 raise UnsupportedProtocol(self.protocol.name)
 
+        hostname: str
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
                 if not self.subdomain or not worker.wildcard_domain:

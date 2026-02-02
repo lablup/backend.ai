@@ -960,6 +960,14 @@ def _apply_ordering(
     This function applies the user-specified ordering columns first, then adds the id column
     as the last tiebreaker to ensure deterministic ordering (required for stable cursor pagination).
     """
+    id_ordering_item: OrderingItem
+    set_ordering: Callable[
+        [
+            sa.Column[Any] | InstrumentedAttribute[Any] | sa.sql.elements.KeyedColumnElement[Any],
+            OrderDirection,
+        ],
+        Any,
+    ]
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
             # Default ordering by id column (ascending for forward pagination)
@@ -1045,6 +1053,8 @@ def _apply_cursor_pagination(
         For example, if ordering by "created_at DESC", this ensures we only get items
         where created_at < cursor_created_at, or where created_at = cursor_created_at but id < cursor_id.
         """
+        cond: WhereClauseType
+        condition_when_same_with_subq: WhereClauseType
         match pagination_order:
             case ConnectionPaginationOrder.FORWARD | None:
                 if direction == OrderDirection.ASC:

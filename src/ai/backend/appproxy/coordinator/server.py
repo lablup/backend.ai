@@ -16,7 +16,7 @@ import sys
 import time
 import traceback
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
@@ -1203,6 +1203,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match server_config.proxy_coordinator.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run

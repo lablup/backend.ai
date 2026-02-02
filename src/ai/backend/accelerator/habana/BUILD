@@ -39,5 +39,3 @@ resources(
         "**/py.typed",
     ],
 )
-
-shell_sources()

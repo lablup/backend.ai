@@ -4,7 +4,3 @@ python_test_utils(
         "!test_*.py",
     ],
 )
-
-python_tests(
-    name="tests",
-)

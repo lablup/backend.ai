@@ -1688,6 +1688,7 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match server_config.agent_common.event_loop:
                     case EventLoopType.UVLOOP:
                         import uvloop

@@ -1428,6 +1428,7 @@ class PackageContext(Context):
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = self.dist_info.target_path / "checksum.txt"
 
+        csum_line: str = ""
         with csum_path.open() as f:
             lines = f.readlines()
             for line in lines:

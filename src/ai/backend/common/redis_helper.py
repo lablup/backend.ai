@@ -123,6 +123,7 @@ async def execute(
             # pooling is handled automatically. The context manager in 5.x closes the pool
             # on exit, which is not desired for reuse.
             aw_or_pipe = func(redis_client)
+            result: Any
             if isinstance(aw_or_pipe, Pipeline):
                 async with aw_or_pipe:
                     result = await aw_or_pipe.execute()

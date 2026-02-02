@@ -751,6 +751,7 @@ class BinarySize(int):
             expr = expr.lower()
             ending = ""
             dec_expr: Decimal
+            suffix: str = ""
             try:
                 for ending in cls.endings:
                     if (stem := expr.removesuffix(ending)) != expr:

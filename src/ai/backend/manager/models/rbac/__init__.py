@@ -602,6 +602,7 @@ class AbstractPermissionContextBuilder[
         target_scope: ScopeType,
         requested_permission: PermissionType,
     ) -> PermissionContextType:
+        permission_ctx: PermissionContextType
         match target_scope:
             case SystemScope():
                 permission_ctx = await self.build_ctx_in_system_scope(ctx)

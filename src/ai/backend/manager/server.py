@@ -16,6 +16,7 @@ import traceback
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -1884,6 +1885,7 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match bootstrap_cfg.manager.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run

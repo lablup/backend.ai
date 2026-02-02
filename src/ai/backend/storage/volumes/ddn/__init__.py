@@ -106,6 +106,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             if proc.stdout is None:
                 raise SubprocessStdoutNotAvailableError("lfs quota process stdout is not available")
             next_line_is_quota = False
+            line = ""
             while True:
                 try:
                     raw = await proc.stdout.readline()

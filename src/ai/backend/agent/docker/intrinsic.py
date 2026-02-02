@@ -260,6 +260,8 @@ class CPUPlugin(AbstractComputePlugin):
                             )
                         }
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
+                    case _:
+                        return None
             except OSError as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
@@ -688,6 +690,8 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_read_bytes += int(value)
                                 if stat == "wbytes":
                                     io_write_bytes += int(value)
+                    case _:
+                        return None
             except OSError as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",

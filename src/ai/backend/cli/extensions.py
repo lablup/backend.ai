@@ -20,8 +20,8 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     """
 
     def main(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        _interrupted = False
         try:
-            _interrupted = False
             kwargs.pop("standalone_mode", None)
             kwargs.pop("prog_name", None)
             super().main(  # type: ignore[call-overload]

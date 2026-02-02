@@ -7,7 +7,3 @@ python_test_utils(
         "//:reqs#aiosqlite",  # not auto-inferred
     ],
 )
-
-python_tests(
-    name="tests",
-)

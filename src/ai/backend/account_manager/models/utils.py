@@ -173,12 +173,12 @@ class ExtendedAsyncSAEngine(SAEngine):
         Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
         """
 
-        # result: TQueryResult | Sentinel = Sentinel.token
         _begin_trx = cast(
             Callable[..., AbstractAsyncCtxMgr[SASession]],
             self.begin_session if begin_trx is None else begin_trx,
         )
 
+        result: TQueryResult | None = None
         max_attempts = 10
         try:
             async for attempt in AsyncRetrying(
@@ -198,6 +198,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             raise TimeoutError(
                 f"DB serialization failed after {max_attempts} retry transactions"
             ) from e
+        if result is None:
+            raise RuntimeError("AsyncRetrying loop completed without setting result")
         return result
 
 

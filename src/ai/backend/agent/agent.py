@@ -3283,6 +3283,7 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
+        raw_definition: dict[str, Any]
         match runtime_variant:
             case RuntimeVariant.VLLM:
                 _model = {

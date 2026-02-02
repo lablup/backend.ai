@@ -506,7 +506,7 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                     )
 
                 else:
-                    raise RuntimeError(f"{arg} not considered as a valid response type")
+                    raise RuntimeError(f"{response_cls} not considered as a valid response type")
 
                 # Extract nested model definitions (e.g., referenced models) to components
                 if additional_definitions := response_schema.pop("$defs", None):

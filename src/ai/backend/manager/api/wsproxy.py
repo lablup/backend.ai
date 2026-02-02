@@ -71,6 +71,8 @@ class TCPProxy(ServiceProxy):
         self.down_task: asyncio.Task[Any] | None = None
 
     async def proxy(self) -> web.WebSocketResponse:
+        reader: asyncio.StreamReader
+        writer: asyncio.StreamWriter
         try:
             try:
                 log.debug("Trying to open proxied TCP connection to {}:{}", self.host, self.port)

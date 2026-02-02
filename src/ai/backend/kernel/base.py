@@ -675,6 +675,7 @@ class BaseRunner(metaclass=ABCMeta):
         prev_pid_set = {}
         for history in self._pid_set_history:  # merge the history
             prev_pid_set.update(history)
+        terminated_pid_list: list[int] = []
         for _ in range(30):
             current_pid_set = scan_proc_stats()
             terminated_pid_list = sorted(set(prev_pid_set.keys()) - set(current_pid_set.keys()))
@@ -928,6 +929,7 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                     log.debug("cmdargs: {0}", cmdargs)
                     log.debug("env: {0}", service_env)
+                    proc: asyncio.subprocess.Process
                     try:
                         proc = await asyncio.create_subprocess_exec(
                             *map(str, cmdargs),
@@ -956,9 +958,10 @@ class BaseRunner(metaclass=ABCMeta):
                         }
                     except TimeoutError:
                         # Takes too much time to open a local port.
-                        if service_info["name"] in self.services_running:
-                            await terminate_and_wait(proc, timeout_seconds=10.0)
-                            self.services_running.pop(service_info["name"], None)
+                        if (
+                            running_proc := self.services_running.pop(service_info["name"], None)
+                        ) is not None:
+                            await terminate_and_wait(running_proc, timeout_seconds=10.0)
                             error_reason = (
                                 f"opening the service port timed out: {service_info['name']}"
                             )
@@ -1191,6 +1194,7 @@ class BaseRunner(metaclass=ABCMeta):
                 )
 
         log.debug("start serving...")
+        op_type = ""
         while True:
             try:
                 data = await self.insock.recv_multipart()

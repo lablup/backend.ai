@@ -1766,6 +1766,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     msg = await agent_sock.recv_multipart()
                     if not msg:
                         break
+                    reply: list[bytes]
                     try:
                         if msg[0] == b"host-pid-to-container-pid":
                             container_id = msg[1].decode()

@@ -811,6 +811,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ctnr_host_port_map: MutableMapping[int, int] = {}
         stdin_port = 0
         stdout_port = 0
+        repl_in_port: int
+        repl_out_port: int
         for idx, port in enumerate(exposed_ports):
             host_port = assigned_ports[port]
 
