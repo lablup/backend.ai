@@ -706,40 +706,87 @@ class ResourcePartitioner:
                     f"Agent {agent_id} missing resource.allocations in MANUAL mode"
                 )
 
-            all_devices: dict[DeviceName, Sequence[DeviceId]] = dict(allocations.devices)
-            all_devices[DeviceName("cpu")] = allocations.cpu
+            configured_device_names = set(allocations.devices.keys())
+            cls._validate_configured_device_names(agent_id, configured_device_names, global_devices)
 
-            for device_name, configured_ids in all_devices.items():
-                if device_name not in global_devices:
-                    available = ", ".join(str(d) for d in sorted(global_devices.keys()))
-                    raise InvalidResourceConfigError(
-                        f"Agent {agent_id}: Unknown device '{device_name}'. Available: {available}"
+            for device_name, device_info in global_devices.items():
+                if device_name in _SHARED_DEVICE_NAMES:
+                    assignments[agent_id][device_name] = cls._parse_manual_slot_partition(
+                        device_info, Decimal(allocations.mem)
+                    )
+                else:
+                    configured_ids = (
+                        allocations.cpu
+                        if device_name == DeviceName("cpu")
+                        else allocations.devices.get(device_name, [])
+                    )
+                    assignments[agent_id][device_name] = cls._parse_manual_device_partition(
+                        agent_id, device_name, configured_ids, global_devices
                     )
 
-                available_ids = {d.device_id for d in global_devices[device_name].devices}
-                for device_id in configured_ids:
-                    if device_id not in available_ids:
-                        valid_ids = ", ".join(
-                            str(d) for d in sorted(available_ids, key=_natural_sort_key)
-                        )
-                        raise InvalidResourceConfigError(
-                            f"Agent {agent_id}: Unknown device ID '{device_id}' for '{device_name}'. "
-                            f"Available: {valid_ids}"
-                        )
+        cls._validate_device_exclusivity(assignments)
+        return assignments
 
-                assignments[agent_id][device_name] = DevicePartition(
-                    device_ids=list(configured_ids)
+    @classmethod
+    def _validate_configured_device_names(
+        cls,
+        agent_id: AgentId,
+        configured_device_names: set[DeviceName],
+        global_devices: GlobalDeviceMap,
+    ) -> None:
+        for device_name in configured_device_names:
+            if device_name not in global_devices:
+                available = ", ".join(str(d) for d in sorted(global_devices.keys()))
+                raise InvalidResourceConfigError(
+                    f"Agent {agent_id}: Unknown device '{device_name}'. Available: {available}"
                 )
 
-            for device_name in global_devices:
-                if device_name not in assignments[agent_id]:
-                    assignments[agent_id][device_name] = DevicePartition(device_ids=[])
+    @classmethod
+    def _parse_manual_device_partition(
+        cls,
+        agent_id: AgentId,
+        device_name: DeviceName,
+        configured_ids: Sequence[DeviceId],
+        global_devices: GlobalDeviceMap,
+    ) -> DevicePartition:
+        if device_name not in global_devices:
+            available = ", ".join(str(d) for d in sorted(global_devices.keys()))
+            raise InvalidResourceConfigError(
+                f"Agent {agent_id}: Unknown device '{device_name}'. Available: {available}"
+            )
 
-        shared_device_names = {DeviceName("mem")}
+        available_ids = {d.device_id for d in global_devices[device_name].devices}
+        for device_id in configured_ids:
+            if device_id not in available_ids:
+                valid_ids = ", ".join(str(d) for d in sorted(available_ids, key=_natural_sort_key))
+                raise InvalidResourceConfigError(
+                    f"Agent {agent_id}: Unknown device ID '{device_id}' for '{device_name}'. "
+                    f"Available: {valid_ids}"
+                )
+
+        return DevicePartition(device_ids=list(configured_ids))
+
+    @classmethod
+    def _parse_manual_slot_partition(
+        cls,
+        device_info: GlobalDeviceInfo,
+        configured_amount: Decimal,
+    ) -> SlotPartition:
+        slot_names = {slot_name for slot_name, _ in device_info.plugin.slot_types}
+        per_agent_slots: dict[SlotName, Decimal] = {}
+        for slot_name in slot_names:
+            per_agent_slots[slot_name] = configured_amount
+        return SlotPartition(slots=per_agent_slots)
+
+    @classmethod
+    def _validate_device_exclusivity(
+        cls,
+        assignments: Mapping[AgentId, Mapping[DeviceName, Partition]],
+    ) -> None:
         device_owner: dict[DeviceName, dict[DeviceId, AgentId]] = defaultdict(dict)
         for agent_id, device_assignments in assignments.items():
             for device_name, partition in device_assignments.items():
-                if device_name in shared_device_names:
+                if device_name in _SHARED_DEVICE_NAMES:
                     continue
                 if isinstance(partition, DevicePartition):
                     for device_id in partition.device_ids:
@@ -750,8 +797,6 @@ class ResourcePartitioner:
                                 f"{other_agent}, {agent_id}"
                             )
                         device_owner[device_name][device_id] = agent_id
-
-        return assignments
 
 
 class ResourceAllocator(aobject):
