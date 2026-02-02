@@ -1122,6 +1122,8 @@ class ComputeSession(BaseFunction):
                     part = await reader.next()
                     if part is None:
                         break
+                    if not isinstance(part, aiohttp.BodyPartReader):
+                        raise TypeError(f"Expected BodyPartReader, got {type(part).__name__}")
                     content_encoding = part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower()
                     if content_encoding != "identity":
                         raise ValueError(

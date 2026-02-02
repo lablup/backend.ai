@@ -845,9 +845,9 @@ class Context(metaclass=ABCMeta):
             data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
             data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
             redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host  # type: ignore
-            redis_addr_table["port"] = halfstack.redis_addr.face.port  # type: ignore
-            data["redis"]["addr"] = redis_addr_table  # type: ignore
+            redis_addr_table["host"] = halfstack.redis_addr.face.host
+            redis_addr_table["port"] = halfstack.redis_addr.face.port
+            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
@@ -871,9 +871,9 @@ class Context(metaclass=ABCMeta):
             data = tomlkit.load(fp)
             # Update redis addr inline table
             redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host  # type: ignore
-            redis_addr_table["port"] = halfstack.redis_addr.face.port  # type: ignore
-            data["redis"]["addr"] = redis_addr_table  # type: ignore
+            redis_addr_table["host"] = halfstack.redis_addr.face.host
+            redis_addr_table["port"] = halfstack.redis_addr.face.port
+            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
 
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
@@ -906,7 +906,7 @@ class Context(metaclass=ABCMeta):
             if frontend_mode == FrontendMode.WILDCARD:
                 # Remove port_proxy section for wildcard mode
                 if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
-                    del data["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+                    del data["proxy_worker"]["port_proxy"]
 
                 # Override api_advertised_addr with app_address and advertised_port
                 api_advertised_addr_table = tomlkit.inline_table()

@@ -115,7 +115,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         This method should be overridden by subclasses to implement specific setup and cleanup logic.
         """
         raise NotImplementedError("Subclasses must implement this method.")
-        yield  # Required for async generator typing
+        yield  # type: ignore[unreachable]  # Required for async generator typing
 
     @final
     async def run_test(self, exporter: TestExporter) -> None:

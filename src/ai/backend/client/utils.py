@@ -49,7 +49,7 @@ def flatten_connections_in_data(data: dict[str, Any] | None) -> dict[str, Any]:
     If a value is a dictionary containing an 'edges' key, it is flattened using flatten_connection().
     Returns a new dictionary with all connections flattened.
     """
-    result = {}
+    result: dict[str, Any] = {}
 
     if data is None:
         return result

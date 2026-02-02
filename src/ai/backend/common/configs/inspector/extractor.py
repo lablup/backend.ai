@@ -291,10 +291,10 @@ class ConfigInspector:
             return None
 
         # Unwrap Optional types
-        annotation = self._unwrap_optional(annotation)
+        unwrapped = self._unwrap_optional(annotation)
 
         # Extract the target type based on composite type
-        target_type = self._get_composite_target_type(annotation, meta.composite)
+        target_type = self._get_composite_target_type(unwrapped, meta.composite)
         if target_type is None:
             return None
 
@@ -309,7 +309,7 @@ class ConfigInspector:
         # Handle Python 3.10+ UnionType (X | None syntax)
         if isinstance(annotation, types.UnionType):
             args = annotation.__args__
-            non_none = [a for a in args if a is not type(None)]
+            non_none: list[type] = [a for a in args if a is not type(None)]
             if len(non_none) == 1:
                 return non_none[0]
             return annotation
@@ -325,9 +325,9 @@ class ConfigInspector:
 
     def _get_composite_target_type(
         self,
-        annotation: type,
+        annotation: type | types.UnionType,
         composite: CompositeType | None,
-    ) -> type | None:
+    ) -> type | types.UnionType | None:
         """Get the target type for children extraction based on composite type.
 
         Args:

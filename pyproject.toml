@@ -305,6 +305,14 @@ module = [
 ]
 disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
 
+# ServerAddr.face is typed as HostPortPair | None but __post_init__ always sets it
+# Disable union-attr errors for install module until types are properly refactored
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.install.*",
+]
+disable_error_code = ["union-attr", "misc"]
+
 # Ignore errors in vendor code, accelerators, and build tools
 # These are external/generated code or low-priority plugins
 [[tool.mypy.overrides]]
