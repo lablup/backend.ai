@@ -1069,6 +1069,7 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
     ) -> ScopeListResult:
+        # TODO: Implement storage host scope search
         raise NotImplementedError("Storage host data is stored in etcd, not in the database.")
 
     async def search_entities_in_scope(
