@@ -747,7 +747,7 @@ class ResourceAllocator(aobject):
                 agent_computer, total_slots
             )
             agent_resource_scaling_factor[agent_id] = self._calculate_scaling_factors(
-                allocation_mode
+                allocation_mode, agent_computer
             )
 
         self.agent_computers = agent_computers
@@ -884,6 +884,7 @@ class ResourceAllocator(aobject):
         for device_name, device_info in global_device_map.items():
             partition = device_assignments[device_name]
             alloc_map = await device_info.plugin.create_alloc_map()
+            assigned_devices: list[AbstractComputeDevice] = []
 
             match partition:
                 case DevicePartition(device_ids=ids):
@@ -944,6 +945,7 @@ class ResourceAllocator(aobject):
     def _calculate_scaling_factors(
         self,
         allocation_mode: ResourceAllocationMode,
+        agent_computers: Mapping[DeviceName, ComputerContext],
     ) -> SlotsMap:
         num_agents = len(self.agent_ids)
 
@@ -954,17 +956,21 @@ class ResourceAllocator(aobject):
             case ResourceAllocationMode.SHARED:
                 return defaultdict(lambda: Decimal(1))
 
-            case ResourceAllocationMode.AUTO_SPLIT:
-                return defaultdict(lambda: Decimal(1) / Decimal(num_agents))
+            case ResourceAllocationMode.AUTO_SPLIT | ResourceAllocationMode.MANUAL:
+                agent_slots: dict[SlotName, Decimal] = defaultdict(Decimal)
+                for ctx in agent_computers.values():
+                    for slot_info in ctx.alloc_map.device_slots.values():
+                        agent_slots[slot_info.slot_name] += slot_info.amount
 
-            case ResourceAllocationMode.MANUAL:
-                # TODO(BA-4146): Implement proper scaling factor calculation for manual mode.
-                # For MANUAL mode, scaling factor should be (allocated / total) for each slot,
-                # representing the actual fraction of system resources this agent was assigned.
-                # This requires access to the agent's computed alloc_map after partitioning
-                # to determine allocated amounts for both SlotPartition and DevicePartition.
-                # For now, use 1/n as a reasonable approximation.
-                return defaultdict(lambda: Decimal(1) / Decimal(num_agents))
+                scaling_factors: dict[SlotName, Decimal] = {}
+                for slot_name, agent_amount in agent_slots.items():
+                    total_amount = self.available_total_slots.get(slot_name, Decimal(0))
+                    if total_amount > 0:
+                        scaling_factors[slot_name] = agent_amount / total_amount
+                    else:
+                        scaling_factors[slot_name] = Decimal(0)
+
+                return defaultdict(lambda: Decimal(0), scaling_factors)
 
     @cached_property
     def _agent_discovery(self) -> AbstractAgentDiscovery:

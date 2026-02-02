@@ -154,18 +154,18 @@ def create_mock_plugin(
     slot_types: Sequence[tuple[SlotName, SlotTypes]] | None = None,
 ) -> AbstractComputePlugin:
     """Helper to create a mock compute plugin."""
-    mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)  # type: ignore[assignment]
+    mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)
     mock_plugin.get_metadata.return_value = {}  # type: ignore[attr-defined]
 
     # Create mock devices for each device_id in the alloc_map
     mock_devices: list[AbstractComputeDevice] = []
     for dev_id in alloc_map.device_slots.keys():
-        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)  # type: ignore[assignment]
-        mock_device.device_id = dev_id  # type: ignore[attr-defined]
+        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = dev_id
         mock_devices.append(mock_device)
 
     # Create a fresh alloc_map for each call
-    async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:  # type: ignore[misc]
+    async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:
         if isinstance(original_map, FractionAllocMap):
             return create_fraction_alloc_map({
                 dev_id: (slot.slot_name, slot.amount)
@@ -192,11 +192,11 @@ def create_mock_plugin(
             slot_types_set.add((slot_info.slot_name, slot_info.slot_type))
         slot_types = list(slot_types_set)
 
-    mock_plugin.slot_types = slot_types  # type: ignore[attr-defined]
-    mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[attr-defined,assignment]
-    mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[attr-defined,method-assign]
-    mock_plugin.available_slots = AsyncMock(return_value=available_slots)  # type: ignore[attr-defined,method-assign]
-    mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[attr-defined,method-assign]
+    mock_plugin.slot_types = slot_types
+    mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
+    mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
+    mock_plugin.available_slots = AsyncMock(return_value=available_slots)  # type: ignore[method-assign]
+    mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
     return mock_plugin
 
@@ -211,7 +211,6 @@ def create_mock_computers(
     }
 
 
-
 def create_global_device_info(
     plugin: AbstractComputePlugin,
     alloc_map: AbstractAllocMap,
@@ -219,8 +218,8 @@ def create_global_device_info(
     """Helper to create GlobalDeviceInfo for ResourcePartitioner testing."""
     devices: list[AbstractComputeDevice] = []
     for dev_id in alloc_map.device_slots.keys():
-        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)  # type: ignore[assignment]
-        mock_device.device_id = dev_id  # type: ignore[attr-defined]
+        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = dev_id
         devices.append(mock_device)
 
     return GlobalDeviceInfo(
@@ -676,19 +675,23 @@ class TestResourceAllocatorAutoSplitMode:
 
         await allocator.__aexit__(None, None, None)
 
-    async def test_scaling_factor_is_one_over_n(
+    async def test_scaling_factor_even_distribution(
         self,
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """AUTO_SPLIT: scaling factor is 1/n for all slots."""
+        """AUTO_SPLIT: scaling factor is proportional to allocation (even case).
+
+        With even distribution, proportional scaling equals 1/n.
+        2 agents, 4 devices → each gets 2 → scaling = 2/4 = 0.5
+        """
         config = create_test_config(
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
         computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
+            DeviceName("cpu"): create_discrete_alloc_map({
+                DeviceId(str(i)): (SlotName("cpu"), Decimal("1")) for i in range(4)
             }),
         })
         setup_mock_resources(monkeypatch, computers)
@@ -699,6 +702,51 @@ class TestResourceAllocatorAutoSplitMode:
         factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
         assert factor1[SlotName("cpu")] == Decimal("0.5")
         assert factor2[SlotName("cpu")] == Decimal("0.5")
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_scaling_factor_uneven_distribution(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT: scaling factor is proportional to actual allocation (uneven case).
+
+        With uneven distribution, proportional scaling differs from naive 1/n.
+        3 agents, 5 devices → distribution is [2, 2, 1]:
+        - agent1: 2/5 = 0.4
+        - agent2: 2/5 = 0.4
+        - agent3: 1/5 = 0.2
+
+        A naive 1/n approach would give 1/3 ≈ 0.333 for all agents, which is
+        incorrect because agent3 only has 1 device while others have 2.
+        """
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=3,
+        )
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(5)
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        factor1 = allocator.get_resource_scaling_factor(AgentId("agent1"))
+        factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
+        factor3 = allocator.get_resource_scaling_factor(AgentId("agent3"))
+
+        # Proportional scaling: allocated / total
+        assert factor1[SlotName("cuda.device")] == Decimal("2") / Decimal("5")
+        assert factor2[SlotName("cuda.device")] == Decimal("2") / Decimal("5")
+        assert factor3[SlotName("cuda.device")] == Decimal("1") / Decimal("5")
+
+        # Verify this is NOT the naive 1/n approach
+        naive_factor = Decimal("1") / Decimal("3")
+        assert factor1[SlotName("cuda.device")] != naive_factor
+        assert factor3[SlotName("cuda.device")] != naive_factor
 
         await allocator.__aexit__(None, None, None)
 
