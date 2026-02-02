@@ -57,6 +57,7 @@ from ai.backend.manager.data.image.types import (
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
+    ImageTagEntry,
     ImageType,
     KVPair,
     RescanImagesResult,
@@ -888,8 +889,7 @@ class ImageRow(Base):  # type: ignore[misc]
         return result
 
     def to_dataclass(self) -> ImageData:
-        from ai.backend.manager.data.image.types import ImageData
-
+        _, ptag_set = self.image_ref.tag_set
         return ImageData(
             id=ImageID(self.id),
             name=ImageCanonical(self.name),
@@ -907,6 +907,13 @@ class ImageRow(Base):  # type: ignore[misc]
             accelerators=self.accelerators,
             labels=ImageLabelsData(label_data=self.labels),
             resources=ImageResourcesData(resources_data=self.resources),
+            resource_limits=[
+                ResourceLimit(
+                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
+                )
+                for k, v in self.resources.items()
+            ],
+            tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
             status=self.status,
         )
 
@@ -937,6 +944,7 @@ class ImageRow(Base):  # type: ignore[misc]
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            created_at=self.created_at,
             # legacy
             hash=self.trimmed_digest or None,
         )

@@ -111,6 +111,10 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .image import (
+    image_v2,
+    images_v2,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -273,6 +277,8 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
+    image_v2 = image_v2
+    images_v2 = images_v2
 
 
 @strawberry.type

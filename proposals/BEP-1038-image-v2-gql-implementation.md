@@ -35,7 +35,7 @@ This document defines the implementation plan for `ImageV2GQL` types as part of 
 - `ImageResourceLimitGQL` - Resource limit info
 
 #### Info Types (Grouped)
-- `ImageIdentityInfoGQL` - Identity info (canonical_name, namespace, architecture, aliases)
+- `ImageIdentityInfoGQL` - Identity info (canonical_name, namespace, architecture)
 - `ImageMetadataInfoGQL` - Metadata info (tags, labels, digest, size_bytes, status, created_at)
 - `ImageRequirementsInfoGQL` - Requirements info (resource_limits, supported_accelerators)
 - `ImagePermissionInfoGQL` - Permission info (permissions)
@@ -60,8 +60,7 @@ ImageV2GQL
 ├── identity: ImageIdentityInfoGQL       # Image identity information
 │   ├── canonical_name
 │   ├── namespace
-│   ├── architecture
-│   └── aliases
+│   └── architecture
 │
 ├── metadata: ImageMetadataInfoGQL       # Metadata information
 │   ├── tags

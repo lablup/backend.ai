@@ -9,6 +9,7 @@ These types reference entities that should be represented as proper Relay Node c
 | Type/Field | Future Node | Current Action |
 |------------|-------------|----------------|
 | `ImageV2GQL.registry` | `ContainerRegistryNode` | Keep as string, replace later |
+| `ImageIdentityInfoGQL.aliases` | N/A (requires DB join) | Omit for now, add as field resolver later |
 
 ---
 
@@ -41,8 +42,35 @@ class ImageV2GQL(Node):
 
 ---
 
+## Aliases Field (Defer to Field Resolver)
+
+### ImageIdentityInfoGQL.aliases field
+
+**Current Action**: Omit from initial implementation.
+
+**Reason**: The `aliases` field requires a database join with `ImageAliasRow`, which is not included in the basic `ImageData` structure used for efficient batch queries.
+
+**Future**: Add as a separate field resolver that loads aliases on demand.
+
+```python
+# Future implementation
+@strawberry.type(name="ImageIdentityInfo")
+class ImageIdentityInfoGQL:
+    canonical_name: str
+    namespace: str
+    architecture: str
+
+    @strawberry.field
+    async def aliases(self, info: strawberry.Info) -> list[str]:
+        # Load aliases via dataloader using image_id
+        ...
+```
+
+---
+
 ## Future Implementation PRs
 
 | PR | Fields to Add/Modify |
 |----|---------------------|
 | ContainerRegistryNode PR | Replace `registry: str` with `registry: ContainerRegistryNode` connection |
+| Aliases PR | Add `aliases` field resolver to `ImageIdentityInfoGQL` |
