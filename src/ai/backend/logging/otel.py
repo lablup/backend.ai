@@ -23,13 +23,17 @@ class OpenTelemetrySpec:
     service_version: str
     log_level: str
     endpoint: str
+    service_instance_id: str | None = None
 
     def to_resource(self) -> Resource:
-        return Resource.create({
+        attributes = {
             "service.name": self.service_name,
             "service.id": str(self.service_id),
             "service.version": self.service_version,
-        })
+        }
+        if self.service_instance_id:
+            attributes["service.instance.id"] = self.service_instance_id
+        return Resource.create(attributes)
 
 
 def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpec) -> None:

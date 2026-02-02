@@ -915,6 +915,7 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             service_version=__version__,
             log_level=config.otel.log_level,
             endpoint=config.otel.endpoint,
+            service_instance_id=f"webserver-{socket.gethostname()}",
         )
         BraceStyleAdapter.apply_otel(otel_spec)
     yield

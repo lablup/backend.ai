@@ -822,6 +822,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             service_version=meta.version,
             log_level=root_ctx.config_provider.config.otel.log_level,
             endpoint=root_ctx.config_provider.config.otel.endpoint,
+            service_instance_id=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
     try:
