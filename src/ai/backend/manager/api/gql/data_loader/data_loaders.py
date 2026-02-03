@@ -5,7 +5,7 @@ from functools import cached_property, partial
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.types import AgentId, KernelId
+from ai.backend.common.types import AgentId, ImageID, KernelId
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.deployment.types import (
@@ -173,7 +173,7 @@ class DataLoaders:
     @cached_property
     def image_loader(
         self,
-    ) -> DataLoader[uuid.UUID, ImageData | None]:
+    ) -> DataLoader[ImageID, ImageData | None]:
         return DataLoader(load_fn=partial(load_images_by_ids, self._processors.image))
 
     @cached_property

@@ -2745,6 +2745,9 @@ type KernelV2 implements Node {
 
   """Lifecycle status and timestamps."""
   lifecycle: KernelLifecycleInfo!
+
+  """The container image used by this kernel."""
+  image: ImageV2
 }
 
 """An edge in a connection."""
