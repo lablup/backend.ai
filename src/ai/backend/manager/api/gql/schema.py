@@ -190,6 +190,23 @@ from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
+from .user_v2 import (
+    # Mutations
+    admin_bulk_create_users,
+    admin_create_user,
+    admin_delete_user,
+    admin_delete_users,
+    admin_purge_user,
+    admin_purge_users,
+    admin_update_user,
+    # Queries
+    admin_user_v2,
+    admin_users,
+    domain_users,
+    project_users,
+    update_user,
+    user_v2,
+)
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -279,6 +296,12 @@ class Query:
     route_histories = route_histories
     image_v2 = image_v2
     images_v2 = images_v2
+    # User V2 APIs
+    admin_user_v2 = admin_user_v2
+    admin_users = admin_users
+    domain_users = domain_users
+    project_users = project_users
+    user_v2 = user_v2
 
 
 @strawberry.type
@@ -367,6 +390,15 @@ class Mutation:
     admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # User V2 APIs
+    admin_create_user = admin_create_user
+    admin_bulk_create_users = admin_bulk_create_users
+    admin_update_user = admin_update_user
+    update_user = update_user
+    admin_delete_user = admin_delete_user
+    admin_delete_users = admin_delete_users
+    admin_purge_user = admin_purge_user
+    admin_purge_users = admin_purge_users
 
 
 @strawberry.type
