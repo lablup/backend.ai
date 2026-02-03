@@ -173,8 +173,16 @@ def create_mock_computers(
                 })
             raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
 
+        # Calculate available slots from the alloc_map
+        available_slots: dict[SlotName, Decimal] = {}
+        for slot_info in alloc_map.device_slots.values():
+            if slot_info.slot_name not in available_slots:
+                available_slots[slot_info.slot_name] = Decimal("0")
+            available_slots[slot_info.slot_name] += slot_info.amount
+
         mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
         mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
+        mock_plugin.available_slots = AsyncMock(return_value=available_slots)  # type: ignore[method-assign]
         mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
         result[device_name] = mock_plugin

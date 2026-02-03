@@ -516,6 +516,33 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return []
 
 
+@dataclass(kw_only=True, frozen=True)
+class GlobalDeviceInfo:
+    """
+    Represents the complete view of all physical devices discovered from a compute plugin.
+
+    "Global" refers to the host-wide, shared pool of devices before any partitioning
+    or allocation to individual agents. In multi-agent scenarios, GlobalDeviceInfo
+    holds all available devices on the host, while each agent receives its own
+    ComputerContext with a partitioned subset or view of these devices based on
+    the configured allocation mode (SHARED, AUTO_SPLIT, or MANUAL).
+
+    This separation enables:
+    - Device discovery to happen once at startup
+    - Flexible partitioning strategies to be applied afterward
+    - Clear distinction between physical resources and agent-specific allocations
+    """
+
+    plugin: AbstractComputePlugin
+    devices: Sequence[AbstractComputeDevice]
+    alloc_map: AbstractAllocMap
+
+    @property
+    def device_ids(self) -> Sequence[DeviceId]:
+        return [device.device_id for device in self.devices]
+
+
+type GlobalDeviceMap = Mapping[DeviceName, GlobalDeviceInfo]
 type ComputersMap = Mapping[DeviceName, ComputerContext]
 type SlotsMap = Mapping[SlotName, Decimal]
 
@@ -543,15 +570,11 @@ class ResourceAllocator(aobject):
 
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
-        computers = await self._load_resources()
+        plugins = await self._load_resources()
+        global_devices = await self._create_global_devices(plugins)
+        self.computers = self._create_computers(global_devices)
 
-        computer_contexts: dict[DeviceName, ComputerContext] = {}
-        for name, computer in computers.items():
-            devices = await computer.list_devices()
-            alloc_map = await computer.create_alloc_map()
-            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
-        self.computers = computer_contexts
-        total_slots = self._calculate_total_slots()
+        total_slots = await self._calculate_total_slots()
         self.available_total_slots = self._calculate_available_total_slots(total_slots)
 
         agent_computers = {}
@@ -621,11 +644,37 @@ class ResourceAllocator(aobject):
             raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
         return self.agent_resource_scaling_factor[agent_id]
 
-    def _calculate_total_slots(self) -> SlotsMap:
+    async def _create_global_devices(
+        self,
+        plugins: Mapping[DeviceName, AbstractComputePlugin],
+    ) -> GlobalDeviceMap:
+        global_devices: dict[DeviceName, GlobalDeviceInfo] = {}
+        for device_name, plugin in plugins.items():
+            devices = await plugin.list_devices()
+            alloc_map = await plugin.create_alloc_map()
+            global_devices[device_name] = GlobalDeviceInfo(
+                plugin=plugin,
+                devices=list(devices),
+                alloc_map=alloc_map,
+            )
+        return global_devices
+
+    def _create_computers(self, global_devices: GlobalDeviceMap) -> ComputersMap:
+        computers: dict[DeviceName, ComputerContext] = {}
+        for device_name, device_info in global_devices.items():
+            computers[device_name] = ComputerContext(
+                instance=device_info.plugin,
+                devices=device_info.devices,
+                alloc_map=device_info.alloc_map,
+            )
+        return computers
+
+    async def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for device in self.computers.values():
-            for slot_info in device.alloc_map.device_slots.values():
-                total_slots[slot_info.slot_name] += slot_info.amount
+        for ctx in self.computers.values():
+            plugin_slots = await ctx.instance.available_slots()
+            for slot_name, amount in plugin_slots.items():
+                total_slots[slot_name] += amount
         return total_slots
 
     def _calculate_available_total_slots(self, total_slots: SlotsMap) -> SlotsMap:
