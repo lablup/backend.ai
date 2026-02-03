@@ -179,5 +179,5 @@ class DataLoaders:
     @cached_property
     def kernel_loader(
         self,
-    ) -> DataLoader[KernelId, Optional[KernelInfo]]:
+    ) -> DataLoader[KernelId, KernelInfo | None]:
         return DataLoader(load_fn=partial(load_kernels_by_ids, self._processors.session))

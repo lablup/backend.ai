@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo
@@ -14,7 +13,7 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 async def load_kernels_by_ids(
     processor: SessionProcessors,
     kernel_ids: Sequence[KernelId],
-) -> list[Optional[KernelInfo]]:
+) -> list[KernelInfo | None]:
     """Batch load kernels by their IDs.
 
     Args:

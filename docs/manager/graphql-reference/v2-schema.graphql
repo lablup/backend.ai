@@ -5291,48 +5291,6 @@ type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-"""Added in 26.1.0. Scheduler-specific configuration options"""
-type SchedulerConfig {
-  """
-  Number of scheduling retries to skip before attempting to schedule a session.
-  Used to prevent repeated scheduling attempts for sessions that previously failed.
-  """
-  numRetriesToSkip: Int!
-}
-
-"""
-Added in 26.1.0. Scheduler information including retry attempts and predicate results. Contains details about scheduling attempts when a session is pending.
-"""
-type SchedulerInfo {
-  """Number of scheduling attempts made for this session."""
-  retries: Int
-
-  """ISO 8601 timestamp of the last scheduling attempt."""
-  lastTry: String
-
-  """Message from the last scheduling attempt."""
-  msg: String
-
-  """List of predicates that failed during scheduling."""
-  failedPredicates: [SchedulerPredicate!]
-
-  """List of predicates that passed during scheduling."""
-  passedPredicates: [SchedulerPredicate!]
-}
-
-"""
-Added in 26.1.0. A scheduler predicate result from scheduling attempts. Predicates are conditions checked during session scheduling.
-"""
-type SchedulerPredicate {
-  """Name of the predicate (e.g., 'concurrency', 'reserved_time')."""
-  name: String!
-
-  """
-  Message explaining why the predicate failed. Null for passed predicates.
-  """
-  msg: String
-}
-
 """
 Added in 26.2.0. Type of scheduler used for session scheduling in a resource group.
 """
@@ -5342,7 +5300,6 @@ enum SchedulerType {
   DRF
   FAIR_SHARE
 }
-
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
 type SchedulingBroadcastEventPayload {
@@ -5406,6 +5363,8 @@ enum ServicePortProtocols {
   TCP
   PREOPEN
   INTERNAL
+  VNC
+  RDP
 }
 
 """

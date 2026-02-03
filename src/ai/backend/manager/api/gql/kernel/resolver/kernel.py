@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -17,25 +16,25 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")
+@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> Optional[KernelV2GQL]:
+) -> KernelV2GQL | None:
     return await fetch_kernel(info, KernelId(id))
 
 
-@strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")
+@strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")  # type: ignore[misc]
 async def kernels_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[KernelFilterGQL] = None,
-    order_by: Optional[list[KernelOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: KernelFilterGQL | None = None,
+    order_by: list[KernelOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> KernelConnectionV2GQL:
     return await fetch_kernels(
         info,

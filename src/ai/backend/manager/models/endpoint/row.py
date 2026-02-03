@@ -637,7 +637,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                     kernel.id,
                 )
                 continue
-            service_ports_list = cast(list[dict[str, Any]], kernel.service_ports)
+            service_ports_list = kernel.service_ports
             num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
             if num_inference_ports > 1:
                 log.warning(

@@ -464,7 +464,7 @@ async def stream_proxy(
         kernel_host = hostname.decode() if isinstance(hostname, bytes) else hostname
     else:
         kernel_host = kernel.kernel_host
-    service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], kernel.service_ports or [])
+    service_ports: list[dict[str, Any]] = kernel.service_ports or []
     sport: dict[str, Any] = {}
     host_port: int = 0
     dest: tuple[str, int] = ("", 0)
@@ -617,7 +617,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     raw_service_ports = compute_session.main_kernel.service_ports
     if raw_service_ports is None:
         return web.json_response([])
-    service_ports: list[dict[str, Any]] = cast(list[dict[str, Any]], raw_service_ports)
+    service_ports: list[dict[str, Any]] = raw_service_ports
     resp = []
     for item in service_ports:
         response_dict: dict[str, Any] = {

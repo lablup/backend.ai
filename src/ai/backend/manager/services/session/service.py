@@ -1043,7 +1043,7 @@ class SessionService:
                 )
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
-            service_ports = cast(list[dict[str, Any]] | None, sess.main_kernel.service_ports)
+            service_ports = sess.main_kernel.service_ports
             if service_ports is None:
                 raise KernelNotReady(
                     f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
@@ -1269,9 +1269,7 @@ class SessionService:
             kernel_host = urlparse(session.main_kernel.agent_addr).hostname
         else:
             kernel_host = session.main_kernel.kernel_host
-        service_ports: list[dict[str, Any]] = cast(
-            list[dict[str, Any]], session.main_kernel.service_ports or []
-        )
+        service_ports: list[dict[str, Any]] = session.main_kernel.service_ports or []
         sport: dict[str, Any] = {}
         host_port: int
         for sport in service_ports:
