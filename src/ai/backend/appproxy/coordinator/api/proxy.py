@@ -158,9 +158,13 @@ async def proxy(
         ]
 
         log.debug("protocol: {} ({})", params.protocol, type(params.protocol))
+        # Map application-level protocols to transport-level protocols for worker selection
         if params.protocol == ProxyProtocol.PREOPEN:
             log.debug("overriding PREOPEN to HTTP")
             params.protocol = ProxyProtocol.HTTP
+        elif params.protocol in (ProxyProtocol.VNC, ProxyProtocol.RDP):
+            log.debug("overriding {} to TCP", params.protocol)
+            params.protocol = ProxyProtocol.TCP
 
         async def _update(sess: SASession) -> tuple[Circuit, Worker]:
             circuit, worker = await add_circuit(
