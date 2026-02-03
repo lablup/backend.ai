@@ -134,10 +134,9 @@ Detailed specifications are organized into component-specific documents:
 
 ### Phase 2: Agent RPC Headers
 
-1. Add RPC headers model to Agent
-2. Add RPC headers support to Agent RPC dispatcher
-3. Update Manager to send headers in RPC calls
-4. Maintain backward compatibility with legacy Agents
+1. Add RPC headers model to Agent (including agent_id for message routing)
+2. Implement new RPC APIs with built-in header support
+3. Update Manager to use new APIs with headers
 
 ### Phase 3: App-Proxy Standardization
 
@@ -153,25 +152,11 @@ Detailed specifications are organized into component-specific documents:
 
 ### Manager → Agent Communication
 
-During migration:
-- Manager sends requests with `headers` field in body
-- New Agents extract request_id from headers
-- Legacy Agents ignore the `headers` field (no breaking change)
-
-Version detection via Agent capability advertisement.
+New RPC APIs are created with built-in header support, separate from existing APIs. This avoids backward compatibility concerns entirely - legacy Agents continue using existing APIs while new Agents use the new APIs with header support.
 
 ### HTTP Services
 
 HTTP services can adopt request ID middleware incrementally - no breaking changes.
-
-## Open Questions
-
-1. **Capability Advertisement**: How should Manager detect if Agent supports RPC headers?
-   - Option A: Agent advertises capabilities during registration
-   - Option B: Always send headers (legacy Agents ignore unknown fields)
-
-2. **Event System**: Should event handlers maintain the original request_id or generate new ones?
-   - Recommendation: Maintain original for causality tracking
 
 ## Ideation
 
