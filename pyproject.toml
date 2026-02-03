@@ -268,6 +268,14 @@ explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
+# Ignore errors in alembic migration files
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.manager.models.alembic.versions.*",
+    "ai.backend.appproxy.coordinator.models.alembic.versions.*",
+]
+ignore_errors = true
+
 [tool.pyright]
 pythonVersion = "3.13"
 extraPaths = ["src"]

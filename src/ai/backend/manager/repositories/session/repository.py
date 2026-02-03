@@ -224,9 +224,26 @@ class SessionRepository:
     async def resolve_image(
         self,
         image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
+        alive_only: bool = True,
     ) -> ImageRow:
+        """Resolve an image from the given identifiers.
+
+        When ``alive_only`` is True (default), only images with the ALIVE status
+        are considered.  Set it to False to also include DELETED images, which is
+        useful when the caller needs to reference images that are no longer active
+        (e.g., committing a session whose base image has been deleted).
+        """
         async with self._db.begin_readonly_session() as db_sess:
-            return await ImageRow.resolve(db_sess, image_identifiers)
+            if alive_only:
+                return await ImageRow.resolve(db_sess, image_identifiers)
+            return await ImageRow.resolve(
+                db_sess,
+                image_identifiers,
+                filter_by_statuses=[
+                    ImageStatus.ALIVE,
+                    ImageStatus.DELETED,
+                ],
+            )
 
     @session_repository_resilience.apply()
     async def get_customized_image_count(
