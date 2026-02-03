@@ -5,12 +5,13 @@ Revises: 5bbce2f389e4
 Create Date: 2026-01-20 10:29:05.603026
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '352143f82276'
-down_revision = '5bbce2f389e4'
+revision = "352143f82276"
+down_revision = "5bbce2f389e4"
 branch_labels = None
 depends_on = None
 
