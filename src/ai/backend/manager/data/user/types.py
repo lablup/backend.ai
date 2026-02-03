@@ -136,3 +136,20 @@ class UserData:
 class UserCreateResultData:
     user: UserData
     keypair: KeyPairData
+
+
+@dataclass
+class UserSearchResult:
+    """Result of user search operations."""
+
+    items: list[UserData]
+    """List of user data items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""
