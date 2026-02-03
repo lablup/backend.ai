@@ -133,7 +133,7 @@ class TestSessionRepositorySearch:
             mock_result.has_previous_page = False
 
             mp.setattr(
-                "ai.backend.manager.repositories.session.repository.execute_batch_querier",
+                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
                 AsyncMock(return_value=mock_result),
             )
 
@@ -170,7 +170,7 @@ class TestSessionRepositorySearch:
             mock_result.has_previous_page = False
 
             mp.setattr(
-                "ai.backend.manager.repositories.session.repository.execute_batch_querier",
+                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
                 AsyncMock(return_value=mock_result),
             )
 
@@ -209,7 +209,7 @@ class TestSessionRepositorySearch:
             mock_result.has_previous_page = True
 
             mp.setattr(
-                "ai.backend.manager.repositories.session.repository.execute_batch_querier",
+                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
                 AsyncMock(return_value=mock_result),
             )
 
