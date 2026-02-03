@@ -90,15 +90,3 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
-
-
-class NotSupportedOrderingType(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/not-supported-ordering-type"
-    error_title = "The specified ordering type is not supported."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.PERMISSION,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
