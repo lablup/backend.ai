@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -75,8 +75,8 @@ class TestDomainPurgersIntegration:
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
-                total_resource_slots={},
-                allowed_vfolder_hosts={},
+                total_resource_slots=ResourceSlot({}),
+                allowed_vfolder_hosts=VFolderHostPermissionMap({}),
                 allowed_docker_registries=[],
                 dotfiles=b"",
                 integration_id=None,
@@ -164,8 +164,8 @@ class TestDomainPurgersIntegration:
                 description="Test group for integration tests",
                 is_active=True,
                 domain_name=sample_domain,
-                total_resource_slots={},
-                allowed_vfolder_hosts={},
+                total_resource_slots=ResourceSlot({}),
+                allowed_vfolder_hosts=VFolderHostPermissionMap({}),
                 dotfiles=b"\x90",
                 resource_policy=project_resource_policy,
                 type=ProjectType.GENERAL,
