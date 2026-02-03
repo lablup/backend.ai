@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import (
     Annotated,
@@ -54,9 +54,9 @@ from ai.backend.common.typed_validators import (
 from ai.backend.common.types import (
     BinarySize,
     BinarySizeField,
+    DeviceId,
+    DeviceName,
     ResourceGroupType,
-    SlotName,
-    SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
@@ -1566,17 +1566,16 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
 
 class ResourceAllocationConfig(BaseConfigSchema):
     cpu: Annotated[
-        int,
-        Field(),
+        Sequence[DeviceId],
+        Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "Number of CPU cores allocated to this agent for container workloads. "
+                "CPU core IDs allocated to this agent for container workloads. "
                 "Only used when resource allocation_mode is 'manual'. "
-                "All agents in manual mode must specify this value. "
-                "The total allocation across all agents should not exceed available cores."
+                "Example: ['0', '1', '2', '3'] assigns CPU cores 0-3 to this agent."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="4", prod="16"),
+            example=ConfigExample(local='["0", "1"]', prod='["0", "1", "2", "3"]'),
         ),
     ]
     mem: Annotated[
@@ -1594,17 +1593,20 @@ class ResourceAllocationConfig(BaseConfigSchema):
         ),
     ]
     devices: Annotated[
-        Mapping[SlotNameField, Decimal],
+        Mapping[DeviceName, Sequence[DeviceId]],
         Field(default_factory=dict),
         BackendAIConfigMeta(
             description=(
-                "Device-specific resource allocations as key-value pairs. "
+                "Device assignments as device-name to list of device IDs. "
                 "Only used when resource allocation_mode is 'manual'. "
-                "Keys are slot names (e.g., 'cuda.mem', 'cuda.shares'), values are decimal amounts. "
-                "Use to allocate GPU memory, compute shares, and other accelerator resources."
+                "Keys are device names (e.g., 'cuda'), values are lists of device IDs. "
+                "Example: cuda = ['cuda0', 'cuda1'] assigns GPU devices 0-1 to this agent."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="", prod='{"cuda.mem": "0.5", "cuda.shares": "0.5"}'),
+            example=ConfigExample(
+                local="",
+                prod='cuda = ["cuda0", "cuda1"]',
+            ),
         ),
     ]
 
@@ -1613,14 +1615,79 @@ class ResourceAllocationConfig(BaseConfigSchema):
         arbitrary_types_allowed=True,
     )
 
+    @field_validator("cpu", mode="before")
+    @classmethod
+    def _validate_cpu_format(cls, v: Any) -> Sequence[DeviceId]:
+        if v is None:
+            return []
+        if isinstance(v, int):
+            raise ValueError(
+                f"Old integer format detected for 'cpu' (value {v}). "
+                "MANUAL mode now uses device ID list format. "
+                'Example: cpu = ["0", "1", "2", "3"] instead of cpu = 4.'
+            )
+        if isinstance(v, Sequence) and not isinstance(v, str):
+            return [DeviceId(str(item)) for item in v]
+        raise ValueError(f"cpu must be a list of core IDs, got {type(v).__name__}")
+
+    @field_validator("devices", mode="before")
+    @classmethod
+    def _parse_devices(cls, v: Any) -> Mapping[DeviceName, Sequence[DeviceId]]:
+        if v is None:
+            return {}
+        if not isinstance(v, Mapping):
+            raise ValueError(f"devices must be a mapping, got {type(v).__name__}")
+
+        result: dict[DeviceName, list[DeviceId]] = {}
+        for key, value in v.items():
+            key_str = str(key)
+            if "." in key_str:
+                raise ValueError(
+                    f"Old slot-based format detected: key '{key_str}' contains '.'. "
+                    "MANUAL mode now uses device-based format with device names as keys. "
+                    'Example: cuda = ["cuda0", "cuda1"] instead of cuda.mem = 0.5.'
+                )
+            device_name = DeviceName(key_str)
+            if isinstance(value, (int, float, Decimal)):
+                raise ValueError(
+                    f"Old slot-based format detected for '{key}' (numeric value {value}). "
+                    "MANUAL mode now uses device-based format. "
+                    'Example: cuda = ["cuda0", "cuda1"] instead of cuda.mem = 0.5.'
+                )
+            if isinstance(value, str):
+                # Check for string decimal values from old slot-based format (e.g., "0.5")
+                if "." in value:
+                    try:
+                        Decimal(value)
+                        raise ValueError(
+                            f"Old slot-based format detected for '{key}' (numeric value '{value}'). "
+                            "MANUAL mode now uses device-based format. "
+                            'Example: cuda = ["cuda0", "cuda1"] instead of cuda.mem = 0.5.'
+                        )
+                    except InvalidOperation:
+                        pass  # Not a valid decimal, treat as device ID
+                result[device_name] = [DeviceId(value)]
+            elif isinstance(value, Sequence):
+                result[device_name] = [DeviceId(str(dev_id)) for dev_id in value]
+            else:
+                raise ValueError(
+                    f"Device '{key}' value must be a list of device IDs, got {type(value).__name__}"
+                )
+        return result
+
     @model_validator(mode="after")
-    def validate_values_are_positive(self) -> Self:
-        if self.cpu is not None and self.cpu < 0:
-            raise ValueError(f"Allocated cpu must not be a negative value, but given {self.cpu}")
+    def _reject_cpu_in_devices(self) -> Self:
+        if DeviceName("cpu") in self.devices:
+            raise ValueError(
+                "CPU must be specified via 'cpu' field, not in 'devices'. "
+                "Example: cpu = ['0', '1', '2', '3']"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _reject_negative_mem(self) -> Self:
         if self.mem is not None and self.mem < 0:
             raise ValueError(f"Allocated mem must not be a negative value, but given {self.mem}")
-        if any(value < 0 for value in self.devices.values()):
-            raise ValueError("All allocated device resource values must not be a negative value")
         return self
 
 
@@ -2373,16 +2440,21 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
                         )
 
             case ResourceAllocationMode.MANUAL:
-                slot_names: list[set[SlotName]] = []
                 for config in agent_configs:
                     if config.resource.allocations is None:
                         raise ValueError(
                             "On MANUAL mode, config must specify cpu and mem resource allocations"
                         )
-
-                    slot_names.append(set(config.resource.allocations.devices.keys()))
-
-                if not all(slot_name == slot_names[0] for slot_name in slot_names):
-                    raise ValueError("All agents must have the same slots defined in the devices!")
+                    alloc = config.resource.allocations
+                    if not alloc.cpu:
+                        raise ValueError(
+                            "On MANUAL mode, allocations must specify cpu "
+                            "(e.g., cpu = ['0', '1', '2', '3'])"
+                        )
+                    if alloc.mem <= 0:
+                        raise ValueError(
+                            "On MANUAL mode, allocations must specify a positive mem value "
+                            "(e.g., mem = '32G')"
+                        )
 
         return self
