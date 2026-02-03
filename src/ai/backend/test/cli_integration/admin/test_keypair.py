@@ -177,38 +177,6 @@ def test_update_keypair(
         )
 
 
-def test_delete_keypair(run_admin: ClientRunnerFunc, users: tuple[User]) -> None:
-    """
-    Test delete keypair.
-    This test must be executed after test_add_keypair.
-    """
-    print("[ Delete keypair ]")
-    return
-    # Get access key
-    with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
-        p.expect(EOF)
-        decoded = decode(p.before)
-        loaded = json.loads(decoded)
-        keypair_list = loaded.get("items")
-        assert isinstance(keypair_list, list), "List not printed properly!"
-
-    for i, user in enumerate(users):
-        keypair = get_keypair_from_list(keypair_list, user.email)
-        assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
-
-        # Delete keypair
-        with closing(run_admin(["admin", "keypair", "delete", keypair["access_key"]])) as p:
-            p.expect(EOF)
-
-        # Delete test user
-        with closing(run_admin(["--output=json", "admin", "user", "purge", user.email])) as p:
-            p.sendline("y")
-            p.expect(EOF)
-            before = decode(p.before)
-            response = json.loads(before[before.index("{") :])
-            assert response.get("ok") is True, f"Account deletion failed: {user.username}"
-
-
 def test_list_keypair(run_admin: ClientRunnerFunc) -> None:
     """
     Test list keypair.

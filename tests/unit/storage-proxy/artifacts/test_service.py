@@ -608,7 +608,7 @@ class TestHuggingFaceDownloadStep:
         # Create an async generator that immediately raises a non-retriable error
         async def mock_iter_chunked_error(chunk_size: int) -> AsyncIterator[bytes]:
             raise RuntimeError("HTTP 404 Not Found")
-            yield  # Never reached, but needed for generator syntax
+            yield  # type: ignore[unreachable]  # Never reached, but needed for generator syntax
 
         # Configure response with error status
         mock_response.status = 404

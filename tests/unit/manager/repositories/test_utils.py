@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
@@ -112,7 +113,7 @@ async def session_info(
         )
         db_sess.add(scaling_group)
 
-        domain = DomainRow(name=domain_name, total_resource_slots={})
+        domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
@@ -136,7 +137,7 @@ async def session_info(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
-            total_resource_slots={},
+            total_resource_slots=ResourceSlot(),
             resource_policy=resource_policy_name,
         )
         db_sess.add(group)
@@ -159,6 +160,8 @@ async def session_info(
             scaling_group_name=sgroup_name,
             group_id=group_id,
             user_uuid=user_uuid,
+            occupying_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             vfolder_mounts={},
         )
         db_sess.add(sess)
@@ -169,7 +172,8 @@ async def session_info(
             group_id=group_id,
             user_uuid=user_uuid,
             cluster_role=DEFAULT_ROLE,
-            occupied_slots={},
+            occupied_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             repl_in_port=0,
             repl_out_port=0,
             stdin_port=0,
@@ -420,13 +424,13 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         "group_id": orig_mapping["group_id"],
         "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
-        "occupied_slots": {},
-        "requested_slots": {},
+        "occupied_slots": ResourceSlot(),
+        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
         "stdout_port": 0,
-        "vfolder_mounts": {},
+        "vfolder_mounts": [],
     }
     await conn.execute(
         sa.insert(kernels).values({
@@ -483,13 +487,13 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         "group_id": orig_mapping["group_id"],
         "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
-        "occupied_slots": {},
-        "requested_slots": {},
+        "occupied_slots": ResourceSlot(),
+        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
         "stdout_port": 0,
-        "vfolder_mounts": {},
+        "vfolder_mounts": [],
     }
     await conn.execute(
         sa.insert(kernels).values({

@@ -48,7 +48,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = ContainerId(container.id[:7])
     try:
-        ret = await container.stats(stream=False)  # TODO: cache
+        # aiodocker may return list[dict] or dict depending on version
+        ret: list[dict[str, Any]] | dict[str, Any] = await container.stats(stream=False)
     except RuntimeError as e:
         msg = str(e.args[0]).lower()
         if "event loop is closed" in msg or "session is closed" in msg:
@@ -64,19 +65,19 @@ async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     else:
         entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
-        if isinstance(ret, list):
-            if not ret:
+        match ret:
+            case list() if ret:
+                entry = ret[0]
+            case dict() if ret:
+                entry = ret
+            case _:
                 # The API may return an empty result upon container termination.
+                log.warning(
+                    "cannot read stats (cid:{}): got an empty result: {}",
+                    short_cid,
+                    ret,
+                )
                 return None
-            entry = ret[0]
-        # The API may return an invalid or empty result upon container termination.
-        if ret is None or not isinstance(ret, dict):
-            log.warning(
-                "cannot read stats (cid:{}): got an empty result: {}",
-                short_cid,
-                ret,
-            )
-            return None
         if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
         return entry

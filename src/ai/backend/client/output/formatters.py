@@ -32,7 +32,7 @@ def format_multiline(value: Any, indent_length: int) -> str:
     return "\n".join(buf)
 
 
-def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
+def format_nested_dicts(value: Mapping[str, Mapping[str, Any] | None]) -> str:
     """
     Format a mapping from string keys to sub-mappings.
     """

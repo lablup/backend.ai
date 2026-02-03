@@ -70,17 +70,8 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
         if value is None:
             return value
         if dialect.name == "postgresql":
-            match value:
-                case uuid.UUID():
-                    return str(value)
-                case _:
-                    return str(uuid.UUID(value))
-        else:
-            match value:
-                case uuid.UUID():
-                    return value.bytes
-                case _:
-                    return uuid.UUID(value).bytes
+            return str(value)
+        return value.bytes
 
     def process_result_value(self, value: Any, dialect: Dialect) -> UUID_SubType | None:
         if value is None:

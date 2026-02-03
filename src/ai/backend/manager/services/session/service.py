@@ -888,20 +888,6 @@ class SessionService:
                     opts,
                     flush_timeout=2.0,
                 )
-                if raw_result is None:
-                    # the kernel may have terminated from its side,
-                    # or there was interruption of agents.
-                    resp["result"] = {
-                        "status": "finished",
-                        "runId": run_id,
-                        "exitCode": 130,
-                        "options": {},
-                        "files": [],
-                        "console": [],
-                    }
-                    return ExecuteSessionActionResult(
-                        result=resp, session_data=session.to_dataclass()
-                    )
                 # Keep internal/public API compatilibty
                 result = {
                     "status": raw_result["status"],

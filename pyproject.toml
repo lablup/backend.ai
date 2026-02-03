@@ -287,6 +287,7 @@ explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key", "import-untyped"]
 enable_error_code = ["possibly-undefined"]
+warn_unreachable = true
 
 # Disable errors in client CLI, web server, and tests
 # Client SDK will be rewritten, so defer all type fixes
@@ -303,6 +304,14 @@ module = [
     "tests.unit.client.*",
 ]
 disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
+
+# ServerAddr.face is typed as HostPortPair | None but __post_init__ always sets it
+# Disable union-attr errors for install module until types are properly refactored
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.install.*",
+]
+disable_error_code = ["union-attr", "misc"]
 
 # Ignore errors in vendor code, accelerators, and build tools
 # These are external/generated code or low-priority plugins

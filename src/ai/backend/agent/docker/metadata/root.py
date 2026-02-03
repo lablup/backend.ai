@@ -31,7 +31,7 @@ class ContainerMetadataPlugin(MetadataPlugin):
         ]
 
     async def get_envs(self, request: web.Request) -> web.Response:
-        kernel: DockerKernel = request["kernel"]
+        kernel: DockerKernel | None = request["kernel"]
         if kernel is None:
             return web.Response(status=HTTPStatus.NOT_FOUND)
         response = dict(kernel.environ)

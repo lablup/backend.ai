@@ -505,7 +505,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         offset: int,
         *,
         scaling_group: str | None = None,
-        raw_status: str | None = None,
+        raw_status: str | AgentStatus | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[Agent]:

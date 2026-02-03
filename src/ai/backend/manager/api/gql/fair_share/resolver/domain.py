@@ -47,8 +47,6 @@ async def admin_domain_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return DomainFairShareGQL.from_dataclass(action_result.data)
 
 
@@ -148,8 +146,6 @@ async def domain_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return DomainFairShareGQL.from_dataclass(action_result.data)
 
 

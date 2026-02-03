@@ -608,13 +608,6 @@ class ArtifactService:
         )
         client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
 
-        if client_resp is None:
-            log.warning(
-                "Failed to connect to reservoir registry after {}",
-                registry_data.endpoint,
-            )
-            raise ReservoirConnectionError("Failed to connect to remote reservoir")
-
         RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
         parsed_resp = RespTypeAdapter.validate_python(client_resp)
 

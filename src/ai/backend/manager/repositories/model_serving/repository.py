@@ -466,9 +466,6 @@ class ModelServingRepository:
         """
         Private method to validate user access to endpoint.
         """
-        if endpoint.session_owner is None:
-            return True
-
         query = sa.select(UserRow).where(UserRow.uuid == endpoint.session_owner)
         result = await session.execute(query)
         owner = result.scalar()

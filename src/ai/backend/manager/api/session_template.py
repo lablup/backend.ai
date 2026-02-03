@@ -90,7 +90,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
             resp.append({
                 "id": template_id,
-                "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
+                "user": str(user_uuid),
             })
             if result.rowcount != 1:
                 raise DBOperationFailed(f"Failed to create session template: {template_id}")
@@ -210,10 +210,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
                 "group_id": str(row.group_id),
                 "domain_name": domain_name,
             })
-        if isinstance(resp, str):
-            resp = load_json(resp)
-        else:
-            resp = load_json(dump_json(resp))
+        resp = load_json(dump_json(resp))
         return web.json_response(resp)
 
 

@@ -1089,7 +1089,7 @@ async def session_info(database_engine: ExtendedAsyncSAEngine) -> AsyncIterator[
         )
         db_sess.add(scaling_group)
 
-        domain = DomainRow(name=domain_name, total_resource_slots={})
+        domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
@@ -1113,7 +1113,7 @@ async def session_info(database_engine: ExtendedAsyncSAEngine) -> AsyncIterator[
             id=group_id,
             name=group_name,
             domain_name=domain_name,
-            total_resource_slots={},
+            total_resource_slots=ResourceSlot(),
             resource_policy=resource_policy_name,
         )
         db_sess.add(group)

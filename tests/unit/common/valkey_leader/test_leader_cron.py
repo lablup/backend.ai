@@ -143,7 +143,7 @@ class TestLeaderCron:
 
         # Verify everything was stopped
         assert leader_cron._stopped is True
-        assert len(leader_cron._task_runners) == 0
+        assert len(leader_cron._task_runners) == 0  # type: ignore[unreachable]
 
     async def test_tasks_execute_as_leader(self, mock_tasks: list[MockTask]) -> None:
         """Test that tasks execute when server is leader."""

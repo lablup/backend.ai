@@ -134,7 +134,7 @@ class AgentHeartbeatUpsert:
             "architecture": self.metadata.architecture,
             "auto_terminate_abusing_kernel": self.metadata.auto_terminate_abusing_kernel,
             "lost_at": None,
-            "occupied_slots": {},
+            "occupied_slots": ResourceSlot(),
             "first_contact": self.heartbeat_received,
         }
 

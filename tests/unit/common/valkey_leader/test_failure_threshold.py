@@ -110,7 +110,7 @@ class TestFailureThreshold:
         assert leader_election_with_threshold.is_leader is False
 
         # Stop the election
-        await leader_election_with_threshold.stop()
+        await leader_election_with_threshold.stop()  # type: ignore[unreachable]
 
     async def test_no_false_positives_when_not_leader(
         self, leader_election_with_threshold: ValkeyLeaderElection, mock_leader_client: AsyncMock

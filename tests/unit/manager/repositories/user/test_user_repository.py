@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest, UserNotFound
@@ -117,7 +118,7 @@ class TestUserRepository:
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
                 dotfiles=b"",
@@ -150,11 +151,11 @@ class TestUserRepository:
         async with db_with_cleanup.begin_session() as session:
             policy = KeyPairResourcePolicyRow(
                 name=policy_name,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 max_concurrent_sessions=10,
                 max_session_lifetime=0,
                 max_pending_session_count=5,
-                max_pending_session_resource_slots={},
+                max_pending_session_resource_slots=ResourceSlot(),
                 max_concurrent_sftp_sessions=5,
                 max_containers_per_session=1,
                 idle_timeout=0,
@@ -250,7 +251,7 @@ class TestUserRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=sample_domain,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
                 resource_policy=project_resource_policy,

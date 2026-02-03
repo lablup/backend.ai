@@ -1696,14 +1696,13 @@ class AbstractAgent[
                 if self.local_config.debug.log_events:
                     log.info(f"lifecycle event: {ev!r}")
                 try:
-                    if ev.event == LifecycleEvent.START:
-                        tg.create_task(self._handle_start_event(ev))
-                    elif ev.event == LifecycleEvent.DESTROY:
-                        tg.create_task(self._handle_destroy_event(ev))
-                    elif ev.event == LifecycleEvent.CLEAN:
-                        tg.create_task(self._handle_clean_event(ev))
-                    else:
-                        log.warning("unsupported lifecycle event: {!r}", ev)
+                    match ev.event:
+                        case LifecycleEvent.START:
+                            tg.create_task(self._handle_start_event(ev))
+                        case LifecycleEvent.DESTROY:
+                            tg.create_task(self._handle_destroy_event(ev))
+                        case LifecycleEvent.CLEAN:
+                            tg.create_task(self._handle_clean_event(ev))
                 except Exception:
                     log.exception(
                         "unexpected error in process_lifecycle_events(): {!r}, continuing...",

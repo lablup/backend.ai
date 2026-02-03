@@ -136,11 +136,10 @@ _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
 
 class UndefChecker(t.Trafaret):
-    def check_and_return(self, value: Any) -> object:
+    def check_and_return(self, value: Any) -> object:  # noqa: RET503
         if value == undefined:
             return value
-        self._failure("Invalid Undef format", value=value)
-        return None
+        self._failure("Invalid Undef format", value=value)  # raises DataError
 
 
 resource_opts_iv = t.Dict({

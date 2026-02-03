@@ -12,6 +12,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
@@ -232,8 +233,8 @@ class DomainRepository:
             "description": "Model Store",
             "is_active": True,
             "domain_name": domain_name,
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
+            "total_resource_slots": ResourceSlot(),
+            "allowed_vfolder_hosts": VFolderHostPermissionMap(),
             "integration_id": None,
             "resource_policy": "default",
             "type": ProjectType.MODEL_STORE,

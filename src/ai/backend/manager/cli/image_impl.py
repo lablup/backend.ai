@@ -234,10 +234,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
         try:
             image_row = await ImageRow.from_alias(session, alias)
             for key, value in validate_image_labels(image_row.labels).items():
-                print(f"{key:<40}: ", end="")
-                if isinstance(value, list):
-                    value = f"[{', '.join(value)}]"
-                print(value)
+                print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
@@ -271,10 +268,7 @@ async def validate_image_canonical(
 
                 print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
-                    print(f"{key:<40}: ", end="")
-                    if isinstance(value, list):
-                        value = f"{', '.join(value)}"
-                    print(value)
+                    print(f"{key:<40}: {value}")
             else:
                 rows = await session.scalars(
                     sa.select(ImageRow).where(
@@ -289,10 +283,7 @@ async def validate_image_canonical(
                         print("-" * 50)
                     print(f"{'architecture':<40}: {image_row.architecture}")
                     for key, value in validate_image_labels(image_row.labels).items():
-                        print(f"{key:<40}: ", end="")
-                        if isinstance(value, list):
-                            value = f"{', '.join(value)}"
-                        print(value)
+                        print(f"{key:<40}: {value}")
 
         except UnknownImageReference as e:
             log.error(f"{e}")

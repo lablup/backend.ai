@@ -6,7 +6,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NoReturn, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -129,21 +129,21 @@ async def detect_system_docker(ctx: Context) -> str:
             return cast(str, response_data["Version"])
 
 
-def fail_with_snap_docker_refresh_request() -> None:
+def fail_with_snap_docker_refresh_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install Docker 20.10.15 or later from the Snap package index.",
         instruction="Try running `sudo snap refresh docker --edge`",
     )
 
 
-def fail_with_system_docker_install_request() -> None:
+def fail_with_system_docker_install_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install Docker for your system.",
         instruction="Check out https://docs.docker.com/engine/install/",
     )
 
 
-def fail_with_compose_install_request() -> None:
+def fail_with_compose_install_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install docker-compose v2 or later.",
         instruction="Check out https://docs.docker.com/compose/install/",
@@ -187,10 +187,7 @@ async def check_docker(ctx: Context) -> None:
     else:
         docker_version = await detect_system_docker(ctx)
         ctx.log.write(docker_version)
-        if docker_version is not None:
-            ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
-        else:
-            fail_with_system_docker_install_request()
+        ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
 
     # Compose is not a part of the docker API but a client-side plugin.
     # We need to execute the client command to get information about it.

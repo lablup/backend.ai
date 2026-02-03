@@ -92,8 +92,6 @@ class Group(BaseFunction):
         :param domain_name: Name of domain to list groups.
         :param fields: Per-group query fields to fetch.
         """
-        if fields is None:
-            fields = _default_list_fields
         query = _d("""
             query($domain_name: String) {
                 groups(domain_name: $domain_name) {$fields}
@@ -117,8 +115,6 @@ class Group(BaseFunction):
         :param gid: ID of the group to fetch.
         :param fields: Additional per-group query fields to fetch.
         """
-        if fields is None:
-            fields = _default_detail_fields
         query = _d("""
             query($gid: UUID!) {
                 group(id: $gid) {$fields}

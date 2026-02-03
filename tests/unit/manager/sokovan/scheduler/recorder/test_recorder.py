@@ -110,7 +110,7 @@ class TestValidatorPattern:
                         raise ValueError("Exceeded 8GB memory limit")
 
                     # This step won't be reached due to exception
-                    with recorder.step("dependency_check", success_detail="Dependencies OK"):
+                    with recorder.step("dependency_check", success_detail="Dependencies OK"):  # type: ignore[unreachable]
                         pass
             pool.build_all_records()
 

@@ -4,7 +4,6 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -133,7 +132,7 @@ class OSInfo(RichCast):
 @dataclasses.dataclass()
 class ServerAddr:
     bind: HostPortPair  # the server-bind address (e.g., 0.0.0.0:8080)
-    face: HostPortPair = cast(HostPortPair, None)  # the client-facing address (e.g., 10.1.2.3:9090)
+    face: HostPortPair | None = None  # the client-facing address (e.g., 10.1.2.3:9090)
 
     def __post_init__(self) -> None:
         # Ensure that face is always initialized, while its unspecified value is None.

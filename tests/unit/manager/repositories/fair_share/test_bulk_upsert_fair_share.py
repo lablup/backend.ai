@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -134,7 +135,7 @@ class TestBulkUpsertDomainFairShare:
                     name=name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -174,7 +175,7 @@ class TestBulkUpsertDomainFairShare:
                     name=name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -225,7 +226,7 @@ class TestBulkUpsertDomainFairShare:
                     name=name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -425,7 +426,7 @@ class TestBulkUpsertProjectFairShare:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -448,6 +449,7 @@ class TestBulkUpsertProjectFairShare:
                     domain_name=domain_name,
                     description="Test project",
                     resource_policy=policy_name,
+                    total_resource_slots=ResourceSlot(),
                 )
                 db_sess.add(group)
             await db_sess.commit()
@@ -486,7 +488,7 @@ class TestBulkUpsertProjectFairShare:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -509,6 +511,7 @@ class TestBulkUpsertProjectFairShare:
                     domain_name=domain_name,
                     description="Test project",
                     resource_policy=policy_name,
+                    total_resource_slots=ResourceSlot(),
                 )
                 db_sess.add(group)
             await db_sess.flush()
@@ -664,7 +667,7 @@ class TestBulkUpsertUserFairShare:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -758,7 +761,7 @@ class TestBulkUpsertUserFairShare:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -863,7 +866,7 @@ class TestBulkUpsertUserFairShare:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

@@ -118,10 +118,7 @@ class Terminal:
         await safe_close_task(self.term_out_task)
         pid, fd = pty.fork()
         if pid == 0:
-            args = (
-                shlex.split(self.shell_cmd) if isinstance(self.shell_cmd, str) else self.shell_cmd
-            )
-            os.execv(args[0], args)
+            os.execv(self.shell_cmd[0], self.shell_cmd)
         else:
             self.pid = pid
             self.fd = fd

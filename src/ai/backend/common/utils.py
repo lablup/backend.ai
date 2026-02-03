@@ -203,14 +203,15 @@ def nmget(
     None
     """
     pieces = key_path.split(path_delimiter)
+    current: Any = o
     while pieces:
         p = pieces.pop(0)
-        if o is None or p not in o:
+        if current is None or p not in current:
             return def_val
-        o = o[p]
-    if o is None and null_as_default:
+        current = current[p]
+    if current is None and null_as_default:
         return def_val
-    return o
+    return current
 
 
 def readable_size_to_bytes(expr: Any) -> BinarySize | Decimal:

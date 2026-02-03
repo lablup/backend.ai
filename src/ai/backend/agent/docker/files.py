@@ -27,8 +27,6 @@ def scandir(root: Path, allowed_max_size: int) -> dict[Path, float]:
     their last modified time.
     """
     file_stats: dict[Path, float] = dict()
-    if not isinstance(root, Path):
-        root = Path(root)
     if not root.exists():
         return file_stats
     for entry in os.scandir(root):

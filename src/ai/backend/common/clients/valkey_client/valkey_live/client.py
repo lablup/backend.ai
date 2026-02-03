@@ -263,9 +263,6 @@ class ValkeyLiveClient:
         :return: Dictionary of field names to values.
         """
         result = await self._client.client.hgetall(name)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
         for key, value in result.items():
@@ -521,9 +518,6 @@ class ValkeyLiveClient:
         :return: Dictionary of field names to values.
         """
         result = await self._client.client.hgetall(key)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         str_result: dict[str, str] = {}
         for k, v in result.items():

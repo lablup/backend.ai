@@ -127,7 +127,7 @@ class TestSearchAutoScalingRulesValidated:
         """Create a domain for testing"""
         name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(name=name, total_resource_slots={})
+            domain = DomainRow(name=name, total_resource_slots=ResourceSlot())
             db_sess.add(domain)
             await db_sess.flush()
 
@@ -188,7 +188,7 @@ class TestSearchAutoScalingRulesValidated:
                 id=group_id,
                 name=name,
                 domain_name=test_domain,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 resource_policy=test_project_resource_policy,
             )
             db_sess.add(group)

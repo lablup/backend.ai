@@ -1206,14 +1206,14 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
-        status: str | None = None,
+        status: str | SessionStatus | None = None,
         filter: str | None = None,
     ) -> int:
         status_list: list[SessionStatus] | None = None
-        if isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
+        if isinstance(status, SessionStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
@@ -1246,15 +1246,15 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
-        status: str | None = None,
+        status: str | SessionStatus | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         status_list: list[SessionStatus] | None = None
-        if isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
+        if isinstance(status, SessionStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(

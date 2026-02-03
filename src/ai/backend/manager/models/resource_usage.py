@@ -455,9 +455,9 @@ def parse_resource_usage(
     if kernel.vfolder_mounts:
         # For >=22.03, return used host directories instead of volume host, which is not so useful.
         nfs = {str(mount.host_path) for mount in kernel.vfolder_mounts}
-    elif kernel.mounts and isinstance(kernel.mounts[0], list):
+    elif kernel.mounts and isinstance(kernel.mounts[0], list):  # type: ignore[unreachable]
         # For the kernel records that have legacy contents of `mounts`.
-        nfs = {mount[2] for mount in kernel.mounts}
+        nfs = {mount[2] for mount in kernel.mounts}  # type: ignore[unreachable]
 
     device_type = set()
     smp = 0

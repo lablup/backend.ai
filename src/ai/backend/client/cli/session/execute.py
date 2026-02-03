@@ -257,11 +257,7 @@ def prepare_resource_arg(resources: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
-    if env is not None:
-        envs = {k: v for k, v in map(lambda s: s.split("=", 1), env)}
-    else:
-        envs = {}
-    return envs
+    return {k: v for k, v in map(lambda s: s.split("=", 1), env)}
 
 
 def prepare_mount_arg(
@@ -479,13 +475,6 @@ def run(
     resources = prepare_resource_arg(resources)
     resource_opts = prepare_resource_arg(resource_opts)
     mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
-
-    if env_range is None:
-        env_range = []
-    if build_range is None:
-        build_range = []
-    if exec_range is None:
-        exec_range = []
 
     env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
     build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]

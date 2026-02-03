@@ -123,7 +123,7 @@ class BigInt(Scalar):  # type: ignore[misc]
     parse_value = coerce_bigint
 
     @staticmethod
-    def parse_literal(node: graphql.language.ast.IntValueNode) -> int | float | None:
+    def parse_literal(node: graphql.language.ast.ValueNode) -> int | float | None:
         if isinstance(node, graphql.language.ast.IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):

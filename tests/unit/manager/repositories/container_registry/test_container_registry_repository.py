@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.errors.image import (
@@ -139,7 +140,7 @@ class TestContainerRegistryRepository:
         """Pre-created domain for group tests. Returns domain name."""
         domain_name = "test-domain-" + str(uuid.uuid4())[:8]
         async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(name=domain_name, total_resource_slots={})
+            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
             session.add(domain)
             await session.commit()
         return domain_name
@@ -176,7 +177,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)
@@ -807,7 +808,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}-assoc",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)
@@ -935,7 +936,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}-partial",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)

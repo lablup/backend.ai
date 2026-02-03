@@ -215,7 +215,7 @@ class ConfigInspector:
 
         return str(annotation)
 
-    def _is_nullable_type(self, annotation: type | None) -> bool:
+    def _is_nullable_type(self, annotation: type | types.UnionType | None) -> bool:
         """Check if a type annotation is nullable (Type | None).
 
         Args:
@@ -291,10 +291,10 @@ class ConfigInspector:
             return None
 
         # Unwrap Optional types
-        annotation = self._unwrap_optional(annotation)
+        unwrapped = self._unwrap_optional(annotation)
 
         # Extract the target type based on composite type
-        target_type = self._get_composite_target_type(annotation, meta.composite)
+        target_type = self._get_composite_target_type(unwrapped, meta.composite)
         if target_type is None:
             return None
 
@@ -304,12 +304,12 @@ class ConfigInspector:
 
         return None
 
-    def _unwrap_optional(self, annotation: type) -> type:
+    def _unwrap_optional(self, annotation: type | types.UnionType) -> type | types.UnionType:
         """Unwrap Optional[T] to get T."""
         # Handle Python 3.10+ UnionType (X | None syntax)
         if isinstance(annotation, types.UnionType):
             args = annotation.__args__
-            non_none = [a for a in args if a is not type(None)]
+            non_none: list[type] = [a for a in args if a is not type(None)]
             if len(non_none) == 1:
                 return non_none[0]
             return annotation
@@ -325,9 +325,9 @@ class ConfigInspector:
 
     def _get_composite_target_type(
         self,
-        annotation: type,
+        annotation: type | types.UnionType,
         composite: CompositeType | None,
-    ) -> type | None:
+    ) -> type | types.UnionType | None:
         """Get the target type for children extraction based on composite type.
 
         Args:

@@ -268,9 +268,7 @@ class URLColumn(TypeDecorator[yarl.URL]):
     def process_result_value(self, value: str | None, dialect: sa.Dialect) -> yarl.URL | None:
         if value is None:
             return None
-        if value is not None:
-            return yarl.URL(value)
-        return None
+        return yarl.URL(value)
 
 
 class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]):

@@ -51,8 +51,6 @@ async def admin_user_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return UserFairShareGQL.from_dataclass(action_result.data)
 
 
@@ -154,8 +152,6 @@ async def user_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return UserFairShareGQL.from_dataclass(action_result.data)
 
 

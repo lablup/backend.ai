@@ -1313,7 +1313,7 @@ main.command()(_events_cmd(docs='Alias of "session events"'))
 session.command()(_events_cmd())
 
 
-def _fetch_session_names() -> tuple[str]:
+def _fetch_session_names() -> tuple[str, ...]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",

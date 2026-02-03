@@ -49,8 +49,6 @@ async def admin_project_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return ProjectFairShareGQL.from_dataclass(action_result.data)
 
 
@@ -150,8 +148,6 @@ async def project_fair_share(
         )
     )
 
-    if action_result.data is None:
-        return None
     return ProjectFairShareGQL.from_dataclass(action_result.data)
 
 
