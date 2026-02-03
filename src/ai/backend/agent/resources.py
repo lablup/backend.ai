@@ -518,6 +518,21 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
 @dataclass(kw_only=True, frozen=True)
 class GlobalDeviceInfo:
+    """
+    Represents the complete view of all physical devices discovered from a compute plugin.
+
+    "Global" refers to the host-wide, shared pool of devices before any partitioning
+    or allocation to individual agents. In multi-agent scenarios, GlobalDeviceInfo
+    holds all available devices on the host, while each agent receives its own
+    ComputerContext with a partitioned subset or view of these devices based on
+    the configured allocation mode (SHARED, AUTO_SPLIT, or MANUAL).
+
+    This separation enables:
+    - Device discovery to happen once at startup
+    - Flexible partitioning strategies to be applied afterward
+    - Clear distinction between physical resources and agent-specific allocations
+    """
+
     plugin: AbstractComputePlugin
     devices: Sequence[AbstractComputeDevice]
     alloc_map: AbstractAllocMap
