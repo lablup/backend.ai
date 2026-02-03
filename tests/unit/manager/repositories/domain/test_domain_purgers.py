@@ -245,7 +245,6 @@ class TestDomainPurgersIntegration:
                 await session.refresh(kernel)
         return kernels
 
-    @pytest.mark.asyncio
     async def test_purge_domain_kernels(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -270,7 +269,6 @@ class TestDomainPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
