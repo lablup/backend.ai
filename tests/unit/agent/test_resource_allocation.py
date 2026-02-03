@@ -1,13 +1,14 @@
 """
-Unit tests for ResourceAllocator and multi-agent resource allocation.
+Unit tests for ResourcePartitioner and ResourceAllocator.
 
-Tests the ResourceAllocator implementation that handles SHARED, AUTO_SPLIT, and MANUAL
-resource allocation modes for multiple agents running on the same physical host.
+This file is organized into two main sections:
+1. ResourcePartitioner unit tests - Direct tests of partitioning logic
+2. ResourceAllocator integration tests - End-to-end tests through the allocator
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, Mock
@@ -27,7 +28,12 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
+    DevicePartition,
+    GlobalDeviceInfo,
     ResourceAllocator,
+    ResourcePartitioner,
+    SlotPartition,
+    _natural_sort_key,
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import (
@@ -38,6 +44,10 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+
+# =============================================================================
+# Test Helpers
+# =============================================================================
 
 
 def create_test_config(
@@ -139,54 +149,84 @@ def create_discrete_alloc_map(
     return DiscretePropertyAllocMap(device_slots=slots, exclusive_slot_types=set())
 
 
+def create_mock_plugin(
+    alloc_map: AbstractAllocMap,
+    slot_types: Sequence[tuple[SlotName, SlotTypes]] | None = None,
+) -> AbstractComputePlugin:
+    """Helper to create a mock compute plugin."""
+    mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)
+    mock_plugin.get_metadata.return_value = {}  # type: ignore[attr-defined]
+
+    # Create mock devices for each device_id in the alloc_map
+    mock_devices: list[AbstractComputeDevice] = []
+    for dev_id in alloc_map.device_slots.keys():
+        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = dev_id
+        mock_devices.append(mock_device)
+
+    # Create a fresh alloc_map for each call
+    async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:
+        if isinstance(original_map, FractionAllocMap):
+            return create_fraction_alloc_map({
+                dev_id: (slot.slot_name, slot.amount)
+                for dev_id, slot in original_map.device_slots.items()
+            })
+        if isinstance(original_map, DiscretePropertyAllocMap):
+            return create_discrete_alloc_map({
+                dev_id: (slot.slot_name, slot.amount)
+                for dev_id, slot in original_map.device_slots.items()
+            })
+        raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
+
+    # Calculate available slots from the alloc_map
+    available_slots: dict[SlotName, Decimal] = {}
+    for slot_info in alloc_map.device_slots.values():
+        if slot_info.slot_name not in available_slots:
+            available_slots[slot_info.slot_name] = Decimal("0")
+        available_slots[slot_info.slot_name] += slot_info.amount
+
+    # Extract slot_types from the alloc_map if not provided
+    if slot_types is None:
+        slot_types_set: set[tuple[SlotName, SlotTypes]] = set()
+        for slot_info in alloc_map.device_slots.values():
+            slot_types_set.add((slot_info.slot_name, slot_info.slot_type))
+        slot_types = list(slot_types_set)
+
+    mock_plugin.slot_types = slot_types
+    mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
+    mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
+    mock_plugin.available_slots = AsyncMock(return_value=available_slots)  # type: ignore[method-assign]
+    mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
+
+    return mock_plugin
+
+
 def create_mock_computers(
     computers_spec: Mapping[DeviceName, AbstractAllocMap],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
-    """
-    Helper to create mock compute plugins for testing.
+    """Helper to create mock compute plugins for ResourceAllocator testing."""
+    return {
+        device_name: create_mock_plugin(alloc_map)
+        for device_name, alloc_map in computers_spec.items()
+    }
 
-    This function is isolated to contain the mock creation and type ignores.
-    """
-    result: dict[DeviceName, AbstractComputePlugin] = {}
-    for device_name, alloc_map in computers_spec.items():
-        mock_plugin: AbstractComputePlugin = Mock(spec=AbstractComputePlugin)
-        mock_plugin.get_metadata.return_value = {"slot_name": str(device_name)}  # type: ignore[attr-defined]
 
-        # Create mock devices for each device_id in the alloc_map
-        mock_devices: list[AbstractComputeDevice] = []
-        for dev_id in alloc_map.device_slots.keys():
-            mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
-            mock_device.device_id = dev_id
-            mock_devices.append(mock_device)
+def create_global_device_info(
+    plugin: AbstractComputePlugin,
+    alloc_map: AbstractAllocMap,
+) -> GlobalDeviceInfo:
+    """Helper to create GlobalDeviceInfo for ResourcePartitioner testing."""
+    devices: list[AbstractComputeDevice] = []
+    for dev_id in alloc_map.device_slots.keys():
+        mock_device: AbstractComputeDevice = Mock(spec=AbstractComputeDevice)
+        mock_device.device_id = dev_id
+        devices.append(mock_device)
 
-        # Create a fresh alloc_map for each call
-        async def _create_alloc_map(original_map: AbstractAllocMap = alloc_map) -> AbstractAllocMap:
-            if isinstance(original_map, FractionAllocMap):
-                return create_fraction_alloc_map({
-                    dev_id: (slot.slot_name, slot.amount)
-                    for dev_id, slot in original_map.device_slots.items()
-                })
-            if isinstance(original_map, DiscretePropertyAllocMap):
-                return create_discrete_alloc_map({
-                    dev_id: (slot.slot_name, slot.amount)
-                    for dev_id, slot in original_map.device_slots.items()
-                })
-            raise NotImplementedError(f"Unsupported alloc_map type: {type(original_map)}")
-
-        # Calculate available slots from the alloc_map
-        available_slots: dict[SlotName, Decimal] = {}
-        for slot_info in alloc_map.device_slots.values():
-            if slot_info.slot_name not in available_slots:
-                available_slots[slot_info.slot_name] = Decimal("0")
-            available_slots[slot_info.slot_name] += slot_info.amount
-
-        mock_plugin.create_alloc_map = _create_alloc_map  # type: ignore[method-assign]
-        mock_plugin.list_devices = AsyncMock(return_value=mock_devices)  # type: ignore[method-assign]
-        mock_plugin.available_slots = AsyncMock(return_value=available_slots)  # type: ignore[method-assign]
-        mock_plugin.cleanup = AsyncMock(return_value=None)  # type: ignore[method-assign]
-
-        result[device_name] = mock_plugin
-    return result
+    return GlobalDeviceInfo(
+        plugin=plugin,
+        devices=devices,
+        alloc_map=alloc_map,
+    )
 
 
 @pytest.fixture
@@ -200,13 +240,14 @@ def setup_mock_resources(
     monkeypatch: pytest.MonkeyPatch,
     computers: Mapping[DeviceName, AbstractComputePlugin],
 ) -> None:
-    """Helper to mock resource loading for a specific test."""
+    """Helper to mock resource loading for ResourceAllocator tests."""
 
-    async def _mock_load(self: ResourceAllocator) -> Mapping[DeviceName, AbstractComputePlugin]:
+    async def _mock_load(
+        self: ResourceAllocator,
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
         return computers
 
     def _mock_calculate_total_slots(self: ResourceAllocator) -> Mapping[SlotName, Decimal]:
-        # Calculate from the mocked computers
         total_slots: dict[SlotName, Decimal] = {}
         for ctx in self.computers.values():
             for slot_info in ctx.alloc_map.device_slots.values():
@@ -216,7 +257,6 @@ def setup_mock_resources(
         return total_slots
 
     async def _mock_scan(self: ResourceAllocator) -> Mapping[SlotName, Decimal]:
-        # Calculate from the mocked computers
         return _mock_calculate_total_slots(self)
 
     monkeypatch.setattr(
@@ -229,796 +269,563 @@ def setup_mock_resources(
     )
 
 
-class TestSharedMode:
-    async def test_no_restrictions(
+# =============================================================================
+# ResourcePartitioner Unit Tests
+# =============================================================================
+
+
+class TestNaturalSortKey:
+    """Unit tests for _natural_sort_key helper function."""
+
+    def test_simple_numeric_suffix(self) -> None:
+        """Test sorting with simple numeric suffixes."""
+        device_ids = [DeviceId("cuda0"), DeviceId("cuda1"), DeviceId("cuda10"), DeviceId("cuda2")]
+        sorted_ids = sorted(device_ids, key=_natural_sort_key)
+        assert sorted_ids == [
+            DeviceId("cuda0"),
+            DeviceId("cuda1"),
+            DeviceId("cuda2"),
+            DeviceId("cuda10"),
+        ]
+
+    def test_purely_numeric_ids(self) -> None:
+        """Test sorting with purely numeric IDs."""
+        device_ids = [DeviceId("0"), DeviceId("1"), DeviceId("10"), DeviceId("2")]
+        sorted_ids = sorted(device_ids, key=_natural_sort_key)
+        assert sorted_ids == [DeviceId("0"), DeviceId("1"), DeviceId("2"), DeviceId("10")]
+
+    def test_complex_device_ids(self) -> None:
+        """Test sorting with complex device IDs like nvme partitions."""
+        device_ids = [DeviceId("nvme0n1p1"), DeviceId("nvme0n1p10"), DeviceId("nvme0n1p2")]
+        sorted_ids = sorted(device_ids, key=_natural_sort_key)
+        assert sorted_ids == [
+            DeviceId("nvme0n1p1"),
+            DeviceId("nvme0n1p2"),
+            DeviceId("nvme0n1p10"),
+        ]
+
+
+class TestResourcePartitionerAssignments:
+    """Unit tests for ResourcePartitioner.generate_*_assignments methods."""
+
+    def _create_global_device_map(
         self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.SHARED,
-            num_agents=2,
-        )
-
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
-            }),
-            DeviceName("cuda"): create_fraction_alloc_map({
-                DeviceId("cuda"): (SlotName("cuda.shares"), Decimal("1.0")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # In SHARED mode, both agents get full resources
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("8")
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-        assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("8")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-
-        # No resources reserved in SHARED mode
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("0")
-        assert reserved1[SlotName("cuda.shares")] == Decimal("0")
-        assert reserved2[SlotName("cpu")] == Decimal("0")
-        assert reserved2[SlotName("cuda.shares")] == Decimal("0")
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_with_reserved_resources(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.SHARED,
-            reserved_cpu=2,
-            reserved_mem="4G",
-        )
-
-        # Create 8 CPU devices (1 core each). Single mem device with 16G.
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("1")) for i in range(8)
-            }),
-            DeviceName("root"): create_fraction_alloc_map({
-                DeviceId("root"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("16G"))),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        for i in range(8):
-            assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-                DeviceId(f"cpu{i}")
-            ].amount == Decimal("1")
-        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
-            DeviceId("root")
-        ].amount == Decimal(BinarySize.finite_from_str("16G"))
-
-        # SHARED mode: reserved_slots = system reserved only (not from other agents)
-        # For CPU: total=8, available=6, reserved_slots = 8 - 6 = 2
-        # For mem: total=16G, available=12G, reserved_slots = 16G - 12G = 4G
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        assert reserved1[SlotName("cpu")] == Decimal("2")
-        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("4G"))
-
-        await allocator.__aexit__(None, None, None)
-
-
-@pytest.mark.skip(
-    reason=(
-        "BA-4143: AUTO_SPLIT partitioning temporarily disabled. All modes now behave "
-        "like SHARED until BEP-1041 device-centric design is implemented."
-    )
-)
-class TestAutoSplitMode:
-    async def test_fraction_alloc_map(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
-            num_agents=2,
-        )
-
-        # Single CUDA device with 1.0 shares
-        computers = create_mock_computers({
-            DeviceName("cuda"): create_fraction_alloc_map({
-                DeviceId("cuda"): (SlotName("cuda.shares"), Decimal("1.0")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-
-        # AUTO_SPLIT: Each agent gets half (1.0 / 2 = 0.5)
-        # reserved_slots = total - allocated = 1.0 - 0.5 = 0.5
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
-        assert reserved2[SlotName("cuda.shares")] == Decimal("0.5")
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_discrete_alloc_map_even(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
-            num_agents=2,
-        )
-
-        # Single CUDA device with 8 slots
-        computers = create_mock_computers({
-            DeviceName("cuda"): create_discrete_alloc_map({
-                DeviceId("cuda"): (SlotName("cuda"), Decimal("8")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("8")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("8")
-
-        # AUTO_SPLIT: Each agent gets 4 (8 / 2 agents)
-        # reserved_slots = total - allocated = 8 - 4 = 4
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cuda")] == Decimal("4")
-        assert reserved2[SlotName("cuda")] == Decimal("4")
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_discrete_alloc_map_uneven(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
-            num_agents=3,
-        )
-
-        # Single CUDA device with 5 slots
-        computers = create_mock_computers({
-            DeviceName("cuda"): create_discrete_alloc_map({
-                DeviceId("cuda"): (SlotName("cuda"), Decimal("5")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        # alloc_map shows original hardware amounts (unchanged)
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-        agent3_computers = allocator.get_computers(AgentId("agent3"))
-
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("5")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("5")
-        assert agent3_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("5")
-
-        # 5 divided by 3 = 1 with remainder 2
-        # First two agents get 2, last agent gets 1
-        # reserved_slots = total - allocated
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        reserved3 = allocator.agent_reserved_slots[AgentId("agent3")]
-        assert reserved1[SlotName("cuda")] == Decimal("3")  # 5 - 2 = 3
-        assert reserved2[SlotName("cuda")] == Decimal("3")  # 5 - 2 = 3
-        assert reserved3[SlotName("cuda")] == Decimal("4")  # 5 - 1 = 4
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_with_reserved_resources(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
-            reserved_cpu=4,
-            num_agents=2,
-        )
-
-        # 8 CPU devices with 2 cores each (total 16 cores)
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("2")) for i in range(8)
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        for i in range(8):
-            assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-                DeviceId(f"cpu{i}")
-            ].amount == Decimal("2")
-            assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
-                DeviceId(f"cpu{i}")
-            ].amount == Decimal("2")
-
-        # Total = 16, reserved_cpu = 4, available = 12
-        # Split between 2 agents: 12 / 2 = 6 per agent
-        # reserved_slots = total - allocated = 16 - 6 = 10
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("10")
-        assert reserved2[SlotName("cpu")] == Decimal("10")
-
-        await allocator.__aexit__(None, None, None)
-
-
-@pytest.mark.skip(
-    reason=(
-        "BA-4143: MANUAL allocation temporarily disabled. All modes now behave "
-        "like SHARED until BEP-1041 device-centric design is implemented."
-    )
-)
-class TestManualMode:
-    async def test_cpu_mem(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.MANUAL,
-            allocated_cpu=4,
-            allocated_mem="8G",
-            num_agents=2,
-        )
-
-        # Separate CPU and mem devices in different device groups
-        # CPU device group with 1 device (16 cores)
-        # Root device group with 1 device (32G mem)
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
-            }),
-            DeviceName("root"): create_fraction_alloc_map({
-                DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("16")
-        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
-            DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("32G"))
-        assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("16")
-        assert agent2_computers[DeviceName("root")].alloc_map.device_slots[
-            DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("32G"))
-
-        # MANUAL mode: Each agent gets 4 CPU and 8G mem
-        # reserved_slots = total - allocated
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("12")  # 16 - 4 = 12
-        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))  # 32G - 8G
-        assert reserved2[SlotName("cpu")] == Decimal("12")
-        assert reserved2[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_with_allocated_devices(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.MANUAL,
-            allocated_cpu=8,
-            allocated_mem="16G",
-            allocated_devices={
-                SlotName("cuda.shares"): Decimal("0.5"),
-            },
-        )
-
-        # Each device in its own group
-        # CPU device group with 1 device
-        # Root device group with 1 device (mem)
-        # CUDA device group with 1 device (cuda.shares only)
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_fraction_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
-            }),
-            DeviceName("root"): create_fraction_alloc_map({
-                DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
-            }),
-            DeviceName("cuda"): create_fraction_alloc_map({
-                DeviceId("cuda0"): (SlotName("cuda.shares"), Decimal("1.0")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda0")
-        ].amount == Decimal("1.0")
-
-        # MANUAL mode: agent gets 0.5 cuda.shares
-        # reserved_slots = total - allocated = 1.0 - 0.5 = 0.5
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
-
-        await allocator.__aexit__(None, None, None)
-
-
-class TestMultiDeviceScenarios:
-    """Tests for realistic multi-device scenarios.
-
-    These tests ensure the resource partitioning logic works correctly with:
-    - Single devices (CPU with multiple cores, memory pools)
-    - Multiple physical devices (multi-GPU systems, NUMA nodes)
-    """
-
-    @pytest.mark.skip(reason="BA-4143: AUTO_SPLIT partitioning temporarily disabled.")
-    async def test_multiple_cpu_cores_auto_split(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Test AUTO_SPLIT with an 8-core CPU (realistic scenario)."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
-            num_agents=2,
-        )
-
-        # Create 1 CPU device with 8 cores (realistic: 1 physical CPU chip)
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_discrete_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        # Verify total slots by summing from computers
-        total_cpu = sum(
-            slot.amount
-            for ctx in allocator.computers.values()
-            for slot in ctx.alloc_map.device_slots.values()
-            if slot.slot_name == SlotName("cpu")
-        )
-        assert total_cpu == Decimal("8")
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("8")
-        assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("8")
-
-        # AUTO_SPLIT: Each agent gets 4 cores (8 / 2 agents)
-        # reserved_slots = total - allocated = 8 - 4 = 4
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("4")
-        assert reserved2[SlotName("cpu")] == Decimal("4")
-
-        await allocator.__aexit__(None, None, None)
-
-    @pytest.mark.skip(reason="BA-4143: MANUAL allocation temporarily disabled.")
-    async def test_multiple_cpu_cores_manual_mode(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Test MANUAL mode with an 8-core CPU and memory."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.MANUAL,
-            allocated_cpu=3,
-            allocated_mem="8G",
-        )
-
-        # Separate CPU and memory into different device groups
-        # CPU device group with 1 device (8 cores)
-        # Root device group with 1 device (16G mem)
-        computers = create_mock_computers({
-            DeviceName("cpu"): create_discrete_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
-            }),
-            DeviceName("root"): create_discrete_alloc_map({
-                DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("16G"))),
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("8")
-        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
-            DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("16G"))
-
-        # MANUAL mode: agent gets 3 CPU cores and 8G mem
-        # reserved_slots = total - allocated
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        assert reserved1[SlotName("cpu")] == Decimal("5")  # 8 - 3 = 5
-        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("8G"))  # 16G - 8G
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_calculate_total_slots_sums_all_devices(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Verify that total_slots correctly sums across multiple GPU devices."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.SHARED,
-        )
-
-        # Create 4 GPU devices with VRAM (realistic multi-GPU setup)
-        computers = create_mock_computers({
-            DeviceName("cuda"): create_discrete_alloc_map({
-                DeviceId(f"cuda{i}"): (SlotName("cuda.mem"), Decimal("8000000000"))
-                for i in range(4)
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        # 4 GPUs × 8GB each = 32GB total VRAM
-        total_cuda_mem = sum(
-            slot.amount
-            for ctx in allocator.computers.values()
-            for slot in ctx.alloc_map.device_slots.values()
-            if slot.slot_name == SlotName("cuda.mem")
-        )
-        assert total_cuda_mem == Decimal("32000000000")
-
-        await allocator.__aexit__(None, None, None)
-
-    async def test_multi_device_shared_mode(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Test SHARED mode with multiple GPU devices - all agents share all resources."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.SHARED,
-            num_agents=3,
-        )
-
-        # 4 separate GPU devices (realistic: multi-GPU system)
-        computers = create_mock_computers({
+        specs: Mapping[DeviceName, AbstractAllocMap],
+    ) -> Mapping[DeviceName, GlobalDeviceInfo]:
+        """Helper to create GlobalDeviceMap for testing."""
+        result = {}
+        for device_name, alloc_map in specs.items():
+            plugin = create_mock_plugin(alloc_map)
+            result[device_name] = create_global_device_info(plugin, alloc_map)
+        return result
+
+    def test_shared_returns_all_devices(self) -> None:
+        """SHARED mode returns DevicePartition with all device IDs."""
+        global_devices = self._create_global_device_map({
             DeviceName("cuda"): create_discrete_alloc_map({
                 DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
             }),
         })
 
-        setup_mock_resources(monkeypatch, computers)
+        result = ResourcePartitioner.generate_shared_assignments(global_devices)
 
-        allocator = await ResourceAllocator.new(config, mock_etcd)
+        # Result is defaultdict - any AgentId gets the same assignment
+        any_agent = AgentId("any-agent")
+        assert DeviceName("cuda") in result[any_agent]
+        partition = result[any_agent][DeviceName("cuda")]
+        assert isinstance(partition, DevicePartition)
+        assert len(partition.device_ids) == 4
 
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-        agent3_computers = allocator.get_computers(AgentId("agent3"))
+    def test_autosplit_partitions_devices_exclusively(self) -> None:
+        """AUTO_SPLIT partitions devices exclusively between agents."""
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
+            }),
+        })
+        agent_ids = [AgentId("agent1"), AgentId("agent2")]
+        available_slots = {SlotName("cuda.device"): Decimal("4")}
 
-        # In SHARED mode, all agents see all devices
-        # Total = 4, with 4 devices, amount per device = 4 / 4 = 1
-        for i in range(4):
-            assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("1")
-            assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("1")
-            assert agent3_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("1")
+        result = ResourcePartitioner.generate_autosplit_assignments(
+            global_devices, agent_ids, available_slots
+        )
 
-        await allocator.__aexit__(None, None, None)
+        # Each agent gets their own assignment
+        assert AgentId("agent1") in result
+        assert AgentId("agent2") in result
 
-    @pytest.mark.skip(reason="BA-4143: AUTO_SPLIT partitioning temporarily disabled.")
-    async def test_mixed_devices_with_different_slot_types(
+        # Each agent gets 2 devices (DevicePartition)
+        agent1_cuda = result[AgentId("agent1")][DeviceName("cuda")]
+        agent2_cuda = result[AgentId("agent2")][DeviceName("cuda")]
+        assert isinstance(agent1_cuda, DevicePartition)
+        assert isinstance(agent2_cuda, DevicePartition)
+        assert len(agent1_cuda.device_ids) == 2
+        assert len(agent2_cuda.device_ids) == 2
+
+        # No overlap
+        assert not set(agent1_cuda.device_ids) & set(agent2_cuda.device_ids)
+
+    def test_autosplit_shared_device_uses_slot_partition(self) -> None:
+        """AUTO_SPLIT uses SlotPartition for shared devices (mem)."""
+        global_devices = self._create_global_device_map({
+            DeviceName("mem"): create_fraction_alloc_map({
+                DeviceId("root"): (SlotName("mem"), Decimal("16000000000")),
+            }),
+        })
+        agent_ids = [AgentId("agent1"), AgentId("agent2")]
+        available_slots = {SlotName("mem"): Decimal("16000000000")}
+
+        result = ResourcePartitioner.generate_autosplit_assignments(
+            global_devices, agent_ids, available_slots
+        )
+
+        # Memory should be SlotPartition (shared device)
+        agent1_mem = result[AgentId("agent1")][DeviceName("mem")]
+        agent2_mem = result[AgentId("agent2")][DeviceName("mem")]
+        assert isinstance(agent1_mem, SlotPartition)
+        assert isinstance(agent2_mem, SlotPartition)
+
+        # Each agent gets half the memory
+        assert agent1_mem.slots[SlotName("mem")] == Decimal("8000000000")
+        assert agent2_mem.slots[SlotName("mem")] == Decimal("8000000000")
+
+    def test_autosplit_uneven_distribution(self) -> None:
+        """AUTO_SPLIT distributes remainder to first agents."""
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(5)
+            }),
+        })
+        agent_ids = [AgentId("agent1"), AgentId("agent2"), AgentId("agent3")]
+        available_slots = {SlotName("cuda.device"): Decimal("5")}
+
+        result = ResourcePartitioner.generate_autosplit_assignments(
+            global_devices, agent_ids, available_slots
+        )
+
+        # 5 devices / 3 agents = [2, 2, 1]
+        partition1 = result[AgentId("agent1")][DeviceName("cuda")]
+        partition2 = result[AgentId("agent2")][DeviceName("cuda")]
+        partition3 = result[AgentId("agent3")][DeviceName("cuda")]
+        assert isinstance(partition1, DevicePartition)
+        assert isinstance(partition2, DevicePartition)
+        assert isinstance(partition3, DevicePartition)
+        assert len(partition1.device_ids) == 2
+        assert len(partition2.device_ids) == 2
+        assert len(partition3.device_ids) == 1
+
+    def test_autosplit_more_agents_than_devices(self) -> None:
+        """AUTO_SPLIT: some agents get zero devices when agents > devices."""
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(2)
+            }),
+        })
+        agent_ids = [AgentId(f"agent{i}") for i in range(1, 6)]  # 5 agents
+        available_slots = {SlotName("cuda.device"): Decimal("2")}
+
+        result = ResourcePartitioner.generate_autosplit_assignments(
+            global_devices, agent_ids, available_slots
+        )
+
+        # 2 devices / 5 agents = [1, 1, 0, 0, 0]
+        partition1 = result[AgentId("agent1")][DeviceName("cuda")]
+        partition2 = result[AgentId("agent2")][DeviceName("cuda")]
+        partition3 = result[AgentId("agent3")][DeviceName("cuda")]
+        partition4 = result[AgentId("agent4")][DeviceName("cuda")]
+        partition5 = result[AgentId("agent5")][DeviceName("cuda")]
+
+        assert isinstance(partition1, DevicePartition)
+        assert isinstance(partition2, DevicePartition)
+        assert isinstance(partition3, DevicePartition)
+        assert isinstance(partition4, DevicePartition)
+        assert isinstance(partition5, DevicePartition)
+
+        assert len(partition1.device_ids) == 1
+        assert len(partition2.device_ids) == 1
+        assert len(partition3.device_ids) == 0
+        assert len(partition4.device_ids) == 0
+        assert len(partition5.device_ids) == 0
+
+    def test_autosplit_zero_devices(self) -> None:
+        """AUTO_SPLIT: handles device type with zero devices gracefully."""
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({}),  # No devices
+        })
+        agent_ids = [AgentId("agent1"), AgentId("agent2")]
+        available_slots = {SlotName("cuda.device"): Decimal("0")}
+
+        result = ResourcePartitioner.generate_autosplit_assignments(
+            global_devices, agent_ids, available_slots
+        )
+
+        # All agents get empty DevicePartition
+        partition1 = result[AgentId("agent1")][DeviceName("cuda")]
+        partition2 = result[AgentId("agent2")][DeviceName("cuda")]
+
+        assert isinstance(partition1, DevicePartition)
+        assert isinstance(partition2, DevicePartition)
+        assert len(partition1.device_ids) == 0
+        assert len(partition2.device_ids) == 0
+
+    def test_manual_currently_behaves_like_shared(self) -> None:
+        """MANUAL mode currently returns all devices (like SHARED)."""
+        global_devices = self._create_global_device_map({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
+            }),
+        })
+
+        result = ResourcePartitioner.generate_manual_assignments(global_devices)
+
+        # Result is defaultdict - any AgentId gets the same assignment (like SHARED)
+        any_agent = AgentId("any-agent")
+        assert DeviceName("cuda") in result[any_agent]
+        partition = result[any_agent][DeviceName("cuda")]
+        assert isinstance(partition, DevicePartition)
+        assert len(partition.device_ids) == 4
+
+
+# =============================================================================
+# ResourceAllocator Integration Tests
+# =============================================================================
+
+
+class TestResourceAllocatorSharedMode:
+    """Integration tests for ResourceAllocator in SHARED mode."""
+
+    async def test_all_agents_see_all_resources(
         self,
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test with CPU and GPU devices using AUTO_SPLIT.
-
-        CPUs use DiscretePropertyAllocMap, and GPUs with shares use FractionAllocMap.
-        """
+        """SHARED mode: all agents see full resources."""
         config = create_test_config(
-            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            allocation_mode=ResourceAllocationMode.SHARED,
             num_agents=2,
         )
-
-        # 1 CPU device with 4 cores (discrete)
-        # 1 GPU device with fractional shares
         computers = create_mock_computers({
-            DeviceName("cpu"): create_discrete_alloc_map({
-                DeviceId("cpu"): (SlotName("cpu"), Decimal("4")),
+            DeviceName("cpu"): create_fraction_alloc_map({
+                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
             }),
             DeviceName("cuda"): create_fraction_alloc_map({
                 DeviceId("cuda0"): (SlotName("cuda.shares"), Decimal("1.0")),
             }),
         })
-
         setup_mock_resources(monkeypatch, computers)
 
         allocator = await ResourceAllocator.new(config, mock_etcd)
 
-        # Verify total slots by summing from computers
-        total_cpu = sum(
-            slot.amount
-            for ctx in allocator.computers.values()
-            for slot in ctx.alloc_map.device_slots.values()
-            if slot.slot_name == SlotName("cpu")
-        )
-        total_cuda_shares = sum(
-            slot.amount
-            for ctx in allocator.computers.values()
-            for slot in ctx.alloc_map.device_slots.values()
-            if slot.slot_name == SlotName("cuda.shares")
-        )
-        assert total_cpu == Decimal("4")
-        assert total_cuda_shares == Decimal("1.0")
-
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
 
-        # alloc_map shows original hardware amounts (unchanged)
+        # Both agents see full resources
         assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
+        ].amount == Decimal("8")
         assert agent2_computers[DeviceName("cpu")].alloc_map.device_slots[
             DeviceId("cpu")
-        ].amount == Decimal("4")
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda0")
-        ].amount == Decimal("1.0")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda0")
-        ].amount == Decimal("1.0")
-
-        # AUTO_SPLIT:
-        # CPU: each agent gets 2 cores, reserved = 4 - 2 = 2
-        # GPU shares: each agent gets 0.5 shares, reserved = 1.0 - 0.5 = 0.5
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cpu")] == Decimal("2")
-        assert reserved2[SlotName("cpu")] == Decimal("2")
-        assert reserved1[SlotName("cuda.shares")] == Decimal("0.5")
-        assert reserved2[SlotName("cuda.shares")] == Decimal("0.5")
+        ].amount == Decimal("8")
 
         await allocator.__aexit__(None, None, None)
 
-    @pytest.mark.skip(reason="BA-4143: AUTO_SPLIT partitioning temporarily disabled.")
-    async def test_multi_gpu_auto_split(
+    async def test_no_reserved_slots(
         self,
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test AUTO_SPLIT with multiple GPU devices sharing the same slot type."""
+        """SHARED mode: no resources reserved between agents."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.SHARED,
+            num_agents=2,
+        )
+        computers = create_mock_computers({
+            DeviceName("cpu"): create_fraction_alloc_map({
+                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cpu")] == Decimal("0")
+        assert reserved2[SlotName("cpu")] == Decimal("0")
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_scaling_factor_is_one(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """SHARED mode: scaling factor is 1.0 for all slots."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.SHARED,
+            num_agents=2,
+        )
+        computers = create_mock_computers({
+            DeviceName("cpu"): create_fraction_alloc_map({
+                DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        factor1 = allocator.get_resource_scaling_factor(AgentId("agent1"))
+        factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
+        assert factor1[SlotName("cpu")] == Decimal("1.0")
+        assert factor2[SlotName("cpu")] == Decimal("1.0")
+
+        await allocator.__aexit__(None, None, None)
+
+
+class TestResourceAllocatorAutoSplitMode:
+    """Integration tests for ResourceAllocator in AUTO_SPLIT mode."""
+
+    async def test_devices_partitioned_exclusively(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT: devices are partitioned exclusively between agents."""
         config = create_test_config(
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
 
-        # 4 GPU devices with 1.0 shares each (total 4.0 shares)
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        agent2_computers = allocator.get_computers(AgentId("agent2"))
+
+        agent1_devices = set(agent1_computers[DeviceName("cuda")].alloc_map.device_slots.keys())
+        agent2_devices = set(agent2_computers[DeviceName("cuda")].alloc_map.device_slots.keys())
+
+        # Each agent gets 2 devices
+        assert len(agent1_devices) == 2
+        assert len(agent2_devices) == 2
+        # No overlap
+        assert not agent1_devices & agent2_devices
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_uneven_device_distribution(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT: uneven devices distributed with remainder to first agents."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=3,
+        )
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(5)
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        # 5 devices / 3 agents = [2, 2, 1]
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        agent2_computers = allocator.get_computers(AgentId("agent2"))
+        agent3_computers = allocator.get_computers(AgentId("agent3"))
+
+        assert len(agent1_computers[DeviceName("cuda")].alloc_map.device_slots) == 2
+        assert len(agent2_computers[DeviceName("cuda")].alloc_map.device_slots) == 2
+        assert len(agent3_computers[DeviceName("cuda")].alloc_map.device_slots) == 1
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_reserved_slots_reflect_partitioning(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT: reserved slots = total - allocated."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=2,
+        )
         computers = create_mock_computers({
             DeviceName("cuda"): create_fraction_alloc_map({
                 DeviceId(f"cuda{i}"): (SlotName("cuda.shares"), Decimal("1.0")) for i in range(4)
             }),
         })
-
         setup_mock_resources(monkeypatch, computers)
 
         allocator = await ResourceAllocator.new(config, mock_etcd)
 
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # alloc_map shows original hardware amounts (unchanged)
-        for i in range(4):
-            assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("1.0")
-            assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("1.0")
-
-        # AUTO_SPLIT: Total = 4.0 shares, each agent gets 2.0 shares
-        # reserved_slots = total - allocated = 4.0 - 2.0 = 2.0
+        # Each agent gets 2 devices (2.0 shares), reserved = 4.0 - 2.0 = 2.0
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cuda.shares")] == Decimal("2")
-        assert reserved2[SlotName("cuda.shares")] == Decimal("2")
+        assert reserved1[SlotName("cuda.shares")] == Decimal("2.0")
+        assert reserved2[SlotName("cuda.shares")] == Decimal("2.0")
 
         await allocator.__aexit__(None, None, None)
 
-    async def test_multi_gpu_shared_mode_with_reservation(
+    async def test_scaling_factor_even_distribution(
         self,
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test SHARED mode with multiple GPU devices and system reservation."""
-        config = create_test_config(
-            allocation_mode=ResourceAllocationMode.SHARED,
-            num_agents=2,
-        )
+        """AUTO_SPLIT: scaling factor is proportional to allocation (even case).
 
-        # 4 GPU devices with 8GB memory each (total 32GB)
-        computers = create_mock_computers({
-            DeviceName("cuda"): create_discrete_alloc_map({
-                DeviceId(f"cuda{i}"): (SlotName("cuda.mem"), Decimal("8000000000"))
-                for i in range(4)
-            }),
-        })
-
-        setup_mock_resources(monkeypatch, computers)
-
-        allocator = await ResourceAllocator.new(config, mock_etcd)
-
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-
-        # SHARED mode: both agents get full resources
-        # Total = 32GB, with 4 devices, per-device = 32GB / 4 = 8GB
-        for i in range(4):
-            assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("8000000000")
-            assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-                DeviceId(f"cuda{i}")
-            ].amount == Decimal("8000000000")
-
-        await allocator.__aexit__(None, None, None)
-
-
-class TestAllocationModesFallbackToShared:
-    """
-    Tests verifying that AUTO_SPLIT and MANUAL modes now behave like SHARED.
-
-    BA-4143: As a baseline before implementing BEP-1041's device-centric design,
-    all allocation modes see all devices (no partitioning).
-    """
-
-    async def test_auto_split_behaves_like_shared(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Verify AUTO_SPLIT mode now gives all agents full access to all resources."""
+        With even distribution, proportional scaling equals 1/n.
+        2 agents, 4 devices → each gets 2 → scaling = 2/4 = 0.5
+        """
         config = create_test_config(
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
-
         computers = create_mock_computers({
-            DeviceName("cuda"): create_fraction_alloc_map({
-                DeviceId("cuda"): (SlotName("cuda.shares"), Decimal("1.0")),
+            DeviceName("cpu"): create_discrete_alloc_map({
+                DeviceId(str(i)): (SlotName("cpu"), Decimal("1")) for i in range(4)
             }),
         })
-
         setup_mock_resources(monkeypatch, computers)
 
         allocator = await ResourceAllocator.new(config, mock_etcd)
 
-        # Both agents should see full device slot amounts (no partitioning)
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        agent2_computers = allocator.get_computers(AgentId("agent2"))
-        assert agent1_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-        assert agent2_computers[DeviceName("cuda")].alloc_map.device_slots[
-            DeviceId("cuda")
-        ].amount == Decimal("1.0")
-
-        # No resources reserved between agents (all see full resources)
-        reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        assert reserved1[SlotName("cuda.shares")] == Decimal("0")
-        assert reserved2[SlotName("cuda.shares")] == Decimal("0")
+        factor1 = allocator.get_resource_scaling_factor(AgentId("agent1"))
+        factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
+        assert factor1[SlotName("cpu")] == Decimal("0.5")
+        assert factor2[SlotName("cpu")] == Decimal("0.5")
 
         await allocator.__aexit__(None, None, None)
 
-    async def test_manual_behaves_like_shared(
+    async def test_scaling_factor_uneven_distribution(
         self,
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Verify MANUAL mode now gives all agents full access to all resources."""
+        """AUTO_SPLIT: scaling factor is proportional to actual allocation (uneven case).
+
+        With uneven distribution, proportional scaling differs from naive 1/n.
+        3 agents, 5 devices → distribution is [2, 2, 1]:
+        - agent1: 2/5 = 0.4
+        - agent2: 2/5 = 0.4
+        - agent3: 1/5 = 0.2
+
+        A naive 1/n approach would give 1/3 ≈ 0.333 for all agents, which is
+        incorrect because agent3 only has 1 device while others have 2.
+        """
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=3,
+        )
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(5)
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        factor1 = allocator.get_resource_scaling_factor(AgentId("agent1"))
+        factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
+        factor3 = allocator.get_resource_scaling_factor(AgentId("agent3"))
+
+        # Proportional scaling: allocated / total
+        assert factor1[SlotName("cuda.device")] == Decimal("2") / Decimal("5")
+        assert factor2[SlotName("cuda.device")] == Decimal("2") / Decimal("5")
+        assert factor3[SlotName("cuda.device")] == Decimal("1") / Decimal("5")
+
+        # Verify this is NOT the naive 1/n approach
+        naive_factor = Decimal("1") / Decimal("3")
+        assert factor1[SlotName("cuda.device")] != naive_factor
+        assert factor3[SlotName("cuda.device")] != naive_factor
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_single_agent_gets_all_devices(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT with 1 agent: behaves like SHARED."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=1,
+        )
+        computers = create_mock_computers({
+            DeviceName("cuda"): create_discrete_alloc_map({
+                DeviceId(f"cuda{i}"): (SlotName("cuda.device"), Decimal("1")) for i in range(4)
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        assert len(agent1_computers[DeviceName("cuda")].alloc_map.device_slots) == 4
+
+        await allocator.__aexit__(None, None, None)
+
+    async def test_mixed_device_types(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """AUTO_SPLIT: CPU devices partitioned, memory slots divided."""
+        config = create_test_config(
+            allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
+            num_agents=2,
+        )
+        computers = create_mock_computers({
+            DeviceName("cpu"): create_discrete_alloc_map({
+                DeviceId(f"cpu{i}"): (SlotName("cpu"), Decimal("1")) for i in range(4)
+            }),
+            DeviceName("mem"): create_fraction_alloc_map({
+                DeviceId("root"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("16G"))),
+            }),
+        })
+        setup_mock_resources(monkeypatch, computers)
+
+        allocator = await ResourceAllocator.new(config, mock_etcd)
+
+        agent1_computers = allocator.get_computers(AgentId("agent1"))
+        agent2_computers = allocator.get_computers(AgentId("agent2"))
+
+        # CPU: 4 devices / 2 agents = 2 each (exclusive)
+        assert len(agent1_computers[DeviceName("cpu")].alloc_map.device_slots) == 2
+        assert len(agent2_computers[DeviceName("cpu")].alloc_map.device_slots) == 2
+
+        # Memory: shared device, both see same device with divided slots
+        assert len(agent1_computers[DeviceName("mem")].alloc_map.device_slots) == 1
+        assert len(agent2_computers[DeviceName("mem")].alloc_map.device_slots) == 1
+
+        await allocator.__aexit__(None, None, None)
+
+
+@pytest.mark.skip(reason="BA-4143: MANUAL allocation temporarily disabled.")
+class TestResourceAllocatorManualMode:
+    """Integration tests for ResourceAllocator in MANUAL mode."""
+
+    async def test_respects_manual_allocations(
+        self,
+        mock_etcd: AsyncEtcd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """MANUAL mode: allocations are per agent config."""
         config = create_test_config(
             allocation_mode=ResourceAllocationMode.MANUAL,
             allocated_cpu=4,
             allocated_mem="8G",
-            num_agents=1,
+            num_agents=2,
         )
-
         computers = create_mock_computers({
             DeviceName("cpu"): create_fraction_alloc_map({
                 DeviceId("cpu"): (SlotName("cpu"), Decimal("16")),
@@ -1027,59 +834,16 @@ class TestAllocationModesFallbackToShared:
                 DeviceId("mem"): (SlotName("mem"), Decimal(BinarySize.finite_from_str("32G"))),
             }),
         })
-
         setup_mock_resources(monkeypatch, computers)
 
         allocator = await ResourceAllocator.new(config, mock_etcd)
 
-        # Agent should see full device slot amounts (manual allocations ignored)
-        agent1_computers = allocator.get_computers(AgentId("agent1"))
-        assert agent1_computers[DeviceName("cpu")].alloc_map.device_slots[
-            DeviceId("cpu")
-        ].amount == Decimal("16")
-        assert agent1_computers[DeviceName("root")].alloc_map.device_slots[
-            DeviceId("mem")
-        ].amount == Decimal(BinarySize.finite_from_str("32G"))
-
-        # No resources reserved (all see full resources)
+        # Each agent gets 4 CPU and 8G mem
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
-        assert reserved1[SlotName("cpu")] == Decimal("0")
-        assert reserved1[SlotName("mem")] == Decimal("0")
+        reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
+        assert reserved1[SlotName("cpu")] == Decimal("12")  # 16 - 4
+        assert reserved1[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
+        assert reserved2[SlotName("cpu")] == Decimal("12")
+        assert reserved2[SlotName("mem")] == Decimal(BinarySize.finite_from_str("24G"))
 
         await allocator.__aexit__(None, None, None)
-
-    async def test_scaling_factor_always_one(
-        self,
-        mock_etcd: AsyncEtcd,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Verify scaling factor is always 1.0 regardless of allocation mode."""
-        for mode in [
-            ResourceAllocationMode.SHARED,
-            ResourceAllocationMode.AUTO_SPLIT,
-            ResourceAllocationMode.MANUAL,
-        ]:
-            config = create_test_config(
-                allocation_mode=mode,
-                allocated_cpu=4 if mode == ResourceAllocationMode.MANUAL else None,
-                allocated_mem="8G" if mode == ResourceAllocationMode.MANUAL else None,
-                num_agents=2,
-            )
-
-            computers = create_mock_computers({
-                DeviceName("cpu"): create_fraction_alloc_map({
-                    DeviceId("cpu"): (SlotName("cpu"), Decimal("8")),
-                }),
-            })
-
-            setup_mock_resources(monkeypatch, computers)
-
-            allocator = await ResourceAllocator.new(config, mock_etcd)
-
-            # Scaling factor should always be 1.0
-            factor1 = allocator.get_resource_scaling_factor(AgentId("agent1"))
-            factor2 = allocator.get_resource_scaling_factor(AgentId("agent2"))
-            assert factor1[SlotName("cpu")] == Decimal("1.0")
-            assert factor2[SlotName("cpu")] == Decimal("1.0")
-
-            await allocator.__aexit__(None, None, None)

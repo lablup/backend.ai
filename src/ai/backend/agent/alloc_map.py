@@ -14,6 +14,7 @@ from typing import (
     Any,
     TypeVar,
     final,
+    override,
 )
 
 import attr
@@ -45,6 +46,11 @@ T = TypeVar("T")
 class AllocationStrategy(enum.Enum):
     FILL = 0
     EVENLY = 1
+
+
+class AllocationType(enum.Enum):
+    DISCRETE = 0
+    FRACTIONAL = 1
 
 
 @attr.define()
@@ -280,6 +286,10 @@ class AbstractAllocMap(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def get_allocation_type(self) -> AllocationType:
+        pass
+
 
 class DiscretePropertyAllocMap(AbstractAllocMap):
     """
@@ -499,6 +509,10 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         for slot_name, per_device_alloc in existing_alloc.items():
             for device_id, alloc in per_device_alloc.items():
                 self.allocations[slot_name][device_id] -= alloc
+
+    @override
+    def get_allocation_type(self) -> AllocationType:
+        return AllocationType.DISCRETE
 
 
 class FractionAllocMap(AbstractAllocMap):
@@ -904,3 +918,7 @@ class FractionAllocMap(AbstractAllocMap):
         for slot_name, per_device_alloc in existing_alloc.items():
             for device_id, alloc in per_device_alloc.items():
                 self.allocations[slot_name][device_id] -= alloc
+
+    @override
+    def get_allocation_type(self) -> AllocationType:
+        return AllocationType.FRACTIONAL
