@@ -833,6 +833,20 @@ async def populate_fixture(
                                 rounds=600_000,
                                 salt_size=32,
                             )
+                elif isinstance(col.type, ResourceSlotColumn):
+                    from ai.backend.common.types import ResourceSlot
+
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            if not isinstance(row[col.name], ResourceSlot):
+                                row[col.name] = ResourceSlot.from_json(row[col.name])
+                elif isinstance(col.type, VFolderHostPermissionColumn):
+                    from ai.backend.common.types import VFolderHostPermissionMap
+
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            if not isinstance(row[col.name], VFolderHostPermissionMap):
+                                row[col.name] = VFolderHostPermissionMap(row[col.name])
 
             match op_mode:
                 case FixtureOpModes.INSERT:

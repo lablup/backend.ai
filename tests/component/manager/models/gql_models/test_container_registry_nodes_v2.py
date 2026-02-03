@@ -7,6 +7,7 @@ from graphene.test import Client
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext, Mutation, Query
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -41,8 +42,8 @@ FIXTURES_WITH_NOASSOC = [
                 "is_active": True,
                 "domain_name": "default",
                 "resource_policy": "default",
-                "total_resource_slots": {},
-                "allowed_vfolder_hosts": {},
+                "total_resource_slots": ResourceSlot(),
+                "allowed_vfolder_hosts": VFolderHostPermissionMap(),
                 "type": "general",
             }
         ],
