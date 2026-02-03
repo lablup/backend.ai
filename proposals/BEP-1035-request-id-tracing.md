@@ -140,8 +140,9 @@ Detailed specifications are organized into component-specific documents:
 
 ### Phase 3: App-Proxy Standardization
 
-1. Add HTTP middleware for request ID to Coordinator and Worker
-2. Ensure Worker ↔ Coordinator propagation
+1. Update Manager to propagate request_id to App-Proxy (HTTP header)
+2. Add HTTP middleware for request ID to Coordinator and Worker
+3. Ensure Worker ↔ Coordinator propagation
 
 ### Phase 4: Full Coverage
 
