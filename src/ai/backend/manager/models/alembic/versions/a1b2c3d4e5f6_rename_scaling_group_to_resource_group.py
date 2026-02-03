@@ -105,7 +105,9 @@ def upgrade() -> None:
 
     # === project_usage_buckets ===
     op.drop_index("ix_project_usage_bucket_lookup", table_name="project_usage_buckets")
-    op.drop_constraint("uq_project_usage_bucket", table_name="project_usage_buckets", type_="unique")
+    op.drop_constraint(
+        "uq_project_usage_bucket", table_name="project_usage_buckets", type_="unique"
+    )
     op.alter_column("project_usage_buckets", "scaling_group", new_column_name="resource_group")
     op.create_index(
         "ix_project_usage_bucket_lookup",
@@ -190,7 +192,9 @@ def downgrade() -> None:
     )
 
     # === project_usage_buckets ===
-    op.drop_constraint("uq_project_usage_bucket", table_name="project_usage_buckets", type_="unique")
+    op.drop_constraint(
+        "uq_project_usage_bucket", table_name="project_usage_buckets", type_="unique"
+    )
     op.drop_index("ix_project_usage_bucket_lookup", table_name="project_usage_buckets")
     op.alter_column("project_usage_buckets", "resource_group", new_column_name="scaling_group")
     op.create_index(
