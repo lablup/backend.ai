@@ -42,7 +42,7 @@ class SessionDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_session_owner(self, session_id: str | SessionId) -> UserData | None:
+    async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         async with self._db.begin_readonly_session() as db_sess:
             query = (
                 sa.select(UserRow)

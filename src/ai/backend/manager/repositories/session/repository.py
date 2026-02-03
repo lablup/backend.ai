@@ -48,7 +48,7 @@ class SessionRepository:
         self._db_source = SessionDBSource(db)
 
     @session_repository_resilience.apply()
-    async def get_session_owner(self, session_id: str | SessionId) -> UserData | None:
+    async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         return await self._db_source.get_session_owner(session_id)
 
     @session_repository_resilience.apply()
