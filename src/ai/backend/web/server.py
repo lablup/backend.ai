@@ -11,6 +11,7 @@ import ssl
 import sys
 import time
 import traceback
+import uuid
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -914,6 +915,7 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             service_version=__version__,
             log_level=config.otel.log_level,
             endpoint=config.otel.endpoint,
+            service_instance_id=uuid.uuid4(),
             service_instance_name=instance_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)

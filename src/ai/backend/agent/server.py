@@ -1519,6 +1519,7 @@ async def service_discovery_ctx(
             service_version=meta.version,
             log_level=local_config.otel.log_level,
             endpoint=local_config.otel.endpoint,
+            service_instance_id=meta.id,
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
