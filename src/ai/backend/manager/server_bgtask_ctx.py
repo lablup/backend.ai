@@ -37,6 +37,7 @@ async def manager_bgtask_registry_ctx(root_ctx: RootContext) -> AsyncIterator[No
     registry.register(
         CommitSessionHandler(
             session_repository=root_ctx.repositories.session.repository,
+            image_repository=root_ctx.repositories.image.repository,
             agent_registry=root_ctx.registry,
             event_hub=root_ctx.event_hub,
             event_fetcher=root_ctx.event_fetcher,

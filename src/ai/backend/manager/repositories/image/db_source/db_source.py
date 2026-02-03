@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -37,6 +40,7 @@ from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
+    rescan_images,
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -428,3 +432,16 @@ class ImageDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def rescan_images(
+        self,
+        registry_or_image: str | None = None,
+        project: str | None = None,
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
+        return await rescan_images(
+            self._db,
+            registry_or_image,
+            project,
+            reporter=reporter,
+        )

@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.docker import ImageRef
@@ -314,3 +320,12 @@ class ImageRepository:
         Returns ImageListResult with items and pagination info.
         """
         return await self._db_source.search_images(querier)
+
+    @image_repository_resilience.apply()
+    async def rescan_images(
+        self,
+        registry_or_image: str | None = None,
+        project: str | None = None,
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
+        return await self._db_source.rescan_images(registry_or_image, project, reporter)

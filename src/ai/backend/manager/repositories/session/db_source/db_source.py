@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +12,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
-from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, RescanImagesResult
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
 from ai.backend.manager.data.user.types import UserData
@@ -23,7 +20,7 @@ from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.image import ImageRow, rescan_images
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
@@ -336,19 +333,6 @@ class SessionDBSource:
                 .where(SessionRow.id == session_id)
             )
             return cast(SessionRow | None, await db_session.scalar(select_stmt))
-
-    async def rescan_images(
-        self,
-        image_canonical: str,
-        registry_project: str,
-        reporter: ProgressReporter | None = None,
-    ) -> RescanImagesResult:
-        return await rescan_images(
-            self._db,
-            image_canonical,
-            registry_project,
-            reporter=reporter,
-        )
 
     async def query_userinfo(
         self,

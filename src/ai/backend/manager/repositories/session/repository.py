@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
+from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
@@ -16,7 +13,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
-from ai.backend.manager.data.image.types import ImageIdentifier, RescanImagesResult
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionListResult
 from ai.backend.manager.data.user.types import UserData
@@ -183,15 +180,6 @@ class SessionRepository:
         session_name: str | None = None,
     ) -> SessionRow | None:
         return await self._db_source.modify_session(updater, session_name)
-
-    @session_repository_resilience.apply()
-    async def rescan_images(
-        self,
-        image_canonical: str,
-        registry_project: str,
-        reporter: ProgressReporter | None = None,
-    ) -> RescanImagesResult:
-        return await self._db_source.rescan_images(image_canonical, registry_project, reporter)
 
     @session_repository_resilience.apply()
     async def query_userinfo(
