@@ -93,6 +93,8 @@ type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
+_SHARED_DEVICE_NAMES: Final = frozenset({DeviceName("mem")})
+
 # Regex pattern for natural sort key extraction
 _NATURAL_SORT_PATTERN: Final = re.compile(r"(\d+)")
 
@@ -582,8 +584,6 @@ type ResourceAssignments = Mapping[AgentId, Mapping[DeviceName, Partition]]
 
 
 class ResourcePartitioner:
-    _SHARED_DEVICE_NAMES: Final = frozenset({DeviceName("mem")})
-
     @classmethod
     def generate_shared_assignments(
         cls,
@@ -608,7 +608,7 @@ class ResourcePartitioner:
 
         for device_name, device_info in global_devices.items():
             partitions: Mapping[AgentId, Partition]
-            if device_name in cls._SHARED_DEVICE_NAMES:
+            if device_name in _SHARED_DEVICE_NAMES:
                 partitions = cls._calculate_slot_partitions(device_info, agent_ids, available_slots)
             else:
                 partitions = cls._calculate_device_partitions(device_info.device_ids, agent_ids)
@@ -669,20 +669,23 @@ class ResourcePartitioner:
         """
         num_agents = len(agent_ids)
         device_slot_names = {slot_name for slot_name, _ in device_info.plugin.slot_types}
-        is_fractional = isinstance(device_info.alloc_map, FractionAllocMap)
 
         result: dict[AgentId, SlotPartition] = {}
         for agent_idx, agent_id in enumerate(agent_ids):
             per_agent_slots: dict[SlotName, Decimal] = {}
             for slot_name in device_slot_names:
-                if slot_name in available_slots:
-                    total_amount = available_slots[slot_name]
-                    if is_fractional:
+                if slot_name not in available_slots:
+                    continue
+
+                total_amount = available_slots[slot_name]
+                match device_info.alloc_map.get_allocation_type():
+                    case alloc_map_mod.AllocationType.FRACTIONAL:
                         per_agent_slots[slot_name] = total_amount / num_agents
-                    else:
+                    case alloc_map_mod.AllocationType.DISCRETE:
                         base, remainder = divmod(total_amount, num_agents)
                         extra = Decimal(1) if agent_idx < remainder else Decimal(0)
                         per_agent_slots[slot_name] = base + extra
+
             result[agent_id] = SlotPartition(slots=per_agent_slots)
 
         return result
