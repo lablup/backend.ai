@@ -75,12 +75,14 @@ This leads to:
   External Request              Background Task / Event Handler
         │                                  │
         ▼                                  ▼
-  ┌───────────┐                    ┌───────────────┐
-  │   HTTP    │                    │ Auto-generate │
-  │ Middleware│                    │  request_id   │
-  └─────┬─────┘                    └───────┬───────┘
-        │                                  │
-        └────────────────┬─────────────────┘
+  ┌───────────┐                    ┌─────────────────────────┐
+  │   HTTP    │                    │ 1. Use propagated rid   │
+  │ Middleware│                    │    (from event/context) │
+  └─────┬─────┘                    │ 2. Auto-generate        │
+        │                          │    (fallback only)      │
+        │                          └───────────┬─────────────┘
+        │                                      │
+        └────────────────┬─────────────────────┘
                          ▼
          ┌───────────────────────────────────────┐
          │     _request_id_var (ContextVar)      │
