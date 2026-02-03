@@ -26,7 +26,11 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareSearchResult,
     UserProjectKey,
 )
-from ai.backend.manager.errors.fair_share import FairShareNotFoundError
+from ai.backend.manager.errors.fair_share import (
+    DomainNotConnectedToResourceGroupError,
+    ProjectNotConnectedToResourceGroupError,
+    UserNotConnectedToResourceGroupError,
+)
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -114,31 +118,53 @@ class FairShareDBSource:
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
             return result.row.to_data(spec.default_weight)
 
-    async def get_domain_fair_share(
+    async def get_rg_scoped_domain_fair_share(
         self,
         resource_group: str,
         domain_name: str,
-    ) -> DomainFairShareData:
+    ) -> DomainFairShareData | None:
         """Get a domain fair share record by scaling group and domain name.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            DomainFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the domain fair share is not found.
+            DomainNotConnectedToResourceGroupError: If domain is not connected to resource group.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DomainFairShareRow).where(
-                sa.and_(
-                    DomainFairShareRow.resource_group == resource_group,
-                    DomainFairShareRow.domain_name == domain_name,
+            query = (
+                sa.select(
+                    ScalingGroupForDomainRow.domain,
+                    DomainFairShareRow,
+                )
+                .select_from(ScalingGroupForDomainRow)
+                .outerjoin(
+                    DomainFairShareRow,
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group == DomainFairShareRow.resource_group,
+                        ScalingGroupForDomainRow.domain == DomainFairShareRow.domain_name,
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        ScalingGroupForDomainRow.scaling_group == resource_group,
+                        ScalingGroupForDomainRow.domain == domain_name,
+                    )
                 )
             )
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
+            row = result.one_or_none()
             if row is None:
-                raise FairShareNotFoundError(
-                    f"Domain fair share not found: resource_group={resource_group}, domain_name={domain_name}"
-                )
+                raise DomainNotConnectedToResourceGroupError(domain_name, resource_group)
+
+            fair_share_row: DomainFairShareRow | None = row.DomainFairShareRow
+            if fair_share_row is None:
+                return None
+
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            return fair_share_row.to_data(spec.default_weight)
 
     async def search_domain_fair_shares(
         self,
@@ -167,7 +193,7 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_domain_fair_share_entities(
+    async def search_rg_scoped_domain_fair_shares(
         self,
         scope: DomainFairShareSearchScope,
         querier: BatchQuerier,
@@ -177,6 +203,9 @@ class FairShareDBSource:
         This method returns all domains associated with a resource group,
         regardless of whether they have fair share records.
 
+        Query is based on ScalingGroupForDomainRow (domains connected to resource group),
+        with LEFT JOIN to DomainFairShareRow for optional fair share details.
+
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
@@ -185,11 +214,12 @@ class FairShareDBSource:
             DomainFairShareEntitySearchResult with domain entities and their optional fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: domains associated with resource_group LEFT JOIN fair_share
+            # Build query from ScalingGroupForDomainRow (connection table)
+            # LEFT JOIN with DomainFairShareRow for optional fair share details
             query = (
                 sa.select(
+                    ScalingGroupForDomainRow.domain.label("domain_name"),
                     ScalingGroupForDomainRow.scaling_group,
-                    ScalingGroupForDomainRow.domain,
                     DomainFairShareRow,
                 )
                 .select_from(ScalingGroupForDomainRow)
@@ -210,7 +240,7 @@ class FairShareDBSource:
             items = [
                 self._build_domain_entity_item(
                     resource_group=row.scaling_group,
-                    domain_name=row.domain,
+                    domain_name=row.domain_name,
                     fair_share_row=row.DomainFairShareRow,
                     default_weight=spec.default_weight,
                 )
@@ -264,31 +294,56 @@ class FairShareDBSource:
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
             return result.row.to_data(spec.default_weight)
 
-    async def get_project_fair_share(
+    async def get_rg_scoped_project_fair_share(
         self,
         resource_group: str,
         project_id: uuid.UUID,
-    ) -> ProjectFairShareData:
+    ) -> ProjectFairShareData | None:
         """Get a project fair share record by scaling group and project ID.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            ProjectFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the project fair share is not found.
+            ProjectNotConnectedToResourceGroupError: If project is not connected to resource group.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ProjectFairShareRow).where(
-                sa.and_(
-                    ProjectFairShareRow.resource_group == resource_group,
-                    ProjectFairShareRow.project_id == project_id,
+            query = (
+                sa.select(
+                    ScalingGroupForProjectRow.group,
+                    GroupRow.domain_name,
+                    ProjectFairShareRow,
+                )
+                .select_from(ScalingGroupForProjectRow)
+                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .outerjoin(
+                    ProjectFairShareRow,
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group
+                        == ProjectFairShareRow.resource_group,
+                        ScalingGroupForProjectRow.group == ProjectFairShareRow.project_id,
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == resource_group,
+                        ScalingGroupForProjectRow.group == project_id,
+                    )
                 )
             )
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
+            row = result.one_or_none()
             if row is None:
-                raise FairShareNotFoundError(
-                    f"Project fair share not found: resource_group={resource_group}, project_id={project_id}"
-                )
+                raise ProjectNotConnectedToResourceGroupError(str(project_id), resource_group)
+
+            fair_share_row: ProjectFairShareRow | None = row.ProjectFairShareRow
+            if fair_share_row is None:
+                return None
+
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            return fair_share_row.to_data(spec.default_weight)
 
     async def search_project_fair_shares(
         self,
@@ -317,7 +372,7 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_project_fair_share_entities(
+    async def search_rg_scoped_project_fair_shares(
         self,
         scope: ProjectFairShareSearchScope,
         querier: BatchQuerier,
@@ -327,6 +382,10 @@ class FairShareDBSource:
         This method returns all projects associated with a resource group,
         regardless of whether they have fair share records.
 
+        Query is based on ScalingGroupForProjectRow (projects connected to resource group),
+        with JOIN to GroupRow for domain_name, and LEFT JOIN to ProjectFairShareRow
+        for optional fair share details.
+
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
@@ -335,17 +394,18 @@ class FairShareDBSource:
             ProjectFairShareEntitySearchResult with project entities and their optional fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: projects associated with resource_group LEFT JOIN fair_share
+            # Build query from ScalingGroupForProjectRow (connection table)
+            # JOIN with GroupRow to get domain_name
+            # LEFT JOIN with ProjectFairShareRow for optional fair share details
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
                     ScalingGroupForProjectRow.group.label("project_id"),
-                    DomainRow.name.label("domain_name"),
+                    GroupRow.domain_name.label("domain_name"),
+                    ScalingGroupForProjectRow.scaling_group,
                     ProjectFairShareRow,
                 )
                 .select_from(ScalingGroupForProjectRow)
                 .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
-                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .outerjoin(
                     ProjectFairShareRow,
                     sa.and_(
@@ -480,34 +540,65 @@ class FairShareDBSource:
                 index_elements=["resource_group", "user_uuid", "project_id"],
             )
 
-    async def get_user_fair_share(
+    async def get_rg_scoped_user_fair_share(
         self,
         resource_group: str,
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
-    ) -> UserFairShareData:
+    ) -> UserFairShareData | None:
         """Get a user fair share record by scaling group, project ID, and user UUID.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            UserFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the user fair share is not found.
+            UserNotConnectedToResourceGroupError: If user's project is not connected to resource group.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(UserFairShareRow).where(
-                sa.and_(
-                    UserFairShareRow.resource_group == resource_group,
-                    UserFairShareRow.project_id == project_id,
-                    UserFairShareRow.user_uuid == user_uuid,
+            query = (
+                sa.select(
+                    AssocGroupUserRow.user_id,
+                    AssocGroupUserRow.group_id,
+                    GroupRow.domain_name,
+                    UserFairShareRow,
+                )
+                .select_from(ScalingGroupForProjectRow)
+                .join(
+                    AssocGroupUserRow,
+                    ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id,
+                )
+                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+                .outerjoin(
+                    UserFairShareRow,
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == UserFairShareRow.resource_group,
+                        AssocGroupUserRow.user_id == UserFairShareRow.user_uuid,
+                        AssocGroupUserRow.group_id == UserFairShareRow.project_id,
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        ScalingGroupForProjectRow.scaling_group == resource_group,
+                        AssocGroupUserRow.group_id == project_id,
+                        AssocGroupUserRow.user_id == user_uuid,
+                    )
                 )
             )
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
+            row = result.one_or_none()
             if row is None:
-                raise FairShareNotFoundError(
-                    f"User fair share not found: resource_group={resource_group}, "
-                    f"project_id={project_id}, user_uuid={user_uuid}"
+                raise UserNotConnectedToResourceGroupError(
+                    str(user_uuid), str(project_id), resource_group
                 )
+
+            fair_share_row: UserFairShareRow | None = row.UserFairShareRow
+            if fair_share_row is None:
+                return None
+
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            return fair_share_row.to_data(spec.default_weight)
 
     async def get_user_project_info(
         self,
@@ -604,7 +695,7 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_user_fair_share_entities(
+    async def search_rg_scoped_user_fair_shares(
         self,
         scope: UserFairShareSearchScope,
         querier: BatchQuerier,
@@ -614,6 +705,10 @@ class FairShareDBSource:
         This method returns all users associated with a resource group (via project membership),
         regardless of whether they have fair share records.
 
+        Query is based on ScalingGroupForProjectRow (projects connected to resource group),
+        with JOIN to AssocGroupUserRow for user memberships, JOIN to GroupRow for domain_name,
+        and LEFT JOIN to UserFairShareRow for optional fair share details.
+
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
@@ -622,23 +717,24 @@ class FairShareDBSource:
             UserFairShareEntitySearchResult with user entities and their optional fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query:
-            # Users in projects associated with resource_group LEFT JOIN fair_share
-            # Path: ScalingGroupForProjectRow -> AssocGroupUserRow -> UserFairShareRow
+            # Build query from ScalingGroupForProjectRow (connection table)
+            # JOIN with AssocGroupUserRow to get users in connected projects
+            # JOIN with GroupRow to get domain_name
+            # LEFT JOIN with UserFairShareRow for optional fair share details
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
                     AssocGroupUserRow.user_id.label("user_uuid"),
                     AssocGroupUserRow.group_id.label("project_id"),
-                    DomainRow.name.label("domain_name"),
+                    GroupRow.domain_name.label("domain_name"),
+                    ScalingGroupForProjectRow.scaling_group,
                     UserFairShareRow,
                 )
                 .select_from(ScalingGroupForProjectRow)
                 .join(
-                    AssocGroupUserRow, ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id
+                    AssocGroupUserRow,
+                    ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id,
                 )
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
-                .join(DomainRow, GroupRow.domain_name == DomainRow.name)
+                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(

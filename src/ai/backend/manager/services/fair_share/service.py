@@ -15,9 +15,6 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareData,
     UserFairShareData,
 )
-from ai.backend.manager.errors.fair_share import FairShareNotFoundError
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -127,14 +124,14 @@ class FairShareService:
     ) -> DomainFairShareData:
         """Create default DomainFairShareData for domains without fair share records.
 
-        Sets weight=None to ensure uses_default=true in GraphQL.
+        Sets weight=None and uses_default=True to indicate this is generated from defaults.
         """
         return DomainFairShareData(
             id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted records
             resource_group=resource_group,
             domain_name=domain_name,
             spec=FairShareSpec(
-                weight=None,  # None triggers uses_default=true in GraphQL
+                weight=None,  # None indicates using resource group's default weight
                 half_life_days=scaling_group_spec.half_life_days,
                 lookback_days=scaling_group_spec.lookback_days,
                 decay_unit_days=scaling_group_spec.decay_unit_days,
@@ -143,6 +140,7 @@ class FairShareService:
             calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
             metadata=self._create_default_metadata(),
             default_weight=scaling_group_spec.default_weight,
+            uses_default=True,
         )
 
     def _create_default_project_fair_share(
@@ -152,7 +150,10 @@ class FairShareService:
         domain_name: str,
         scaling_group_spec: FairShareScalingGroupSpec,
     ) -> ProjectFairShareData:
-        """Create default ProjectFairShareData for projects without fair share records."""
+        """Create default ProjectFairShareData for projects without fair share records.
+
+        Sets uses_default=True to indicate this is generated from defaults.
+        """
         return ProjectFairShareData(
             id=uuid.UUID(int=0),
             resource_group=resource_group,
@@ -168,6 +169,7 @@ class FairShareService:
             calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
             metadata=self._create_default_metadata(),
             default_weight=scaling_group_spec.default_weight,
+            uses_default=True,
         )
 
     def _create_default_user_fair_share(
@@ -178,7 +180,10 @@ class FairShareService:
         domain_name: str,
         scaling_group_spec: FairShareScalingGroupSpec,
     ) -> UserFairShareData:
-        """Create default UserFairShareData for users without fair share records."""
+        """Create default UserFairShareData for users without fair share records.
+
+        Sets uses_default=True to indicate this is generated from defaults.
+        """
         return UserFairShareData(
             id=uuid.UUID(int=0),
             resource_group=resource_group,
@@ -195,6 +200,7 @@ class FairShareService:
             calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
             metadata=self._create_default_metadata(),
             default_weight=scaling_group_spec.default_weight,
+            uses_default=True,
             scheduling_rank=None,  # No rank calculated yet
         )
 
@@ -205,37 +211,31 @@ class FairShareService:
     ) -> GetDomainFairShareActionResult:
         """Get a domain fair share record.
 
-        If the record doesn't exist but the domain exists, returns default
-        fair share data using the resource group's default configuration.
+        If the record doesn't exist but the domain is connected to the resource group,
+        returns default fair share data using the resource group's default configuration.
+
+        Raises:
+            DomainNotConnectedToResourceGroupError: If the domain is not connected
+                to the specified resource group.
         """
-        try:
-            result = await self._repository.get_domain_fair_share(
-                resource_group=action.resource_group,
-                domain_name=action.domain_name,
-            )
+        result = await self._repository.get_rg_scoped_domain_fair_share(
+            resource_group=action.resource_group,
+            domain_name=action.domain_name,
+        )
+
+        if result is not None:
             return GetDomainFairShareActionResult(data=result)
-        except FairShareNotFoundError as e:
-            # Check if domain exists
-            domain_exists = await self._repository.get_domain_exists(action.domain_name)
-            if not domain_exists:
-                raise DomainNotFound() from e
 
-            # Get scaling group spec for default values
-            scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
-                action.resource_group
-            )
-
-            # Create default fair share data
-            default_data = DomainFairShareData(
-                id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
-                resource_group=action.resource_group,
-                domain_name=action.domain_name,
-                spec=self._create_default_spec(scaling_group_spec),
-                calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
-                metadata=self._create_default_metadata(),
-                default_weight=scaling_group_spec.default_weight,
-            )
-            return GetDomainFairShareActionResult(data=default_data)
+        # Domain is connected but has no fair share record - create default
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.resource_group
+        )
+        default_data = self._create_default_domain_fair_share(
+            resource_group=action.resource_group,
+            domain_name=action.domain_name,
+            scaling_group_spec=scaling_group_spec,
+        )
+        return GetDomainFairShareActionResult(data=default_data)
 
     async def search_domain_fair_shares(
         self, action: SearchDomainFairSharesAction
@@ -262,7 +262,7 @@ class FairShareService:
         without fair share records.
         """
         # Call entity-based repository method
-        entity_result = await self._repository.search_domain_fair_share_entities(
+        entity_result = await self._repository.search_rg_scoped_domain_fair_shares(
             action.scope, action.querier
         )
 
@@ -296,38 +296,39 @@ class FairShareService:
     ) -> GetProjectFairShareActionResult:
         """Get a project fair share record.
 
-        If the record doesn't exist but the project exists, returns default
-        fair share data using the resource group's default configuration.
+        If the record doesn't exist but the project is connected to the resource group,
+        returns default fair share data using the resource group's default configuration.
+
+        Raises:
+            ProjectNotConnectedToResourceGroupError: If the project is not connected
+                to the specified resource group.
         """
-        try:
-            result = await self._repository.get_project_fair_share(
-                resource_group=action.resource_group,
-                project_id=action.project_id,
-            )
+        result = await self._repository.get_rg_scoped_project_fair_share(
+            resource_group=action.resource_group,
+            project_id=action.project_id,
+        )
+
+        if result is not None:
             return GetProjectFairShareActionResult(data=result)
-        except FairShareNotFoundError as e:
-            # Check if project exists and get domain_name
-            domain_name = await self._repository.get_project_info(action.project_id)
-            if domain_name is None:
-                raise ProjectNotFound() from e
 
-            # Get scaling group spec for default values
-            scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
-                action.resource_group
-            )
+        # Project is connected but has no fair share record - create default
+        # We need domain_name for the default data
+        domain_name = await self._repository.get_project_info(action.project_id)
+        if domain_name is None:
+            # This shouldn't happen if project is connected to resource group
+            # but handle defensively
+            domain_name = ""
 
-            # Create default fair share data
-            default_data = ProjectFairShareData(
-                id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
-                resource_group=action.resource_group,
-                project_id=action.project_id,
-                domain_name=domain_name,
-                spec=self._create_default_spec(scaling_group_spec),
-                calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
-                metadata=self._create_default_metadata(),
-                default_weight=scaling_group_spec.default_weight,
-            )
-            return GetProjectFairShareActionResult(data=default_data)
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.resource_group
+        )
+        default_data = self._create_default_project_fair_share(
+            resource_group=action.resource_group,
+            project_id=action.project_id,
+            domain_name=domain_name,
+            scaling_group_spec=scaling_group_spec,
+        )
+        return GetProjectFairShareActionResult(data=default_data)
 
     async def search_project_fair_shares(
         self, action: SearchProjectFairSharesAction
@@ -354,7 +355,7 @@ class FairShareService:
         without fair share records.
         """
         # Call entity-based repository method
-        entity_result = await self._repository.search_project_fair_share_entities(
+        entity_result = await self._repository.search_rg_scoped_project_fair_shares(
             action.scope, action.querier
         )
 
@@ -389,43 +390,44 @@ class FairShareService:
     ) -> GetUserFairShareActionResult:
         """Get a user fair share record.
 
-        If the record doesn't exist but the user exists in the project, returns
-        default fair share data using the resource group's default configuration.
+        If the record doesn't exist but the user is connected to the resource group
+        (via project membership), returns default fair share data using the resource
+        group's default configuration.
+
+        Raises:
+            UserNotConnectedToResourceGroupError: If the user's project is not connected
+                to the specified resource group.
         """
-        try:
-            result = await self._repository.get_user_fair_share(
-                resource_group=action.resource_group,
-                project_id=action.project_id,
-                user_uuid=action.user_uuid,
-            )
+        result = await self._repository.get_rg_scoped_user_fair_share(
+            resource_group=action.resource_group,
+            project_id=action.project_id,
+            user_uuid=action.user_uuid,
+        )
+
+        if result is not None:
             return GetUserFairShareActionResult(data=result)
-        except FairShareNotFoundError as e:
-            # Check if user exists in project and get domain_name
-            domain_name = await self._repository.get_user_project_info(
-                action.project_id, action.user_uuid
-            )
-            if domain_name is None:
-                raise UserNotFound() from e
 
-            # Get scaling group spec for default values
-            scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
-                action.resource_group
-            )
+        # User is connected but has no fair share record - create default
+        # We need domain_name for the default data
+        domain_name = await self._repository.get_user_project_info(
+            action.project_id, action.user_uuid
+        )
+        if domain_name is None:
+            # This shouldn't happen if user is connected to resource group
+            # but handle defensively
+            domain_name = ""
 
-            # Create default fair share data
-            default_data = UserFairShareData(
-                id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
-                resource_group=action.resource_group,
-                user_uuid=action.user_uuid,
-                project_id=action.project_id,
-                domain_name=domain_name,
-                spec=self._create_default_spec(scaling_group_spec),
-                calculation_snapshot=self._create_default_calculation_snapshot(scaling_group_spec),
-                metadata=self._create_default_metadata(),
-                default_weight=scaling_group_spec.default_weight,
-                scheduling_rank=None,  # No rank calculated yet
-            )
-            return GetUserFairShareActionResult(data=default_data)
+        scaling_group_spec = await self._repository.get_scaling_group_fair_share_spec(
+            action.resource_group
+        )
+        default_data = self._create_default_user_fair_share(
+            resource_group=action.resource_group,
+            user_uuid=action.user_uuid,
+            project_id=action.project_id,
+            domain_name=domain_name,
+            scaling_group_spec=scaling_group_spec,
+        )
+        return GetUserFairShareActionResult(data=default_data)
 
     async def search_user_fair_shares(
         self, action: SearchUserFairSharesAction
@@ -452,7 +454,7 @@ class FairShareService:
         without fair share records.
         """
         # Call entity-based repository method
-        entity_result = await self._repository.search_user_fair_share_entities(
+        entity_result = await self._repository.search_rg_scoped_user_fair_shares(
             action.scope, action.querier
         )
 

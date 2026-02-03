@@ -97,6 +97,8 @@ class DomainFairShareData:
     metadata: FairShareMetadata
     default_weight: Decimal
     """Resource group's default weight for entities without explicit weight."""
+    uses_default: bool = False
+    """True if this data was generated from defaults (no fair share record exists)."""
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,8 @@ class ProjectFairShareData:
     metadata: FairShareMetadata
     default_weight: Decimal
     """Resource group's default weight for entities without explicit weight."""
+    uses_default: bool = False
+    """True if this data was generated from defaults (no fair share record exists)."""
 
 
 @dataclass(frozen=True)
@@ -128,6 +132,8 @@ class UserFairShareData:
     metadata: FairShareMetadata
     default_weight: Decimal
     """Resource group's default weight for entities without explicit weight."""
+    uses_default: bool = False
+    """True if this data was generated from defaults (no fair share record exists)."""
     scheduling_rank: int | None = None
     """Computed scheduling priority rank. Lower value = higher priority.
     None means rank calculation has not been performed yet."""

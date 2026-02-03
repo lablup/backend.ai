@@ -102,17 +102,22 @@ class FairShareRepository:
         return await self._db_source.upsert_domain_fair_share(upserter)
 
     @fair_share_repository_resilience.apply()
-    async def get_domain_fair_share(
+    async def get_rg_scoped_domain_fair_share(
         self,
         resource_group: str,
         domain_name: str,
-    ) -> DomainFairShareData:
+    ) -> DomainFairShareData | None:
         """Get a domain fair share record by scaling group and domain name.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            DomainFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the domain fair share is not found.
+            DomainNotConnectedToResourceGroupError: If domain is not connected to resource group.
         """
-        return await self._db_source.get_domain_fair_share(resource_group, domain_name)
+        return await self._db_source.get_rg_scoped_domain_fair_share(resource_group, domain_name)
 
     @fair_share_repository_resilience.apply()
     async def search_domain_fair_shares(
@@ -123,7 +128,7 @@ class FairShareRepository:
         return await self._db_source.search_domain_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_domain_fair_share_entities(
+    async def search_rg_scoped_domain_fair_shares(
         self,
         scope: DomainFairShareSearchScope,
         querier: BatchQuerier,
@@ -140,7 +145,7 @@ class FairShareRepository:
         Returns:
             DomainFairShareEntitySearchResult with domain entities and their optional details.
         """
-        return await self._db_source.search_domain_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_scoped_domain_fair_shares(scope, querier)
 
     # ==================== Project Fair Share ====================
 
@@ -161,17 +166,22 @@ class FairShareRepository:
         return await self._db_source.upsert_project_fair_share(upserter)
 
     @fair_share_repository_resilience.apply()
-    async def get_project_fair_share(
+    async def get_rg_scoped_project_fair_share(
         self,
         resource_group: str,
         project_id: uuid.UUID,
-    ) -> ProjectFairShareData:
+    ) -> ProjectFairShareData | None:
         """Get a project fair share record by scaling group and project ID.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            ProjectFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the project fair share is not found.
+            ProjectNotConnectedToResourceGroupError: If project is not connected to resource group.
         """
-        return await self._db_source.get_project_fair_share(resource_group, project_id)
+        return await self._db_source.get_rg_scoped_project_fair_share(resource_group, project_id)
 
     @fair_share_repository_resilience.apply()
     async def search_project_fair_shares(
@@ -182,7 +192,7 @@ class FairShareRepository:
         return await self._db_source.search_project_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_project_fair_share_entities(
+    async def search_rg_scoped_project_fair_shares(
         self,
         scope: ProjectFairShareSearchScope,
         querier: BatchQuerier,
@@ -199,7 +209,7 @@ class FairShareRepository:
         Returns:
             ProjectFairShareEntitySearchResult with project entities and their optional details.
         """
-        return await self._db_source.search_project_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_scoped_project_fair_shares(scope, querier)
 
     # ==================== User Fair Share ====================
 
@@ -246,18 +256,25 @@ class FairShareRepository:
         return await self._db_source.bulk_upsert_user_fair_share(bulk_upserter)
 
     @fair_share_repository_resilience.apply()
-    async def get_user_fair_share(
+    async def get_rg_scoped_user_fair_share(
         self,
         resource_group: str,
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
-    ) -> UserFairShareData:
+    ) -> UserFairShareData | None:
         """Get a user fair share record by scaling group, project ID, and user UUID.
 
+        Queries from connection table with LEFT JOIN to fair share.
+
+        Returns:
+            UserFairShareData if fair share record exists, None if connected but no record.
+
         Raises:
-            FairShareNotFoundError: If the user fair share is not found.
+            UserNotConnectedToResourceGroupError: If user's project is not connected to resource group.
         """
-        return await self._db_source.get_user_fair_share(resource_group, project_id, user_uuid)
+        return await self._db_source.get_rg_scoped_user_fair_share(
+            resource_group, project_id, user_uuid
+        )
 
     @fair_share_repository_resilience.apply()
     async def search_user_fair_shares(
@@ -268,7 +285,7 @@ class FairShareRepository:
         return await self._db_source.search_user_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_user_fair_share_entities(
+    async def search_rg_scoped_user_fair_shares(
         self,
         scope: UserFairShareSearchScope,
         querier: BatchQuerier,
@@ -285,7 +302,7 @@ class FairShareRepository:
         Returns:
             UserFairShareEntitySearchResult with user entities and their optional details.
         """
-        return await self._db_source.search_user_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_scoped_user_fair_shares(scope, querier)
 
     # ==================== Entity Info & Spec ====================
 

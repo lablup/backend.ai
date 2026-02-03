@@ -61,6 +61,12 @@ class DomainFairShareGQL(Node):
     updated_at: datetime = strawberry.field(
         description="Timestamp when this record was last updated."
     )
+    uses_default: bool = strawberry.field(
+        description=(
+            "Added in 26.2.0. True if this fair share data was generated from default values "
+            "(no fair share record exists in the database). False if this is actual stored data."
+        )
+    )
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -121,6 +127,7 @@ class DomainFairShareGQL(Node):
             ),
             created_at=data.metadata.created_at,
             updated_at=data.metadata.updated_at,
+            uses_default=data.uses_default,
         )
 
 
