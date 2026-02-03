@@ -19,14 +19,16 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserCreateResultData, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserData, UserSearchResult
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -182,6 +184,48 @@ class UserRepository:
     ) -> int:
         """Delete user's keypairs including Valkey concurrency cleanup."""
         return await self._db_source.delete_keypairs_with_valkey(user_uuid, valkey_stat_client)
+
+    @user_repository_resilience.apply()
+    async def search_users(self, querier: BatchQuerier) -> UserSearchResult:
+        """Search all users with pagination and filters (admin only).
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users(querier=querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_domain(
+        self, scope: DomainUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users within a domain.
+
+        Args:
+            scope: DomainUserSearchScope defining the domain to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users_by_domain(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_project(
+        self, scope: ProjectUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users within a project.
+
+        Args:
+            scope: ProjectUserSearchScope defining the project to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users_by_project(scope, querier)
 
     async def _get_time_binned_monthly_stats(
         self,

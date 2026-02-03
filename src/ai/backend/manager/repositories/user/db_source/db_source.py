@@ -21,7 +21,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreateResultData, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserData, UserSearchResult
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -35,7 +35,12 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
+from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
+    ProjectType,
+    association_groups_users,
+    groups,
+)
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
@@ -67,6 +72,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
@@ -81,6 +87,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_purger,
     create_user_vfolder_permission_purger,
 )
+from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -783,4 +790,91 @@ class UserDBSource:
         if endpoint_ids_to_delete:
             await session.execute(
                 sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
+            )
+
+    # ==================== Search Methods ====================
+
+    async def search_users(
+        self,
+        querier: BatchQuerier,
+    ) -> UserSearchResult:
+        """Search all users with pagination and filters (admin only).
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(UserRow)
+            result = await execute_batch_querier(db_session, query, querier)
+
+            items = [row.UserRow.to_data() for row in result.rows]
+            return UserSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_users_by_domain(
+        self,
+        scope: DomainUserSearchScope,
+        querier: BatchQuerier,
+    ) -> UserSearchResult:
+        """Search users within a domain.
+
+        Args:
+            scope: DomainUserSearchScope defining the domain to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(UserRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+
+            items = [row.UserRow.to_data() for row in result.rows]
+            return UserSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_users_by_project(
+        self,
+        scope: ProjectUserSearchScope,
+        querier: BatchQuerier,
+    ) -> UserSearchResult:
+        """Search users within a project.
+
+        Joins with association_groups_users to find project members.
+
+        Args:
+            scope: ProjectUserSearchScope defining the project to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(UserRow)
+                .select_from(UserRow)
+                .join(
+                    AssocGroupUserRow,
+                    UserRow.uuid == AssocGroupUserRow.user_id,
+                )
+            )
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+
+            items = [row.UserRow.to_data() for row in result.rows]
+            return UserSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

@@ -23,6 +23,18 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from ai.backend.manager.services.user.actions.search_users import (
+    SearchUsersAction,
+    SearchUsersActionResult,
+)
+from ai.backend.manager.services.user.actions.search_users_by_domain import (
+    SearchUsersByDomainAction,
+    SearchUsersByDomainActionResult,
+)
+from ai.backend.manager.services.user.actions.search_users_by_project import (
+    SearchUsersByProjectAction,
+    SearchUsersByProjectActionResult,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -37,6 +49,13 @@ class UserProcessors(AbstractProcessorPackage):
     purge_user: ActionProcessor[PurgeUserAction, PurgeUserActionResult]
     user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
     admin_month_stats: ActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
+    search_users: ActionProcessor[SearchUsersAction, SearchUsersActionResult]
+    search_users_by_domain: ActionProcessor[
+        SearchUsersByDomainAction, SearchUsersByDomainActionResult
+    ]
+    search_users_by_project: ActionProcessor[
+        SearchUsersByProjectAction, SearchUsersByProjectActionResult
+    ]
 
     def __init__(self, user_service: UserService, action_monitors: list[ActionMonitor]) -> None:
         self.create_user = ActionProcessor(user_service.create_user, action_monitors)
@@ -45,6 +64,13 @@ class UserProcessors(AbstractProcessorPackage):
         self.purge_user = ActionProcessor(user_service.purge_user, action_monitors)
         self.user_month_stats = ActionProcessor(user_service.user_month_stats, action_monitors)
         self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
+        self.search_users = ActionProcessor(user_service.search_users, action_monitors)
+        self.search_users_by_domain = ActionProcessor(
+            user_service.search_users_by_domain, action_monitors
+        )
+        self.search_users_by_project = ActionProcessor(
+            user_service.search_users_by_project, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -55,4 +81,7 @@ class UserProcessors(AbstractProcessorPackage):
             PurgeUserAction.spec(),
             UserMonthStatsAction.spec(),
             AdminMonthStatsAction.spec(),
+            SearchUsersAction.spec(),
+            SearchUsersByDomainAction.spec(),
+            SearchUsersByProjectAction.spec(),
         ]
