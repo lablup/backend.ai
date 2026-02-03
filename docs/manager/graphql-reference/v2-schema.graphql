@@ -2675,7 +2675,7 @@ type KernelSessionInfo {
   sessionType: SessionTypes!
 }
 
-"""Added in 26.2.0"""
+"""Added in 26.2.0. Status of a kernel in its lifecycle."""
 enum KernelStatus {
   PENDING
   SCHEDULED

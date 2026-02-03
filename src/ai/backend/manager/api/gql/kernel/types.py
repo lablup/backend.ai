@@ -30,7 +30,98 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
-KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.2.0")
+
+@strawberry.enum(
+    name="KernelStatus",
+    description="Added in 26.2.0. Status of a kernel in its lifecycle.",
+)
+class KernelStatusGQL(StrEnum):
+    """GraphQL enum for kernel status."""
+
+    PENDING = "PENDING"
+    SCHEDULED = "SCHEDULED"
+    PREPARING = "PREPARING"
+    BUILDING = "BUILDING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
+    RUNNING = "RUNNING"
+    RESTARTING = "RESTARTING"
+    RESIZING = "RESIZING"
+    SUSPENDED = "SUSPENDED"
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+    ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
+
+    @classmethod
+    def from_internal(cls, internal_status: KernelStatus) -> KernelStatusGQL:
+        """Convert internal KernelStatus to GraphQL enum."""
+        match internal_status:
+            case KernelStatus.PENDING:
+                return cls.PENDING
+            case KernelStatus.SCHEDULED:
+                return cls.SCHEDULED
+            case KernelStatus.PREPARING:
+                return cls.PREPARING
+            case KernelStatus.BUILDING:
+                return cls.BUILDING
+            case KernelStatus.PULLING:
+                return cls.PULLING
+            case KernelStatus.PREPARED:
+                return cls.PREPARED
+            case KernelStatus.CREATING:
+                return cls.CREATING
+            case KernelStatus.RUNNING:
+                return cls.RUNNING
+            case KernelStatus.RESTARTING:
+                return cls.RESTARTING
+            case KernelStatus.RESIZING:
+                return cls.RESIZING
+            case KernelStatus.SUSPENDED:
+                return cls.SUSPENDED
+            case KernelStatus.TERMINATING:
+                return cls.TERMINATING
+            case KernelStatus.TERMINATED:
+                return cls.TERMINATED
+            case KernelStatus.ERROR:
+                return cls.ERROR
+            case KernelStatus.CANCELLED:
+                return cls.CANCELLED
+
+    def to_internal(self) -> KernelStatus:
+        """Convert GraphQL enum to internal KernelStatus."""
+        match self:
+            case KernelStatusGQL.PENDING:
+                return KernelStatus.PENDING
+            case KernelStatusGQL.SCHEDULED:
+                return KernelStatus.SCHEDULED
+            case KernelStatusGQL.PREPARING:
+                return KernelStatus.PREPARING
+            case KernelStatusGQL.BUILDING:
+                return KernelStatus.BUILDING
+            case KernelStatusGQL.PULLING:
+                return KernelStatus.PULLING
+            case KernelStatusGQL.PREPARED:
+                return KernelStatus.PREPARED
+            case KernelStatusGQL.CREATING:
+                return KernelStatus.CREATING
+            case KernelStatusGQL.RUNNING:
+                return KernelStatus.RUNNING
+            case KernelStatusGQL.RESTARTING:
+                return KernelStatus.RESTARTING
+            case KernelStatusGQL.RESIZING:
+                return KernelStatus.RESIZING
+            case KernelStatusGQL.SUSPENDED:
+                return KernelStatus.SUSPENDED
+            case KernelStatusGQL.TERMINATING:
+                return KernelStatus.TERMINATING
+            case KernelStatusGQL.TERMINATED:
+                return KernelStatus.TERMINATED
+            case KernelStatusGQL.ERROR:
+                return KernelStatus.ERROR
+            case KernelStatusGQL.CANCELLED:
+                return KernelStatus.CANCELLED
 
 
 @dataclass(frozen=True)
@@ -72,14 +163,14 @@ class KernelStatusFilterGQL:
         if self.in_:
             return in_factory(
                 KernelStatusInMatchSpec(
-                    values=self.in_,
+                    values=[s.to_internal() for s in self.in_],
                     negated=False,
                 )
             )
         if self.not_in:
             return in_factory(
                 KernelStatusInMatchSpec(
-                    values=self.not_in,
+                    values=[s.to_internal() for s in self.not_in],
                     negated=True,
                 )
             )
@@ -374,7 +465,7 @@ class KernelV2GQL(Node):
                 resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
             ),
             lifecycle=KernelLifecycleInfoGQL(
-                status=KernelStatusGQL(kernel_info.lifecycle.status),
+                status=KernelStatusGQL.from_internal(kernel_info.lifecycle.status),
                 result=SessionResult(kernel_info.lifecycle.result),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
