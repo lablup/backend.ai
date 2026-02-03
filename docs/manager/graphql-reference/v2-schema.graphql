@@ -5349,7 +5349,7 @@ type ServicePortEntry {
   name: String!
 
   """Protocol type for this service port (http, tcp, preopen, internal)."""
-  protocol: ServicePortProtocols!
+  protocol: ServicePortProtocol!
 
   """Port numbers inside the container."""
   containerPorts: [Int!]!
@@ -5361,7 +5361,8 @@ type ServicePortEntry {
   isInference: Boolean!
 }
 
-enum ServicePortProtocols {
+"""Added in 26.2.0. Protocol type for service ports."""
+enum ServicePortProtocol {
   HTTP
   TCP
   PREOPEN
