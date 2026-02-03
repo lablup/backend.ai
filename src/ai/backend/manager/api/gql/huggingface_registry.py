@@ -2,20 +2,25 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
+from ai.backend.manager.repositories.huggingface_registry.updaters import (
+    HuggingFaceRegistryUpdaterSpec,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -34,8 +39,8 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
@@ -44,7 +49,7 @@ class HuggingFaceRegistry(Node):
     id: NodeID[str]
     url: str
     name: str
-    token: Optional[str]
+    token: str | None
 
     @classmethod
     def from_dataclass(cls, data: HuggingFaceRegistryData) -> Self:
@@ -58,7 +63,7 @@ class HuggingFaceRegistry(Node):
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
-    ) -> list["HuggingFaceRegistry"]:
+    ) -> list[HuggingFaceRegistry]:
         action_result = (
             await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
                 GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
@@ -82,10 +87,10 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
-) -> Optional[HuggingFaceRegistry]:
+) -> HuggingFaceRegistry | None:
     processors = info.context.processors
     action_result = await processors.artifact_registry.get_huggingface_registry.wait_for_complete(
         GetHuggingFaceRegistryAction(registry_id=uuid.UUID(id))
@@ -93,15 +98,15 @@ async def huggingface_registry(
     return HuggingFaceRegistry.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registries(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    offset: Optional[int] = None,
-    limit: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    offset: int | None = None,
+    limit: int | None = None,
 ) -> HuggingFaceRegistryConnection:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
@@ -114,10 +119,7 @@ async def huggingface_registries(
     )
 
     nodes = [HuggingFaceRegistry.from_dataclass(data) for data in action_result.data]
-    edges = [
-        HuggingFaceRegistryEdge(node=node, cursor=to_global_id(HuggingFaceRegistry, node.id))
-        for node in nodes
-    ]
+    edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return HuggingFaceRegistryConnection(
         edges=edges,
@@ -134,10 +136,10 @@ async def huggingface_registries(
 class CreateHuggingFaceRegistryInput:
     url: str
     name: str
-    token: Optional[str] = None
+    token: str | None = None
 
-    def to_creator(self) -> HuggingFaceRegistryCreator:
-        return HuggingFaceRegistryCreator(url=self.url, token=self.token)
+    def to_creator(self) -> Creator[HuggingFaceRegistryRow]:
+        return Creator(spec=HuggingFaceRegistryCreatorSpec(url=self.url, token=self.token))
 
     def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
         return ArtifactRegistryCreatorMeta(name=self.name)
@@ -146,15 +148,16 @@ class CreateHuggingFaceRegistryInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateHuggingFaceRegistryInput:
     id: ID
-    url: Optional[str] = UNSET
-    name: Optional[str] = UNSET
-    token: Optional[str] = UNSET
+    url: str | None = UNSET
+    name: str | None = UNSET
+    token: str | None = UNSET
 
-    def to_modifier(self) -> HuggingFaceRegistryModifier:
-        return HuggingFaceRegistryModifier(
+    def to_updater(self) -> Updater[HuggingFaceRegistryRow]:
+        spec = HuggingFaceRegistryUpdaterSpec(
             url=OptionalState[str].from_graphql(self.url),
             token=OptionalState[str].from_graphql(self.token),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
     def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
         return ArtifactRegistryModifierMeta(
@@ -182,7 +185,7 @@ class DeleteHuggingFaceRegistryPayload:
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
@@ -202,7 +205,7 @@ async def create_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
@@ -211,7 +214,7 @@ async def update_huggingface_registry(
     action_result = (
         await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
             UpdateHuggingFaceRegistryAction(
-                id=uuid.UUID(input.id), modifier=input.to_modifier(), meta=input.to_modifier_meta()
+                updater=input.to_updater(), meta=input.to_modifier_meta()
             )
         )
     )
@@ -221,7 +224,7 @@ async def update_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload:

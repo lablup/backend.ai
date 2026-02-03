@@ -12,7 +12,7 @@ class SessionStatusHistoryRetriever(TestCode):
         session_meta = CreatedSessionMetaContext.current()
         session_name = session_meta.name
 
-        expected_status = set([
+        expected_status = {
             "SCHEDULED",
             "PREPARING",
             "PULLING",
@@ -20,13 +20,13 @@ class SessionStatusHistoryRetriever(TestCode):
             "PENDING",
             "CREATING",
             "RUNNING",
-        ])
+        }
 
-        unexpected_status = set([
+        unexpected_status = {
             "TERMINATING",
             "TERMINATED",
             "EXPIRED",
-        ])
+        }
 
         result = await session.ComputeSession(name=session_name).get_status_history()
         assert result["result"] != "", "Status history should not be empty"

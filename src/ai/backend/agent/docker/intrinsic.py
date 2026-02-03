@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import multiprocessing
@@ -7,7 +9,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiohttp
 import async_timeout
@@ -15,13 +17,36 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent import __version__  # pants: no-infer-dep
+from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.errors import InvalidResourceConfigError
+from ai.backend.agent.exception import InvalidArgumentError
 from ai.backend.agent.plugin.network import (
     AbstractNetworkAgentPlugin,
     ContainerNetworkCapability,
     ContainerNetworkInfo,
 )
-from ai.backend.agent.types import MountInfo
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+    StatModes,
+)
+from ai.backend.agent.types import Container, MountInfo
+from ai.backend.agent.utils import closing_async, read_sysfs
+from ai.backend.agent.vendor.linux import libnuma
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
@@ -35,32 +60,9 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import current_loop, nmget
+from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__  # pants: no-infer-dep
-from ..alloc_map import AllocationStrategy
-from ..errors import InvalidResourceConfigError
-from ..exception import InvalidArgumentError
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    Measurement,
-    MetricTypes,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-    StatModes,
-)
-from ..utils import closing_async, read_sysfs
-from ..vendor.linux import libnuma
-from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -79,13 +81,12 @@ pruned_disk_types = frozenset([
 ])
 
 
-def netstat_ns_work(ns_path: Path):
+def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
     with nsenter(ns_path):
-        result = psutil.net_io_counters(pernic=True)
-    return result
+        return psutil.net_io_counters(pernic=True)
 
 
-async def netstat_ns(ns_path: Path):
+async def netstat_ns(ns_path: Path) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     # Linux namespace is per-thread state. Therefore we need to ensure
     # IO is executed in the same thread where we switched the namespace.
@@ -103,8 +104,7 @@ async def netstat_ns(ns_path: Path):
         is_daemon = False
 
     if is_daemon:
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
-        return result
+        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
     try:
         with ProcessPoolExecutor(max_workers=1) as executor:
             result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
@@ -114,10 +114,11 @@ async def netstat_ns(ns_path: Path):
     return result
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
+async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = container.id[:7]
     try:
-        ret = await container.stats(stream=False)  # TODO: cache
+        # aiodocker may return list[dict] or dict depending on version
+        ret: list[dict[str, Any]] | dict[str, Any] = await container.stats(stream=False)
     except RuntimeError as e:
         msg = str(e.args[0]).lower()
         if "event loop is closed" in msg or "session is closed" in msg:
@@ -170,7 +171,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -244,9 +245,9 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        async def sysfs_impl(container_id):
+        async def sysfs_impl(container_id: str) -> float | None:
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
-            version = ctx.agent.docker_info["CgroupVersion"]
+            version = ctx.agent.docker_info["CgroupVersion"]  # type: ignore[attr-defined]
             try:
                 match version:
                     case "1":
@@ -260,7 +261,9 @@ class CPUPlugin(AbstractComputePlugin):
                             )
                         }
                         cpu_used = int(cpu_stats["usage_usec"]) / 1e3
-            except IOError as e:
+                    case _:
+                        return None
+            except OSError as e:
                 log.warning(
                     "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -269,18 +272,18 @@ class CPUPlugin(AbstractComputePlugin):
                 return None
             return cpu_used
 
-        async def api_impl(container_id):
+        async def api_impl(container_id: str) -> float | None:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None
-                cpu_used = nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
-                return cpu_used
+                cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
+                return cpu_usage / 1e6
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -296,7 +299,7 @@ class CPUPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, cpu_used in zip(container_ids, results):
+        for cid, cpu_used in zip(container_ids, results, strict=True):
             if cpu_used is None:
                 continue
             per_container_cpu_used[cid] = Measurement(Decimal(cpu_used).quantize(q))
@@ -324,28 +327,27 @@ class CPUPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid: int, cid: str) -> Optional[Decimal]:
+        async def psutil_impl(pid: int, cid: str) -> Decimal | None:
             try:
                 p = psutil.Process(pid)
                 cpu_times = p.cpu_times()
             except psutil.NoSuchProcess:
                 log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
-                cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
-                return cpu_used
+                return Decimal(cpu_times.user + cpu_times.system) * 1000
             return None
 
-        async def api_impl(cid: str, pids: list[int]) -> list[Optional[Decimal]]:
+        async def api_impl(_cid: str, _pids: list[int]) -> list[Decimal | None]:
             return []
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: list[Optional[Decimal]] = []
+        results: list[Decimal | None] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks: list[asyncio.Task[list[Optional[Decimal]]]] = []
+                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
                 # group by container ID
                 cid_pids_map: dict[str, list[int]] = {}
                 for pid, cid in pid_map_list:
@@ -363,7 +365,7 @@ class CPUPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, cid), cpu_used in zip(pid_map_list, results):
+        for (pid, cid), cpu_used in zip(pid_map_list, results, strict=True):
             if cpu_used is None:
                 continue
             per_process_cpu_util[pid] = Measurement(
@@ -405,9 +407,9 @@ class CPUPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        cores = [*map(int, device_alloc["cpu"].keys())]
+        cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
@@ -491,7 +493,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -534,10 +536,10 @@ class MemoryPlugin(AbstractComputePlugin):
         net_rx_bytes = _nstat.bytes_recv
         net_tx_bytes = _nstat.bytes_sent
 
-        def get_disk_stat():
+        def get_disk_stat() -> tuple[Decimal, Decimal, dict[DeviceId, Measurement]]:
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
-            per_disk_stat = {}
+            per_disk_stat: dict[DeviceId, Measurement] = {}
             for disk_info in psutil.disk_partitions():
                 # Skip additional filesystem types not filtered by psutil, like squashfs.
                 if disk_info.fstype in pruned_disk_types:
@@ -551,7 +553,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 dstat = os.statvfs(disk_info.mountpoint)
                 disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                 disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
-                per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                per_disk_stat[DeviceId(disk_info.device)] = Measurement(disk_usage, disk_capacity)
                 total_disk_usage += disk_usage
                 total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
@@ -599,7 +601,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
-        def get_scratch_size(container_id: str) -> int:
+        def get_scratch_size(_container_id: str) -> int:
             # Temporarily disabled as this function incurs too much delay with
             # a large number of files in scratch dirs, causing indefinite accumulation of
             # stat collector tasks and slowing down everything.
@@ -618,7 +620,9 @@ class MemoryPlugin(AbstractComputePlugin):
             #         total_size += path.stat().st_size
             # return total_size
 
-        async def sysfs_impl(container_id: str):
+        async def sysfs_impl(
+            container_id: str,
+        ) -> tuple[int, int, int, int, int, int, int] | None:
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             version = ctx.agent.get_cgroup_version()
@@ -687,7 +691,9 @@ class MemoryPlugin(AbstractComputePlugin):
                                     io_read_bytes += int(value)
                                 if stat == "wbytes":
                                     io_write_bytes += int(value)
-            except IOError as e:
+                    case _:
+                        return None
+            except OSError as e:
                 log.warning(
                     "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
@@ -718,13 +724,13 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
-        async def api_impl(container_id: str):
+        async def api_impl(container_id: str) -> tuple[int, int, int, int, int, int, int] | None:
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:
                     async with async_timeout.timeout(2.0):
                         ret = await fetch_api_stats(container)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return None
                 if ret is None:
                     return None
@@ -771,7 +777,7 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid in container_ids:
             tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
-        for cid, result in zip(container_ids, results):
+        for cid, result in zip(container_ids, results, strict=True):
             if result is None:
                 continue
             per_container_mem_used_bytes[cid] = Measurement(
@@ -830,9 +836,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(
-            pid: int, cid: str
-        ) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        async def psutil_impl(pid: int, cid: str) -> tuple[int | None, int | None, int | None]:
             try:
                 p = psutil.Process(pid)
                 stats = p.as_dict(attrs=["memory_info", "io_counters"])
@@ -853,14 +857,14 @@ class MemoryPlugin(AbstractComputePlugin):
             return None, None, None
 
         async def api_impl(
-            cid: str, pids: list[int]
-        ) -> list[tuple[Optional[int], Optional[int], Optional[int]]]:
+            _cid: str, _pids: list[int]
+        ) -> list[tuple[int | None, int | None, int | None]]:
             return []
 
         per_process_mem_used_bytes = {}
         per_process_io_read_bytes = {}
         per_process_io_write_bytes = {}
-        results: list[tuple[Optional[int], Optional[int], Optional[int]]]
+        results: list[tuple[int | None, int | None, int | None]]
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
@@ -883,7 +887,7 @@ class MemoryPlugin(AbstractComputePlugin):
                     psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
-        for (pid, _), result in zip(pid_map_list, results):
+        for (pid, _), result in zip(pid_map_list, results, strict=True):
             mem, io_read, io_write = result
             if mem is not None:
                 per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))
@@ -933,9 +937,9 @@ class MemoryPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: Docker,
-        device_alloc,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        memory = sum(device_alloc["mem"].values())
+        memory = sum(device_alloc[SlotName("mem")].values())
         return {
             "HostConfig": {
                 "MemorySwap": int(memory),  # prevent using swap!
@@ -1043,10 +1047,10 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         return await super().update_plugin_config(plugin_config)
 
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
-        return set([ContainerNetworkCapability.GLOBAL])
+        return {ContainerNetworkCapability.GLOBAL}
 
     async def join_network(
-        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs: Any
     ) -> dict[str, Any]:
         if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
             return {
@@ -1058,18 +1062,17 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
                     "NetworkMode": "host",
                 }
             }
-        else:
-            return {
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            }
+        return {
+            "HostConfig": {
+                "NetworkMode": "host",
+            },
+        }
 
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass
 
     async def prepare_port_forward(
-        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> None:
         host_ports = [p[0] for p in ports]
         scratch_dir = (
@@ -1092,7 +1095,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         )
 
     async def expose_ports(
-        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> ContainerNetworkInfo:
         host_ports = [p[0] for p in ports]
 

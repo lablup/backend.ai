@@ -1,7 +1,7 @@
 import asyncio
 import enum
 import os
-from typing import Optional, Self
+from typing import Self
 
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
@@ -10,7 +10,7 @@ from ai.backend.common.exception import BackendAIError, ErrorCode
 
 
 class APIMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -35,7 +35,7 @@ class APIMetricObserver:
         return cls._instance
 
     def _inc_request_total(
-        self, *, method: str, endpoint: str, error_code: Optional[ErrorCode], status_code: int
+        self, *, method: str, endpoint: str, error_code: ErrorCode | None, status_code: int
     ) -> None:
         self._request_count.labels(
             method=method,
@@ -51,7 +51,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -69,7 +69,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -86,7 +86,7 @@ class APIMetricObserver:
 
 
 class GraphQLMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -135,7 +135,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
     ) -> None:
         self._request_count.labels(
@@ -156,7 +156,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -178,7 +178,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -202,7 +202,7 @@ class GraphQLMetricObserver:
 
 
 class EventMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _event_count: Counter
     _event_failure_count: Counter
@@ -273,7 +273,7 @@ class EventMetricObserver:
 
 
 class BgTaskMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _bgtask_count: Gauge
     _bgtask_done_count: Counter
@@ -307,7 +307,7 @@ class BgTaskMetricObserver:
         self._bgtask_count.labels(task_name=task_name).inc()
 
     def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+        self, *, task_name: str, status: str, duration: float, error_code: ErrorCode | None
     ) -> None:
         self._bgtask_count.labels(task_name=task_name).dec()
         self._bgtask_processing_time.labels(
@@ -327,7 +327,7 @@ class BgTaskMetricObserver:
 
 
 class ActionMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _action_count: Counter
     _action_duration_sec: Histogram
@@ -372,7 +372,7 @@ class ActionMetricObserver:
         operation_type: str,
         status: str,
         duration: float,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
     ) -> None:
         self._action_count.labels(
             entity_type=entity_type,
@@ -406,9 +406,11 @@ class LayerType(enum.StrEnum):
     AUTH_REPOSITORY = "auth_repository"
     ARTIFACT_REPOSITORY = "artifact_repository"
     ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
+    AUDIT_LOG_REPOSITORY = "audit_log_repository"
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
     DOMAIN_REPOSITORY = "domain_repository"
+    ERROR_LOG_REPOSITORY = "error_log_repository"
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
     IMAGE_REPOSITORY = "image_repository"
@@ -424,17 +426,22 @@ class LayerType(enum.StrEnum):
     SCALING_GROUP_REPOSITORY = "scaling_group_repository"
     SCHEDULE_REPOSITORY = "schedule_repository"
     SCHEDULER_REPOSITORY = "scheduler_repository"
+    SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
     SESSION_REPOSITORY = "session_repository"
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
     USER_REPOSITORY = "user_repository"
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
     VFOLDER_REPOSITORY = "vfolder_repository"
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
+    FAIR_SHARE_REPOSITORY = "fair_share_repository"
+    RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
 
     # DB Source layers
+    AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    ERROR_LOG_DB_SOURCE = "error_log_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
     RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
     SCHEDULE_DB_SOURCE = "schedule_db_source"
@@ -460,6 +467,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
+    VALKEY_VOLUME_STATS = "valkey_volume_stats"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -472,7 +480,7 @@ ClientType = DomainType
 
 
 class LayerMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
@@ -547,7 +555,7 @@ class LayerMetricObserver:
         layer: LayerType,
         operation: str,
         duration: float,
-        exception: Optional[BaseException] = None,
+        exception: BaseException | None = None,
     ) -> None:
         success = exception is None
         self._layer_operation_triggered_count.labels(
@@ -581,7 +589,7 @@ class LayerMetricObserver:
 
 
 class SystemMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _async_task_count: Gauge
     _cpu_usage_percent: Gauge
@@ -621,7 +629,7 @@ class SystemMetricObserver:
 
 
 class SweeperMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _session_sweep_count: Counter
     _kernel_sweep_count: Counter
@@ -652,7 +660,7 @@ class SweeperMetricObserver:
 
 
 class EventPropagatorMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _propagator_count: Gauge
     _propagator_alias_count: Gauge
@@ -698,7 +706,7 @@ class EventPropagatorMetricObserver:
 
 
 class CommonMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     gql: GraphQLMetricObserver
@@ -718,7 +726,7 @@ class CommonMetricRegistry:
         self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -729,7 +737,7 @@ class CommonMetricRegistry:
 
 
 class StageObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _stage_count: Counter
 

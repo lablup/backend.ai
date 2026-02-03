@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from ai.backend.common.data.notification import NotifiableMessage
+from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.logging import BraceStyleAdapter
-
-from ...data.notification import NotificationRuleType
-from ...services.notification.actions import ProcessNotificationAction
+from ai.backend.manager.services.notification.actions import ProcessNotificationAction
 
 if TYPE_CHECKING:
-    from ...services.processors import Processors
+    from ai.backend.manager.services.processors import Processors
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationEventHandler",)
 
@@ -36,7 +35,7 @@ class NotificationEventHandler:
 
     async def handle_notification_triggered(
         self,
-        context: None,
+        _context: None,
         source: str,
         event: NotificationTriggeredEvent,
     ) -> None:

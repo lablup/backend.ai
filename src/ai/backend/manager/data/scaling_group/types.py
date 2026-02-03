@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 
 
 class SchedulerType(StrEnum):
@@ -13,6 +18,7 @@ class SchedulerType(StrEnum):
     FIFO = "fifo"
     LIFO = "lifo"
     DRF = "drf"
+    FAIR_SHARE = "fair-share"
 
 
 @dataclass
@@ -61,6 +67,19 @@ class ScalingGroupSchedulerOptions:
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
 
+    def to_json(self) -> dict[str, Any]:
+        """Convert scheduler options to JSON-serializable dict."""
+        return {
+            "allowed_session_types": [st.value for st in self.allowed_session_types],
+            "pending_timeout": self.pending_timeout.total_seconds(),
+            "config": dict(self.config),
+            "agent_selection_strategy": self.agent_selection_strategy.value,
+            "agent_selector_config": dict(self.agent_selector_config),
+            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
+            "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
+            "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
+        }
+
 
 @dataclass
 class ScalingGroupSchedulerConfig:
@@ -78,6 +97,7 @@ class ScalingGroupData:
     network: ScalingGroupNetworkConfig
     driver: ScalingGroupDriverConfig
     scheduler: ScalingGroupSchedulerConfig
+    fair_share_spec: FairShareScalingGroupSpec
 
 
 @dataclass
@@ -88,3 +108,23 @@ class ScalingGroupListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class ResourceInfo:
+    """Resource information for a scaling group.
+
+    Provides aggregated resource metrics:
+    - capacity: Sum of available_slots from ALIVE, schedulable agents
+    - used: Sum of occupied_slots from kernels in RUNNING/TERMINATING status
+    - free: capacity - used
+    """
+
+    capacity: ResourceSlot
+    """Total available resources from ALIVE, schedulable agents."""
+
+    used: ResourceSlot
+    """Currently occupied resources from active kernels."""
+
+    free: ResourceSlot
+    """Available resources (capacity - used)."""

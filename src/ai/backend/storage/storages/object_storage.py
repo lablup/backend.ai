@@ -38,6 +38,11 @@ class ObjectStorage(AbstractStorage):
     _presigned_upload_config: PresignedUploadConfig
     _presigned_download_config: PresignedDownloadConfig
 
+    @property
+    @override
+    def name(self) -> str:
+        return self._name
+
     def __init__(self, name: str, cfg: ObjectStorageConfig) -> None:
         self._name = name
         self._endpoint = cfg.endpoint
@@ -128,7 +133,7 @@ class ObjectStorage(AbstractStorage):
             )
 
         except Exception as e:
-            raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
+            raise ObjectInfoFetchError(f"Get object info failed: {e!s}") from e
 
     @override
     async def delete_file(self, filepath: str) -> None:
@@ -142,7 +147,7 @@ class ObjectStorage(AbstractStorage):
             s3_client = self._get_s3_client()
             await s3_client.delete_object(filepath)
         except Exception as e:
-            raise ObjectStorageObjectDeletionError(f"Delete object failed: {str(e)}") from e
+            raise ObjectStorageObjectDeletionError(f"Delete object failed: {e!s}") from e
 
     async def generate_presigned_upload_url(self, key: str) -> PresignedUploadObjectResponse:
         """
@@ -222,7 +227,7 @@ class ObjectStorage(AbstractStorage):
             s3_client = self._get_s3_client()
             return await s3_client.list_objects_with_prefix(prefix)
         except Exception as e:
-            raise ObjectInfoFetchError(f"List objects failed: {str(e)}") from e
+            raise ObjectInfoFetchError(f"List objects failed: {e!s}") from e
 
     def _get_s3_client(self) -> S3Client:
         return S3Client(

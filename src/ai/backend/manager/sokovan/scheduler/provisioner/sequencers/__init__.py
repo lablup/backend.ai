@@ -1,11 +1,13 @@
 from .drf import DRFSequencer
+from .fair_share import FairShareSequencer
 from .fifo import FIFOSequencer
 from .lifo import LIFOSequencer
 from .sequencer import WorkloadSequencer
 
 __all__ = [
-    "WorkloadSequencer",
+    "DRFSequencer",
+    "FairShareSequencer",
     "FIFOSequencer",
     "LIFOSequencer",
-    "DRFSequencer",
+    "WorkloadSequencer",
 ]

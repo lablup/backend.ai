@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import secrets
 import tarfile
 import tempfile
@@ -12,7 +11,7 @@ from collections.abc import (
     Sequence,
 )
 from pathlib import Path
-from typing import Any, Optional, Self, cast
+from typing import Any, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -20,33 +19,33 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.compat import current_loop
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionTypes
-
-from ...cli.types import Undefined, undefined
-from ..compat import current_loop
-from ..config import DEFAULT_CHUNK_SIZE
-from ..exceptions import BackendClientError
-from ..pagination import fetch_paginated_result
-from ..request import (
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import (
     AttachedFile,
     Request,
     SSEContextManager,
     WebSocketContextManager,
     WebSocketResponse,
 )
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import (
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import (
     ProgressReportingReader,
     create_connection_field,
     flatten_connection,
     to_global_id,
 )
-from ..utils import dedent as _d
-from ..versioning import get_id_or_name, get_naming
+from ai.backend.client.utils import dedent as _d
+from ai.backend.client.versioning import get_id_or_name, get_naming
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, SessionTypes
+
 from .base import BaseFunction, api_function
 
 __all__ = ("ComputeSession", "InferenceSession")
@@ -87,14 +86,14 @@ _default_session_node_detail_fields = (
     session_node_fields["scaling_group"],
     session_node_fields["vfolder_mounts"],
     session_node_fields["image_references"],
-    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),  # type: ignore
+    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),
 )
 
 
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
     modified: dict[str, Any] = {}
     for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
+        if isinstance(v, (Mapping, dict)):
             modified[k] = drop(v, value_to_drop)
         elif v != value_to_drop:
             modified[k] = v
@@ -116,9 +115,9 @@ class ComputeSession(BaseFunction):
     all containers belonging to the same compute session.
     """
 
-    id: Optional[UUID]
-    name: Optional[str]
-    owner_access_key: Optional[str]
+    id: UUID | None
+    name: str | None
+    owner_access_key: str | None
     created: bool
     status: str
     service_ports: list[str]
@@ -129,15 +128,15 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: Optional[str] = None,
-        access_key: Optional[str] = None,
+        status: str | None = None,
+        access_key: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of sessions.
 
@@ -162,10 +161,12 @@ class ComputeSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -196,37 +197,37 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        priority: Optional[int] = None,
-        starts_at: Optional[str] = None,
+        priority: int | None = None,
+        starts_at: str | None = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[UUID]] = None,
-        callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
-        mount_ids: Optional[list[UUID]] = None,
-        mount_id_map: Optional[Mapping[UUID, str]] = None,
-        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        batch_timeout: Optional[str | int] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
+        dependencies: Sequence[UUID] | None = None,
+        callback_url: str | None = None,
+        mounts: list[str] | None = None,
+        mount_map: Mapping[str, str] | None = None,
+        mount_ids: list[UUID] | None = None,
+        mount_id_map: Mapping[UUID, str] | None = None,
+        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
+        batch_timeout: str | int | None = None,
+        resources: Mapping[str, str | int] | None = None,
+        resource_opts: Mapping[str, str | int] | None = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[list[int]] = None,
-        assign_agent: Optional[list[str]] = None,
-        attach_network: Optional[str] = None,
+        scaling_group: str | None = None,
+        owner_access_key: str | None = None,
+        preopen_ports: list[int] | None = None,
+        assign_agent: list[str] | None = None,
+        attach_network: str | None = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -303,7 +304,8 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
-            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
+            if not (4 <= len(name) <= 64):
+                raise ValueError("Client session token should be 4 to 64 characters long.")
         else:
             faker = Faker()
             name = f"pysdk-{faker.user_name()}"
@@ -386,7 +388,7 @@ class ComputeSession(BaseFunction):
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            o = cls(name, owner_access_key)  # type: ignore
+            o = cls(name, owner_access_key)
             if api_session.get().api_version[0] >= 5:
                 o.id = UUID(data["sessionId"])
             o.created = data.get("created", True)  # True is for legacy
@@ -427,7 +429,7 @@ class ComputeSession(BaseFunction):
         tag: str | Undefined = undefined,
         scaling_group: str | Undefined = undefined,
         owner_access_key: str | Undefined = undefined,
-        attach_network: Optional[str] = None,  # TODO: Handle this argument properly
+        _attach_network: str | None = None,  # TODO: Handle this argument properly
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.
@@ -496,7 +498,8 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not undefined:
-            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
+            if not (4 <= len(name) <= 64):
+                raise ValueError("Client session token should be 4 to 64 characters long.")
         else:
             name = f"pysdk-{secrets.token_urlsafe(8)}"
 
@@ -562,7 +565,7 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
+    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -579,7 +582,8 @@ class ComputeSession(BaseFunction):
                 "sessionId": str(self.id),
             }
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session must have either id or name")
             identity_params = {
                 "sessionName": self.name,
             }
@@ -632,10 +636,12 @@ class ComputeSession(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_compute_session"]
+        return cast(dict[str, Any], data["modify_compute_session"])
 
     @api_function
-    async def destroy(self, *, forced: bool = False, recursive: bool = False):
+    async def destroy(
+        self, *, forced: bool = False, recursive: bool = False
+    ) -> dict[str, Any] | None:
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -657,10 +663,13 @@ class ComputeSession(BaseFunction):
         )
         async with rqst.fetch() as resp:
             if resp.status == 200:
-                return await resp.json()
+                result: dict[str, Any] = await resp.json()
+
+                return result
+        return None
 
     @api_function
-    async def restart(self):
+    async def restart(self) -> None:
         """
         Restarts the compute session.
         The server force-destroys the current running container(s), but keeps their
@@ -679,7 +688,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_name):
+    async def rename(self, new_name: str) -> None:
         """
         Renames Session ID of running compute session.
         """
@@ -696,7 +705,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def commit(self):
+    async def commit(self) -> dict[str, Any]:
         """
         Commit a running session to a tar file in the agent host.
         """
@@ -710,10 +719,12 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def export_to_image(self, new_image_name: str):
+    async def export_to_image(self, new_image_name: str) -> dict[str, Any]:
         """
         Commits running session to new image and then uploads to designated container registry.
         Requires Backend.AI server set up for per-user image commit feature (24.03).
@@ -728,10 +739,12 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """
         Tries to interrupt the current ongoing code execution.
         This may fail without any explicit errors depending on the code being
@@ -750,7 +763,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -785,10 +798,12 @@ class ComputeSession(BaseFunction):
             },
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def get_info(self):
+    async def get_info(self) -> dict[str, Any]:
         """
         Retrieves a brief information about the compute session.
         """
@@ -802,12 +817,14 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def detail(
         self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieves a detailed information about the compute session.
         This is similar to :func:`get_info`, but includes more information
@@ -848,7 +865,7 @@ class ComputeSession(BaseFunction):
         return result
 
     @api_function
-    async def get_logs(self, kernel_id: Optional[UUID] = None):
+    async def get_logs(self, kernel_id: UUID | None = None) -> dict[str, Any]:
         """
         Retrieves the console log of the compute session container.
         """
@@ -864,10 +881,12 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def get_dependency_graph(self):
+    async def get_dependency_graph(self) -> dict[str, Any]:
         """
         Retrieves the root node of dependency graph of the compute session.
         """
@@ -885,10 +904,12 @@ class ComputeSession(BaseFunction):
         )
 
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def get_status_history(self):
+    async def get_status_history(self) -> dict[str, Any]:
         """
         Retrieves the status transition history of the compute session.
         """
@@ -902,16 +923,18 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def execute(
         self,
-        run_id: Optional[str] = None,
-        code: Optional[str] = None,
+        run_id: str | None = None,
+        code: str | None = None,
         mode: str = "query",
-        opts: Optional[dict] = None,
-    ):
+        opts: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Executes a code snippet directly in the compute session or sends a set of
         build/clean/execute commands to the compute session.
@@ -941,7 +964,8 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         if mode in {"query", "continue", "input"}:
-            assert code is not None, "The code argument must be a valid string even when empty."
+            if code is None:
+                raise ValueError("The code argument must be a valid string even when empty.")
             rqst = Request(
                 "POST",
                 f"/{prefix}/{self.session_identifier}",
@@ -985,17 +1009,18 @@ class ComputeSession(BaseFunction):
                 },
             })
         else:
-            raise BackendClientError("Invalid execution mode: {0}".format(mode))
+            raise BackendClientError(f"Invalid execution mode: {mode}")
         async with rqst.fetch() as resp:
-            return (await resp.json())["result"]
+            result = await resp.json()
+            return cast(dict[str, Any], result["result"])
 
     @api_function
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         show_progress: bool = False,
-    ):
+    ) -> Any:
         """
         Uploads the given list of files to the compute session.
         You may refer them in the batch-mode execution or from the code
@@ -1042,9 +1067,7 @@ class ComputeSession(BaseFunction):
                         )
                     )
                 except ValueError:
-                    msg = 'File "{0}" is outside of the base directory "{1}".'.format(
-                        file_path, base_path
-                    )
+                    msg = f'File "{file_path}" is outside of the base directory "{base_path}".'
                     raise ValueError(msg) from None
             rqst = Request(
                 "POST",
@@ -1061,7 +1084,7 @@ class ComputeSession(BaseFunction):
         files: Sequence[str | Path],
         dest: str | Path = ".",
         show_progress: bool = False,
-    ):
+    ) -> dict[str, Any]:
         """
         Downloads the given list of files from the compute session.
 
@@ -1096,15 +1119,23 @@ class ComputeSession(BaseFunction):
             reader = aiohttp.MultipartReader.from_response(resp.raw_response)
             with tqdm_obj as pbar:
                 while True:
-                    part = cast(aiohttp.BodyPartReader, await reader.next())
+                    part = await reader.next()
                     if part is None:
                         break
-                    assert part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower() == "identity"
-                    assert part.headers.get(hdrs.CONTENT_TRANSFER_ENCODING, "binary").lower() in (
-                        "binary",
-                        "8bit",
-                        "7bit",
-                    )
+                    if not isinstance(part, aiohttp.BodyPartReader):
+                        raise TypeError(f"Expected BodyPartReader, got {type(part).__name__}")
+                    content_encoding = part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower()
+                    if content_encoding != "identity":
+                        raise ValueError(
+                            f"Unexpected content encoding: {content_encoding}, expected 'identity'"
+                        )
+                    content_transfer = part.headers.get(
+                        hdrs.CONTENT_TRANSFER_ENCODING, "binary"
+                    ).lower()
+                    if content_transfer not in ("binary", "8bit", "7bit"):
+                        raise ValueError(
+                            f"Unexpected content transfer encoding: {content_transfer}"
+                        )
                     fp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
                     while True:
                         chunk = await part.read_chunk(DEFAULT_CHUNK_SIZE)
@@ -1116,11 +1147,11 @@ class ComputeSession(BaseFunction):
                     with tarfile.open(fp.name) as tarf:
                         tarf.extractall(path=dest, filter=tarfile.data_filter)
                         file_names.extend(tarf.getnames())
-                    os.unlink(fp.name)
+                    Path(fp.name).unlink()
         return {"file_names": file_names}
 
     @api_function
-    async def list_files(self, path: str | Path = "."):
+    async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         """
         Gets the list of files in the given path inside the compute session
         container.
@@ -1140,7 +1171,9 @@ class ComputeSession(BaseFunction):
             "path": path,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     async def stream_app_info(self) -> Mapping[str, Any]:
@@ -1155,7 +1188,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with api_request.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def get_abusing_report(self) -> Mapping[str, Any]:
@@ -1172,7 +1207,9 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(Mapping[str, Any], result)
 
     @api_function
     async def start_service(
@@ -1205,7 +1242,9 @@ class ComputeSession(BaseFunction):
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     # only supported in AsyncAPISession
     def listen_events(self, scope: str = "*") -> SSEContextManager:
@@ -1225,7 +1264,8 @@ class ComputeSession(BaseFunction):
                 },
             )
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session name is required for API version < 6")
             params = {
                 get_naming(api_session.get().api_version, "event_name_arg"): self.name,
             }
@@ -1263,7 +1303,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: Optional[dict] = None
+        self, code: str = "", *, mode: str = "query", opts: dict[str, Any] | None = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1280,13 +1320,13 @@ class ComputeSession(BaseFunction):
             opts = {}
         elif mode == "batch":
             opts = {
-                "clean": opts.get("clean", None),
-                "build": opts.get("build", None),
+                "clean": opts.get("clean"),
+                "build": opts.get("build"),
                 "buildLog": bool(opts.get("buildLog", False)),
-                "exec": opts.get("exec", None),
+                "exec": opts.get("exec"),
             }
         else:
-            msg = "Invalid stream-execution mode: {0}".format(mode)
+            msg = f"Invalid stream-execution mode: {mode}"
             raise BackendClientError(msg)
         request = Request(
             "GET",
@@ -1294,7 +1334,7 @@ class ComputeSession(BaseFunction):
             params=params,
         )
 
-        async def send_code(ws):
+        async def send_code(ws: WebSocketResponse) -> None:
             await ws.send_json({
                 "code": code,
                 "mode": mode,
@@ -1309,9 +1349,9 @@ class InferenceSession(BaseFunction):
     Provides various interactions with inference sessions in Backend.AI.
     """
 
-    id: Optional[UUID]
-    name: Optional[str]
-    owner_access_key: Optional[str]
+    id: UUID | None
+    name: str | None
+    owner_access_key: str | None
     created: bool
     status: str
     service_ports: list[str]
@@ -1329,9 +1369,9 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        _filter: str | None = None,
+        _order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of inference sessions.
         """
@@ -1348,10 +1388,12 @@ class InferenceSession(BaseFunction):
 
     @api_function
     @classmethod
-    async def hello(cls) -> str:
+    async def hello(cls) -> dict[str, Any]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -1369,34 +1411,34 @@ class InferenceSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
         type_: str = SessionTypes.INFERENCE.value,
-        starts_at: Optional[str] = None,
+        starts_at: str | None = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[UUID]] = None,
-        callback_url: Optional[str] = None,
-        mounts: Optional[list[str]] = None,
-        mount_map: Optional[Mapping[str, str]] = None,
-        mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        mount_ids: Optional[list[UUID]] = None,
-        mount_id_map: Optional[Mapping[UUID, str]] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str]] = None,
-        resource_opts: Optional[Mapping[str, str | int | bool]] = None,
+        dependencies: Sequence[UUID] | None = None,
+        callback_url: str | None = None,
+        mounts: list[str] | None = None,
+        mount_map: Mapping[str, str] | None = None,
+        mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        mount_ids: list[UUID] | None = None,
+        mount_id_map: Mapping[UUID, str] | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
+        resources: Mapping[str, str] | None = None,
+        resource_opts: Mapping[str, str | int | bool] | None = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = None,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[list[int]] = None,
-        assign_agent: Optional[list[str]] = None,
+        domain_name: str | None = None,
+        group_name: str | None = None,
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = None,
+        scaling_group: str | None = None,
+        owner_access_key: str | None = None,
+        preopen_ports: list[int] | None = None,
+        assign_agent: list[str] | None = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1411,10 +1453,10 @@ class InferenceSession(BaseFunction):
         *,
         name: str | Undefined = undefined,
         type_: str | Undefined = undefined,
-        starts_at: Optional[str] = None,
+        starts_at: str | None = None,
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Optional[Sequence[UUID]] = None,  # cannot be stored in templates
+        dependencies: Sequence[UUID] | None = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: list[str] | Undefined = undefined,
@@ -1438,7 +1480,7 @@ class InferenceSession(BaseFunction):
         """
         raise NotImplementedError
 
-    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
+    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -1455,7 +1497,8 @@ class InferenceSession(BaseFunction):
                 "sessionId": str(self.id),
             }
         else:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("Session must have either id or name")
             identity_params = {
                 "sessionName": self.name,
             }
@@ -1464,35 +1507,35 @@ class InferenceSession(BaseFunction):
         return identity_params
 
     @api_function
-    async def destroy(self, *, forced: bool = False):
+    async def destroy(self, *, forced: bool = False) -> None:
         """
         Destroys the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def restart(self):
+    async def restart(self) -> None:
         """
         Restarts the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_id: str) -> None:
         """
         Renames Session ID or running inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def commit(self):
+    async def commit(self) -> None:
         """
         Commit a running session to a tar file in the agent host.
         """
         raise NotImplementedError
 
     @api_function
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """
         Tries to interrupt the current ongoing code execution.
         This may fail without any explicit errors depending on the code being
@@ -1501,7 +1544,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict[str, Any] | None = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if an user has passed the tab key just after the code in
@@ -1510,21 +1553,21 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def get_info(self):
+    async def get_info(self) -> None:
         """
         Retrieves a brief information about the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def get_logs(self):
+    async def get_logs(self) -> None:
         """
         Retrieves the console log of the inference session container.
         """
         raise NotImplementedError
 
     @api_function
-    async def get_status_history(self):
+    async def get_status_history(self) -> None:
         """
         Retrieves the status transition history of the inference session.
         """
@@ -1534,9 +1577,9 @@ class InferenceSession(BaseFunction):
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         show_progress: bool = False,
-    ):
+    ) -> None:
         """
         Uploads the given list of files to the inference session.
         """
@@ -1548,14 +1591,14 @@ class InferenceSession(BaseFunction):
         files: Sequence[str | Path],
         dest: str | Path = ".",
         show_progress: bool = False,
-    ):
+    ) -> None:
         """
         Downloads the given list of files from the inference session.
         """
         raise NotImplementedError
 
     @api_function
-    async def list_files(self, path: str | Path = "."):
+    async def list_files(self, path: str | Path = ".") -> None:
         """
         Gets the list of files in the given path inside the inference session
         container.
@@ -1563,11 +1606,11 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def stream_app_info(self):
+    async def stream_app_info(self) -> None:
         raise NotImplementedError
 
     @api_function
-    async def get_abusing_report(self):
+    async def get_abusing_report(self) -> None:
         """
         Retrieves abusing reports of session's sibling kernels.
         """
@@ -1582,8 +1625,8 @@ class StreamPty(WebSocketResponse):
 
     __slots__ = ("ws",)
 
-    async def resize(self, rows, cols):
-        await self.ws.send_str(
+    async def resize(self, rows: int, cols: int) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "resize",
                 "rows": rows,
@@ -1591,8 +1634,8 @@ class StreamPty(WebSocketResponse):
             })
         )
 
-    async def restart(self):
-        await self.ws.send_str(
+    async def restart(self) -> None:
+        await self.ws.send_str(  # type: ignore[attr-defined]
             json.dumps({
                 "type": "restart",
             })

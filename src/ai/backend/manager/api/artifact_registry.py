@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
@@ -135,6 +135,7 @@ class APIHandler:
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
+        force = body.parsed.options.force
         action_result = (
             await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
                 DelegateImportArtifactRevisionBatchAction(
@@ -144,6 +145,7 @@ class APIHandler:
                     if body.parsed.delegatee_target
                     else None,
                     artifact_revision_ids=body.parsed.artifact_revision_ids,
+                    force=force,
                 )
             )
         )
@@ -266,7 +268,7 @@ class APIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "artifact-registries"

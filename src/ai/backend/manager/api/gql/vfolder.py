@@ -6,8 +6,8 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql_legacy.gql_relay import AsyncNode
 from ai.backend.manager.data.deployment.types import ExtraVFolderMountData
-from ai.backend.manager.models.gql_relay import AsyncNode
 
 
 @strawberry.federation.type(keys=["id"], name="VirtualFolderNode", extend=True)
@@ -27,7 +27,7 @@ class ExtraVFolderMount(Node):
 
     @strawberry.field
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
-        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", self._vfolder_id)
+        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", str(self._vfolder_id))
         return VFolder(id=ID(vfolder_global_id))
 
     @classmethod
@@ -47,7 +47,7 @@ ExtraVFolderMountEdge = Edge[ExtraVFolderMount]
 class ExtraVFolderMountConnection(Connection[ExtraVFolderMount]):
     count: int
 
-    def __init__(self, *args, count: int, **kwargs: Any):
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 

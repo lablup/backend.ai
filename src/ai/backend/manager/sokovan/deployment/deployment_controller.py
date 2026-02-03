@@ -5,23 +5,41 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
-from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteInfo,
+    RouteSearchResult,
+    RouteTrafficStatus,
+)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
+from ai.backend.manager.repositories.deployment.options import RouteConditions
+from ai.backend.manager.repositories.deployment.updaters import (
+    DeploymentPolicyUpdaterSpec,
+    DeploymentUpdaterSpec,
+    RouteUpdaterSpec,
+)
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
     RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
-
-from ..scheduling_controller import SchedulingController
+from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -95,37 +113,46 @@ class DeploymentController:
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
+        image_id = await self._deployment_repository.get_image_id(model_revision.image_identifier)
 
-        deployment_info = await self._deployment_repository.create_endpoint(
-            draft.to_creator(model_revision)
+        spec = LegacyEndpointCreatorSpec.from_deployment_creator(
+            creator=draft.to_creator(model_revision),
+            image_id=image_id,
         )
-        return deployment_info
+        creator = RBACEntityCreator(
+            spec=spec,
+            scope_type=ScopeType.USER,
+            scope_id=str(draft.metadata.created_user),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+        return await self._deployment_repository.create_endpoint_legacy(creator)
 
     async def update_deployment(
         self,
         endpoint_id: uuid.UUID,
-        modifier: DeploymentModifier,
+        spec: DeploymentUpdaterSpec,
     ) -> DeploymentInfo:
         """
         Update an existing deployment with new specifications.
 
         Args:
             endpoint_id: ID of the deployment to update
-            modifier: Deployment modification specification
+            spec: Deployment updater specification
 
         Returns:
             DeploymentInfo: Information about the updated deployment
         """
         log.info("Updating deployment {}", endpoint_id)
+        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
-            endpoint_id=endpoint_id, modifier=modifier
+            endpoint_id=endpoint_id, updater=updater
         )
         target_revision = modified_endpoint.target_revision()
         if target_revision:
             await self._scheduling_controller.validate_session_spec(
                 SessionValidationSpec.from_revision(model_revision=target_revision)
             )
-        res = await self._deployment_repository.update_endpoint_with_modifier(endpoint_id, modifier)
+        res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:
@@ -184,3 +211,102 @@ class DeploymentController:
         """
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
         log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
+
+    # ========== Deployment Policy Methods ==========
+
+    async def get_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> DeploymentPolicyData:
+        """Get the deployment policy for an endpoint.
+
+        Args:
+            endpoint_id: ID of the endpoint
+
+        Returns:
+            DeploymentPolicyData: Policy data
+        """
+        return await self._deployment_repository.get_deployment_policy(endpoint_id)
+
+    async def update_deployment_policy(
+        self,
+        endpoint_id: uuid.UUID,
+        updater_spec: DeploymentPolicyUpdaterSpec,
+    ) -> DeploymentPolicyData:
+        """Update the deployment policy for an endpoint.
+
+        Args:
+            endpoint_id: ID of the endpoint
+            updater_spec: Policy update specification
+
+        Returns:
+            DeploymentPolicyData: Updated policy data
+        """
+        # First get the policy to find its ID (primary key)
+        policy = await self._deployment_repository.get_deployment_policy(endpoint_id)
+        return await self._deployment_repository.update_deployment_policy(
+            Updater(spec=updater_spec, pk_value=policy.id)
+        )
+
+    # Route operations
+
+    async def search_routes(
+        self,
+        querier: BatchQuerier,
+    ) -> RouteSearchResult:
+        """Search routes with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+
+        Returns:
+            RouteSearchResult with items, total_count, and pagination info
+        """
+        return await self._deployment_repository.search_routes(querier)
+
+    async def get_route(
+        self,
+        route_id: uuid.UUID,
+    ) -> RouteInfo | None:
+        """Get a single route by its ID.
+
+        Args:
+            route_id: The route ID
+
+        Returns:
+            RouteInfo if found, None otherwise
+        """
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1),
+            conditions=[RouteConditions.by_ids([route_id])],
+        )
+        result = await self._deployment_repository.search_routes(querier)
+        return result.items[0] if result.items else None
+
+    async def update_route_traffic_status(
+        self,
+        route_id: uuid.UUID,
+        traffic_status: RouteTrafficStatus,
+    ) -> RouteInfo | None:
+        """Update route traffic status.
+
+        Args:
+            route_id: The route ID
+            traffic_status: New traffic status
+
+        Returns:
+            Updated RouteInfo if found, None otherwise
+        """
+        spec = RouteUpdaterSpec(
+            traffic_status=OptionalState.update(traffic_status),
+        )
+        updater: Updater[RoutingRow] = Updater(spec=spec, pk_value=route_id)
+        success = await self._deployment_repository.update_route(updater)
+        if not success:
+            return None
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1),
+            conditions=[RouteConditions.by_ids([route_id])],
+        )
+        result = await self._deployment_repository.search_routes(querier)
+        return result.items[0] if result.items else None

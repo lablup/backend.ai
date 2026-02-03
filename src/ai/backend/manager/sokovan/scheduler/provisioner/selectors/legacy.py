@@ -6,8 +6,8 @@ with fewer unutilized capabilities.
 """
 
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence, Union
 
 from .selector import (
     AbstractAgentSelector,
@@ -47,8 +47,8 @@ class LegacyAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker based on resource priorities.
@@ -61,7 +61,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
         )
 
         # Choose the best tracker
-        def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
+        def tracker_sort_key(tracker: AgentStateTracker) -> list[int | Decimal]:
             occupied_slots = tracker.get_current_occupied_slots()
             return [
                 -count_unutilized_capabilities(
@@ -73,6 +73,4 @@ class LegacyAgentSelector(AbstractAgentSelector):
                 ],
             ]
 
-        chosen_tracker = max(trackers, key=tracker_sort_key)
-
-        return chosen_tracker
+        return max(trackers, key=tracker_sort_key)

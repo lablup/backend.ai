@@ -3,15 +3,16 @@ from __future__ import annotations
 import abc
 import logging
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
-from ai.backend.common.artifact_storage import AbstractStorage, ImportStepContext
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.data.storage.types import ImportStepContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -36,7 +37,7 @@ class VerifyStepResult:
 InputType = TypeVar("InputType")
 
 
-class ImportStep(abc.ABC, Generic[InputType]):
+class ImportStep[InputType](abc.ABC):
     """Base class for import pipeline steps"""
 
     @property
@@ -61,6 +62,44 @@ class ImportStep(abc.ABC, Generic[InputType]):
         """Return the storage for this step"""
         pass
 
+    def _resolve_storage_prefix(self, context: ImportStepContext, default_prefix: str) -> str:
+        """
+        Resolve storage prefix based on storage_prefix setting.
+
+        Args:
+            context: Import step context containing storage_prefix
+            default_prefix: Default prefix when storage_prefix is None
+
+
+        Returns:
+            The resolved prefix ("/" for root storage)
+        """
+        if context.custom_storage_prefix is None:
+            return default_prefix
+        return context.custom_storage_prefix
+
+    def _resolve_storage_key(
+        self, context: ImportStepContext, default_prefix: str, file_path: str
+    ) -> str:
+        """
+        Resolve full storage key for a file based on storage_prefix setting.
+
+        Args:
+            context: Import step context containing storage_prefix
+            default_prefix: Default prefix when storage_prefix is None
+            file_path: The file path to store
+
+        Returns:
+            The resolved storage key path
+        """
+        prefix = self._resolve_storage_prefix(context, default_prefix)
+        # "/" means root storage - store files without prefix
+        if prefix == "/":
+            return file_path
+        if prefix:
+            return f"{prefix}/{file_path}"
+        return file_path
+
     async def cleanup_stage(self, context: ImportStepContext) -> None:
         """Default cleanup implementation that removes files"""
         storage = self.stage_storage(context)
@@ -71,7 +110,7 @@ class ImportStep(abc.ABC, Generic[InputType]):
             await storage.delete_file(model_prefix)
             log.info(f"[cleanup] Removed files: {model_prefix}")
         except Exception as e:
-            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {str(e)}")
+            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {e!s}")
 
 
 class ImportPipeline:

@@ -1,18 +1,19 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
 
 
 @dataclass
 class CreateVFSStorageAction(VFSStorageAction):
-    creator: VFSStorageCreator
+    creator: Creator[VFSStorageRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -26,5 +27,5 @@ class CreateVFSStorageActionResult(BaseActionResult):
     result: VFSStorageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

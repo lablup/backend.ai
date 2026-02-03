@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any
 
 import yarl
 from pydantic import HttpUrl
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -21,64 +23,74 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.data.user.types import UserRole
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import RouteStatus
 
 __all__ = [
-    "EndpointLifecycle",
-    "EndpointData",
-    "RoutingData",
-    "EndpointTokenData",
+    "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
+    "EndpointAutoScalingRuleListResult",
+    "EndpointData",
+    "EndpointLifecycle",
+    "EndpointTokenData",
+    "RoutingData",
 ]
+
+
+@dataclass
+class EndpointAccessValidationData:
+    """Minimal endpoint data required for access validation."""
+
+    session_owner_id: uuid.UUID | None
+    session_owner_role: UserRole | None
+    domain: str
 
 
 @dataclass
 class EndpointData:
     id: uuid.UUID
     name: str
-    image: Optional[ImageData]
+    image: ImageData | None
     domain: str
     project: uuid.UUID
     resource_group: str
     resource_slots: ResourceSlot
     url: str
     model: uuid.UUID
-    model_definition_path: Optional[str]
-    model_mount_destination: Optional[str]
+    model_definition_path: str | None
+    model_mount_destination: str | None
     created_user_id: uuid.UUID
-    created_user_email: Optional[str]
+    created_user_email: str | None
     session_owner_id: uuid.UUID
     session_owner_email: str
-    tag: Optional[str]
-    startup_command: Optional[str]
-    bootstrap_script: Optional[str]
-    callback_url: Optional[yarl.URL]
-    environ: Optional[Mapping[str, Any]]
-    resource_opts: Optional[Mapping[str, Any]]
+    tag: str | None
+    startup_command: str | None
+    bootstrap_script: str | None
+    callback_url: yarl.URL | None
+    environ: Mapping[str, Any] | None
+    resource_opts: Mapping[str, Any] | None
     replicas: int
     cluster_mode: ClusterMode
     cluster_size: int
     open_to_public: bool
     created_at: datetime
-    destroyed_at: Optional[datetime]
+    destroyed_at: datetime | None
     retries: int
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
-    routings: Optional[Sequence["RoutingData"]] = None
+    routings: Sequence[RoutingData] | None = None
 
 
 @dataclass
 class RoutingData:
     id: uuid.UUID
     endpoint: uuid.UUID
-    session: Optional[uuid.UUID]
+    session: uuid.UUID | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime
+    created_at: datetime | None
     error_data: dict[str, Any]
 
 
@@ -110,6 +122,16 @@ class EndpointAutoScalingRuleData:
 
 
 @dataclass
+class EndpointAutoScalingRuleListResult:
+    """Search result with total count for endpoint auto scaling rules."""
+
+    items: list[EndpointAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
 class UserData:
     uuid: uuid.UUID
     email: str
@@ -124,22 +146,22 @@ class ScalingGroupData:
 @dataclass
 class ModelServicePrepareCtx:
     model_id: uuid.UUID
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
     owner_role: UserRole
     group_id: uuid.UUID
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
 
 
 @dataclass
 class MountOption:
-    mount_destination: Optional[str]
+    mount_destination: str | None
     type: MountTypes
-    permission: Optional[MountPermission]
+    permission: MountPermission | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -152,7 +174,7 @@ class MountOption:
 @dataclass
 class RouteInfo:
     route_id: uuid.UUID
-    session_id: Optional[uuid.UUID]
+    session_id: uuid.UUID | None
     traffic_ratio: float
 
 
@@ -166,13 +188,13 @@ class RouteConnectionInfo:
 @dataclass
 class ServiceConfig:
     model: str
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     model_version: int
     model_mount_destination: str
     extra_mounts: dict[uuid.UUID, MountOption]
-    environ: Optional[dict[str, str]]
+    environ: dict[str, str] | None
     scaling_group: str
-    resources: Optional[dict[str, str | int]]
+    resources: dict[str, str | int] | None
     resource_opts: dict[str, str | int | bool]
 
     def to_dict(self) -> dict[str, Any]:
@@ -194,11 +216,11 @@ class ServiceInfo:
     model_id: uuid.UUID
     extra_mounts: Sequence[uuid.UUID]
     name: str
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     replicas: int
     desired_session_count: int
     active_routes: list[RouteInfo]
-    service_endpoint: Optional[HttpUrl]
+    service_endpoint: HttpUrl | None
     is_public: bool
     runtime_variant: RuntimeVariant
 
@@ -210,13 +232,15 @@ class CompactServiceInfo:
     replicas: int
     desired_session_count: int
     active_route_count: int
-    service_endpoint: Optional[HttpUrl]
+    service_endpoint: HttpUrl | None
     is_public: bool
 
 
 @dataclass
 class RequesterCtx:
-    is_authorized: Optional[bool]
+    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
+
+    is_authorized: bool | None
     user_id: uuid.UUID
     user_role: UserRole
     domain_name: str
@@ -224,7 +248,7 @@ class RequesterCtx:
 
 @dataclass
 class ErrorInfo:
-    session_id: Optional[uuid.UUID]
+    session_id: uuid.UUID | None
     error: dict[str, Any]
 
 
@@ -232,7 +256,7 @@ class ErrorInfo:
 class MutationResult:
     success: bool
     message: str
-    data: Optional[Any]
+    data: Any | None
 
 
 @dataclass

@@ -7,18 +7,12 @@ import socket
 import sys
 from abc import abstractmethod
 from collections import UserDict
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Final,
-    List,
-    Optional,
-    Sequence,
-    TypeAlias,
 )
 
 import click
@@ -42,7 +36,7 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
-NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
+type NestedStrKeyedDict = "dict[str, Any | NestedStrKeyedDict]"
 
 _default_pyroscope_config: dict[str, Any] = {
     "enabled": False,
@@ -83,7 +77,7 @@ manager_local_config_iv = (
             t.Key("name"): tx.Slug[2:64],
             t.Key("user"): t.String,
             t.Key("password"): t.String,
-            t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+            t.Key("pool-size", default=8): t.ToInt[1:],
             t.Key("pool-recycle", default=-1): t.ToFloat[-1:],  # -1 is infinite
             t.Key("pool-pre-ping", default=False): t.ToBool,
             t.Key("max-overflow", default=64): t.ToInt[-1:],  # -1 is infinite  # type: ignore
@@ -382,14 +376,14 @@ volume_config_iv = t.Dict({
 ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
-class AbstractConfig(UserDict):
+class AbstractConfig(UserDict[str, Any]):
     """
     Deprecated: Use ai.backend.manager.config.unified instead.
     """
 
-    _watch_callbacks: List[ConfigWatchCallback]
+    _watch_callbacks: list[ConfigWatchCallback]
 
-    def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(self, initial_data: Mapping[str, Any] | None = None) -> None:
         super().__init__(initial_data)
         self._watch_callbacks = []
 
@@ -411,7 +405,7 @@ class LocalConfig(AbstractConfig):
 
 
 def load(
-    config_path: Optional[Path] = None,
+    config_path: Path | None = None,
     log_level: LogLevel = LogLevel.NOTSET,
 ) -> LocalConfig:
     """
@@ -468,6 +462,6 @@ def load(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return LocalConfig(cfg)

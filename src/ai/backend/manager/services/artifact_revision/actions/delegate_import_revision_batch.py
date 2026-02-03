@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
@@ -14,13 +14,14 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 # TODO: Make this a batch action.
 @dataclass
 class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
-    delegator_reservoir_id: Optional[uuid.UUID]
-    artifact_type: Optional[ArtifactType]
-    delegatee_target: Optional[DelegateeTarget]
+    delegator_reservoir_id: uuid.UUID | None
+    artifact_type: ArtifactType | None
+    delegatee_target: DelegateeTarget | None
     artifact_revision_ids: list[uuid.UUID]
+    force: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -32,8 +33,8 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
 @dataclass
 class DelegateImportArtifactRevisionBatchActionResult(BaseActionResult):
     result: list[ArtifactRevisionData]
-    task_ids: list[Optional[uuid.UUID]]
+    task_ids: list[uuid.UUID | None]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

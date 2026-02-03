@@ -6,10 +6,10 @@ import sys
 
 import click
 
+from ai.backend.agent.dependencies.composer import AgentDependencyComposer, AgentDependencyInput
 from ai.backend.common.dependencies.stacks.visualizing import VisualizingDependencyStack
 from ai.backend.logging import BraceStyleAdapter
 
-from ..dependencies.composer import AgentDependencyComposer, AgentDependencyInput
 from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

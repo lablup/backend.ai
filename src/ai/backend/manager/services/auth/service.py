@@ -1,11 +1,13 @@
 import logging
 from collections import ChainMap
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional, cast
+from typing import Any, cast
 
 from aiohttp import web
+from sqlalchemy import RowMapping
 
-from ai.backend.common.dto.manager.auth.field import AuthTokenType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -18,7 +20,6 @@ from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     PasswordExpired,
     UserCreationError,
-    UserNotFound,
 )
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
@@ -97,11 +98,11 @@ class AuthService:
                 # TODO: per-group role is not yet implemented.
                 await self._auth_repository.get_group_membership(action.group_id, action.user_id)
                 group_role = "user"
-            except GroupMembershipNotFoundError:
+            except GroupMembershipNotFoundError as e:
                 raise ObjectNotFound(
                     extra_msg="No such project or you are not the member of it.",
                     object_name="project (user group)",
-                )
+                ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
@@ -123,7 +124,7 @@ class AuthService:
         auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        elif hook_result.result:
+        if hook_result.result:
             # Passed one of AUTHORIZED hook
             user = hook_result.result
         else:
@@ -139,16 +140,12 @@ class AuthService:
                 action.email,
                 target_password_info=target_password_info,
             )
-        if user is None:
-            raise AuthorizationFailed("User credential mismatch.")
-        if user["status"] == UserStatus.BEFORE_VERIFICATION:
+        if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
-        if user["status"] in INACTIVE_USER_STATUSES:
+        if user.status in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
-        user_row = await self._auth_repository.get_user_row_by_uuid(user["uuid"])
-        if user_row is None:
-            raise UserNotFound(extra_data=user["uuid"])
+        user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
         main_keypair_row = user_row.get_main_keypair_row()
         if main_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
@@ -171,10 +168,10 @@ class AuthService:
             stream_response=None,
             authorization_result=AuthorizationResult(
                 access_key=main_keypair_row.access_key,
-                secret_key=main_keypair_row.secret_key,
-                user_id=user["uuid"],
-                role=user["role"],
-                status=user["status"],
+                secret_key=main_keypair_row.secret_key or "",
+                user_id=user.uuid,
+                role=user.role,
+                status=user.status,
             ),
         )
 
@@ -187,9 +184,12 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        else:
-            # Merge the hook results as a single map.
-            user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
+        # Merge the hook results as a single map.
+        hook_results = cast(list[Mapping[str, Any]], hook_result.result or [])
+        # Convert Mapping to dict for ChainMap compatibility
+        user_data_overriden: ChainMap[str, Any] = ChainMap(*[
+            dict(result) for result in hook_results
+        ])
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -226,7 +226,7 @@ class AuthService:
             "need_password_change": False,
             "full_name": action.full_name if action.full_name is not None else "",
             "description": action.description if action.description is not None else "",
-            "status": UserStatus.ACTIVE,
+            "status": UserStatus.INACTIVE,
             "status_info": "user-signup",
             "role": UserRole.USER,
             "integration_id": None,
@@ -248,7 +248,7 @@ class AuthService:
             "user_id": action.email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
+            "is_active": data.get("status") == UserStatus.ACTIVE,
             "is_admin": False,
             "resource_policy": resource_policy,
             "rate_limit": 1000,
@@ -265,8 +265,8 @@ class AuthService:
                 group_name=group_name,
                 domain_name=action.domain_name,
             )
-        except UserCreationError:
-            raise InternalServerError("Error creating user account")
+        except UserCreationError as e:
+            raise InternalServerError("Error creating user account") from e
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -288,22 +288,20 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
-        result = await self._auth_repository.check_credential_without_migration(
+        await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
             action.password,
         )
-        if result is None:
-            raise GenericBadRequest("Invalid email and/or password")
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
 
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
-        success = await self._auth_repository.update_user_full_name(
+        await self._auth_repository.update_user_full_name(
             action.email, action.domain_name, action.full_name
         )
-        return UpdateFullNameActionResult(success=success)
+        return UpdateFullNameActionResult(success=True)
 
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
@@ -316,14 +314,15 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
-        user = await self._auth_repository.check_credential_without_migration(
-            domain_name,
-            email,
-            action.old_password,
-        )
-        if user is None:
-            log.info(log_fmt + ": old password mismtach", *log_args)
-            raise AuthorizationFailed("Old password mismatch")
+        try:
+            await self._auth_repository.check_credential_without_migration(
+                domain_name,
+                email,
+                action.old_password,
+            )
+        except AuthorizationFailed as e:
+            log.info(log_fmt + ": old password mismatch", *log_args)
+            raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -364,8 +363,6 @@ class AuthService:
             action.email,
             password=action.current_password,
         )
-        if checked_user is None:
-            raise AuthorizationFailed("User credential mismatch.")
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user["password"]):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
@@ -433,12 +430,12 @@ class AuthService:
             ),
         )
 
-    async def _check_password_age(self, user: dict, auth_config: Optional[AuthConfig]) -> None:
+    async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None
         ):
-            password_changed_at: Optional[datetime] = user["password_changed_at"]
+            password_changed_at: datetime | None = user.password_changed_at
             if password_changed_at is None:
                 return  # Skip check if password_changed_at is not set
 

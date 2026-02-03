@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import HuggingFaceRegistryStatefulData
@@ -13,7 +12,7 @@ class HuggingFaceRegistryData:
     id: uuid.UUID
     name: str
     url: str
-    token: Optional[str]
+    token: str | None
 
     @classmethod
     def from_stateful_data(
@@ -40,3 +39,13 @@ class HuggingFaceRegistryData:
             url=self.url,
             token=self.token,
         )
+
+
+@dataclass
+class HuggingFaceRegistryListResult:
+    """Search result with total count for HuggingFace registries."""
+
+    items: list[HuggingFaceRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

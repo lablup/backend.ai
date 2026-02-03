@@ -1,7 +1,8 @@
 import enum
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
@@ -44,18 +45,18 @@ class TestSpec:
     description: str
     tags: set[TestTag]
     template: TestTemplate
-    parametrizes: Optional[Mapping[ContextName, Sequence[Any]]] = None
+    parametrizes: Mapping[ContextName, Sequence[Any]] | None = None
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, TestSpec):
             return NotImplemented
         # If name is the same, consider them equal
         return self.name == other.name
 
-    def product_parametrizes(self) -> Optional[Sequence[Mapping[ContextName, Any]]]:
+    def product_parametrizes(self) -> Sequence[Mapping[ContextName, Any]] | None:
         """
         Get the product of all parametrizes for the test specification.
         """
@@ -63,7 +64,7 @@ class TestSpec:
             return None
         keys = list(self.parametrizes.keys())
         values_product = product(*(self.parametrizes[key] for key in keys))
-        return [dict(zip(keys, combination)) for combination in values_product]
+        return [dict(zip(keys, combination, strict=True)) for combination in values_product]
 
 
 class TestSpecManager:

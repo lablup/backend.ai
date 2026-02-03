@@ -4,9 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Optional
-
-from dateutil.tz import tzutc
+from typing import Any
 
 from ai.backend.common.types import (
     KernelEnqueueingConfig,
@@ -27,8 +25,8 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
     SessionEnqueueData,
 )
+from ai.backend.manager.sokovan.scheduling_controller.types import CalculatedResources
 
-from ..types import CalculatedResources
 from .base import SessionPreparerRule
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -55,6 +53,7 @@ class SessionPreparer:
         validated_scaling_group: AllowedScalingGroup,
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> SessionEnqueueData:
         """
         Convert creation spec to enqueue data.
@@ -112,6 +111,7 @@ class SessionPreparer:
             context.vfolder_mounts,
             context,
             calculated_resources,
+            enqueue_time,
         )
 
         # Collect images from kernels
@@ -121,7 +121,7 @@ class SessionPreparer:
         total_requested = calculated_resources.session_requested_slots
 
         # Build complete session data with all information
-        session_data = SessionEnqueueData(
+        return SessionEnqueueData(
             id=session_id,
             creation_id=spec.session_creation_id,
             name=spec.session_name,
@@ -136,7 +136,7 @@ class SessionPreparer:
             priority=spec.priority,
             status=SessionStatus.PENDING.name,
             status_history={
-                SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                SessionStatus.PENDING.name: enqueue_time.isoformat(),
             },
             requested_slots=total_requested,
             occupying_slots=ResourceSlot(),
@@ -157,9 +157,8 @@ class SessionPreparer:
             timeout=timeout,
             kernels=kernel_data_list,
             dependencies=spec.dependency_sessions or [],
+            startup_command=spec.startup_command,
         )
-
-        return session_data
 
     def _determine_network_config(
         self,
@@ -169,11 +168,10 @@ class SessionPreparer:
         """Determine network type and ID from spec."""
         if spec.network:
             return NetworkType.PERSISTENT, str(spec.network.id)
-        elif context.scaling_group_network.use_host_network:
+        if context.scaling_group_network.use_host_network:
             return NetworkType.HOST, None
-        else:
-            # Default to VOLATILE for multi-container or single-container sessions
-            return NetworkType.VOLATILE, None
+        # Default to VOLATILE for multi-container or single-container sessions
+        return NetworkType.VOLATILE, None
 
     async def _prepare_kernels(
         self,
@@ -185,6 +183,7 @@ class SessionPreparer:
         vfolder_mounts: list[VFolderMount],
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> list[KernelEnqueueData]:
         """Prepare kernel enqueue data."""
         kernel_data_list = []
@@ -263,7 +262,7 @@ class SessionPreparer:
                 starts_at=spec.starts_at,
                 status=KernelStatus.PENDING.name,
                 status_history={
-                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                    KernelStatus.PENDING.name: enqueue_time.isoformat(),
                 },
                 occupied_slots=ResourceSlot(),
                 requested_slots=requested_slots,
@@ -294,7 +293,7 @@ class SessionPreparer:
         self,
         spec: SessionCreationSpec,
         kernel_config: list[KernelEnqueueingConfig],
-    ) -> Optional[list[str]]:
+    ) -> list[str] | None:
         """Get pre-assigned agent for a kernel."""
         # Check if agent is specified in kernel config
         designated_agents = set()

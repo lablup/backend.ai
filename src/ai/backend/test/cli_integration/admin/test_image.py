@@ -1,18 +1,18 @@
 import json
 from contextlib import closing
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_alias_image(run_admin: ClientRunnerFunc):
+def test_alias_image(run_admin: ClientRunnerFunc) -> None:
     pass
 
 
-def test_dealias_image(run_admin: ClientRunnerFunc):
+def test_dealias_image(run_admin: ClientRunnerFunc) -> None:
     pass
 
 
-def test_list_image(run_admin: ClientRunnerFunc):
+def test_list_image(run_admin: ClientRunnerFunc) -> None:
     print("[ List image ]")
     with closing(run_admin(["--output=json", "admin", "image", "list"])) as p:
         p.expect(EOF)

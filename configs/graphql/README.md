@@ -64,7 +64,7 @@ After regenerating the supergraph, restart the gateway container:
 docker compose -f docker-compose.halfstack-main.yml restart backendai-half-apollo-router
 ```
 
-**Note**: While the supergraph schema contains routing URLs in `@join__graph` directives, we explicitly override them in `gateway.config.ts` using `transportEntries` to ensure correct routing to each subgraph endpoint.
+**Note**: Both `supergraph.yaml` (which generates `supergraph.graphql`) and `gateway.config.ts` must have matching routing URLs. The `transportEntries` in `gateway.config.ts` do not override the URLs in `@join__graph` directives—both configurations must be updated together for correct routing to each subgraph endpoint.
 
 ## Subscription Support
 

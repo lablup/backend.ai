@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping
-from typing import Any, Optional, Self
+from typing import Any, Self, cast
 
 from glide import ExpirySet, ExpiryType
 
@@ -136,7 +136,7 @@ class ValkeyArtifactRegistryClient:
     async def get_registry(
         self,
         registry_id: uuid.UUID,
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         """
         Get cached registry data.
 
@@ -149,8 +149,7 @@ class ValkeyArtifactRegistryClient:
             return None
 
         json_value = value.decode()
-        data = load_json(json_value)
-        return data
+        return cast(Mapping[str, Any] | None, load_json(json_value))
 
     @valkey_artifact_registries_resilience.apply()
     async def delete_registry(
@@ -165,5 +164,4 @@ class ValkeyArtifactRegistryClient:
         """
         key = self._make_registry_key(registry_id)
         result = await self._client.client.delete([key])
-        deleted = result > 0
-        return deleted
+        return result > 0

@@ -1,34 +1,32 @@
 import logging
 import uuid
-from collections.abc import Sequence
-from datetime import datetime
-from typing import Awaitable, Callable, Generic, Optional
+from collections.abc import Awaitable, Callable, Sequence
+from datetime import UTC, datetime
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.validator.base import ActionValidator
-
-from ..action import (
+from ai.backend.manager.actions.action import (
+    BaseAction,
+    BaseActionResult,
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
-    TAction,
-    TActionResult,
 )
-from ..monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.validator.base import ActionValidator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ActionRunner(Generic[TAction, TActionResult]):
+class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
     _func: Callable[[TAction], Awaitable[TActionResult]]
     _monitors: Sequence[ActionMonitor]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]],
+        monitors: Sequence[ActionMonitor] | None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
@@ -61,8 +59,8 @@ class ActionRunner(Generic[TAction, TActionResult]):
         action_id = action_trigger_meta.action_id
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
-        result: Optional[TActionResult] = None
-        error_code: Optional[ErrorCode] = None
+        result: TActionResult | None = None
+        error_code: ErrorCode | None = None
 
         await self._start_monitors(action, action_trigger_meta)
         try:
@@ -87,7 +85,7 @@ class ActionRunner(Generic[TAction, TActionResult]):
             entity_id = action.entity_id()
             if entity_id is None and result is not None:
                 entity_id = result.entity_id()
-            ended_at = datetime.now()
+            ended_at = datetime.now(UTC)
             duration = ended_at - started_at
             meta = BaseActionResultMeta(
                 action_id=action_id,
@@ -105,7 +103,7 @@ class ActionRunner(Generic[TAction, TActionResult]):
             )
 
 
-class ActionProcessor(Generic[TAction, TActionResult]):
+class ActionProcessor[TAction: BaseAction, TActionResult: BaseActionResult]:
     _validators: Sequence[ActionValidator]
 
     _runner: ActionRunner[TAction, TActionResult]
@@ -113,15 +111,15 @@ class ActionProcessor(Generic[TAction, TActionResult]):
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]] = None,
-        validators: Optional[Sequence[ActionValidator]] = None,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[ActionValidator] | None = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 
         self._validators = validators or []
 
     async def _run(self, action: TAction) -> TActionResult:
-        started_at = datetime.now()
+        started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for validator in self._validators:

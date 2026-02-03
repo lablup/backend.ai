@@ -50,11 +50,11 @@ from ai.backend.manager.services.project_resource_policy.service import ProjectR
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction
 )
-from ai.backend.manager.services.project_resource_policy.types import ProjectResourcePolicyCreator
+from ai.backend.manager.repositories.project_resource_policy.creators import ProjectResourcePolicyCreatorSpec
 
 # Create action
 action = CreateProjectResourcePolicyAction(
-    creator=ProjectResourcePolicyCreator(
+    creator=ProjectResourcePolicyCreatorSpec(
         name="development-policy",
         max_vfolder_count=50,
         max_quota_scope_size=10737418240,  # 10GB

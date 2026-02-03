@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
@@ -17,8 +17,8 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.json import dump_json
+from ai.backend.manager.exceptions import AgentError
 
-from ..exceptions import AgentError
 from .common import ObjectNotFound
 
 if TYPE_CHECKING:
@@ -95,10 +95,10 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
 
     def __init__(
         self,
-        extra_msg: Optional[str] = None,
-        extra_data: Optional[dict[str, Any]] = None,
-        **kwargs,
-    ):
+        extra_msg: str | None = None,
+        extra_data: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
                 {
@@ -170,10 +170,10 @@ class BackendAgentError(BackendAIError):
     def __init__(
         self,
         agent_error_type: str,
-        exc_info: Union[str, AgentError, Exception, Mapping[str, Optional[str]], None] = None,
-    ):
+        exc_info: str | AgentError | Exception | Mapping[str, str | None] | None = None,
+    ) -> None:
         super().__init__()
-        agent_details: Mapping[str, Optional[str]]
+        agent_details: Mapping[str, str | None]
         if not agent_error_type.startswith("https://"):
             agent_error_type = self._short_type_map[agent_error_type.upper()]
         self.args = (
@@ -188,7 +188,7 @@ class BackendAgentError(BackendAIError):
                 "title": exc_info,
             }
         elif isinstance(exc_info, AgentError):
-            e = cast(AgentError, exc_info)
+            e = exc_info
             agent_details = {
                 "type": agent_error_type,
                 "title": "Agent-side exception occurred.",
@@ -217,17 +217,17 @@ class BackendAgentError(BackendAIError):
             "agent-details": agent_details,
         })
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.agent_exception:
             return f"{self.agent_error_title} ({self.agent_exception})"
         return f"{self.agent_error_title}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.agent_exception:
             return f"<{type(self).__name__}: {self.agent_error_title} ({self.agent_exception})>"
         return f"<{type(self).__name__}: {self.agent_error_title}>"
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[type[BackendAgentError], tuple[Any, ...]]:  # type: ignore[override]
         return (type(self), (self.agent_error_type, self.agent_details))
 
 

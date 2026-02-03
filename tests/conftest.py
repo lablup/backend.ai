@@ -25,9 +25,9 @@ def pytest_configure(config: Config) -> None:
     markerexpr = getattr(config.option, "markexpr", "")
     if not config.option.integration:
         if markerexpr:
-            setattr(config.option, "markexpr", f"({markerexpr}) and not integration")
+            config.option.markexpr = f"({markerexpr}) and not integration"
         else:
-            setattr(config.option, "markexpr", "not integration")
+            config.option.markexpr = "not integration"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -45,7 +45,7 @@ async def etcd(
     Shared etcd fixture for all tests.
     Creates a real AsyncEtcd client with proper scope prefixing.
     """
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={
@@ -53,15 +53,11 @@ async def etcd(
             ConfigScopes.SGROUP: "sgroup/testing",
             ConfigScopes.NODE: "node/i-test",
         },
-    )
-    try:
+    ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
         await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         yield etcd
-    finally:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
         await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        await etcd.close()
-        del etcd

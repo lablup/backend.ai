@@ -1,7 +1,7 @@
 import enum
 import uuid
 from dataclasses import dataclass
-from typing import Self
+from typing import Any, Self
 
 from sqlalchemy.engine.row import Row
 
@@ -51,7 +51,7 @@ class UserData:
         return f"{ROLE_NAME_PREFIX}user_{self.username}"
 
     @classmethod
-    def from_row(cls, user_row: Row) -> Self:
+    def from_row(cls, user_row: Row[Any]) -> Self:
         return cls(
             id=user_row.uuid,
             username=user_row.username,
@@ -65,11 +65,10 @@ def get_user_self_role_creation_input(user: UserData) -> RoleCreateInput:
     Create a self role and permissions for a user.
     This role allows the user to manage their own data.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=user.role_name(),
         source=RoleSource.SYSTEM,
     )
-    return role_input
 
 
 def get_superadmin_role_creation_input() -> RoleCreateInput:
@@ -77,11 +76,10 @@ def get_superadmin_role_creation_input() -> RoleCreateInput:
     Create a superadmin role and permissions.
     This role allows full access to all entities.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=f"{ROLE_NAME_PREFIX}superadmin",
         source=RoleSource.SYSTEM,
     )
-    return role_input
 
 
 def get_monitor_role_creation_input() -> RoleCreateInput:
@@ -89,8 +87,7 @@ def get_monitor_role_creation_input() -> RoleCreateInput:
     Create a monitor role and permissions.
     This role allows read-only access to all entities.
     """
-    role_input = RoleCreateInput(
+    return RoleCreateInput(
         name=f"{ROLE_NAME_PREFIX}monitor",
         source=RoleSource.SYSTEM,
     )
-    return role_input

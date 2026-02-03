@@ -12,13 +12,14 @@ import shutil
 import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterator, Sequence
+from typing import Any, Final
 
 import aiofiles
 import aiotools
@@ -31,6 +32,7 @@ from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
 from .dev import (
@@ -51,8 +53,8 @@ from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
+    FrontendMode,
     HalfstackConfig,
-    HostPortPair,
     ImageSource,
     InstallInfo,
     InstallType,
@@ -89,7 +91,7 @@ class Context(metaclass=ABCMeta):
         self,
         dist_info: DistInfo,
         install_variable: InstallVariable,
-        app: App,
+        app: App[None],
         *,
         non_interactive: bool = False,
     ) -> None:
@@ -123,7 +125,7 @@ class Context(metaclass=ABCMeta):
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
 
-    def generate_passphrase(self, len=16) -> str:
+    def generate_passphrase(self, len: int = 16) -> str:
         return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
@@ -149,7 +151,7 @@ class Context(metaclass=ABCMeta):
             case "Darwin":
                 await self.run_shell(f"brew install {distro_pkg_name}")
 
-    async def run_exec(self, cmdargs: Sequence[str], **kwargs) -> int:
+    async def run_exec(self, cmdargs: Sequence[str], **kwargs: Any) -> int:
         p = await asyncio.create_subprocess_exec(
             *cmdargs,
             stdout=kwargs.pop("stdout", asyncio.subprocess.PIPE),
@@ -184,19 +186,19 @@ class Context(metaclass=ABCMeta):
             p.terminate()
             try:
                 exit_code = await p.wait()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 p.kill()
                 exit_code = await p.wait()
         return exit_code
 
-    async def run_shell(self, script: str, **kwargs) -> int:
+    async def run_shell(self, script: str, **kwargs: Any) -> int:
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
         raise NotImplementedError
 
     @staticmethod
-    def sed_in_place(path: Path, pattern: str | re.Pattern, replacement: str) -> None:
+    def sed_in_place(path: Path, pattern: str | re.Pattern[str], replacement: str) -> None:
         content = path.read_text()
         match pattern:
             case str():
@@ -206,7 +208,7 @@ class Context(metaclass=ABCMeta):
         path.write_text(content)
 
     @staticmethod
-    def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern, str]]) -> None:
+    def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern[str], str]]) -> None:
         content = path.read_text()
         for pattern, replacement in subs:
             match pattern:
@@ -238,21 +240,19 @@ class Context(metaclass=ABCMeta):
         }
         creds: dict[str, str] | None = None
         if halfstack.etcd_user is not None:
-            assert halfstack.etcd_password is not None
+            if halfstack.etcd_password is None:
+                raise ValueError("etcd_password must be set when etcd_user is provided")
             creds = {
                 "user": halfstack.etcd_user,
                 "password": halfstack.etcd_password,
             }
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
             "local",
             scope_prefix_map,
             credentials=creds,
-        )
-        try:
+        ) as etcd:
             yield etcd
-        finally:
-            await etcd.close()
 
     async def etcd_put_json(self, key: str, value: Any) -> None:
         async with self.etcd_ctx() as etcd:
@@ -262,13 +262,73 @@ class Context(metaclass=ABCMeta):
         async with self.etcd_ctx() as etcd:
             return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
+    async def _ensure_rover_installed(self) -> str:
+        rover_bin = Path.home() / ".rover" / "bin" / "rover"
+
+        if rover_bin.exists():
+            self.log_header("Rover CLI is already installed.")
+            return str(rover_bin)
+
+        if shutil.which("rover"):
+            self.log_header("Rover CLI found in PATH.")
+            return "rover"
+
+        self.log_header("Installing Rover CLI...")
+        install_proc = await asyncio.create_subprocess_shell(
+            "curl -sSL https://rover.apollo.dev/nix/latest | sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await install_proc.communicate()
+        if install_proc.returncode != 0:
+            raise RuntimeError(f"Failed to install Rover CLI:\n{stderr.decode()}")
+
+        if not rover_bin.exists():
+            raise RuntimeError("Rover CLI installation completed but binary not found.")
+
+        bashrc_path = Path.home() / ".bashrc"
+        rover_path_export = 'export PATH="$HOME/.rover/bin:$PATH"'
+        license_export = "export APOLLO_ELV2_LICENSE=accept"
+
+        bashrc_content = ""
+        if bashrc_path.exists():
+            bashrc_content = bashrc_path.read_text()
+
+        lines_to_add = []
+        if rover_path_export not in bashrc_content:
+            lines_to_add.append(rover_path_export)
+        if license_export not in bashrc_content:
+            lines_to_add.append(license_export)
+
+        if lines_to_add:
+            bashrc_addition = "\n# Added by Backend.AI installer for Rover CLI\n"
+            bashrc_addition += "\n".join(lines_to_add) + "\n"
+
+            def _write_bashrc() -> None:
+                with bashrc_path.open("a") as f:
+                    f.write(bashrc_addition)
+
+            await asyncio.to_thread(_write_bashrc)
+            self.log_header("Added Rover PATH and license to ~/.bashrc")
+
+        self.log_header("Rover CLI installed successfully.")
+        return str(rover_bin)
+
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
 
         self.log_header("Generating supergraph.graphql via rover CLI...")
 
+        rover_path = await self._ensure_rover_installed()
+
+        # Accept ELv2 license for supergraph compose.
+        # Although we add this to ~/.bashrc during installation, it won't take effect
+        # in the current session, so we must pass it explicitly to the subprocess.
+        env = os.environ.copy()
+        env["APOLLO_ELV2_LICENSE"] = "accept"
+
         compose_cmd = [
-            "rover",
+            rover_path,
             "supergraph",
             "compose",
             "--config",
@@ -280,12 +340,17 @@ class Context(metaclass=ABCMeta):
             *compose_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
-        with open(output_path, "wb") as f:
-            f.write(stdout)
+
+        def _write_supergraph() -> None:
+            with Path(output_path).open("wb") as f:
+                f.write(stdout)
+
+        await asyncio.to_thread(_write_supergraph)
         self.log_header(f"Wrote supergraph schema to {output_path}")
 
         base_path = self.install_info.base_path
@@ -316,7 +381,8 @@ class Context(metaclass=ABCMeta):
         (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
-        assert self.install_info.halfstack_config.redis_addr
+        if not self.install_info.halfstack_config.redis_addr:
+            raise RuntimeError("redis_addr must be configured")
         self.sed_in_place_multi(
             dst_compose_path,
             [
@@ -413,7 +479,7 @@ class Context(metaclass=ABCMeta):
         self.sed_in_place_multi(
             toml_path,
             [
-                (re.compile("^num-proc = .*", flags=re.M), "num-proc = 1"),
+                (re.compile("^num-proc = .*", flags=re.MULTILINE), "num-proc = 1"),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
                 (
@@ -421,7 +487,7 @@ class Context(metaclass=ABCMeta):
                     f"port = {self.install_info.service_config.manager_addr.bind.port}",
                 ),
                 (
-                    re.compile("^(# )?ipc-base-path =.*", flags=re.M),
+                    re.compile("^(# )?ipc-base-path =.*", flags=re.MULTILINE),
                     f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
                 ),
             ],
@@ -456,7 +522,8 @@ class Context(metaclass=ABCMeta):
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
         if halfstack.ha_setup:
-            assert halfstack.redis_sentinel_addrs
+            if not halfstack.redis_sentinel_addrs:
+                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
             data["redis"] = {
                 "sentinel": ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -471,7 +538,8 @@ class Context(metaclass=ABCMeta):
             if halfstack.redis_password:
                 data["redis"]["password"] = halfstack.redis_password
         else:
-            assert halfstack.redis_addr
+            if not halfstack.redis_addr:
+                raise RuntimeError("redis_addr must be configured")
             data["redis"] = {
                 "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
                 "helper": {
@@ -497,15 +565,15 @@ class Context(metaclass=ABCMeta):
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
                 (
-                    re.compile("^(# )?ipc-base-path = .*", flags=re.M),
+                    re.compile("^(# )?ipc-base-path = .*", flags=re.MULTILINE),
                     f'ipc-base-path = "{service.agent_ipc_base_path}"',
                 ),
                 (
-                    re.compile("^(# )?var-base-path = .*", flags=re.M),
+                    re.compile("^(# )?var-base-path = .*", flags=re.MULTILINE),
                     f'var-base-path = "{service.agent_var_base_path}"',
                 ),
                 (
-                    re.compile("(# )?mount_path = .*", flags=re.M),
+                    re.compile("(# )?mount_path = .*", flags=re.MULTILINE),
                     f'"{self.install_info.base_path / service.vfolder_relpath}"',
                 ),
             ],
@@ -531,7 +599,7 @@ class Context(metaclass=ABCMeta):
 
         self.sed_in_place(
             toml_path,
-            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
             f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
 
@@ -603,14 +671,31 @@ class Context(metaclass=ABCMeta):
         conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        assert halfstack.redis_addr is not None
+        endpoint_protocol = self.install_variable.endpoint_protocol
+        fqdn_prefix = self.install_variable.fqdn_prefix
+        storage_public_address = self.install_variable.storage_public_address
+        public_facing_address = self.install_variable.public_facing_address
+        if halfstack.redis_addr is None:
+            raise RuntimeError("redis_addr must be configured")
+
+        # use FQDN if provided, otherwise use public_facing_address
+        if fqdn_prefix is not None:
+            # With FQDN prefix, use public storage address with https
+            wsproxy_url = f"https://{storage_public_address}:5050"
+        else:
+            # Without FQDN prefix, use public_facing_address with http
+            wsproxy_url = f"http://{public_facing_address}:5050"
+        # Use sed_in_place for dotted key wsproxy.url
+        self.sed_in_place(
+            conf_path,
+            re.compile(r'^wsproxy\.url\s*=\s*".*"', flags=re.MULTILINE),
+            f'wsproxy.url = "{wsproxy_url}"',
+        )
+
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
-            appproxy_itable = tomlkit.inline_table()
-            appproxy_itable["url"] = (
-                f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
-            )
-            data["service"]["appproxy"] = appproxy_itable  # type: ignore
+            if endpoint_protocol is not None:
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -619,7 +704,8 @@ class Context(metaclass=ABCMeta):
             helper_table["socket_connect_timeout"] = 2.0
             helper_table["reconnect_poll_timeout"] = 0.3
             if halfstack.ha_setup:
-                assert halfstack.redis_sentinel_addrs
+                if not halfstack.redis_sentinel_addrs:
+                    raise ValueError("Redis sentinel addresses must be configured for HA setup")
                 redis_table = tomlkit.table()
                 redis_table["sentinel"] = ",".join(
                     f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
@@ -629,7 +715,8 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             else:
-                assert halfstack.redis_addr
+                if not halfstack.redis_addr:
+                    raise RuntimeError("redis_addr must be configured")
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
@@ -739,6 +826,14 @@ class Context(metaclass=ABCMeta):
         self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
         self.log.write(f"API SECRET = {service.appproxy_api_secret}")
 
+        tls_advertised = self.install_variable.tls_advertised
+        advertised_port = self.install_variable.advertised_port
+        wildcard_domain = self.install_variable.wildcard_domain
+        public_facing_address = self.install_variable.public_facing_address
+        apphub_address = self.install_variable.apphub_address
+        app_address = self.install_variable.app_address
+        frontend_mode = self.install_variable.frontend_mode
+
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
             data["db"]["type"] = "postgresql"  # type: ignore[index]
@@ -749,17 +844,24 @@ class Context(metaclass=ABCMeta):
             data["db"]["max_overflow"] = 64  # type: ignore[index]
             data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
             data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
-            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
-            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            redis_addr_table = tomlkit.inline_table()
+            redis_addr_table["host"] = halfstack.redis_addr.face.host
+            redis_addr_table["port"] = halfstack.redis_addr.face.port
+            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.host
-            )
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
             data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
+            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
+            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
+                service.appproxy_coordinator_addr.bind.port
+            )
+            if tls_advertised:
+                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -767,20 +869,65 @@ class Context(metaclass=ABCMeta):
         worker_conf = self.copy_config("app-proxy-worker.toml")
         with worker_conf.open("r") as fp:
             data = tomlkit.load(fp)
-            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
-            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            # Update redis addr inline table
+            redis_addr_table = tomlkit.inline_table()
+            redis_addr_table["host"] = halfstack.redis_addr.face.host
+            redis_addr_table["port"] = halfstack.redis_addr.face.port
+            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
             )
-            data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
-                "host": service.appproxy_worker_addr.bind.host,
-                "port": service.appproxy_worker_addr.bind.port,
-            }
-            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
-            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
+
+            # api_bind_addr as inline table
+            api_bind_addr_table = tomlkit.inline_table()
+            api_bind_addr_table["host"] = service.appproxy_worker_addr.bind.host
+            api_bind_addr_table["port"] = service.appproxy_worker_addr.bind.port
+            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
+
+            # api_advertised_addr as inline table
+            api_advertised_addr_table = tomlkit.inline_table()
+            api_advertised_addr_table["host"] = public_facing_address
+            api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
+            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+
+            # advertise TLS to external clients
+            if tls_advertised:
+                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+
+            # set frontend mode (port or wildcard)
+            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+
+            # configure based on frontend_mode
+            if frontend_mode == FrontendMode.WILDCARD:
+                # Remove port_proxy section for wildcard mode
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+
+                # Override api_advertised_addr with app_address and advertised_port
+                api_advertised_addr_table = tomlkit.inline_table()
+                api_advertised_addr_table["host"] = app_address
+                api_advertised_addr_table["port"] = advertised_port
+                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+
+                # Add wildcard_domain section
+                if wildcard_domain:
+                    wildcard_table = tomlkit.table()
+                    wildcard_table["domain"] = wildcard_domain
+                    bind_addr_table = tomlkit.inline_table()
+                    bind_addr_table["host"] = "0.0.0.0"
+                    bind_addr_table["port"] = 10250
+                    wildcard_table["bind_addr"] = bind_addr_table
+                    wildcard_table["advertised_port"] = advertised_port
+                    wildcard_table.add(tomlkit.nl())  # Add newline before next section
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            else:
+                # update port_proxy.advertised_host
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -794,7 +941,7 @@ class Context(metaclass=ABCMeta):
                     f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}",
                 ),
                 (
-                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.M),
+                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.MULTILINE),
                     f"sqlalchemy.url = postgresql+asyncpg://appproxy:develove@{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}/appproxy",
                 ),
             ],
@@ -806,7 +953,7 @@ class Context(metaclass=ABCMeta):
         service = self.install_info.service_config
         with tempfile.TemporaryDirectory() as tmpdir:
             fixture_path = Path(tmpdir) / "fixture.json"
-            with open(fixture_path, "w") as fw:
+            with fixture_path.open("w") as fw:
                 fw.write(
                     json.dumps({
                         "__mode": "update",
@@ -836,7 +983,7 @@ class Context(metaclass=ABCMeta):
                 username = match.group(1)
             else:
                 continue
-            with open(base_path / f"env-local-{username}-api.sh", "w") as fp:
+            with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
                 print("# Directly access to the manager using API keypair (admin)", file=fp)
                 print(
                     "export"
@@ -851,7 +998,7 @@ class Context(metaclass=ABCMeta):
             user_data = json.loads(Path(user_path).read_bytes())
         for user in user_data["users"]:
             username = user["username"]
-            with open(base_path / f"env-local-{username}-session.sh", "w") as fp:
+            with (base_path / f"env-local-{username}-session.sh").open("w") as fp:
                 print(
                     "# Indirectly access to the manager via the web server using a cookie-based"
                     " login session",
@@ -1009,7 +1156,7 @@ class Context(metaclass=ABCMeta):
                             str(src.file),
                         ])
                 case ImageSource.LOCAL_REGISTRY:
-                    raise NotImplementedError()
+                    raise NotImplementedError
 
 
 class DevContext(Context):
@@ -1281,7 +1428,8 @@ class PackageContext(Context):
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = self.dist_info.target_path / "checksum.txt"
 
-        with open(csum_path, "r") as f:
+        csum_line: str = ""
+        with csum_path.open() as f:
             lines = f.readlines()
             for line in lines:
                 if pkg_name in line:
@@ -1291,7 +1439,7 @@ class PackageContext(Context):
                 raise ValueError(f"Checksum for {pkg_name} not found in {csum_path}")
 
         individual_csum_path = dst_path.with_name(pkg_name + ".sha256")
-        with open(individual_csum_path, "w") as f:
+        with individual_csum_path.open("w") as f:
             f.write(csum_line)
 
         await self._validate_checksum(dst_path, individual_csum_path)

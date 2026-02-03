@@ -1,7 +1,7 @@
 import base64
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Optional, override
+from typing import override
 
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
@@ -22,7 +22,7 @@ class ImagePullCheckSpec:
     image_ref: ImageRef
     image_digest: str
     registry_conf: ImageRegistry
-    pull_timeout: Optional[float]
+    pull_timeout: float | None
     auto_pull_behavior: AutoPullBehavior
 
 
@@ -31,7 +31,7 @@ class ImagePullSpec:
     do_pull: bool
     image_ref: ImageRef
     registry_conf: ImageRegistry
-    pull_timeout: Optional[float]
+    pull_timeout: float | None
 
 
 class ImagePullSpecProvisioner(Provisioner[ImagePullCheckSpec, ImagePullSpec]):
@@ -61,7 +61,7 @@ class ImagePullSpecProvisioner(Provisioner[ImagePullCheckSpec, ImagePullSpec]):
                     case AutoPullBehavior.DIGEST | AutoPullBehavior.TAG:
                         return True
                     case AutoPullBehavior.NONE:
-                        raise ImageNotAvailable(spec.image_ref)
+                        raise ImageNotAvailable(spec.image_ref) from e
             else:
                 raise
         return False
@@ -103,13 +103,11 @@ class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
         return ImagePullResult(image_ref=image_ref, did_pull=did_pull)
 
     async def _pull_image(self, spec: ImagePullSpec) -> ImageRef:
-        auth_config: Optional[dict[str, str]] = None
+        auth_config: dict[str, str] | None = None
         reg_user = spec.registry_conf.get("username")
         reg_passwd = spec.registry_conf.get("password")
         if reg_user is not None and reg_passwd is not None:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }
@@ -120,7 +118,7 @@ class ImagePullProvisioner(Provisioner[ImagePullSpec, ImagePullResult]):
 
             if not result:
                 raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
-            elif error := result[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
         return spec.image_ref

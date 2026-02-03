@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, override
+from typing import Any, cast, override
 
 import aioboto3
 
@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class _S3Credentials:
-    aws_access_key_id: Optional[str]
-    aws_secret_access_key: Optional[str]
+    aws_access_key_id: str | None
+    aws_secret_access_key: str | None
 
 
 @dataclass(frozen=True)
@@ -24,13 +24,13 @@ class _S3Target:
     bucket_name: str
     key: str
     endpoint_url: str
-    region_name: Optional[str]
+    region_name: str | None
 
 
 @dataclass(frozen=True)
 class _S3DownloadConfig:
     chunk_size: int
-    content_type: Optional[str]
+    content_type: str | None
 
 
 class S3DownloadStreamReader(StreamReader):
@@ -39,7 +39,7 @@ class S3DownloadStreamReader(StreamReader):
         target: _S3Target,
         credentials: _S3Credentials,
         config: _S3DownloadConfig,
-    ):
+    ) -> None:
         self._session = aioboto3.Session()
         self._target = target
         self._credentials = credentials
@@ -70,7 +70,7 @@ class S3DownloadStreamReader(StreamReader):
                 body.close()
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._config.content_type
 
 
@@ -83,10 +83,10 @@ class S3Client:
         self,
         bucket_name: str,
         endpoint_url: str,
-        region_name: Optional[str],
-        aws_access_key_id: Optional[str],
-        aws_secret_access_key: Optional[str],
-    ):
+        region_name: str | None,
+        aws_access_key_id: str | None,
+        aws_secret_access_key: str | None,
+    ) -> None:
         self.bucket_name = bucket_name
         self.endpoint_url = endpoint_url
         self.region_name = region_name
@@ -208,7 +208,7 @@ class S3Client:
         self,
         s3_key: str,
         chunk_size: int,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> StreamReader:
         """
         Download and stream S3 object content as bytes chunks.
@@ -246,7 +246,7 @@ class S3Client:
         self,
         s3_key: str,
         expiration: int,
-        content_length_range: Optional[tuple[int, int]] = None,
+        content_length_range: tuple[int, int] | None = None,
     ) -> PresignedUploadObjectResponse:
         """
         Generate a presigned URL for client-side upload to S3.
@@ -266,7 +266,7 @@ class S3Client:
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
-            conditions: list = []
+            conditions: list[Any] = []
 
             if content_length_range:
                 conditions.append([
@@ -292,8 +292,8 @@ class S3Client:
         self,
         s3_key: str,
         expiration: int,
-        response_content_disposition: Optional[str] = None,
-        response_content_type: Optional[str] = None,
+        response_content_disposition: str | None = None,
+        response_content_type: str | None = None,
     ) -> str:
         """
         Generate a presigned URL for client-side download from S3.
@@ -324,13 +324,14 @@ class S3Client:
             if response_content_type:
                 params["ResponseContentType"] = response_content_type
 
-            url = await s3_client.generate_presigned_url(
-                "get_object",
-                Params=params,
-                ExpiresIn=expiration,
+            return cast(
+                str,
+                await s3_client.generate_presigned_url(
+                    "get_object",
+                    Params=params,
+                    ExpiresIn=expiration,
+                ),
             )
-
-            return url
 
     async def get_object_meta(self, s3_key: str) -> ObjectMetaResponse:
         """

@@ -9,10 +9,14 @@ import pathlib
 
 import click
 
-from ai.backend.common.configs.sample_generator import generate_sample_config_file
+from ai.backend.common.configs.generator import (
+    GeneratorConfig,
+    TOMLGenerator,
+)
+from ai.backend.common.meta import ConfigEnvironment
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
-from ..config.unified import ManagerUnifiedConfig
 from .context import CLIContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -38,22 +42,41 @@ def cli() -> None:
     help="Output path for the generated sample configuration file. (default: sample.toml)",
 )
 @click.option(
+    "-e",
+    "--env",
+    type=click.Choice(["local", "prod"]),
+    default="prod",
+    help="Target environment for example values. (default: prod)",
+)
+@click.option(
     "--overwrite",
     is_flag=True,
     help="Overwrite the output file if it already exists.",
 )
+@click.option(
+    "--unmask-secrets",
+    is_flag=True,
+    help="Show actual secret values instead of masking them.",
+)
 @click.pass_obj
 def generate_sample(
-    cli_ctx: CLIContext,
+    _cli_ctx: CLIContext,
     output: pathlib.Path,
+    env: str,
     overwrite: bool,
+    unmask_secrets: bool,
 ) -> None:
     """
     Generate a sample configuration file from the ManagerUnifiedConfig schema.
 
-    This command creates a TOML configuration file with all available options,
-    their default values, descriptions, and examples based on the Pydantic
-    model definition of ManagerUnifiedConfig.
+    This command creates a TOML configuration file with environment-specific examples
+    (local or prod), proper secret masking, and comprehensive documentation from
+    BackendAIConfigMeta annotations.
+
+    Features:
+    - Environment-specific examples (--env local|prod)
+    - Secret field masking (use --unmask-secrets to show actual values)
+    - Comprehensive field documentation from BackendAIConfigMeta
     """
     if output.exists() and not overwrite:
         click.echo(
@@ -62,23 +85,28 @@ def generate_sample(
         )
         return
 
-    header_comment = """
-Backend.AI Manager Configuration Sample
+    header_comment = f"""
+Backend.AI Manager Configuration ({env.upper()} Environment)
 
 This is a sample configuration file for the Backend.AI Manager.
 All configuration options are documented with their descriptions,
-default values, and examples.
+default values, and environment-specific examples.
 
-Generated automatically from the ManagerUnifiedConfig schema.
+Generated using BackendAIConfigMeta annotations.
 """
 
+    config_env = ConfigEnvironment.LOCAL if env == "local" else ConfigEnvironment.PROD
+
     try:
-        generate_sample_config_file(
-            ManagerUnifiedConfig, str(output), header_comment=header_comment.strip()
+        generator_config = GeneratorConfig(
+            mask_secrets=not unmask_secrets,
+            include_version_comments=True,
         )
+        generator = TOMLGenerator(env=config_env, config=generator_config)
+        generator.generate_to_file(ManagerUnifiedConfig, output, header=header_comment.strip())
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        raise click.ClickException(f"Failed to generate sample configuration: {e}")
+        raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 
 
 if __name__ == "__main__":

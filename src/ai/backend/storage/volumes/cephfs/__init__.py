@@ -3,24 +3,23 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List
+from typing import Any
 
 import aiofiles.os
 
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import CephNotInstalledError, QuotaScopeNotFoundError
-from ...subproc import run
-from ...types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
-from ..abc import (
+from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import CapacityUsage, QuotaConfig, QuotaUsage, TreeUsage
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_SIZE,
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -29,24 +28,24 @@ class CephDirQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
         loop = asyncio.get_running_loop()
 
         def read_attrs() -> tuple[int, int]:
-            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined]
+            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined,unused-ignore]
             try:
-                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined]
+                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined,unused-ignore]
             except OSError as e:
                 match e.errno:
                     case 61:
@@ -89,7 +88,7 @@ class CephDirQuotaModel(BaseQuotaModel):
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
-            lambda: os.setxattr(  # type: ignore[attr-defined]
+            lambda: os.setxattr(  # type: ignore[attr-defined,unused-ignore]
                 qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()
             ),
         )
@@ -104,7 +103,7 @@ class CephDirQuotaModel(BaseQuotaModel):
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
-            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined]
+            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined,unused-ignore]
         )
 
 
@@ -114,8 +113,8 @@ class CephFSOpModel(BaseFSOpModel):
         raw_reports = await loop.run_in_executor(
             None,
             lambda: (
-                os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
-                os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+                os.getxattr(path, "ceph.dir.rentries"),  # type: ignore[attr-defined,unused-ignore]
+                os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined,unused-ignore]
             ),
         )
         file_count = int(raw_reports[0].strip().decode())
@@ -126,7 +125,7 @@ class CephFSOpModel(BaseFSOpModel):
         loop = asyncio.get_running_loop()
         raw_report = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            lambda: os.getxattr(path, "ceph.dir.rbytes"),  # type: ignore[attr-defined,unused-ignore]
         )
         return BinarySize(raw_report.strip().decode())
 
@@ -134,14 +133,14 @@ class CephFSOpModel(BaseFSOpModel):
 class CephFSVolume(BaseVolume):
     name = "cephfs"
     loop: asyncio.AbstractEventLoop
-    registry: Dict[str, int]
-    project_id_pool: List[int]
+    registry: dict[str, int]
+    project_id_pool: list[int]
 
     async def init(self) -> None:
         try:
             await run([b"ceph", b"--version"])
-        except FileNotFoundError:
-            raise CephNotInstalledError("Ceph is not installed.")
+        except FileNotFoundError as e:
+            raise CephNotInstalledError("Ceph is not installed.") from e
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:
@@ -153,7 +152,7 @@ class CephFSVolume(BaseVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
 
     async def get_fs_usage(self) -> CapacityUsage:

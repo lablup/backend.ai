@@ -10,11 +10,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
-from typing import (
-    Any,
-    FrozenSet,
-    Optional,
-)
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -29,8 +25,7 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidPathError,
     InvalidQuotaScopeError,
@@ -39,8 +34,8 @@ from ...errors import (
     QuotaScopeNotFoundError,
     SubprocessStdoutNotAvailableError,
 )
-from ...subproc import spawn_and_watch
-from ...types import (
+from ai.backend.storage.subproc import spawn_and_watch
+from ai.backend.storage.types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -52,8 +47,8 @@ from ...types import (
     Stat,
     TreeUsage,
 )
-from ...utils import fstime2datetime
-from ..abc import (
+from ai.backend.storage.utils import fstime2datetime
+from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SIZE,
     CAP_METRIC,
@@ -62,7 +57,8 @@ from ..abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -90,8 +86,8 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
@@ -113,8 +109,8 @@ class QTreeQuotaModel(BaseQuotaModel):
                                 break
                         else:
                             raise TryAgain
-        except RetryError:
-            raise QuotaScopeNotFoundError
+        except RetryError as e:
+            raise QuotaScopeNotFoundError from e
 
         if options is not None:
             result = await self.netapp_client.set_quota_rule(
@@ -134,7 +130,7 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
@@ -302,7 +298,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     parts = tuple(map(os.fsdecode, line.rstrip(b"\n").split(b"\0")))
                     item_path = Path(*Path(parts[7]).parts[2:])
                     inner_relpath = item_path.relative_to(target_relpath)
-                    if inner_relpath == Path("."):  # exclude the top dir
+                    if inner_relpath == Path():  # exclude the top dir
                         continue
                     item_abspath = self.mount_path / target_relpath / inner_relpath
                     match int(parts[5]):
@@ -411,7 +407,7 @@ class XCPFSOpModel(BaseFSOpModel):
                             error_msg = line.removeprefix(error_msg_prefix).rstrip().decode()
                             break
                     raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # -1 indicates "too many"
             total_size = -1
             total_count = -1
@@ -512,7 +508,7 @@ class NetAppVolume(BaseVolume):
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:

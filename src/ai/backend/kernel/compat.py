@@ -1,25 +1,26 @@
 import asyncio
 import signal
-from typing import Awaitable, Callable, Collection, Optional, TypeVar
+from collections.abc import Awaitable, Callable, Collection
+from typing import Any, TypeVar
 
 __all__ = ("current_loop",)
 
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore
+    current_loop = asyncio.get_running_loop
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore
+    current_loop = asyncio.get_event_loop
 
 
-all_tasks: Callable[[], Collection[asyncio.Task]]
+all_tasks: Callable[[asyncio.AbstractEventLoop | None], Collection[asyncio.Task[Any]]]
 if hasattr(asyncio, "all_tasks"):
-    all_tasks = asyncio.all_tasks  # type: ignore
+    all_tasks = asyncio.all_tasks
 else:
-    all_tasks = asyncio.Task.all_tasks  # type: ignore
+    all_tasks = asyncio.Task.all_tasks  # type: ignore[attr-defined]
 
 
-def _cancel_all_tasks(loop):
+def _cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
     to_cancel = all_tasks(loop)
     if not to_cancel:
         return
@@ -37,7 +38,10 @@ def _cancel_all_tasks(loop):
             })
 
 
-def _asyncio_run(coro, *, debug=False):
+_T = TypeVar("_T")
+
+
+def _asyncio_run[T](coro: Awaitable[T], *, debug: bool = False) -> T:
     loop = asyncio.new_event_loop()
     try:
         asyncio.set_event_loop(loop)
@@ -53,23 +57,30 @@ def _asyncio_run(coro, *, debug=False):
             loop.close()
 
 
-_T = TypeVar("_T")
-
-run: Callable[[Awaitable[_T], Optional[bool]], _T]
+run: Callable[[Awaitable[_T], bool | None], _T]
 if hasattr(asyncio, "run"):
-    asyncio_run = asyncio.run  # type: ignore
+    asyncio_run = asyncio.run
 else:
-    asyncio_run = _asyncio_run  # type: ignore
+    asyncio_run = _asyncio_run  # type: ignore[assignment]
 
 
-def asyncio_run_forever(setup_coro, shutdown_coro, *, stop_signals={signal.SIGINT}, debug=False):
+def asyncio_run_forever(
+    setup_coro: Awaitable[None],
+    shutdown_coro: Awaitable[None],
+    *,
+    stop_signals: set[signal.Signals] | None = None,
+    debug: bool = False,
+) -> None:
     """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.
     See discussions on https://github.com/python/asyncio/pull/465
     """
 
-    async def wait_for_stop():
+    if stop_signals is None:
+        stop_signals = {signal.SIGINT}
+
+    async def wait_for_stop() -> None:
         loop = current_loop()
         future = loop.create_future()
         for stop_sig in stop_signals:

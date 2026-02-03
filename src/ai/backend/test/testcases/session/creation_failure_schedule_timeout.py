@@ -12,7 +12,7 @@ class InteractiveSessionCreationFailureScheduleTimeout(TestCode):
         image_dep = ImageContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         resp: ComputeSession = await client_session.ComputeSession.get_or_create(
             image_dep.name,

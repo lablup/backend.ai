@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .base import ScalingGroupAction
 
@@ -14,7 +14,7 @@ from .base import ScalingGroupAction
 class SearchScalingGroupsAction(ScalingGroupAction):
     """Action to search scaling groups."""
 
-    querier: Querier
+    querier: BatchQuerier
 
     @override
     @classmethod
@@ -22,7 +22,7 @@ class SearchScalingGroupsAction(ScalingGroupAction):
         return "search_scaling_groups"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -36,5 +36,5 @@ class SearchScalingGroupsActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

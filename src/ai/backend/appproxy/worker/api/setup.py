@@ -1,5 +1,5 @@
 import urllib.parse
-from typing import Iterable
+from collections.abc import Iterable
 from uuid import UUID
 
 import aiohttp
@@ -18,22 +18,21 @@ from ai.backend.appproxy.common.errors import (
 from ai.backend.appproxy.common.types import (
     CORSOptions,
     FrontendMode,
+    FrontendServerMode,
     ProxyProtocol,
     PydanticResponse,
     WebMiddleware,
 )
 from ai.backend.appproxy.common.types import SerializableCircuit as Circuit
 from ai.backend.appproxy.common.utils import calculate_permit_hash, pydantic_api_handler
-
-from ..config import (
+from ai.backend.appproxy.worker.config import (
     PortProxyConfig,
     TraefikPortProxyConfig,
     TraefikWildcardDomainConfig,
     WildcardDomainConfig,
 )
-from ..coordinator_client import get_circuit_info
-from ..errors import MissingPortConfigError
-from ..types import FrontendServerMode, InteractiveAppInfo, RootContext
+from ai.backend.appproxy.worker.coordinator_client import get_circuit_info
+from ai.backend.appproxy.worker.types import InteractiveAppInfo, RootContext
 
 
 def generate_proxy_url(
@@ -46,6 +45,7 @@ def generate_proxy_url(
     redirect_path: str | None = None,
 ) -> str:
     # Generate base URL based on config type
+    base_url: str
     match config:
         case PortProxyConfig():
             base_url = f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"
@@ -107,7 +107,13 @@ async def setup(
     requested_circuit_id = UUID(jwt_body["circuit"])
 
     config = root_ctx.local_config.proxy_worker
-    port_config = config.port_proxy  # As a default fallback
+    port_config: (
+        PortProxyConfig
+        | WildcardDomainConfig
+        | TraefikPortProxyConfig
+        | TraefikWildcardDomainConfig
+        | None
+    ) = config.port_proxy  # As a default fallback
     circuit = await get_circuit_info(root_ctx, request["request_id"], str(requested_circuit_id))
 
     match config.frontend_mode:
@@ -140,12 +146,6 @@ async def setup(
                 raise ServerMisconfiguredError(
                     "proxy_worker: Missing root-level 'wildcard_domain' config section"
                 )
-        case _:
-            raise ServerMisconfiguredError(
-                f"proxy_worker: Invalid root-level 'frontend_mode': {config.frontend_mode}"
-            )
-    if port_config is None:
-        raise MissingPortConfigError("Port configuration is required")
 
     use_tls = config.tls_advertised or config.tls_listen
     if not isinstance(circuit.app_info, InteractiveAppInfo):
@@ -193,32 +193,31 @@ async def setup(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )
-            else:
-                return PydanticResponse(
-                    ProxySetupResponseModel(
-                        redirect=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
-                        redirectURI=AnyUrl(
-                            f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
-                        ),
+            return PydanticResponse(
+                ProxySetupResponseModel(
+                    redirect=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
                     ),
-                    headers=cors_headers,
-                )
+                    redirectURI=AnyUrl(
+                        f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}"
+                    ),
+                ),
+                headers=cors_headers,
+            )
         case _:
             raise InvalidAPIParameters("E20002: Protocol not available as interactive app")
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 
 def create_app(
-    default_cors_options: CORSOptions,
+    _default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "setup"

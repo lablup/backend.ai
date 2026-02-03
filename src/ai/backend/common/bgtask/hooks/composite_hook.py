@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import AsyncIterator
 
 from .base import AbstractTaskHook, TaskContext
 
@@ -9,7 +9,7 @@ from .base import AbstractTaskHook, TaskContext
 class CompositeTaskHook(AbstractTaskHook):
     """Composite hook that applies multiple hooks in sequence."""
 
-    def __init__(self, hooks: list[AbstractTaskHook]):
+    def __init__(self, hooks: list[AbstractTaskHook]) -> None:
         self._hooks = hooks
 
     @asynccontextmanager

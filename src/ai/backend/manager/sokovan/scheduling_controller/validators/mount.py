@@ -3,7 +3,7 @@
 from typing import Any
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models import verify_vfolder_name
+from ai.backend.manager.models.vfolder import verify_vfolder_name
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,
@@ -21,7 +21,7 @@ class MountNameValidationRule(SessionValidatorRule):
     def validate(
         self,
         spec: SessionCreationSpec,
-        context: SessionCreationContext,
+        _context: SessionCreationContext,
     ) -> None:
         """Validate mount names if mount map is provided."""
         mount_map = spec.creation_spec.get("mount_map") or {}

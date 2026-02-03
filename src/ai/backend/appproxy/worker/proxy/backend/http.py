@@ -4,9 +4,10 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, Final, override
+from typing import Any, Final, override
 
 import aiohttp
 import aiotools
@@ -42,7 +43,7 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
 class HTTPBackend(BaseBackend):
     routes: list[RouteInfo]
 
-    def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
+    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
         client_timeout = aiohttp.ClientTimeout(
@@ -69,7 +70,7 @@ class HTTPBackend(BaseBackend):
     def selected_route(self) -> RouteInfo:
         if len(self.routes) == 0:
             raise WorkerNotAvailable
-        elif len(self.routes) == 1:
+        if len(self.routes) == 1:
             selected_route = self.routes[0]
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable
@@ -114,8 +115,10 @@ class HTTPBackend(BaseBackend):
 
     @asynccontextmanager
     async def connect_websocket(
-        self, route: RouteInfo, request: web.Request, protocols: list[str] = []
+        self, route: RouteInfo, request: web.Request, protocols: list[str] | None = None
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
+        if protocols is None:
+            protocols = []
         client_key = ClientKey(
             endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),
@@ -128,12 +131,19 @@ class HTTPBackend(BaseBackend):
     async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:
         protocol = self.get_x_forwarded_proto(frontend_request)
         host = self.get_x_forwarded_host(frontend_request)
-        remote_host, remote_port = (
+        peername = (
             frontend_request.transport.get_extra_info("peername")
             if frontend_request.transport
-            else None,
-            None,
+            else None
         )
+        remote_host: tuple[str, int] | None
+        remote_port: str | None
+        if peername:
+            remote_host = peername
+            remote_port = str(peername[1])
+        else:
+            remote_host = None
+            remote_port = None
         backend_rqst_hdrs = {}
         # copy frontend request headers without hop-by-hop headers
         for key, value in frontend_request.headers.items():
@@ -218,8 +228,8 @@ class HTTPBackend(BaseBackend):
                 e,
             )
             raise
-        except ConnectionResetError:
-            raise asyncio.CancelledError()
+        except ConnectionResetError as e:
+            raise asyncio.CancelledError() from e
         except aiohttp.ClientOSError as e:
             raise ContainerConnectionRefused from e
         except:
@@ -234,7 +244,7 @@ class HTTPBackend(BaseBackend):
         async def _proxy_task(
             left: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
             right: web.WebSocketResponse | aiohttp.ClientWebSocketResponse,
-            tag="(unknown)",
+            tag: str = "(unknown)",
         ) -> None:
             nonlocal total_bytes
 
@@ -274,7 +284,7 @@ class HTTPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(interval: float) -> None:
+        async def _last_access_marker_task(_interval: float) -> None:
             await self.mark_last_used_time(route)
 
         route = self.selected_route

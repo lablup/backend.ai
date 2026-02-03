@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import collections
 import getpass
@@ -8,8 +10,9 @@ import string
 import sys
 import traceback
 import uuid
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
-from typing import Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, TextIO
 
 import aiohttp
 import click
@@ -20,15 +23,7 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, RangeExprOptionType
 from ai.backend.cli.types import ExitCode
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, MountExpression
-
-from ...compat import asyncio_run, current_loop
-from ...config import local_cache_path
-from ...exceptions import BackendError
-from ...output.fields import network_fields
-from ...session import AsyncSession
-from ..pretty import (
+from ai.backend.client.cli.pretty import (
     format_info,
     print_done,
     print_error,
@@ -37,6 +32,17 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
+from ai.backend.client.compat import asyncio_run, current_loop
+from ai.backend.client.config import local_cache_path
+from ai.backend.client.exceptions import BackendError
+from ai.backend.client.output.fields import network_fields
+from ai.backend.client.session import AsyncSession
+
+if TYPE_CHECKING:
+    from ai.backend.client.func.session import ComputeSession
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.types import ClusterMode, MountExpression
+
 from .args import click_start_option
 
 tabulate_mod.PRESERVE_WHITESPACE = True
@@ -45,16 +51,16 @@ list_expr: click.ParamType = CommaSeparatedListType()
 
 
 async def exec_loop(
-    stdout,
-    stderr,
-    compute_session,
-    mode,
-    code,
+    stdout: TextIO,
+    stderr: TextIO,
+    compute_session: ComputeSession,
+    mode: str,
+    code: str,
     *,
-    opts=None,
-    vprint_done=print_done,
-    is_multi=False,
-):
+    opts: dict[str, Any] | None = None,
+    vprint_done: Callable[[str], None] = print_done,
+    is_multi: bool = False,
+) -> None:
     """
     Fully streamed asynchronous version of the execute loop.
     """
@@ -71,7 +77,7 @@ async def exec_loop(
                 elif rec[0] == "stderr":
                     print(rec[1], end="", file=stderr)
                 else:
-                    print("----- output record (type: {0}) -----".format(rec[0]), file=stdout)
+                    print(f"----- output record (type: {rec[0]}) -----", file=stdout)
                     print(rec[1], file=stdout)
                     print("----- end of record -----", file=stdout)
             stdout.flush()
@@ -79,23 +85,23 @@ async def exec_loop(
             if files:
                 print("--- generated files ---", file=stdout)
                 for item in files:
-                    print("{0}: {1}".format(item["name"], item["url"]), file=stdout)
+                    print("{}: {}".format(item["name"], item["url"]), file=stdout)
                 print("--- end of generated files ---", file=stdout)
             if result["status"] == "clean-finished":
                 exitCode = result.get("exitCode")
-                msg = "Clean finished. (exit code = {0})".format(exitCode)
+                msg = f"Clean finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
             elif result["status"] == "build-finished":
                 exitCode = result.get("exitCode")
-                msg = "Build finished. (exit code = {0})".format(exitCode)
+                msg = f"Build finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
             elif result["status"] == "finished":
                 exitCode = result.get("exitCode")
-                msg = "Execution finished. (exit code = {0})".format(exitCode)
+                msg = f"Execution finished. (exit code = {exitCode})"
                 if is_multi:
                     print(msg, file=stderr)
                 vprint_done(msg)
@@ -111,8 +117,15 @@ async def exec_loop(
 
 
 def exec_loop_sync(
-    stdout, stderr, compute_session, mode, code, *, opts=None, vprint_done=print_done
-):
+    stdout: TextIO,
+    stderr: TextIO,
+    compute_session: ComputeSession,
+    mode: str,
+    code: str,
+    *,
+    opts: dict[str, Any] | None = None,
+    vprint_done: Callable[[str], None] = print_done,
+) -> None:
     """
     Old synchronous polling version of the execute loop.
     """
@@ -128,7 +141,7 @@ def exec_loop_sync(
             elif rec[0] == "stderr":
                 print(rec[1], end="", file=stderr)
             else:
-                print("----- output record (type: {0}) -----".format(rec[0]), file=stdout)
+                print(f"----- output record (type: {rec[0]}) -----", file=stdout)
                 print(rec[1], file=stdout)
                 print("----- end of record -----", file=stdout)
         stdout.flush()
@@ -136,21 +149,21 @@ def exec_loop_sync(
         if files:
             print("--- generated files ---", file=stdout)
             for item in files:
-                print("{0}: {1}".format(item["name"], item["url"]), file=stdout)
+                print("{}: {}".format(item["name"], item["url"]), file=stdout)
             print("--- end of generated files ---", file=stdout)
         if result["status"] == "clean-finished":
             exitCode = result.get("exitCode")
-            vprint_done("Clean finished. (exit code = {0}".format(exitCode), file=stdout)
+            vprint_done(f"Clean finished. (exit code = {exitCode})")
             mode = "continue"
             code = ""
         elif result["status"] == "build-finished":
             exitCode = result.get("exitCode")
-            vprint_done("Build finished. (exit code = {0})".format(exitCode), file=stdout)
+            vprint_done(f"Build finished. (exit code = {exitCode})")
             mode = "continue"
             code = ""
         elif result["status"] == "finished":
             exitCode = result.get("exitCode")
-            vprint_done("Execution finished. (exit code = {0})".format(exitCode), file=stdout)
+            vprint_done(f"Execution finished. (exit code = {exitCode})")
             break
         elif result["status"] == "waiting-input":
             mode = "input"
@@ -163,16 +176,21 @@ def exec_loop_sync(
             code = ""
 
 
-async def exec_terminal(compute_session, *, vprint_wait=print_wait, vprint_done=print_done):
+async def exec_terminal(
+    compute_session: ComputeSession,
+    *,
+    vprint_wait: Callable[[str], None] = print_wait,
+    vprint_done: Callable[[str], None] = print_done,
+) -> None:
     # async with compute_session.stream_pty() as stream: ...
     raise NotImplementedError
 
 
-def _noop(*args, **kwargs):
+def _noop(*args: Any, **kwargs: Any) -> None:
     pass
 
 
-def format_stats(stats):
+def format_stats(stats: dict[str, Any]) -> str:
     formatted = []
     version = stats.pop("version", 1)
     stats.pop("status")
@@ -181,13 +199,13 @@ def format_stats(stats):
         stats.pop("precpu_system_used", None)
         stats.pop("cpu_system_used", None)
         for key, val in stats.items():
-            if key.endswith("_size") or key.endswith("_bytes"):
+            if key.endswith(("_size", "_bytes")):
                 val = naturalsize(val, binary=True)
             elif key == "cpu_used":
                 key += "_msec"
-                val = "{0:,}".format(int(val))
+                val = f"{int(val):,}"
             else:
-                val = "{0:,}".format(int(val))
+                val = f"{int(val):,}"
             formatted.append((key, val))
     elif version == 2:
         max_integer_len = 0
@@ -199,7 +217,7 @@ def format_stats(stats):
                     val = metric.get("stats.max", metric["current"])
                     val = naturalsize(val, binary=True)
                     val, unit = val.rsplit(" ", maxsplit=1)
-                    val = "{:,}".format(Decimal(val))
+                    val = f"{Decimal(val):,}"
                 case "msec" | "usec" | "sec":
                     val = "{:,}".format(Decimal(metric["current"]))
                 case "percent" | "pct" | "%":
@@ -239,18 +257,14 @@ def prepare_resource_arg(resources: Sequence[str]) -> Mapping[str, str]:
 
 
 def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
-    if env is not None:
-        envs = {k: v for k, v in map(lambda s: s.split("=", 1), env)}
-    else:
-        envs = {}
-    return envs
+    return {k: v for k, v in map(lambda s: s.split("=", 1), env)}
 
 
 def prepare_mount_arg(
-    mount_args: Optional[Sequence[str]] = None,
+    mount_args: Sequence[str] | None = None,
     *,
     escape: bool = True,
-) -> Tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
+) -> tuple[Sequence[str], Mapping[str, str], Mapping[str, Mapping[str, str]]]:
     """
     Parse the list of mount arguments into a list of
     vfolder name and in-container mount path pairs,
@@ -391,45 +405,45 @@ def prepare_mount_arg(
 )
 @click_start_option()
 def run(
-    image,
-    files,
-    name,  # click_start_option
-    type,  # click_start_option
+    image: str,
+    files: tuple[str, ...],
+    name: str | None,  # click_start_option
+    type: str,  # click_start_option
     priority: int | None,  # click_start_option
-    starts_at,  # click_start_option
-    enqueue_only,  # click_start_option
-    max_wait,  # click_start_option
-    no_reuse,  # click_start_option
-    callback_url,  # click_start_option
-    code,
-    terminal,  # query-mode options
-    clean,
-    build,
-    exec,
-    basedir,  # batch-mode options
-    env,  # click_start_option
-    bootstrap_script,
-    rm,
-    stats,
-    tag,  # click_start_option
-    quiet,  # extra options
-    env_range,
-    build_range,
-    exec_range,
-    max_parallel,  # experiment support
-    mount,  # click_start_option
-    scaling_group,  # click_start_option
-    resources,  # click_start_option
-    cluster_size,  # click_start_option
+    starts_at: str | None,  # click_start_option
+    enqueue_only: bool,  # click_start_option
+    max_wait: int,  # click_start_option
+    no_reuse: bool,  # click_start_option
+    callback_url: str | None,  # click_start_option
+    code: str | None,
+    terminal: bool,  # query-mode options
+    clean: str | None,
+    build: str | None,
+    exec: str | None,
+    basedir: str | None,  # batch-mode options
+    env: tuple[str, ...],  # click_start_option
+    bootstrap_script: TextIO | None,
+    rm: bool,
+    stats: bool,
+    tag: str | None,  # click_start_option
+    quiet: bool,  # extra options
+    env_range: tuple[str, ...],
+    build_range: tuple[str, ...],
+    exec_range: tuple[str, ...],
+    max_parallel: int,  # experiment support
+    mount: tuple[str, ...],  # click_start_option
+    scaling_group: str | None,  # click_start_option
+    resources: tuple[str, ...],  # click_start_option
+    cluster_size: int,  # click_start_option
     cluster_mode: ClusterMode,
-    resource_opts,  # click_start_option
-    architecture,
-    domain,  # click_start_option
-    group,  # click_start_option
-    network,  # click_start_option
-    preopen,
-    assign_agent,  # resource grouping
-):
+    resource_opts: tuple[str, ...],  # click_start_option
+    architecture: str,
+    domain: str | None,  # click_start_option
+    group: str | None,  # click_start_option
+    network: str | None,  # click_start_option
+    preopen: list[str] | None,
+    assign_agent: list[str] | None,  # resource grouping
+) -> None:
     """
     Run the given code snippet or files in a session.
     Depending on the session ID you give (default is random),
@@ -462,26 +476,21 @@ def run(
     resource_opts = prepare_resource_arg(resource_opts)
     mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
 
-    if env_range is None:
-        env_range = []  # noqa
-    if build_range is None:
-        build_range = []  # noqa
-    if exec_range is None:
-        exec_range = []  # noqa
-
-    env_ranges = {v: r for v, r in env_range}
-    build_ranges = {v: r for v, r in build_range}
-    exec_ranges = {v: r for v, r in exec_range}
+    env_ranges: dict[str, Any] = {v: r for v, r in env_range}  # type: ignore[has-type]
+    build_ranges: dict[str, Any] = {v: r for v, r in build_range}  # type: ignore[has-type]
+    exec_ranges: dict[str, Any] = {v: r for v, r in exec_range}  # type: ignore[has-type]
 
     env_var_maps = [
-        dict(zip(env_ranges.keys(), values)) for values in itertools.product(*env_ranges.values())
+        dict(zip(env_ranges.keys(), values, strict=True))
+        for values in itertools.product(*env_ranges.values())
     ]
     build_var_maps = [
-        dict(zip(build_ranges.keys(), values))
+        dict(zip(build_ranges.keys(), values, strict=True))
         for values in itertools.product(*build_ranges.values())
     ]
     exec_var_maps = [
-        dict(zip(exec_ranges.keys(), values)) for values in itertools.product(*exec_ranges.values())
+        dict(zip(exec_ranges.keys(), values, strict=True))
+        for values in itertools.product(*exec_ranges.values())
     ]
     case_set = collections.OrderedDict()
     vmaps_product = itertools.product(env_var_maps, build_var_maps, exec_var_maps)
@@ -490,7 +499,7 @@ def run(
     env_templates = {k: string.Template(v) for k, v in envs.items()}
 
     if preopen is None:
-        preopen = []  # noqa
+        preopen = []
 
     preopen_ports = preopen
     assigned_agent_list = assign_agent  # should be None if not specified
@@ -520,10 +529,18 @@ def run(
         if not quiet:
             vprint_info("Running multiple sessions for the following combinations:")
             for case in case_set.keys():
-                pretty_env = " ".join("{}={}".format(item[0], item[1]) for item in case[0])
-                print("env = {!r}, build = {!r}, exec = {!r}".format(pretty_env, case[1], case[2]))
+                pretty_env = " ".join(f"{item[0]}={item[1]}" for item in case[0])
+                print(f"env = {pretty_env!r}, build = {case[1]!r}, exec = {case[2]!r}")
 
-    def _run_legacy(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd):
+    def _run_legacy(
+        session: AsyncSession,
+        idx: int,
+        name: str,
+        envs: Mapping[str, str],
+        clean_cmd: str | None,
+        build_cmd: str | None,
+        exec_cmd: str | None,
+    ) -> None:
         try:
             compute_session = session.ComputeSession.get_or_create(
                 image,
@@ -549,44 +566,40 @@ def run(
             print_error(e)
             sys.exit(ExitCode.FAILURE)
         if compute_session.status == "PENDING":
-            print_info("Session ID {0} is enqueued for scheduling.".format(name))
+            print_info(f"Session ID {name} is enqueued for scheduling.")
             return
-        elif compute_session.status == "SCHEDULED":
-            print_info("Session ID {0} is scheduled and about to be started.".format(name))
+        if compute_session.status == "SCHEDULED":
+            print_info(f"Session ID {name} is scheduled and about to be started.")
             return
-        elif compute_session.status == "RUNNING":
+        if compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
-                    )
+                    f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."
                 )
             else:
-                vprint_done("[{0}] Reusing session {1}...".format(idx, compute_session.name))
+                vprint_done(f"[{idx}] Reusing session {compute_session.name}...")
         elif compute_session.status == "TERMINATED":
             print_warn(
-                "Session ID {0} is already terminated.\n"
-                "This may be an error in the compute_session image.".format(name)
+                f"Session ID {name} is already terminated.\n"
+                "This may be an error in the compute_session image."
             )
             return
         elif compute_session.status == "TIMEOUT":
-            print_info("Session ID {0} is still on the job queue.".format(name))
+            print_info(f"Session ID {name} is still on the job queue.")
             return
         elif compute_session.status in ("ERROR", "CANCELLED"):
-            print_fail(
-                "Session ID {0} has an error during scheduling/startup or cancelled.".format(name)
-            )
+            print_fail(f"Session ID {name} has an error during scheduling/startup or cancelled.")
             return
 
         try:
             if files:
-                vprint_wait("[{0}] Uploading source files...".format(idx))
+                vprint_wait(f"[{idx}] Uploading source files...")
                 ret = compute_session.upload(files, basedir=basedir, show_progress=True)
                 if ret.status // 100 != 2:
-                    print_fail("[{0}] Uploading source files failed!".format(idx))
-                    print("{0}: {1}\n{2}".format(ret.status, ret.reason, ret.text()))
+                    print_fail(f"[{idx}] Uploading source files failed!")
+                    print(f"{ret.status}: {ret.reason}\n{ret.text()}")
                     return
-                vprint_done("[{0}] Uploading done.".format(idx))
+                vprint_done(f"[{idx}] Uploading done.")
                 opts = {
                     "clean": clean_cmd,
                     "build": build_cmd,
@@ -610,23 +623,32 @@ def run(
                 exec_loop_sync(
                     sys.stdout, sys.stderr, compute_session, "query", code, vprint_done=vprint_done
                 )
-            vprint_done("[{0}] Execution finished.".format(idx))
+            vprint_done(f"[{idx}] Execution finished.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
         finally:
             if rm:
-                vprint_wait("[{0}] Cleaning up the session...".format(idx))
+                vprint_wait(f"[{idx}] Cleaning up the session...")
                 ret = compute_session.destroy()
-                vprint_done("[{0}] Cleaned up the session.".format(idx))
+                vprint_done(f"[{idx}] Cleaned up the session.")
                 if stats:
                     _stats = ret.get("stats", None) if ret else None
                     if _stats:
-                        print("[{0}] Statistics:\n{1}".format(idx, format_stats(_stats)))
+                        print(f"[{idx}] Statistics:\n{format_stats(_stats)}")
                     else:
-                        print("[{0}] Statistics is not available.".format(idx))
+                        print(f"[{idx}] Statistics is not available.")
 
-    async def _run(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False):
+    async def _run(
+        session: AsyncSession,
+        idx: int,
+        name: str,
+        envs: Mapping[str, str],
+        clean_cmd: str | None,
+        build_cmd: str | None,
+        exec_cmd: str | None,
+        is_multi: bool = False,
+    ) -> None:
         try:
             if network:
                 try:
@@ -677,36 +699,32 @@ def run(
                 attach_network=network_id,
             )
         except Exception as e:
-            print_fail("[{0}] {1}".format(idx, e))
+            print_fail(f"[{idx}] {e}")
             return
         if compute_session.status == "PENDING":
-            print_info("Session ID {0} is enqueued for scheduling.".format(name))
+            print_info(f"Session ID {name} is enqueued for scheduling.")
             return
-        elif compute_session.status == "SCHEDULED":
-            print_info("Session ID {0} is scheduled and about to be started.".format(name))
+        if compute_session.status == "SCHEDULED":
+            print_info(f"Session ID {name} is scheduled and about to be started.")
             return
-        elif compute_session.status == "RUNNING":
+        if compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
-                    )
+                    f"[{idx}] Session {compute_session.name} is ready (domain={compute_session.domain}, group={compute_session.group})."
                 )
             else:
-                vprint_done("[{0}] Reusing session {1}...".format(idx, compute_session.name))
+                vprint_done(f"[{idx}] Reusing session {compute_session.name}...")
         elif compute_session.status == "TERMINATED":
             print_warn(
-                "Session ID {0} is already terminated.\n"
-                "This may be an error in the compute_session image.".format(name)
+                f"Session ID {name} is already terminated.\n"
+                "This may be an error in the compute_session image."
             )
             return
         elif compute_session.status == "TIMEOUT":
-            print_info("Session ID {0} is still on the job queue.".format(name))
+            print_info(f"Session ID {name} is still on the job queue.")
             return
         elif compute_session.status in ("ERROR", "CANCELLED"):
-            print_fail(
-                "Session ID {0} has an error during scheduling/startup or cancelled.".format(name)
-            )
+            print_fail(f"Session ID {name} has an error during scheduling/startup or cancelled.")
             return
 
         if not is_multi:
@@ -715,26 +733,26 @@ def run(
         else:
             log_dir = local_cache_path / "client-logs"
             log_dir.mkdir(parents=True, exist_ok=True)
-            stdout = open(log_dir / "{0}.stdout.log".format(name), "w", encoding="utf-8")
-            stderr = open(log_dir / "{0}.stderr.log".format(name), "w", encoding="utf-8")
+            stdout = (log_dir / f"{name}.stdout.log").open("w", encoding="utf-8")
+            stderr = (log_dir / f"{name}.stderr.log").open("w", encoding="utf-8")
 
         try:
 
-            def indexed_vprint_done(msg):
-                vprint_done("[{0}] ".format(idx) + msg)
+            def indexed_vprint_done(msg: str) -> None:
+                vprint_done(f"[{idx}] " + msg)
 
             if files:
                 if not is_multi:
-                    vprint_wait("[{0}] Uploading source files...".format(idx))
+                    vprint_wait(f"[{idx}] Uploading source files...")
                 ret = await compute_session.upload(
                     files, basedir=basedir, show_progress=not is_multi
                 )
                 if ret.status // 100 != 2:
-                    print_fail("[{0}] Uploading source files failed!".format(idx))
-                    print("{0}: {1}\n{2}".format(ret.status, ret.reason, ret.text()), file=stderr)
+                    print_fail(f"[{idx}] Uploading source files failed!")
+                    print(f"{ret.status}: {ret.reason}\n{ret.text()}", file=stderr)
                     raise RuntimeError("Uploading source files has failed!")
                 if not is_multi:
-                    vprint_done("[{0}] Uploading done.".format(idx))
+                    vprint_done(f"[{idx}] Uploading done.")
                 opts = {
                     "clean": clean_cmd,
                     "build": build_cmd,
@@ -765,49 +783,46 @@ def run(
                     is_multi=is_multi,
                 )
         except BackendError as e:
-            print_fail("[{0}] {1}".format(idx, e))
-            raise RuntimeError(e)
+            print_fail(f"[{idx}] {e}")
+            raise RuntimeError(e) from e
         except Exception as e:
-            print_fail("[{0}] Execution failed!".format(idx))
+            print_fail(f"[{idx}] Execution failed!")
             traceback.print_exc()
-            raise RuntimeError(e)
+            raise RuntimeError(e) from e
         finally:
             try:
                 if rm:
                     if not is_multi:
-                        vprint_wait("[{0}] Cleaning up the session...".format(idx))
+                        vprint_wait(f"[{idx}] Cleaning up the session...")
                     ret = await compute_session.destroy()
-                    vprint_done("[{0}] Cleaned up the session.".format(idx))
+                    vprint_done(f"[{idx}] Cleaned up the session.")
                     if stats:
                         _stats = ret.get("stats", None) if ret else None
                         if _stats:
                             stats_str = format_stats(_stats)
-                            print(
-                                format_info("[{0}] Statistics:".format(idx))
-                                + "\n{0}".format(stats_str)
-                            )
+                            print(format_info(f"[{idx}] Statistics:") + f"\n{stats_str}")
                             if is_multi:
-                                print("Statistics:\n{0}".format(stats_str), file=stderr)
+                                print(f"Statistics:\n{stats_str}", file=stderr)
                         else:
-                            print_warn("[{0}] Statistics: unavailable.".format(idx))
+                            print_warn(f"[{idx}] Statistics: unavailable.")
                             if is_multi:
                                 print("Statistics: unavailable.", file=stderr)
             except Exception as e:
-                print_fail("[{0}] Error while printing stats".format(idx))
+                print_fail(f"[{idx}] Error while printing stats")
                 traceback.print_exc()
-                raise RuntimeError(e)
+                raise RuntimeError(e) from e
             finally:
                 if is_multi:
                     stdout.close()
                     stderr.close()
 
-    async def _run_cases():
+    async def _run_cases() -> None:
         loop = current_loop()
         if name is None:
             name_prefix = f"pysdk-{secrets.token_hex(5)}"
         else:
             name_prefix = name
-        vprint_info("Session name prefix: {0}".format(name_prefix))
+        vprint_info(f"Session name prefix: {name_prefix}")
         if is_multi:
             print_info(
                 "Check out the stdout/stderr logs stored in "
@@ -818,7 +833,7 @@ def run(
             # TODO: limit max-parallelism using aiojobs
             for idx, case in enumerate(case_set.keys()):
                 if is_multi:
-                    _name = "{0}-{1}".format(name_prefix, idx)
+                    _name = f"{name_prefix}-{idx}"
                 else:
                     _name = name_prefix
                 envs = dict(case[0])
@@ -840,4 +855,4 @@ def run(
     try:
         asyncio_run(_run_cases())
     except Exception as e:
-        print_fail("{0}".format(e))
+        print_fail(f"{e}")

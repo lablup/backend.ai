@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -41,7 +43,7 @@ class KeypairResourcePolicyService:
         self, action: ModifyKeyPairResourcePolicyAction
     ) -> ModifyKeyPairResourcePolicyActionResult:
         result = await self._keypair_resource_policy_repository.update_keypair_resource_policy(
-            action.name, action.modifier
+            action.updater
         )
         return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
 

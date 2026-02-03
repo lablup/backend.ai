@@ -5,9 +5,12 @@ import sys
 
 import click
 
+from ai.backend.appproxy.coordinator.dependencies import (
+    CoordinatorDependencyComposer,
+    DependencyInput,
+)
 from ai.backend.common.dependencies.stacks.visualizing import VisualizingDependencyStack
 
-from ..dependencies import CoordinatorDependencyComposer, DependencyInput
 from .context import CLIContext
 
 

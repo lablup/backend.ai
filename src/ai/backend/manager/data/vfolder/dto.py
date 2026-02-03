@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Self
+from typing import Any, Self
 
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
 from ai.backend.common.dto.manager.field import (
@@ -8,7 +9,7 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.models import (
+from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -48,12 +49,12 @@ class Keypair:
 @dataclass
 class VFolderItemToCreate:
     name: str
-    folder_host: Optional[str]
+    folder_host: str | None
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
-    group_id: Optional[uuid.UUID]
+    group_id: uuid.UUID | None
     cloneable: bool
-    unmanaged_path: Optional[str]
+    unmanaged_path: str | None
 
     @classmethod
     async def from_request(cls, request: VFolderCreateReq) -> Self:
@@ -80,8 +81,8 @@ class VFolderItem:
     max_size: int
     creator: str
     ownership_type: VFolderOwnershipType
-    user: Optional[str]
-    group: Optional[str]
+    user: str | None
+    group: str | None
     cloneable: bool
     status: VFolderOperationStatus
     is_owner: bool

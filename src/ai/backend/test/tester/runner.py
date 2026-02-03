@@ -1,9 +1,9 @@
 import uuid
 
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.data.tester import TestSpecMeta
+from ai.backend.test.testcases.spec_manager import TestSpec
 
-from ..contexts.tester import TestSpecMetaContext
-from ..testcases.spec_manager import TestSpec
 from .exporter import TestExporter
 
 

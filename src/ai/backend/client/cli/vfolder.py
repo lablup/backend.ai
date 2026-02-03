@@ -16,13 +16,12 @@ from ai.backend.cli.params import (
     OptionalType,
 )
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.compat import asyncio_run
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.bgtask.types import BgtaskStatus
 
-from ..compat import asyncio_run
-from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .pretty import (
     ProgressBarWithSpinner,
@@ -37,12 +36,12 @@ from .types import CLIContext
 
 
 @main.group()
-def vfolder():
+def vfolder() -> None:
     """Set of vfolder operations"""
 
 
 @vfolder.command()
-def list_hosts():
+def list_hosts() -> None:
     """List the hosts of virtual folders that is accessible to the current user."""
     with Session() as session:
         try:
@@ -55,7 +54,7 @@ def list_hosts():
 
 
 @vfolder.command()
-def list_allowed_types():
+def list_allowed_types() -> None:
     """List allowed vfolder types."""
     with Session() as session:
         try:
@@ -128,7 +127,16 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable):
+def create(
+    name: str,
+    host: str,
+    group: str | None,
+    _host_path: bool,
+    unmanaged_path: str | None,
+    usage_mode: str,
+    permission: str,
+    cloneable: bool,
+) -> None:
     """Create a new virtual folder.
 
     \b
@@ -146,7 +154,7 @@ def create(name, host, group, host_path, unmanaged_path, usage_mode, permission,
                 permission=permission,
                 cloneable=cloneable,
             )
-            print('Virtual folder "{0}" is created.'.format(result["name"]))
+            print('Virtual folder "{}" is created.'.format(result["name"]))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -154,7 +162,7 @@ def create(name, host, group, host_path, unmanaged_path, usage_mode, permission,
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete(name):
+def delete(name: str) -> None:
     """Delete the given virtual folder. The virtual folder will be under `delete-pending` status, which means trash-bin.
     This operation can be retracted by
     calling `restore()`.
@@ -164,7 +172,7 @@ def delete(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete()
+            _ = session.VFolder(name).delete()
             print_done("Deleted.")
         except Exception as e:
             print_error(e)
@@ -173,14 +181,14 @@ def delete(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def purge(name):
+def purge(name: str) -> None:
     """Purge the given virtual folder. This operation is irreversible!
 
     NAME: Name of a virtual folder.
     """
     with Session() as session:
         try:
-            session.VFolder(name).purge()
+            _ = session.VFolder(name).purge()
             print_done("Purged.")
         except Exception as e:
             print_error(e)
@@ -189,7 +197,7 @@ def purge(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def delete_trash(name):
+def delete_trash(name: str) -> None:
     """Delete the given virtual folder's real data. The virtual folder should be under `delete-pending` status, which means trash-bin.
     This operation is irreversible!
 
@@ -197,7 +205,7 @@ def delete_trash(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete_trash()
+            _ = session.VFolder(name).delete_trash()
             print_done("Delete completed.")
         except Exception as e:
             print_error(e)
@@ -206,14 +214,14 @@ def delete_trash(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def recover(name):
+def recover(name: str) -> None:
     """Restore the given virtual folder from deleted status, Deprecated since 24.03.1; use `restore`
 
     NAME: Name of a virtual folder.
     """
     with Session() as session:
         try:
-            session.VFolder(name).restore()
+            _ = session.VFolder(name).restore()
             print_done("Restored.")
         except Exception as e:
             print_error(e)
@@ -222,14 +230,14 @@ def recover(name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def restore(name):
+def restore(name: str) -> None:
     """Restore the given virtual folder from deleted status, from trash bin.
 
     NAME: Name of a virtual folder.
     """
     with Session() as session:
         try:
-            session.VFolder(name).restore()
+            _ = session.VFolder(name).restore()
             print_done("Restored.")
         except Exception as e:
             print_error(e)
@@ -239,7 +247,7 @@ def restore(name):
 @vfolder.command()
 @click.argument("old_name", type=str)
 @click.argument("new_name", type=str)
-def rename(old_name, new_name):
+def rename(old_name: str, new_name: str) -> None:
     """Rename the given virtual folder. This operation is irreversible!
     You cannot change the vfolders that are shared by other users,
     and the new name must be unique among all your accessible vfolders
@@ -251,7 +259,7 @@ def rename(old_name, new_name):
     """
     with Session() as session:
         try:
-            session.VFolder(old_name).rename(new_name)
+            _ = session.VFolder(old_name).rename(new_name)
             print_done("Renamed.")
         except Exception as e:
             print_error(e)
@@ -260,7 +268,7 @@ def rename(old_name, new_name):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def info(name):
+def info(name: str) -> None:
     """Show the information of the given virtual folder.
 
     \b
@@ -269,18 +277,18 @@ def info(name):
     with Session() as session:
         try:
             result = session.VFolder(name).info()
-            print('Virtual folder "{0}" (ID: {1})'.format(result["name"], result["id"]))
+            print('Virtual folder "{}" (ID: {})'.format(result["name"], result["id"]))
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
-            print("- Status: {0}".format(result["status"]))
-            print("- Number of files: {0}".format(result["numFiles"]))
-            print("- Ownership Type: {0}".format(result["type"]))
+            print("- Status: {}".format(result["status"]))
+            print("- Number of files: {}".format(result["numFiles"]))
+            print("- Ownership Type: {}".format(result["type"]))
             print("- Permission:", result["permission"])
             print("- Status:", result["status"])
-            print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
-            print("- Group ID: {0}".format(result["group"]))
-            print("- User ID: {0}".format(result["user"]))
-            print("- Clone Allowed: {0}".format(result["cloneable"]))
+            print("- Usage Mode: {}".format(result.get("usage_mode", "")))
+            print("- Group ID: {}".format(result["group"]))
+            print("- User ID: {}".format(result["user"]))
+            print("- Clone Allowed: {}".format(result["cloneable"]))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -325,7 +333,14 @@ def info(name):
         " include the protocol part and the port number to replace."
     ),
 )
-def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
+def upload(
+    name: str,
+    filenames: tuple[Path, ...],
+    base_dir: Path | None,
+    recursive: bool,
+    chunk_size: int,
+    override_storage_proxy: dict[str, str] | None,
+) -> None:
     """
     TUS Upload a file to the virtual folder from the current working directory.
     The files with the same names will be overwritten.
@@ -336,7 +351,7 @@ def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_pr
     """
     with Session() as session:
         try:
-            session.VFolder(name).upload(
+            _ = session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
                 recursive=recursive,
@@ -390,7 +405,14 @@ def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_pr
     default=20,
     help="Maximum retry attempt when any failure occurs.",
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
+def download(
+    name: str,
+    filenames: tuple[Path, ...],
+    base_dir: Path | None,
+    chunk_size: int,
+    override_storage_proxy: dict[str, str] | None,
+    max_retries: int,
+) -> None:
     """
     Download a file from the virtual folder to the current working directory.
     The files with the same names will be overwritten.
@@ -401,7 +423,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_
     """
     with Session() as session:
         try:
-            session.VFolder(name).download(
+            _ = session.VFolder(name).download(
                 filenames,
                 basedir=base_dir,
                 chunk_size=chunk_size,
@@ -419,7 +441,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("filename", type=Path)
-def request_download(name, filename):
+def request_download(name: str, filename: Path) -> None:
     """
     Request JWT-formatted download token for later use.
 
@@ -438,7 +460,7 @@ def request_download(name, filename):
 
 @vfolder.command()
 @click.argument("filenames", nargs=-1)
-def cp(filenames):
+def cp(filenames: tuple[str, ...]) -> None:
     """An scp-like shortcut for download/upload commands.
 
     \b
@@ -497,7 +519,7 @@ def mkdir(
 @click.argument("name", type=str)
 @click.argument("target_path", type=str)
 @click.argument("new_name", type=str)
-def rename_file(name, target_path, new_name):
+def rename_file(name: str, target_path: str, new_name: str) -> None:
     """
     Rename a file or a directory in a virtual folder.
 
@@ -508,7 +530,7 @@ def rename_file(name, target_path, new_name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).rename_file(target_path, new_name)
+            _ = session.VFolder(name).rename_file(target_path, new_name)
             print_done("Renamed.")
         except Exception as e:
             print_error(e)
@@ -519,7 +541,7 @@ def rename_file(name, target_path, new_name):
 @click.argument("name", type=str)
 @click.argument("src", type=str)
 @click.argument("dst", type=str)
-def mv(name, src, dst):
+def mv(name: str, src: str, dst: str) -> None:
     """
     Move a file or a directory within a virtual folder.
     If the destination is a file and already exists, it will be overwritten.
@@ -533,7 +555,7 @@ def mv(name, src, dst):
     """
     with Session() as session:
         try:
-            session.VFolder(name).move_file(src, dst)
+            _ = session.VFolder(name).move_file(src, dst)
             print_done("Moved.")
         except Exception as e:
             print_error(e)
@@ -542,9 +564,9 @@ def mv(name, src, dst):
 
 @vfolder.command(aliases=["delete-file"])
 @click.argument("name", type=str)
-@click.argument("filenames", nargs=-1)
+@click.argument("filenames", nargs=-1, required=True)
 @click.option("-r", "--recursive", is_flag=True, help="Enable recursive deletion of directories.")
-def rm(name, filenames, recursive):
+def rm(name: str, filenames: tuple[str, ...], recursive: bool) -> None:
     """
     Delete files in a virtual folder.
     If one of the given paths is a directory and the recursive option is enabled,
@@ -554,14 +576,14 @@ def rm(name, filenames, recursive):
 
     \b
     NAME: Name of a virtual folder.
-    FILENAMES: Paths of the files to delete.
+    FILENAMES: Paths of the files to delete (at least one required).
     """
     with Session() as session:
         try:
             if not ask_yn():
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            session.VFolder(name).delete_files(filenames, recursive=recursive)
+            _ = session.VFolder(name).delete_files(filenames, recursive=recursive)
             print_done("Done.")
         except Exception as e:
             print_error(e)
@@ -571,7 +593,7 @@ def rm(name, filenames, recursive):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("path", metavar="PATH", nargs=1, default=".")
-def ls(name, path):
+def ls(name: str, path: str) -> None:
     """
     List files in a path of a virtual folder.
 
@@ -581,9 +603,9 @@ def ls(name, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             result = session.VFolder(name).list_files(path)
-            if "error_msg" in result and result["error_msg"]:
+            if result.get("error_msg"):
                 print_fail(result["error_msg"])
                 return
             files = result["items"]
@@ -611,7 +633,7 @@ def ls(name, path):
     default="rw",
     help='Permission to give. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).',
 )
-def invite(name, emails, perm):
+def invite(name: str, emails: tuple[str, ...], perm: str) -> None:
     """Invite other users to access a user-type virtual folder.
 
     \b
@@ -620,7 +642,8 @@ def invite(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            if perm not in ["rw", "ro", "wd"]:
+                raise ValueError(f"Invalid permission: {perm}. Must be one of: rw, ro, wd")
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
             if invited_ids:
@@ -635,7 +658,7 @@ def invite(name, emails, perm):
 
 
 @vfolder.command()
-def invitations():
+def invitations() -> None:
     """List and manage received invitations."""
     with Session() as session:
         try:
@@ -667,22 +690,22 @@ def invitations():
                 while True:
                     action = input("Choose action. (a)ccept, (r)eject, (c)ancel: ")
                     if action.lower() == "a":
-                        session.VFolder.accept_invitation(invitations[selection]["id"])
+                        _ = session.VFolder.accept_invitation(invitations[selection]["id"])
                         msg = "You can now access vfolder {} ({})".format(
                             invitations[selection]["vfolder_name"],
                             invitations[selection]["id"],
                         )
                         print(msg)
                         break
-                    elif action.lower() == "r":
-                        session.VFolder.delete_invitation(invitations[selection]["id"])
+                    if action.lower() == "r":
+                        _ = session.VFolder.delete_invitation(invitations[selection]["id"])
                         msg = "vfolder invitation rejected: {} ({})".format(
                             invitations[selection]["vfolder_name"],
                             invitations[selection]["id"],
                         )
                         print(msg)
                         break
-                    elif action.lower() == "c":
+                    if action.lower() == "c":
                         break
         except Exception as e:
             print_error(e)
@@ -700,7 +723,7 @@ def invitations():
     default="rw",
     help='Permission to give. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).',
 )
-def share(name, emails, perm):
+def share(name: str, emails: tuple[str, ...], perm: str) -> None:
     """Share a group folder to users with overriding permission.
 
     \b
@@ -709,11 +732,12 @@ def share(name, emails, perm):
     """
     with Session() as session:
         try:
-            assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
+            if perm not in ["rw", "ro", "wd"]:
+                raise ValueError(f"Invalid permission: {perm}. Must be one of: rw, ro, wd")
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
             if shared_emails:
-                print("Shared with {} permission to:".format(perm))
+                print(f"Shared with {perm} permission to:")
                 for _email in shared_emails:
                     print("\t- " + _email)
             else:
@@ -726,7 +750,7 @@ def share(name, emails, perm):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.argument("emails", type=str, nargs=-1, required=True)
-def unshare(name, emails):
+def unshare(name: str, emails: tuple[str, ...]) -> None:
     """Unshare a group folder from users.
 
     \b
@@ -758,7 +782,7 @@ def unshare(name, emails):
     default=None,
     help="The ID of the person who wants to leave (the person who shared the vfolder).",
 )
-def leave(name, shared_user_uuid):
+def leave(name: str, shared_user_uuid: str | None) -> None:
     """Leave the shared virtual folder.
 
     \b
@@ -773,8 +797,8 @@ def leave(name, shared_user_uuid):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave(shared_user_uuid)
-            print('Left the shared virtual folder "{}".'.format(name))
+            _ = session.VFolder(name).leave(shared_user_uuid)
+            print(f'Left the shared virtual folder "{name}".')
 
         except Exception as e:
             print_error(e)
@@ -801,7 +825,7 @@ def leave(name, shared_user_uuid):
     default="rw",
     help="Cloned virtual folder's permission. Default value is 'rw'.",
 )
-def clone(name, target_name, target_host, usage_mode, permission):
+def clone(name: str, target_name: str, target_host: str, usage_mode: str, permission: str) -> None:
     """Clone a virtual folder.
 
     \b
@@ -830,7 +854,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
             sys.exit(ExitCode.FAILURE)
 
     # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
-    async def clone_vfolder_tracker(bgtask_id):
+    async def clone_vfolder_tracker(bgtask_id: str) -> None:
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
@@ -868,7 +892,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     if bgtask_id is None:
         print_done("Cloning the vfolder is complete.")
@@ -894,7 +918,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
         "If not set, the cloneable property is not changed."
     ),
 )
-def update_options(name, permission, set_cloneable):
+def update_options(name: str, permission: str | None, set_cloneable: bool | None) -> None:
     """Update an existing virtual folder.
 
     \b
@@ -906,7 +930,7 @@ def update_options(name, permission, set_cloneable):
             if not vfolder_info["is_owner"]:
                 print("You cannot update virtual folder that you do not own.")
                 return
-            session.VFolder(name).update_options(
+            _ = session.VFolder(name).update_options(
                 name,
                 permission=permission,
                 cloneable=set_cloneable,
@@ -974,7 +998,9 @@ def update_options(name, permission, set_cloneable):
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list_own(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list_own(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List own virtual folders.
     """
@@ -1054,7 +1080,9 @@ def list_own(ctx: CLIContext, filter_, order, offset, limit) -> None:
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list_invited(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list_invited(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List invited virtual folders.
     """
@@ -1134,7 +1162,9 @@ def list_invited(ctx: CLIContext, filter_, order, offset, limit) -> None:
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list_project(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list_project(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List project virtual folders.
     """

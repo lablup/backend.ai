@@ -1,13 +1,13 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
 import sqlalchemy as sa
 import yarl
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
@@ -19,8 +19,6 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -38,15 +36,14 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.registry import AgentRegistry
-
-from ...models.endpoint import EndpointRow
-from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
-from ...models.utils import (
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
+from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -71,7 +68,7 @@ class SessionEventHandler:
 
     async def _handle_started_or_cancelled(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
     ) -> None:
@@ -103,7 +100,7 @@ class SessionEventHandler:
 
     async def handle_session_cancelled(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionCancelledAnycastEvent,
     ) -> None:
@@ -116,7 +113,7 @@ class SessionEventHandler:
 
     async def handle_session_terminating(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionTerminatingAnycastEvent,
     ) -> None:
@@ -128,7 +125,7 @@ class SessionEventHandler:
 
     async def handle_session_terminated(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionTerminatedAnycastEvent,
     ) -> None:
@@ -137,8 +134,8 @@ class SessionEventHandler:
 
     async def handle_destroy_session(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: DoTerminateSessionEvent,
     ) -> None:
         async with self._registry.db.begin_session() as db_sess:
@@ -153,26 +150,21 @@ class SessionEventHandler:
 
     async def handle_batch_result(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
     ) -> None:
         """
         Update the database according to the batch-job completion results
         """
+        reason: KernelLifecycleEventReason
         match event:
-            case SessionSuccessAnycastEvent(
-                session_id=session_id, reason=reason, exit_code=exit_code
-            ):
-                await SessionRow.set_session_result(
-                    self._db, session_id, success=True, exit_code=exit_code
-                )
-            case SessionFailureAnycastEvent(
-                session_id=session_id, reason=reason, exit_code=exit_code
-            ):
-                await SessionRow.set_session_result(
-                    self._db, session_id, success=False, exit_code=exit_code
-                )
+            case SessionSuccessAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
+                await SessionRow.set_session_result(self._db, session_id, success=True)
+                reason = _reason
+            case SessionFailureAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
+                await SessionRow.set_session_result(self._db, session_id, success=False)
+                reason = _reason
         async with self._db.begin_session() as db_sess:
             try:
                 session = await SessionRow.get_session(
@@ -191,13 +183,11 @@ class SessionEventHandler:
 
     async def invoke_session_callback(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: (
             SessionEnqueuedAnycastEvent
-            | SessionScheduledAnycastEvent
             | SessionCheckingPrecondAnycastEvent
-            | SessionPreparingAnycastEvent
             | SessionStartedAnycastEvent
             | SessionCancelledAnycastEvent
             | SessionTerminatingAnycastEvent
@@ -237,11 +227,12 @@ class SessionEventHandler:
                                 update_data: dict[str, Any] = {
                                     "status": RouteStatus.FAILED_TO_START
                                 }
-                                if "error" in session.status_data:
-                                    if session.status_data["error"]["name"] == "MultiAgentError":
-                                        errors = session.status_data["error"]["collection"]
+                                status_data = session.status_data
+                                if status_data and "error" in status_data:
+                                    if status_data["error"]["name"] == "MultiAgentError":
+                                        errors = status_data["error"]["collection"]
                                     else:
-                                        errors = [session.status_data["error"]]
+                                        errors = [status_data["error"]]
                                     update_data["error_data"] = {
                                         "type": "session_cancelled",
                                         "errors": errors,
@@ -270,23 +261,23 @@ class SessionEventHandler:
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
-                        query = sa.select([sa.func.count("*")]).where(
+                        query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
                             & (RoutingRow.status == RouteStatus.HEALTHY)
                         )
                         healthy_routes = await db_sess.scalar(query)
                         if endpoint.replicas == healthy_routes:
-                            query = (
+                            update_query = (
                                 sa.update(EndpointRow)
                                 .where(EndpointRow.id == endpoint.id)
                                 .values({"retries": 0})
                             )
-                            await db_sess.execute(query)
-                            query = sa.delete(RoutingRow).where(
+                            await db_sess.execute(update_query)
+                            delete_query = sa.delete(RoutingRow).where(
                                 (RoutingRow.endpoint == endpoint.id)
                                 & (RoutingRow.status == RouteStatus.FAILED_TO_START)
                             )
-                            await db_sess.execute(query)
+                            await db_sess.execute(delete_query)
 
                 await execute_with_retry(_clear_error)
         except NoResultFound:
@@ -301,7 +292,7 @@ class SessionEventHandler:
             "type": "session_lifecycle",
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
-            "when": datetime.now(timezone.utc).isoformat(),
+            "when": datetime.now(UTC).isoformat(),
         }
 
         self._registry.webhook_ptask_group.create_task(
@@ -310,8 +301,8 @@ class SessionEventHandler:
 
     async def handle_execution_started(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionStartedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -320,8 +311,8 @@ class SessionEventHandler:
 
     async def handle_execution_finished(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionFinishedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -330,8 +321,8 @@ class SessionEventHandler:
 
     async def handle_execution_timeout(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionTimeoutAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -340,8 +331,8 @@ class SessionEventHandler:
 
     async def handle_execution_cancelled(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionCancelledAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -379,7 +370,7 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     except asyncio.CancelledError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log_func = log.warning
         log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
     finally:

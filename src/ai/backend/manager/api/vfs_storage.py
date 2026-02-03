@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from http import HTTPStatus
-from typing import Iterable, Optional, Tuple, cast, override
+from pathlib import Path
+from typing import cast, override
 
 import aiohttp_cors
 from aiohttp import ClientResponse, web
@@ -51,14 +51,14 @@ class VFSDirectoryDownloadProxyStreamReader(StreamReader):
         storage_name: str,
         req: VFSDownloadFileReq,
         filepath: str,
-    ):
+    ) -> None:
         self._storage_proxy_client = storage_proxy_client
         self._storage_name = storage_name
         self._req = req
         self._filepath = filepath
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/x-tar"
 
     @override
@@ -131,7 +131,7 @@ class APIHandler:
         )
 
         # Prepare response headers
-        filename = os.path.basename(filepath)
+        filename = Path(filepath).name
         content_type = cast(str, stream_reader.content_type())
         headers = {
             "Content-Type": content_type,
@@ -257,7 +257,7 @@ class APIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Initialize VFS storage API handlers."""
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)

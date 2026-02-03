@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncIterator, override
+from collections.abc import AsyncIterator
+from typing import override
 
 import aiohttp
 import boto3
@@ -11,7 +12,7 @@ from .base import (
     BaseContainerRegistry,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AWSElasticContainerRegistry(BaseContainerRegistry):
@@ -23,10 +24,11 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
         if not self.registry_info.project:
             raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
+        extra = self.registry_info.extra or {}
         access_key, secret_access_key, region, type_ = (
-            self.registry_info.extra.get("access_key"),
-            self.registry_info.extra.get("secret_access_key"),
-            self.registry_info.extra.get("region"),
+            extra.get("access_key"),
+            extra.get("secret_access_key"),
+            extra.get("region"),
             self.registry_info.type,
         )
 

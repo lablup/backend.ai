@@ -1,30 +1,28 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 import pathlib
-import subprocess
-import sys
-import uuid
-from datetime import datetime
-from functools import partial
-from typing import Optional, cast
+from typing import TYPE_CHECKING
 
 import click
-from more_itertools import chunked
-from setproctitle import setproctitle
 
 from ai.backend.cli.params import BoolExprType, OptionalType
-from ai.backend.cli.types import ExitCode
-from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.validators import TimeDuration
-from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..errors.resource import ConfigurationLoadFailed
-from .context import CLIContext, redis_ctx
+from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
+if TYPE_CHECKING:
+    from ai.backend.logging import BraceStyleAdapter
+
+# LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
+_LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
+
+
+def _get_logger() -> BraceStyleAdapter:
+    import logging
+
+    from ai.backend.logging import BraceStyleAdapter
+
+    return BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -48,25 +46,29 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.NOTSET,
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
+    default="NOTSET",
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    log_level: LogLevel,
+    log_level: str,
     debug: bool,
-    config_path: Optional[pathlib.Path] = None,
+    config_path: pathlib.Path | None = None,
 ) -> None:
     """
     Manager Administration CLI
     """
+    from setproctitle import setproctitle
+
+    from ai.backend.logging.types import LogLevel
+
     setproctitle("backend.ai: manager.cli")
     if debug:
-        log_level = LogLevel.DEBUG
+        log_level = "DEBUG"
 
-    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=log_level))
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=LogLevel(log_level)))
 
 
 @main.command(
@@ -97,7 +99,9 @@ def main(
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(
+    cli_ctx: CLIContext, container_name: str | None, psql_help: bool, psql_args: tuple[str, ...]
+) -> None:
     """
     Run the database shell.
 
@@ -108,10 +112,19 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
+    import asyncio
+    import subprocess
+    import sys
+
+    from ai.backend.cli.types import ExitCode
+
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
     db_config = bootstrap_config.db
+    _psql_args: list[str]
     if psql_help:
-        psql_args = ["--help"]
+        _psql_args = ["--help"]
+    else:
+        _psql_args = list(psql_args)
     if not container_name:
         # Try to get the database container name of the halfstack
         candidate_container_names = subprocess.check_output(
@@ -143,12 +156,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         cmd = [
             "psql",
             (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
-            *psql_args,
+            *_psql_args,
         ]
         subprocess.run(cmd)
         return
     # Use the container to start the psql client command
-    log.info(f"using the db container {container_name} ...")
+    _get_logger().info(f"using the db container {container_name} ...")
     cmd = [
         "docker",
         "exec",
@@ -160,20 +173,20 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         db_config.user,
         "-d",
         db_config.name,
-        *psql_args,
+        *_psql_args,
     ]
     subprocess.run(cmd)
 
 
 @main.command()
 @click.pass_obj
-def generate_api_keypair(cli_ctx: CLIContext) -> None:
+def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ..models.keypair import generate_keypair as _gen_keypair
+    from ai.backend.manager.models.keypair import generate_keypair as _gen_keypair
 
-    log.info("Generating a manager API keypair...")
+    _get_logger().info("Generating a manager API keypair...")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
@@ -195,7 +208,7 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
     type=str,
 )
 @click.pass_obj
-def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
+def generate_rpc_keypair(_cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
     """
     Generate a ZeroMQ CURVE keypair for use in manager-agent RPC and print it out to stdout.
 
@@ -205,7 +218,9 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
-    log.info("Generating a RPC keypair...")
+    from ai.backend.manager.errors.resource import ConfigurationLoadFailed
+
+    _get_logger().info("Generating a RPC keypair...")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     if secret_key is None:
@@ -236,58 +251,55 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     ),
 )
 @click.pass_obj
-def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
+def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> None:
     """
     Delete old records from the kernels, error_logs tables and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
-    import sqlalchemy as sa
-    from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
+    import asyncio
+    import uuid
+    from datetime import UTC, datetime
+    from typing import cast
 
-    from ai.backend.manager.models import SessionRow, error_logs, kernels
+    import sqlalchemy as sa
+    from more_itertools import chunked
+
+    from ai.backend.common.validators import TimeDuration
+    from ai.backend.manager.models.error_logs import error_logs
+    from ai.backend.manager.models.kernel import kernels
+    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.utils import connect_database, vacuum_db
 
-    today = datetime.now()
+    from .context import redis_ctx
+
+    log = _get_logger()
+    today = datetime.now(UTC)
     duration = TimeDuration()
     expiration_date = today - duration.check_and_return(retention)
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
 
-    async def _clear_redis_history():
+    async def _clear_redis_history() -> None:
         try:
             async with connect_database(bootstrap_config.db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
-                        sa.select([kernels.c.id])
+                        sa.select(kernels.c.id)
                         .select_from(kernels)
                         .where(
                             (kernels.c.terminated_at < expiration_date),
                         )
                     )
                     result = await conn.execute(query)
-                    target_kernels = [str(x["id"]) for x in result.all()]
+                    target_kernels = [str(x.id) for x in result.all()]
 
             delete_count = 0
             async with redis_ctx(cli_ctx) as redis_conn_set:
-
-                async def _build_pipe(
-                    r: Redis,
-                    kernel_ids: list[str],
-                ) -> Pipeline:
-                    pipe = r.pipeline(transaction=False)
-                    await pipe.delete(*kernel_ids)
-                    return pipe
-
                 if len(target_kernels) > 0:
                     # Apply chunking to avoid excessive length of command params
                     # and indefinite blocking of the Redis server.
                     for kernel_ids in chunked(target_kernels, 32):
-                        results = await redis_helper.execute(
-                            redis_conn_set.stat,
-                            partial(_build_pipe, kernel_ids=kernel_ids),
-                        )
-                    # Each DEL command returns the number of keys deleted.
-                    delete_count += sum(results)
+                        deleted = await redis_conn_set.stat.delete(kernel_ids)
+                        delete_count += deleted
                     log.info(
                         "Cleaned up {:,} redis statistics records older than {:}.",
                         delete_count,
@@ -295,26 +307,17 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                     )
 
                 # Sync and compact the persistent database of Redis
-                redis_config = await redis_helper.execute(
-                    redis_conn_set.stat,
-                    lambda r: r.config_get("appendonly"),
-                )
-                if redis_config["appendonly"] == "yes":
-                    await redis_helper.execute(
-                        redis_conn_set.stat,
-                        lambda r: r.bgrewriteaof(),
-                    )
+                redis_config = await redis_conn_set.stat.config_get(["appendonly"])
+                if redis_config.get(b"appendonly") == b"yes":
+                    await redis_conn_set.stat.execute_command(["BGREWRITEAOF"])
                     log.info("Issued BGREWRITEAOF to the Redis database.")
                 else:
-                    await redis_helper.execute(
-                        redis_conn_set.stat,
-                        lambda r: r.execute_command("BGSAVE SCHEDULE"),
-                    )
+                    await redis_conn_set.stat.execute_command(["BGSAVE", "SCHEDULE"])
                     log.info("Issued BGSAVE to the Redis database.")
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
 
-    async def _clear_terminated_sessions():
+    async def _clear_terminated_sessions() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
@@ -330,7 +333,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                     )
                     await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
 
-                curs = await conn.execute(sa.select([sa.func.count()]).select_from(SessionRow))
+                curs = await conn.execute(sa.select(sa.func.count()).select_from(SessionRow))
                 if ret := curs.fetchone():
                     table_size = ret[0]
                     log.info(
@@ -343,7 +346,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             expiration_date,
         )
 
-    async def _clear_old_error_logs():
+    async def _clear_old_error_logs() -> None:
         async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
@@ -365,63 +368,63 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
-def schema():
+def schema() -> None:
     """Command set for managing the database schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.etcd:cli")
-def etcd():
+def etcd() -> None:
     """Command set for putting/getting data to/from etcd."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.fixture:cli")
-def fixture():
+def fixture() -> None:
     """Command set for managing fixtures."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
-def api():
+def api() -> None:
     """Command set for API schema inspection and manipulation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
-def gql():
+def gql() -> None:
     """Command set for GraphQL schema."""
     # Deprecated in favor of "api" but kept for backward compatibility
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")
-def image():
+def image() -> None:
     """Command set for managing images."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
-def redis():
+def redis() -> None:
     """Command set for Redis related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.agent:cli")
-def agent():
+def agent() -> None:
     """Command set for agent related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.scheduler:cli")
-def scheduler():
+def scheduler() -> None:
     """Command set for scheduler related operations."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.config:cli")
-def config():
+def config() -> None:
     """Command set for configuration management."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> None:
     """Command set for dependency verification and validation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.health:cli")
-def health():
+def health() -> None:
     """Command set for health checking."""
 
 

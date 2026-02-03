@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -101,28 +101,23 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.utils import query_userinfo as _query_userinfo
 
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InsufficientPrivilege
-from ..errors.kernel import InvalidSessionData, SessionNotFound
-from ..errors.resource import NoCurrentTaskContext
-from ..models import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    SessionDependencyRow,
-    SessionRow,
-    UserRole,
-    kernels,
-    keypairs,
-)
-from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import (
     LegacyBaseRequestModel,
     LegacyBaseResponseModel,
-    Undefined,
     catch_unexpected,
     check_api_params,
     deprecated_stub,
@@ -140,12 +135,10 @@ _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
 
 class UndefChecker(t.Trafaret):
-    def check_and_return(self, value: Any) -> object:
+    def check_and_return(self, value: Any) -> object:  # noqa: RET503
         if value == undefined:
             return value
-        else:
-            self._failure("Invalid Undef format", value=value)
-            return None
+        self._failure("Invalid Undef format", value=value)  # raises DataError
 
 
 resource_opts_iv = t.Dict({
@@ -318,55 +311,12 @@ creation_config_v7 = t.Dict({
     tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
 })
 
-overwritten_param_check = t.Dict({
-    t.Key("template_id"): tx.UUID,
-    t.Key("session_name"): tx.SessionName,
-    t.Key("image", default=None): t.Null | t.String,
-    tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
-    t.Key("group", default=None): t.Null | t.String,
-    t.Key("domain", default=None): t.Null | t.String,
-    t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
-    t.Key("tag", default=None): t.Null | t.String,
-    t.Key("enqueue_only", default=False): t.ToBool,
-    t.Key("max_wait_seconds", default=0): t.Int[0:],
-    t.Key("reuse", default=True): t.ToBool,
-    t.Key("startup_command", default=None): t.Null | t.String,
-    t.Key("bootstrap_script", default=None): t.Null | t.String,
-    t.Key("owner_access_key", default=None): t.Null | t.String,
-    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
-    tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-    tx.AliasedKey(["cluster_mode", "clusterMode"], default="SINGLE_NODE"): tx.Enum(ClusterMode),
-    tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-    tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
-}).allow_extra("*")
-
-
-def sub(d, old, new):
-    for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
-            d[k] = sub(v, old, new)
-        elif d[k] == old:
-            d[k] = new
-    return d
-
-
-def drop_undefined(d):
-    newd = {}
-    for k, v in d.items():
-        if isinstance(v, Mapping) or isinstance(v, dict):
-            newval = drop_undefined(v)
-            if len(newval.keys()) > 0:  # exclude empty dict always
-                newd[k] = newval
-        elif not isinstance(v, Undefined):
-            newd[k] = v
-    return newd
-
 
 async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
-) -> tuple[UUID, UUID, dict]:
+) -> tuple[UUID, UUID, dict[str, Any]]:
     try:
         return await _query_userinfo(
             conn,
@@ -382,7 +332,7 @@ async def query_userinfo(
             ),
         )
     except ValueError as e:
-        raise InvalidAPIParameters(str(e))
+        raise InvalidAPIParameters(str(e)) from e
 
 
 @server_status_required(ALL_ALLOWED)
@@ -445,17 +395,17 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 8 <= api_version[0]:
+        if api_version[0] >= 8:
             params["config"] = creation_config_v6_template.check(params["config"])
-        elif 6 <= api_version[0]:
+        elif api_version[0] >= 6:
             params["config"] = creation_config_v5_template.check(params["config"])
-        elif 5 <= api_version[0]:
+        elif api_version[0] >= 5:
             params["config"] = creation_config_v4_template.check(params["config"])
-        elif (4, "20190315") <= api_version:
+        elif api_version >= (4, "20190315"):
             params["config"] = creation_config_v3_template.check(params["config"])
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
-        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
+        raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict()) from e
 
     scopes_param = {
         "owner_access_key": (
@@ -524,8 +474,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
-        tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-        >> "architecture": t.String,
+        tx.AliasedKey(["arch", "architecture"], default=None) >> "architecture": t.Null | t.String,
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "session_type": tx.Enum(
             SessionTypes
         ),
@@ -558,15 +507,15 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
-    if 9 <= api_version[0]:
+    if api_version[0] >= 9:
         creation_config = creation_config_v7.check(params["config"])
-    elif 8 <= api_version[0]:
+    elif api_version[0] >= 8:
         creation_config = creation_config_v6.check(params["config"])
-    elif 6 <= api_version[0]:
+    elif api_version[0] >= 6:
         creation_config = creation_config_v5.check(params["config"])
-    elif 5 <= api_version[0]:
+    elif api_version[0] >= 5:
         creation_config = creation_config_v4.check(params["config"])
-    elif (4, "20190315") <= api_version:
+    elif api_version >= (4, "20190315"):
         creation_config = creation_config_v3.check(params["config"])
     elif 2 <= api_version[0] <= 4:
         creation_config = creation_config_v2.check(params["config"])
@@ -578,7 +527,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    agent_list = cast(Optional[list[str]], params["config"]["agent_list"])
+    agent_list = cast(list[str] | None, params["config"]["agent_list"])
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
@@ -605,13 +554,16 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
         params["image"],
         params["session_name"],
     )
+    architecture = (
+        params["architecture"] if params["architecture"] is not None else DEFAULT_IMAGE_ARCH
+    )
 
     result = await root_ctx.processors.session.create_from_params.wait_for_complete(
         CreateFromParamsAction(
             params=CreateFromParamsActionParams(
                 session_name=params["session_name"],
                 image=params["image"],
-                architecture=params["architecture"],
+                architecture=architecture,
                 session_type=params["session_type"],
                 group_name=params["group"],
                 domain_name=domain_name,
@@ -756,7 +708,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     }),
     loads=_json_loads,
 )
-async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+async def get_commit_status(request: web.Request, _params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -786,7 +738,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     }),
     loads=_json_loads,
 )
-async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+async def get_abusing_report(request: web.Request, _params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -877,7 +829,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-    filename: Optional[str] = params["filename"]
+    filename: str | None = params["filename"]
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -899,7 +851,7 @@ class ConvertSessionToImageRequesteModel(LegacyBaseRequestModel):
         pattern=r"[a-zA-Z0-9\.\-_]+",
         description="Name of the image to be created.",
     )
-    login_session_token: Annotated[Optional[str], Field(default=None)]
+    login_session_token: Annotated[str | None, Field(default=None)]
     image_visibility: CustomizedImageVisibilityScope = Field(
         default=CustomizedImageVisibilityScope.USER,
         description="Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error.",
@@ -944,7 +896,7 @@ async def convert_session_to_image(
 
 
 @catch_unexpected(log)
-async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
+async def check_agent_lost(root_ctx: RootContext, _interval: float) -> None:
     try:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
@@ -962,21 +914,21 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
 
 
 @catch_unexpected(log)
-async def report_stats(root_ctx: RootContext, interval: float) -> None:
+async def report_stats(root_ctx: RootContext, _interval: float) -> None:
     try:
         stats_monitor = root_ctx.stats_monitor
         await stats_monitor.report_metric(
             GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
         )
 
-        all_inst_ids = [inst_id async for inst_id in root_ctx.registry.enumerate_instances()]
+        all_inst_ids = await root_ctx.registry.enumerate_instances()
         await stats_monitor.report_metric(
             GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
         )
 
         async with root_ctx.db.begin_readonly() as conn:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(kernels)
                 .where(
                     (kernels.c.cluster_role == DEFAULT_ROLE)
@@ -986,22 +938,22 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
             subquery = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(keypairs)
                 .where(keypairs.c.is_active == true())
                 .group_by(keypairs.c.user_id)
             )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
 
             subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            query = sa.select(sa.func.count()).select_from(subquery.alias())
             n = await conn.scalar(query)
             await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
 
             """
-            query = sa.select([sa.func.count()]).select_from(usage)
+            query = sa.select(sa.func.count()).select_from(usage)
             n = await conn.scalar(query)
             await stats_monitor.report_metric(
                 GAUGE, 'ai.backend.manager.accum_kernels', n)
@@ -1180,10 +1132,10 @@ async def restart(request: web.Request, params: Any) -> web.Response:
     except BackendAIError:
         log.exception("RESTART: exception")
         raise
-    except Exception:
+    except Exception as e:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
-        raise web.HTTPInternalServerError
+        raise web.HTTPInternalServerError from e
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1196,9 +1148,9 @@ async def execute(request: web.Request) -> web.Response:
     try:
         params = await read_json(request)
         log.info("EXECUTE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    except json.decoder.JSONDecodeError:
+    except json.decoder.JSONDecodeError as e:
         log.warning("EXECUTE: invalid/missing parameters")
-        raise InvalidAPIParameters
+        raise InvalidAPIParameters from e
 
     result = await root_ctx.processors.session.execute_session.wait_for_complete(
         ExecuteSessionAction(
@@ -1248,8 +1200,8 @@ async def complete(request: web.Request) -> web.Response:
         params = await read_json(request)
         code = params.get("code", "")
         opts = params.get("options", None) or {}
-    except json.decoder.JSONDecodeError:
-        raise InvalidAPIParameters
+    except json.decoder.JSONDecodeError as e:
+        raise InvalidAPIParameters from e
 
     log.info("COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
 
@@ -1332,7 +1284,7 @@ async def _find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-):
+) -> dict[str, list[Any] | str]:
     sessions = await SessionRow.match_sessions(
         db_session,
         session_name_or_id,
@@ -1349,28 +1301,26 @@ async def _find_dependency_sessions(
         raise InvalidSessionData("Invalid session_name type")
 
     kernel_query = (
-        sa.select([
+        sa.select(
             kernels.c.status,
             kernels.c.status_changed,
-        ])
+        )
         .select_from(kernels)
         .where(kernels.c.session_id == session_id)
     )
 
-    dependency_session_ids: list[SessionDependencyRow] = (
-        await db_session.execute(
-            sa.select(SessionDependencyRow.depends_on).where(
-                SessionDependencyRow.session_id == session_id
-            )
+    dependency_result = await db_session.execute(
+        sa.select(SessionDependencyRow.depends_on).where(
+            SessionDependencyRow.session_id == session_id
         )
-    ).first()
-
-    if not dependency_session_ids:
-        dependency_session_ids = []
+    )
+    dependency_session_ids = [row[0] for row in dependency_result.fetchall()]
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
+    if kernel_query_result is None:
+        raise ValueError(f"Kernel not found for session {session_id}")
 
-    session_info: dict[str, list | str] = {
+    session_info: dict[str, list[Any] | str] = {
         "session_id": session_id,
         "session_name": session_name,
         "status": str(kernel_query_result[0]),
@@ -1388,7 +1338,7 @@ async def find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
-):
+) -> dict[str, list[Any] | str]:
     return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
 
 
@@ -1533,19 +1483,19 @@ async def list_files(request: web.Request) -> web.Response:
                 owner_access_key=owner_access_key,
             )
         )
-    except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
+    except (TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 class ContainerLogRequestModel(LegacyBaseRequestModel):
-    owner_access_key: Optional[str] = Field(
+    owner_access_key: str | None = Field(
         default=None,
         alias="ownerAccessKey",
     )
-    kernel_id: Optional[UUID] = Field(
+    kernel_id: UUID | None = Field(
         description="Target kernel to get container logs.",
         default=None,
         alias="kernelId",
@@ -1618,7 +1568,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             request=request,
         )
     )
-    return result.response
+    return cast(web.StreamResponse, result.response)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1636,7 +1586,7 @@ async def get_status_history(request: web.Request, params: Any) -> web.Response:
         "GET_STATUS_HISTORY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
 
-    resp: dict[str, Mapping] = {"result": {}}
+    resp: dict[str, Mapping[str, Any]] = {"result": {}}
     result = await root_ctx.processors.session.get_status_history.wait_for_complete(
         GetStatusHistoryAction(
             session_name=session_name,

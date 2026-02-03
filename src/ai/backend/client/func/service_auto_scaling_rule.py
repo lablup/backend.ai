@@ -1,17 +1,17 @@
 import textwrap
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Optional, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import service_auto_scaling_rule_fields
+from ai.backend.client.output.types import FieldSpec, RelayPaginatedResult
+from ai.backend.client.pagination import execute_paginated_relay_query
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import service_auto_scaling_rule_fields
-from ..output.types import FieldSpec, RelayPaginatedResult
-from ..pagination import execute_paginated_relay_query
-from ..session import api_session
-from ..types import set_if_set
 from .base import BaseFunction, api_function
 
 _default_fields: Sequence[FieldSpec] = (
@@ -42,9 +42,9 @@ class ServiceAutoScalingRule(BaseFunction):
         fields: Sequence[FieldSpec] | None = None,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> RelayPaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> RelayPaginatedResult[dict[str, Any]]:
         return await execute_paginated_relay_query(
             "endpoint_auto_scaling_rule_nodes",
             {
@@ -69,8 +69,8 @@ class ServiceAutoScalingRule(BaseFunction):
         step_size: int,
         cooldown_seconds: int,
         *,
-        min_replicas: Optional[int] = None,
-        max_replicas: Optional[int] = None,
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
     ) -> Self:
         q = textwrap.dedent(
             """
@@ -130,7 +130,7 @@ class ServiceAutoScalingRule(BaseFunction):
     async def get(
         self,
         fields: Sequence[FieldSpec] | None = None,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = textwrap.dedent(
             """\
             query($rule_id: String!) {
@@ -141,7 +141,7 @@ class ServiceAutoScalingRule(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in (fields or _default_fields)))
         variables = {"rule_id": str(self.rule_id)}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint_auto_scaling_rule_node"]
+        return cast(Sequence[dict[str, Any]], data["endpoint_auto_scaling_rule_node"])
 
     @api_function
     async def update(
@@ -153,8 +153,8 @@ class ServiceAutoScalingRule(BaseFunction):
         comparator: AutoScalingMetricComparator | Undefined = undefined,
         step_size: int | Undefined = undefined,
         cooldown_seconds: int | Undefined = undefined,
-        min_replicas: Optional[int] | Undefined = undefined,
-        max_replicas: Optional[int] | Undefined = undefined,
+        min_replicas: int | None | Undefined = undefined,
+        max_replicas: int | None | Undefined = undefined,
     ) -> Self:
         q = textwrap.dedent(
             """
@@ -186,10 +186,10 @@ class ServiceAutoScalingRule(BaseFunction):
             {"rule_id": str(self.rule_id), "input": inputs},
         )
 
-        return data["modify_endpoint_auto_scaling_rule_node"]
+        return cast(Self, data["modify_endpoint_auto_scaling_rule_node"])
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         q = textwrap.dedent(
             """
             mutation($rule_id: String!) {
@@ -205,4 +205,4 @@ class ServiceAutoScalingRule(BaseFunction):
             "rule_id": str(self.rule_id),
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_endpoint_auto_scaling_rule_node"]
+        return cast(dict[str, Any], data["delete_endpoint_auto_scaling_rule_node"])

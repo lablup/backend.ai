@@ -3,15 +3,16 @@ import json
 import logging
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
+from typing import Any
 
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 
 
-async def init_sshd_service(child_env):
+async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
@@ -64,7 +65,7 @@ async def init_sshd_service(child_env):
                 auth_path.parent.chmod(0o700)
             if (auth_path.stat().st_mode & 0o077) != 0:
                 auth_path.chmod(0o600)
-        except IOError:
+        except OSError:
             log.warning("could not set the permission for /home/work/.ssh")
     proc = await asyncio.create_subprocess_exec(
         *[
@@ -98,13 +99,17 @@ async def init_sshd_service(child_env):
         }
         if cluster_ssh_port_mapping_path.is_file():
             cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
-            with open(user_ssh_config_path, "a") as f:
-                for host, (hostname, port) in cluster_ssh_port_mapping.items():
-                    f.write(f"\nHost {host}\n")
-                    f.write(f"\tHostName {hostname}\n")
-                    f.write(f"\tPort {port}\n")
-                    f.write("\tStrictHostKeyChecking no\n")
-                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+            def _write_ssh_config() -> None:
+                with user_ssh_config_path.open("a") as f:
+                    for host, (hostname, port) in cluster_ssh_port_mapping.items():
+                        f.write(f"\nHost {host}\n")
+                        f.write(f"\tHostName {hostname}\n")
+                        f.write(f"\tPort {port}\n")
+                        f.write("\tStrictHostKeyChecking no\n")
+                        f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+            await asyncio.to_thread(_write_ssh_config)
         else:
             for role_name, role_replica in replicas.items():
                 try:
@@ -113,21 +118,29 @@ async def init_sshd_service(child_env):
                         continue
                 except FileNotFoundError:
                     pass
-                with open(user_ssh_config_path, "a") as f:
-                    f.write(f"\nHost {role_name}*\n")
-                    f.write("\tPort 2200\n")
-                    f.write("\tStrictHostKeyChecking no\n")
-                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+                def _write_replica_config() -> None:
+                    with user_ssh_config_path.open("a") as f:
+                        f.write(f"\nHost {role_name}*\n")
+                        f.write("\tPort 2200\n")
+                        f.write("\tStrictHostKeyChecking no\n")
+                        f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+                await asyncio.to_thread(_write_replica_config)
     cluster_pubkey_src_path = Path("/home/config/ssh/id_cluster.pub")
     if cluster_pubkey_src_path.is_file():
         pubkey = cluster_pubkey_src_path.read_bytes()
-        with open(auth_path, "ab") as f:
-            f.write(b"\n")
-            f.write(pubkey)
-            f.write(b"\n")
+
+        def _write_pubkey() -> None:
+            with auth_path.open("ab") as f:
+                f.write(b"\n")
+                f.write(pubkey)
+                f.write(b"\n")
+
+        await asyncio.to_thread(_write_pubkey)
 
 
-async def prepare_sshd_service(service_info):
+async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
     cmdargs = [
         "/opt/kernel/dropbearmulti",
         "dropbear",
@@ -149,11 +162,11 @@ async def prepare_sshd_service(service_info):
             cmdargs.extend(["-p", f"0.0.0.0:{port}"])
     else:
         cmdargs.extend(["-p", f"0.0.0.0:{port_config}"])
-    env = {}
+    env: dict[str, str] = {}
     return cmdargs, env
 
 
-async def prepare_ttyd_service(service_info):
+async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
     shell = "sh"
     if Path("/bin/zsh").exists():
         shell = "zsh"

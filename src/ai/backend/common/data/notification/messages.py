@@ -4,21 +4,22 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from .types import NotificationRuleType
 
 __all__ = (
+    "ArtifactDownloadCompletedMessage",
+    "EndpointLifecycleChangedMessage",
     "NotifiableMessage",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
-    "ArtifactDownloadCompletedMessage",
 )
 
 # Module-level registry for notification message types
-_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type["NotifiableMessage"]] = {}
+_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type[NotifiableMessage]] = {}
 
 
 class NotifiableMessage(BaseModel):
@@ -30,7 +31,7 @@ class NotifiableMessage(BaseModel):
 
     model_config = {"extra": "forbid"}  # Strict validation - reject unknown fields
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         """Automatically register subclasses by their rule type."""
         try:
             rule_type = cls.rule_type()
@@ -52,7 +53,7 @@ class NotifiableMessage(BaseModel):
         cls,
         rule_type: NotificationRuleType,
         data: Mapping[str, Any],
-    ) -> "NotifiableMessage":
+    ) -> NotifiableMessage:
         """Validate notification data against the appropriate message type.
 
         Args:
@@ -98,7 +99,7 @@ class SessionStartedMessage(NotifiableMessage):
         return NotificationRuleType.SESSION_STARTED
 
     session_id: str = Field(description="Unique identifier of the compute session")
-    session_name: Optional[str] = Field(
+    session_name: str | None = Field(
         default=None, description="User-defined name for the session, if provided"
     )
     session_type: str = Field(
@@ -123,7 +124,7 @@ class SessionTerminatedMessage(NotifiableMessage):
         return NotificationRuleType.SESSION_TERMINATED
 
     session_id: str = Field(description="Unique identifier of the compute session")
-    session_name: Optional[str] = Field(
+    session_name: str | None = Field(
         default=None, description="User-defined name for the session, if provided"
     )
     session_type: str = Field(
@@ -135,7 +136,7 @@ class SessionTerminatedMessage(NotifiableMessage):
     status: str = Field(
         description="Final status of the session (e.g., 'terminated', 'cancelled', 'error')"
     )
-    termination_reason: Optional[str] = Field(
+    termination_reason: str | None = Field(
         default=None,
         description="Reason for termination (e.g., 'user-requested', 'timeout', 'error')",
     )
@@ -159,12 +160,38 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
         description="Type of registry where the artifact is stored (e.g., 'HARBOR', 'HUGGINGFACE')"
     )
     registry_id: str = Field(description="Unique identifier of the registry")
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None, description="Version of the artifact revision, if available"
     )
     status: str = Field(description="Status of the artifact revision")
     success: bool = Field(description="Whether the download operation succeeded")
-    digest: Optional[str] = Field(default=None, description="Digest of the artifact revision")
-    verification_result: Optional[dict[str, Any]] = Field(
+    digest: str | None = Field(default=None, description="Digest of the artifact revision")
+    verification_result: dict[str, Any] | None = Field(
         default=None, description="Verification result of the artifact revision, if available"
     )
+
+
+class EndpointLifecycleChangedMessage(NotifiableMessage):
+    """Notification message for endpoint lifecycle change events.
+
+    This message is sent when an endpoint (model service) lifecycle stage
+    changes (e.g., PENDING → SCALING → READY → DESTROYING → DESTROYED).
+    """
+
+    @classmethod
+    def rule_type(cls) -> NotificationRuleType:
+        """Return the notification rule type for this message class."""
+        return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED
+
+    endpoint_id: str = Field(description="Unique identifier of the endpoint")
+    endpoint_name: str = Field(description="User-defined name for the endpoint")
+    domain: str = Field(description="Domain where the endpoint is deployed")
+    project_id: str = Field(description="Project ID where the endpoint belongs")
+    resource_group: str = Field(description="Resource group where the endpoint is deployed")
+    from_status: str | None = Field(
+        default=None,
+        description="Previous lifecycle stage (or None for newly created endpoints)",
+    )
+    to_status: str = Field(description="New lifecycle stage")
+    transition_result: str = Field(description="Result of the transition (success or failure)")
+    event_timestamp: str = Field(description="ISO format timestamp when the transition occurred")

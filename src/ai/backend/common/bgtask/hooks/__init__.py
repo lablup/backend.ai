@@ -6,11 +6,11 @@ from .valkey_hook import ValkeyUnregisterHook
 
 __all__ = [
     "AbstractTaskHook",
-    "TaskContext",
+    "BackgroundTaskObserver",
     "CompositeTaskHook",
     "EventProducerHook",
     "MetricObserverHook",
-    "BackgroundTaskObserver",
     "NopBackgroundTaskObserver",
+    "TaskContext",
     "ValkeyUnregisterHook",
 ]

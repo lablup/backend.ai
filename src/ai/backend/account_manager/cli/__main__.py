@@ -1,26 +1,23 @@
 from pathlib import Path
 
 import click
-import tomlkit
 from setproctitle import setproctitle
 
-from ai.backend.logging import LogLevel
-
-from ..config import ServerConfig, generate_example_json
-from ..utils import ensure_json_serializable
+# Use string list instead of LogLevel enum to avoid heavy ai.backend.logging import at CLI startup
+_LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"]
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
+    type=click.Choice(_LOG_LEVELS, case_sensitive=False),
     default="INFO",
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
-    ctx: click.Context,
-    log_level: str,
+    _ctx: click.Context,
+    _log_level: str,
 ) -> None:
     """
     Backend.AI Account Manager CLI
@@ -32,19 +29,24 @@ def main(
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_example_configuration(output: Path) -> None:
+def generate_example_configuration(output: Path | None) -> None:
     """
     Generates example TOML configuration file for Backend.AI Account Manager.
     """
+    import tomlkit
+
+    from ai.backend.account_manager.config import ServerConfig, generate_example_json
+    from ai.backend.account_manager.utils import ensure_json_serializable
+
     generated_example = generate_example_json(ServerConfig)
-    if output == "-" or output is None:
+    if output is None:
         print(tomlkit.dumps(ensure_json_serializable(generated_example)))
     else:
-        with open(output, mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(tomlkit.dumps(ensure_json_serializable(generated_example)))
 
 

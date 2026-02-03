@@ -4,15 +4,15 @@ import asyncio
 import logging
 import re
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Dict, Generic, Iterator, Mapping, Optional, Tuple, Type, TypeVar
+from collections.abc import Iterator, Mapping
+from typing import Any, ClassVar, TypeVar
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
-
-from ..etcd import AbstractKVStore
-from ..exception import ConfigurationError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -54,7 +54,7 @@ class AbstractPlugin(metaclass=ABCMeta):
         self.local_config = local_config
 
     @abstractmethod
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         """
         Initialize any resource used by the plugin.
         """
@@ -84,7 +84,7 @@ class AbstractPlugin(metaclass=ABCMeta):
 P = TypeVar("P", bound=AbstractPlugin)
 
 
-class BasePluginContext(Generic[P]):
+class BasePluginContext[P: AbstractPlugin]:
     """
     A minimal plugin manager which controls the lifecycles of the given plugins
     and watches & applies the configuration changes in etcd.
@@ -94,12 +94,12 @@ class BasePluginContext(Generic[P]):
 
     etcd: AbstractKVStore
     local_config: Mapping[str, Any]
-    plugins: Dict[str, P]
+    plugins: dict[str, P]
     plugin_group: ClassVar[str] = "backendai_XXX_v10"
-    allowlist: ClassVar[Optional[set[str]]] = None
-    blocklist: ClassVar[Optional[set[str]]] = None
+    allowlist: ClassVar[set[str] | None] = None
+    blocklist: ClassVar[set[str] | None] = None
 
-    _config_watchers: WeakSet[asyncio.Task]
+    _config_watchers: WeakSet[asyncio.Task[Any]]
 
     def __init__(self, etcd: AbstractKVStore, local_config: Mapping[str, Any]) -> None:
         self.etcd = etcd
@@ -118,9 +118,9 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
-    ) -> Iterator[Tuple[str, Type[P]]]:
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
+    ) -> Iterator[tuple[str, type[P]]]:
         cls_allowlist = set() if cls.allowlist is None else cls.allowlist
         arg_allowlist = set() if allowlist is None else allowlist
         allowlist_enabled = allowlist is not None or cls.allowlist is not None
@@ -136,9 +136,9 @@ class BasePluginContext(Generic[P]):
 
     async def init(
         self,
-        context: Optional[Any] = None,
-        allowlist: Optional[set] = None,
-        blocklist: Optional[set] = None,
+        context: Any | None = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> None:
         if allowlist is not None and blocklist is not None:
             if union := allowlist & blocklist:

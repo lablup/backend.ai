@@ -3,7 +3,8 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Final, Optional, Self, Sequence
+from collections.abc import Sequence
+from typing import Any, Final, Self
 
 from pydantic import BaseModel, Field
 
@@ -225,7 +226,7 @@ class ServiceDiscoveryLoop:
     _interval_seconds: int
     _closed: bool = False
     _run_service_task: asyncio.Task[None]
-    _sweep_unhealthy_services_task: Optional[asyncio.Task[None]]
+    _sweep_unhealthy_services_task: asyncio.Task[None] | None
 
     def __init__(
         self,

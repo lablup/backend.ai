@@ -7,19 +7,25 @@ from datetime import datetime
 
 import jinja2
 
-from ai.backend.common.clients.http_client import ClientPool
-from ai.backend.common.data.notification import NotifiableMessage, NotificationChannelType
+from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
+from ai.backend.common.data.notification import (
+    NotifiableMessage,
+    NotificationChannelType,
+)
+from ai.backend.common.data.notification.types import EmailSpec, WebhookSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.errors.notification import (
     InvalidNotificationChannelType,
     NotificationTemplateRenderingFailure,
 )
+from ai.backend.manager.notification.channels.email.channel import EmailChannel
+from ai.backend.manager.notification.channels.webhook.channel import WebhookChannel
 
 from .channels.base import AbstractNotificationChannel
 from .types import NotificationMessage, ProcessRuleParams, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationCenter",)
 
@@ -37,8 +43,6 @@ class NotificationCenter:
 
     def __init__(self) -> None:
         """Initialize the notification center with HTTP client pool and template environment."""
-        from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
-
         self._http_client_pool = ClientPool(
             factory=tcp_client_session_factory,
             cleanup_interval_seconds=600,
@@ -68,12 +72,21 @@ class NotificationCenter:
         # Create handler based on channel type (no caching due to dynamic config changes)
         match channel_data.channel_type:
             case NotificationChannelType.WEBHOOK:
-                from .channels.webhook import WebhookChannel
-
+                if not isinstance(channel_data.spec, WebhookSpec):
+                    raise InvalidNotificationChannelType(
+                        f"Invalid config type for WEBHOOK channel: {type(channel_data.spec)}"
+                    )
                 return WebhookChannel(
                     http_client_pool=self._http_client_pool,
-                    webhook_config=channel_data.config,
+                    webhook_spec=channel_data.spec,
                 )
+
+            case NotificationChannelType.EMAIL:
+                if not isinstance(channel_data.spec, EmailSpec):
+                    raise InvalidNotificationChannelType(
+                        f"Invalid config type for EMAIL channel: {type(channel_data.spec)}"
+                    )
+                return EmailChannel(email_spec=channel_data.spec)
 
         # Explicitly handle unregistered channel types
         raise InvalidNotificationChannelType(
@@ -164,6 +177,4 @@ class NotificationCenter:
                 template=template_str,
                 error=str(e),
             )
-            raise NotificationTemplateRenderingFailure(
-                f"Failed to render template: {str(e)}"
-            ) from e
+            raise NotificationTemplateRenderingFailure(f"Failed to render template: {e!s}") from e

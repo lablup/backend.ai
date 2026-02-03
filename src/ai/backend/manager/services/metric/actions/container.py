@@ -1,15 +1,17 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
-
-from ..types import ContainerMetricOptionalLabel, ContainerMetricResult
+from ai.backend.manager.services.metric.types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResult,
+)
 
 
 @dataclass
 class ContainerMetricMetadataAction(BaseAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,7 +30,7 @@ class ContainerMetricMetadataActionResult(BaseActionResult):
     metric_names: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -42,7 +44,7 @@ class ContainerMetricAction(BaseAction):
     step: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -61,5 +63,5 @@ class ContainerMetricActionResult(BaseActionResult):
     result: list[ContainerMetricResult]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

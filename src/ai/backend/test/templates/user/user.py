@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Optional, override
+from typing import cast, override
 
 from ai.backend.client.func.user import UserRole, UserStatus
 from ai.backend.client.output.fields import group_fields, keypair_fields, user_fields
@@ -36,7 +36,7 @@ class UserTemplate(WrapperTestTemplate):
                 f"Cannot find the group {group_dep.name!r} in the domain {domain_dep.name!r}"
             )
         assert len(group_data) == 1, f"Expected exactly one group, found {len(group_data)}"
-        return group_data[0]["id"]
+        return cast(str, group_data[0]["id"])
 
     async def _create_user_with_keypair(
         self,
@@ -78,13 +78,12 @@ class UserTemplate(WrapperTestTemplate):
         assert len(keypair_info) > 0, "Keypair list should not be empty"
         keypair_info = keypair_info[0]
 
-        user_meta = CreatedUserMeta(
+        return CreatedUserMeta(
             email=user_info["email"],
             password=password,
-            access_key=keypair_info["access_key"],
-            secret_key=keypair_info["secret_key"],
+            access_key=keypair_info["access_key"],  # type: ignore[call-overload]
+            secret_key=keypair_info["secret_key"],  # type: ignore[call-overload]
         )
-        return user_meta
 
     @override
     @actxmgr
@@ -101,7 +100,7 @@ class UserTemplate(WrapperTestTemplate):
         email = f"{username}@tester_email.com"
         description = f"Test user for {test_id}, used in tester package"
 
-        user_meta: Optional[CreatedUserMeta] = None
+        user_meta: CreatedUserMeta | None = None
         user_meta = await self._create_user_with_keypair(
             client_session,
             domain_ctx.name,

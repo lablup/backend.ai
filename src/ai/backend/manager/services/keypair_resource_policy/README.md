@@ -19,11 +19,11 @@ The KeyPair Resource Policy service manages resource policies applied to API acc
 ### Creating a KeyPair Resource Policy
 
 ```python
-from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
+from ai.backend.manager.repositories.keypair_resource_policy.creators import KeyPairResourcePolicyCreatorSpec
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import CreateKeyPairResourcePolicyAction
 
 # Create a new keypair resource policy
-creator = KeyPairResourcePolicyCreator(
+creator = KeyPairResourcePolicyCreatorSpec(
     name="example-policy",
     max_concurrent_sessions=5,
     max_containers_per_session=2,
@@ -94,7 +94,7 @@ Uses `KeyPairResourcePolicyRow` model (src/ai/backend/manager/models/resource_po
 Built on Backend.AI's action framework with three main operations:
 
 1. **CreateKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/create_keypair_resource_policy.py:13)
-   - Uses `KeyPairResourcePolicyCreator` for input validation
+   - Uses `KeyPairResourcePolicyCreatorSpec` for input validation
    - Returns `CreateKeyPairResourcePolicyActionResult` with created policy
 
 2. **ModifyKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/modify_keypair_resource_policy.py)

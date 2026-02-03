@@ -3,17 +3,14 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
-
-from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
-    ObjectPermissionCreateInputBeforeRoleCreation,
+    ObjectPermissionCreateInput,
     ObjectPermissionData,
 )
+from .permission import ScopedPermissionCreateInput
 from .permission_group import (
-    PermissionGroupCreatorBeforeRoleCreation,
     PermissionGroupExtendedData,
 )
 from .status import RoleStatus
@@ -21,56 +18,38 @@ from .types import EntityType, OperationType, RoleSource
 
 
 @dataclass(frozen=True)
-class RoleCreateInput:
-    name: str
-    source: RoleSource = RoleSource.CUSTOM
-    status: RoleStatus = RoleStatus.ACTIVE
-    description: Optional[str] = None
-
-    permission_groups: list[PermissionGroupCreatorBeforeRoleCreation] = field(default_factory=list)
-    object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
-        default_factory=list
-    )
-
-
-@dataclass(frozen=True)
-class RoleUpdateInput(PartialModifier):
-    id: uuid.UUID
-    name: OptionalState[str]
-    source: OptionalState[RoleSource]
-    status: OptionalState[RoleStatus]
-    description: TriState[str]
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        self.source.update_dict(to_update, "source")
-        self.status.update_dict(to_update, "status")
-        self.description.update_dict(to_update, "description")
-        return to_update
-
-
-@dataclass(frozen=True)
-class RoleDeleteInput:
-    id: uuid.UUID
-    _status: RoleStatus = RoleStatus.DELETED
-
-
-@dataclass(frozen=True)
 class RoleData:
+    """
+    Information about a role.
+    If detailed information is needed, use RoleDetailData.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
     status: RoleStatus
     created_at: datetime
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    updated_at: datetime
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
-class RoleDataWithPermissions:
+class AssignedUserData:
+    """Information about a user assigned to a role."""
+
+    user_id: uuid.UUID
+    granted_by: uuid.UUID | None
+    granted_at: datetime
+
+
+@dataclass(frozen=True)
+class RoleDetailData:
+    """
+    Detailed information about a role.
+    It includes permission groups and object permissions.
+    """
+
     id: uuid.UUID
     name: str
     source: RoleSource
@@ -80,9 +59,9 @@ class RoleDataWithPermissions:
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    updated_at: datetime
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -115,11 +94,74 @@ class UserRoleAssignmentInput:
 
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class RolePermissionsUpdateInput:
+    """
+    Input for batch updating role permissions.
+
+    Uses scope-based permission management:
+    - Scoped permissions are added using (scope_type, scope_id, entity_type, operation)
+    - System automatically finds or creates permission groups by scope
+    - All operations are performed in a single transaction
+
+    Breaking Change from previous version:
+    - Removed: add_permission_groups, remove_permission_group_ids, add_permissions, remove_permission_ids
+    - Added: add_scoped_permissions, remove_scoped_permission_ids
+    """
+
+    role_id: uuid.UUID
+
+    # Scoped permissions (automatic permission group management)
+    add_scoped_permissions: list[ScopedPermissionCreateInput] = field(default_factory=list)
+    remove_scoped_permission_ids: list[uuid.UUID] = field(default_factory=list)
+
+    # Object permissions
+    add_object_permissions: list[ObjectPermissionCreateInput] = field(default_factory=list)
+    remove_object_permission_ids: list[uuid.UUID] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class UserRoleRevocationInput:
+    """
+    Input to revoke a user-role association.
+    """
+
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserRoleRevocationData:
+    user_role_id: uuid.UUID
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class RoleListResult:
+    """Result of role search with pagination info."""
+
+    items: list[RoleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AssignedUserListResult:
+    """Result of assigned user search with pagination info."""
+
+    items: list[AssignedUserData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

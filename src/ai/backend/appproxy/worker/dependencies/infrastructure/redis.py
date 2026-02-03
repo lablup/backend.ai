@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from ai.backend.appproxy.worker.config import ServerConfig
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
@@ -11,8 +12,6 @@ from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.health_checker import CID_REDIS_LIVE, CID_REDIS_STAT, ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.types import RedisProfileTarget
-
-from ...config import ServerConfig
 
 
 @dataclass

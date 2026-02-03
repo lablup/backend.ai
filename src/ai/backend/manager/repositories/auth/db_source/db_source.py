@@ -3,22 +3,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.orm import joinedload, selectinload
 
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import (
+    UserRole,
     UserRow,
     UserStatus,
     check_credential,
@@ -58,7 +61,7 @@ class AuthDBSource:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
             query = (
-                sa.select([association_groups_users.c.group_id, association_groups_users.c.user_id])
+                sa.select(association_groups_users.c.group_id, association_groups_users.c.user_id)
                 .select_from(association_groups_users)
                 .where(
                     (association_groups_users.c.group_id == group_id)
@@ -77,7 +80,7 @@ class AuthDBSource:
     async def verify_email_exists(self, email: str) -> bool:
         """Verify if email exists in the database."""
         async with self._db.begin() as conn:
-            query = sa.select([users.c.email]).select_from(users).where(users.c.email == email)
+            query = sa.select(users.c.email).select_from(users).where(users.c.email == email)
             result = await conn.execute(query)
             row = result.first()
             return row is not None
@@ -85,8 +88,8 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_data: dict[str, Any],
+        keypair_data: dict[str, Any],
         group_name: str,
         domain_name: str,
     ) -> UserData:
@@ -102,6 +105,8 @@ class AuthDBSource:
             user_query = users.select().where(users.c.email == user_data["email"])
             result = await conn.execute(user_query)
             user_row = result.first()
+            if user_row is None:
+                raise UserCreationError("Failed to retrieve created user")
 
             # Create keypair
             keypair_data["user"] = user_row.uuid
@@ -110,7 +115,7 @@ class AuthDBSource:
 
             # Add to default group
             group_query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where((groups.c.domain_name == domain_name) & (groups.c.name == group_name))
             )
@@ -121,11 +126,11 @@ class AuthDBSource:
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
 
-            return self._user_row_to_data(user_row)
+            return self._user_row_to_data(UserRow.from_row(user_row))
 
     @auth_db_source_resilience.apply()
-    async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> bool:
-        """Modify user's full name in database. Returns True if updated, False if user not found."""
+    async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
+        """Modify user's full name in database."""
         async with self._db.begin() as conn:
             query = (
                 sa.select(users)
@@ -135,12 +140,11 @@ class AuthDBSource:
             result = await conn.execute(query)
             user_row = result.first()
             if not user_row:
-                return False
+                raise UserNotFound(extra_data={"email": email, "domain": domain_name})
 
             data = {"full_name": full_name}
             update_query = users.update().values(data).where(users.c.email == email)
             await conn.execute(update_query)
-            return True
 
     @auth_db_source_resilience.apply()
     async def modify_user_password(self, email: str, password_info: PasswordInfo) -> None:
@@ -172,7 +176,10 @@ class AuthDBSource:
                 .returning(users.c.password_changed_at)
             )
             result = await conn.execute(query)
-            return result.scalar()
+            password_changed_at = result.scalar()
+            if password_changed_at is None:
+                raise UserNotFound(extra_data={"user_uuid": str(user_uuid)})
+            return cast(datetime, password_changed_at)
 
     @auth_db_source_resilience.apply()
     async def mark_user_and_keypairs_inactive(self, email: str) -> None:
@@ -191,12 +198,10 @@ class AuthDBSource:
             await conn.execute(keypair_query)
 
     @auth_db_source_resilience.apply()
-    async def fetch_ssh_public_key(self, access_key: str) -> Optional[str]:
+    async def fetch_ssh_public_key(self, access_key: str) -> str | None:
         """Fetch SSH public key for an access key from database."""
         async with self._db.begin() as conn:
-            query = sa.select([keypairs.c.ssh_public_key]).where(
-                keypairs.c.access_key == access_key
-            )
+            query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
             return await conn.scalar(query)
 
     @auth_db_source_resilience.apply()
@@ -217,17 +222,17 @@ class AuthDBSource:
             username=row.username,
             email=row.email,
             password=row.password,
-            need_password_change=row.need_password_change,
+            need_password_change=row.need_password_change or False,
             full_name=row.full_name,
             description=row.description,
             is_active=row.status == UserStatus.ACTIVE,
-            status=row.status,
+            status=row.status or UserStatus.ACTIVE,
             status_info=row.status_info,
             created_at=row.created_at,
             modified_at=row.modified_at,
             password_changed_at=row.password_changed_at,
-            domain_name=row.domain_name,
-            role=row.role,
+            domain_name=row.domain_name or "",
+            role=row.role or UserRole.USER,
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             sudo_session_enabled=row.sudo_session_enabled,
@@ -239,7 +244,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> Optional[dict]:
+    ) -> sa.RowMapping:
         """Verify credentials with password migration support."""
         return await check_credential_with_migration(
             db=self._db,
@@ -254,7 +259,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         password: str,
-    ) -> Optional[dict]:
+    ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
         return await check_credential(
             db=self._db,
@@ -264,13 +269,27 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> Optional[UserRow]:
+    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         """Fetch user row by UUID from database."""
         async with self._db.begin_session() as db_session:
-            return await UserRow.query_user_by_uuid(user_uuid, db_session)
+            user_query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    joinedload(UserRow.main_keypair),
+                    selectinload(UserRow.keypairs),
+                )
+            )
+            user_row = await db_session.scalar(user_query)
+            if user_row is None:
+                raise UserNotFound(extra_data=user_uuid)
+            return user_row
 
     @auth_db_source_resilience.apply()
     async def fetch_current_time(self) -> datetime:
         """Fetch current time from database."""
         async with self._db.begin_readonly() as db_conn:
-            return await db_conn.scalar(sa.select(sa.func.now()))
+            result = await db_conn.scalar(sa.select(sa.func.now()))
+            if result is None:
+                raise InternalServerError("Failed to retrieve current database timestamp")
+            return result

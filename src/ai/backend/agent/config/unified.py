@@ -10,15 +10,14 @@ import ipaddress
 import logging
 import os
 import sys
-import textwrap
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import (
+    Annotated,
     Any,
-    Mapping,
-    Optional,
     Self,
-    Sequence,
+    cast,
 )
 from uuid import uuid4
 
@@ -33,11 +32,19 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.agent.affinity_map import AffinityPolicy
+from ai.backend.agent.stats import StatModes
+from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs import (
+    EtcdConfig,
+    OTELConfig,
+    PyroscopeConfig,
+    ServiceDiscoveryConfig,
+)
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.configs.validation_context import BaseConfigValidationContext
-from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -48,16 +55,12 @@ from ai.backend.common.types import (
     BinarySize,
     BinarySizeField,
     ResourceGroupType,
-    ServiceDiscoveryType,
     SlotName,
     SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
-
-from ..affinity_map import AffinityPolicy
-from ..stats import StatModes
-from ..types import AgentBackend
+from ai.backend.logging.validation_context import BaseConfigValidationContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -90,103 +93,99 @@ class AgentConfigValidationContext(BaseConfigValidationContext):
 
 
 class SyncContainerLifecyclesConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=True,
-        description="Whether to enable container lifecycle synchronization",
-        examples=[True, False],
-    )
-    interval: float = Field(
-        default=10.0,
-        ge=0,
-        description="Synchronization interval in seconds",
-        examples=[10.0, 30.0],
-    )
-
-
-class PyroscopeConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Whether to enable Pyroscope profiling",
-        examples=[True, False],
-    )
-    app_name: Optional[str] = Field(
-        default=None,
-        description="Application name to use in Pyroscope",
-        examples=["backendai-agent"],
-        validation_alias=AliasChoices("app-name", "app_name"),
-        serialization_alias="app-name",
-    )
-    server_addr: Optional[str] = Field(
-        default=None,
-        description="Address of the Pyroscope server",
-        examples=["http://localhost:4040"],
-        validation_alias=AliasChoices("server-addr", "server_addr"),
-        serialization_alias="server-addr",
-    )
-    sample_rate: Optional[int] = Field(
-        default=None,
-        description="Sampling rate for Pyroscope profiling",
-        examples=[10, 100],
-        validation_alias=AliasChoices("sample-rate", "sample_rate"),
-        serialization_alias="sample-rate",
-    )
-
-
-class OTELConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Whether to enable OpenTelemetry",
-        examples=[True, False],
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="Log level for OpenTelemetry",
-        examples=["DEBUG", "INFO", "WARN", "ERROR"],
-        validation_alias=AliasChoices("log-level", "log_level"),
-        serialization_alias="log-level",
-    )
-    endpoint: str = Field(
-        default="http://127.0.0.1:4317",
-        description="OTLP endpoint for sending traces",
-        examples=["http://127.0.0.1:4317"],
-    )
-
-
-class ServiceDiscoveryConfig(BaseConfigSchema):
-    type: ServiceDiscoveryType = Field(
-        default=ServiceDiscoveryType.REDIS,
-        description="Type of service discovery to use",
-        examples=[item.value for item in ServiceDiscoveryType],
-    )
+    enabled: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Controls whether the agent synchronizes container lifecycle states with the manager. "
+                "When enabled, the agent periodically checks container states (running, stopped, etc.) "
+                "and reports discrepancies to the manager for reconciliation. Useful for detecting "
+                "orphaned containers or missed lifecycle events."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=10.0, ge=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between container lifecycle synchronization checks. "
+                "Lower values provide faster detection of container state changes but increase "
+                "system overhead. Higher values reduce overhead but may delay detection of issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10.0", prod="30.0"),
+        ),
+    ]
 
 
 class CoreDumpConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Whether to enable core dump collection",
-        examples=[True, False],
-    )
-    path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./coredumps"),
-        description="Directory path for storing core dumps",
-        examples=["./coredumps"],
-    )
-    backup_count: int = Field(
-        default=10,
-        ge=1,
-        description="Number of core dump backups to retain",
-        examples=[10, 20],
-        validation_alias=AliasChoices("backup-count", "backup_count"),
-        serialization_alias="backup-count",
-    )
-    size_limit: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("64M"),
-        description="Maximum size limit for core dumps",
-        examples=["64M", "128M"],
-        validation_alias=AliasChoices("size-limit", "size_limit"),
-        serialization_alias="size-limit",
-    )
-    _core_path: Optional[Path] = PrivateAttr(default=None)
+    enabled: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Enables collection of container core dumps when containers crash unexpectedly. "
+                "When enabled, the agent captures core dump files for debugging crashed containers. "
+                "Requires Linux with specific kernel settings. Only enable when debugging container crashes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    path: Annotated[
+        AutoDirectoryPath,
+        Field(default=AutoDirectoryPath("./coredumps")),
+        BackendAIConfigMeta(
+            description=(
+                "Directory path where container core dump files are stored. "
+                "This directory is created automatically if it doesn't exist. "
+                "Ensure sufficient disk space is available for storing core dumps."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="./coredumps", prod="/var/lib/backend.ai/coredumps"),
+        ),
+    ]
+    backup_count: Annotated[
+        int,
+        Field(
+            default=10,
+            ge=1,
+            validation_alias=AliasChoices("backup-count", "backup_count"),
+            serialization_alias="backup-count",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of core dump backups to retain. "
+                "When this limit is exceeded, older core dump files are automatically deleted "
+                "to free up disk space. Increase this value if you need more historical dumps for debugging."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10", prod="20"),
+        ),
+    ]
+    size_limit: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("64M"),
+            validation_alias=AliasChoices("size-limit", "size_limit"),
+            serialization_alias="size-limit",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum size limit for individual core dump files. "
+                "Core dumps larger than this limit are truncated. "
+                "Use binary size format (e.g., '64M', '128M', '1G'). "
+                "Larger values capture more debugging information but require more storage."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="64M", prod="256M"),
+        ),
+    ]
+    _core_path: Path | None = PrivateAttr(default=None)
 
     @property
     def core_path(self) -> Path:
@@ -232,92 +231,217 @@ class CoreDumpConfig(BaseConfigSchema):
 
 
 class DebugConfig(BaseConfigSchema):
-    enabled: bool = Field(
-        default=False,
-        description="Master switch for debug mode",
-        examples=[True, False],
-    )
-    asyncio: bool = Field(
-        default=False,
-        description="Whether to enable asyncio debug mode",
-        examples=[True, False],
-    )
-    kernel_runner: bool = Field(
-        default=False,
-        description="Whether to enable kernel runner debug mode",
-        examples=[True, False],
-        validation_alias=AliasChoices("kernel-runner", "kernel_runner"),
-        serialization_alias="kernel-runner",
-    )
-    enhanced_aiomonitor_task_info: bool = Field(
-        default=False,
-        description="Enable enhanced task information in aiomonitor",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "enhanced-aiomonitor-task-info", "enhanced_aiomonitor_task_info"
+    enabled: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Master switch for debug mode. When enabled, activates additional debugging features "
+                "and verbose logging across the agent. This setting is typically overridden by "
+                "command-line debug flag. Only enable in development or when troubleshooting issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="true", prod="false"),
         ),
-        serialization_alias="enhanced-aiomonitor-task-info",
-    )
-    skip_container_deletion: bool = Field(
-        default=False,
-        description="Whether to skip container deletion for debugging",
-        examples=[True, False],
-        validation_alias=AliasChoices("skip-container-deletion", "skip_container_deletion"),
-        serialization_alias="skip-container-deletion",
-    )
-    log_stats: bool = Field(
-        default=False,
-        description="Whether to log statistics",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-stats", "log_stats"),
-        serialization_alias="log-stats",
-    )
-    log_kernel_config: bool = Field(
-        default=False,
-        description="Whether to log kernel configuration",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-kernel-config", "log_kernel_config"),
-        serialization_alias="log-kernel-config",
-    )
-    log_alloc_map: bool = Field(
-        default=False,
-        description="Whether to log allocation map",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-alloc-map", "log_alloc_map"),
-        serialization_alias="log-alloc-map",
-    )
-    log_events: bool = Field(
-        default=False,
-        description="Whether to log all internal events",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-events", "log_events"),
-        serialization_alias="log-events",
-    )
-    log_heartbeats: bool = Field(
-        default=False,
-        description="Whether to log heartbeats",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-heartbeats", "log_heartbeats"),
-        serialization_alias="log-heartbeats",
-    )
-    heartbeat_interval: float = Field(
-        default=20.0,
-        description="Heartbeat interval in seconds",
-        examples=[20.0, 30.0],
-        validation_alias=AliasChoices("heartbeat-interval", "heartbeat_interval"),
-        serialization_alias="heartbeat-interval",
-    )
-    log_docker_events: bool = Field(
-        default=False,
-        description="Whether to log Docker events",
-        examples=[True, False],
-        validation_alias=AliasChoices("log-docker-events", "log_docker_events"),
-        serialization_alias="log-docker-events",
-    )
-    coredump: CoreDumpConfig = Field(
-        default_factory=CoreDumpConfig,
-        description="Core dump configuration",
-    )
+    ]
+    asyncio: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Enables Python asyncio debug mode which provides detailed information about "
+                "unawaited coroutines, slow callbacks, and other async programming issues. "
+                "Significantly impacts performance and should only be used for debugging async bugs."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    kernel_runner: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("kernel-runner", "kernel_runner"),
+            serialization_alias="kernel-runner",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables debug mode for the kernel runner component which handles communication "
+                "between the agent and session containers. Produces verbose logs about code execution "
+                "requests, input/output handling, and container communication. Use for debugging "
+                "session execution issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    enhanced_aiomonitor_task_info: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices(
+                "enhanced-aiomonitor-task-info", "enhanced_aiomonitor_task_info"
+            ),
+            serialization_alias="enhanced-aiomonitor-task-info",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables enhanced task information in the aiomonitor debugging interface. "
+                "Provides more detailed async task state information but adds overhead. "
+                "Useful for diagnosing async task leaks or blocking issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    skip_container_deletion: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("skip-container-deletion", "skip_container_deletion"),
+            serialization_alias="skip-container-deletion",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Prevents automatic container deletion after session termination. "
+                "Useful for post-mortem debugging of container state, filesystem, and logs. "
+                "Warning: containers will accumulate and consume resources. Only enable temporarily."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    log_stats: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-stats", "log_stats"),
+            serialization_alias="log-stats",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables logging of container resource statistics (CPU, memory, GPU usage). "
+                "Produces verbose periodic logs showing resource consumption metrics. "
+                "Useful for debugging resource tracking and quota enforcement issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    log_kernel_config: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-kernel-config", "log_kernel_config"),
+            serialization_alias="log-kernel-config",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Logs the kernel configuration sent to containers at startup. "
+                "Shows environment variables, mount points, and execution settings. "
+                "Helpful for debugging container initialization or configuration issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    log_alloc_map: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-alloc-map", "log_alloc_map"),
+            serialization_alias="log-alloc-map",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Logs the resource allocation map showing which resources (CPU cores, GPUs) "
+                "are assigned to which containers. Useful for debugging resource allocation "
+                "conflicts or understanding how resources are distributed."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    log_events: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-events", "log_events"),
+            serialization_alias="log-events",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Logs all internal agent events including container lifecycle events, "
+                "resource updates, and inter-component communication. Produces high volume "
+                "of logs but valuable for understanding agent behavior during issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    log_heartbeats: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-heartbeats", "log_heartbeats"),
+            serialization_alias="log-heartbeats",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Logs heartbeat messages sent between agent and manager. "
+                "Heartbeats contain agent status and resource availability information. "
+                "Use for debugging connectivity or status synchronization issues."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    heartbeat_interval: Annotated[
+        float,
+        Field(
+            default=20.0,
+            validation_alias=AliasChoices("heartbeat-interval", "heartbeat_interval"),
+            serialization_alias="heartbeat-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between heartbeat messages sent to the manager. "
+                "The manager uses heartbeats to detect agent availability. "
+                "Lower values provide faster detection of agent issues but increase network traffic."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="20.0", prod="20.0"),
+        ),
+    ]
+    log_docker_events: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("log-docker-events", "log_docker_events"),
+            serialization_alias="log-docker-events",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Logs Docker daemon events received by the agent (container start/stop/die, etc.). "
+                "Useful for debugging container lifecycle issues or understanding Docker behavior. "
+                "Only applicable when using Docker backend."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    coredump: Annotated[
+        CoreDumpConfig,
+        Field(default_factory=CoreDumpConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for container core dump collection. "
+                "Core dumps help debug container crashes by providing memory snapshots at crash time."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     @field_validator("enabled", mode="before")
     @classmethod
@@ -334,249 +458,590 @@ class CommonAgentConfig(BaseConfigSchema):
     Agent settings that cannot be overridden per-agent.
     """
 
-    backend: AgentBackend = Field(
-        description=textwrap.dedent("""
-        Backend type for the agent.
-        This determines how the agent interacts with the underlying infrastructure.
-        Available options are:
-        - `docker`: Uses Docker as the backend.
-        - `kubernetes`: Uses Kubernetes as the backend.
-        - `dummy`: A dummy backend for testing purposes.
-        """),
-        examples=[item.value for item in AgentBackend],
-        validation_alias=AliasChoices("backend", "mode"),
-        serialization_alias="backend",
-    )
-    rpc_listen_addr: HostPortPair = Field(
-        default=HostPortPair(host="0.0.0.0", port=6001),
-        description="RPC listen address and port",
-        examples=[{"host": "", "port": 6001}],
-        validation_alias=AliasChoices("rpc-listen-addr", "rpc_listen_addr"),
-        serialization_alias="rpc-listen-addr",
-    )
-    internal_addr: HostPortPair = Field(
-        default=HostPortPair(host="0.0.0.0", port=6003),
-        description="Service address and port",
-        validation_alias=AliasChoices("service-addr", "internal-addr", "service_addr"),
-        serialization_alias="internal-addr",
-    )
-    announce_internal_addr: HostPortPair = Field(
-        default=HostPortPair(host="host.docker.internal", port=6003),
-        description="Announce address and port",
-        validation_alias=AliasChoices("announce-addr", "announce-internal-addr", "announce_addr"),
-        serialization_alias="announce-internal-addr",
-    )
-    ssl_enabled: bool = Field(
-        default=False,
-        description="Whether to enable SSL",
-        examples=[True, False],
-        validation_alias=AliasChoices("ssl-enabled", "ssl_enabled"),
-        serialization_alias="ssl-enabled",
-    )
-    ssl_cert: Optional[FilePath] = Field(
-        default=None,
-        description="Path to SSL certificate file",
-        examples=["/path/to/cert.pem"],
-        validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
-        serialization_alias="ssl-cert",
-    )
-    ssl_key: Optional[FilePath] = Field(
-        default=None,
-        description="Path to SSL private key file",
-        examples=["/path/to/key.pem"],
-        validation_alias=AliasChoices("ssl-key", "ssl_key"),
-        serialization_alias="ssl-key",
-    )
-    advertised_rpc_addr: Optional[HostPortPair] = Field(
-        default=None,
-        description="Advertised RPC address and port",
-        examples=[{"host": "192.168.1.100", "port": 6001}],
-        validation_alias=AliasChoices("advertised-rpc-addr", "advertised_rpc_addr"),
-        serialization_alias="advertised-rpc-addr",
-    )
-    rpc_auth_manager_public_key: Optional[FilePath] = Field(
-        default=None,
-        description="Path to RPC auth manager public key",
-        examples=["/path/to/public.key"],
-        validation_alias=AliasChoices("rpc-auth-manager-public-key", "rpc_auth_manager_public_key"),
-        serialization_alias="rpc-auth-manager-public-key",
-    )
-    rpc_auth_agent_keypair: Optional[FilePath] = Field(
-        default=None,
-        description="Path to RPC auth agent keypair",
-        examples=["/path/to/keypair.key"],
-        validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
-        serialization_alias="rpc-auth-agent-keypair",
-    )
-    ipc_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
-        description="Base path for IPC",
-        examples=["/tmp/backend.ai/ipc"],
-        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
-        serialization_alias="ipc-base-path",
-    )
-    var_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./var/lib/backend.ai"),
-        description="Base path for variable data",
-        examples=["./var/lib/backend.ai"],
-        validation_alias=AliasChoices("var-base-path", "var_base_path"),
-        serialization_alias="var-base-path",
-    )
-    mount_path: Optional[AutoDirectoryPath] = Field(
-        default=None,
-        description="Mount path for containers",
-        examples=["/mnt/backend.ai"],
-        validation_alias=AliasChoices("mount-path", "mount_path"),
-        serialization_alias="mount-path",
-    )
-    cohabiting_storage_proxy: bool = Field(
-        default=True,
-        description="Whether to enable cohabiting storage proxy",
-        examples=[True, False],
-        validation_alias=AliasChoices("cohabiting-storage-proxy", "cohabiting_storage_proxy"),
-        serialization_alias="cohabiting-storage-proxy",
-    )
-    public_host: Optional[str] = Field(
-        default=None,
-        description="Public host address",
-        examples=["backend.ai"],
-        validation_alias=AliasChoices("public-host", "public_host"),
-        serialization_alias="public-host",
-    )
-    region: Optional[str] = Field(
-        default=None,
-        description="Region name",
-        examples=["us-east-1"],
-    )
-    instance_type: Optional[str] = Field(
-        default=None,
-        description="Instance type",
-        examples=["m5.large"],
-        validation_alias=AliasChoices("instance-type", "instance_type"),
-        serialization_alias="instance-type",
-    )
-    pid_file: Path = Field(
-        default=Path(os.devnull),
-        description="Path to PID file",
-        examples=["/var/run/agent.pid"],
-        validation_alias=AliasChoices("pid-file", "pid_file"),
-        serialization_alias="pid-file",
-    )
-    event_loop: EventLoopType = Field(
-        default=EventLoopType.ASYNCIO,
-        description="Event loop type",
-        examples=[item.value for item in EventLoopType],
-        validation_alias=AliasChoices("event-loop", "event_loop"),
-        serialization_alias="event-loop",
-    )
-    skip_manager_detection: bool = Field(
-        default=False,
-        description="Whether to skip manager detection",
-        examples=[True, False],
-        validation_alias=AliasChoices("skip-manager-detection", "skip_manager_detection"),
-        serialization_alias="skip-manager-detection",
-    )
-    aiomonitor_termui_port: int = Field(
-        default=38200,
-        ge=1,
-        le=65535,
-        description="Port for aiomonitor terminal UI",
-        examples=[38200],
-        validation_alias=AliasChoices(
-            "aiomonitor-termui-port", "aiomonitor-port", "aiomonitor_termui_port"
+    backend: Annotated[
+        AgentBackend,
+        Field(
+            validation_alias=AliasChoices("backend", "mode"),
+            serialization_alias="backend",
         ),
-        serialization_alias="aiomonitor-termui-port",
-    )
-    aiomonitor_webui_port: int = Field(
-        default=39200,
-        ge=1,
-        le=65535,
-        description="Port for aiomonitor web UI",
-        examples=[39200],
-        validation_alias=AliasChoices("aiomonitor-webui-port", "aiomonitor_webui_port"),
-        serialization_alias="aiomonitor-webui-port",
-    )
-    metadata_server_bind_host: str = Field(
-        default="0.0.0.0",
-        description="Metadata server bind host",
-        examples=["0.0.0.0"],
-        validation_alias=AliasChoices("metadata-server-bind-host", "metadata_server_bind_host"),
-        serialization_alias="metadata-server-bind-host",
-    )
-    metadata_server_port: int = Field(
-        default=40128,
-        ge=1,
-        le=65535,
-        description="Metadata server port",
-        examples=[40128],
-        validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
-        serialization_alias="metadata-server-port",
-    )
-    allow_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed compute plugins",
-        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
-        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
-        serialization_alias="allow-compute-plugins",
-    )
-    block_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked compute plugins",
-        examples=[{"ai.backend.accelerator.mock"}],
-        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
-        serialization_alias="block-compute-plugins",
-    )
-    allow_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
-        serialization_alias="allow-network-plugins",
-    )
-    block_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
-        serialization_alias="block-network-plugins",
-    )
-    image_commit_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./tmp/backend.ai/commit"),
-        description="Path for image commit",
-        examples=["./tmp/backend.ai/commit"],
-        validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
-        serialization_alias="image-commit-path",
-    )
-    abuse_report_path: Optional[Path] = Field(
-        default=None,
-        description="Path for abuse reports",
-        examples=["/var/log/backend.ai/abuse"],
-        validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
-        serialization_alias="abuse-report-path",
-    )
-    use_experimental_redis_event_dispatcher: bool = Field(
-        default=False,
-        description="Whether to use experimental Redis event dispatcher",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
+        BackendAIConfigMeta(
+            description=(
+                "Backend type for the agent determining how it interacts with the underlying "
+                "container orchestration infrastructure. Available options: "
+                "'docker' uses Docker daemon for container management (default for most deployments); "
+                "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
+                "'dummy' is a mock backend for testing without actual containers."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="docker", prod="docker"),
         ),
-        serialization_alias="use-experimental-redis-event-dispatcher",
-    )
-    docker_mode: Optional[str] = Field(
-        default=None,
-        description="Docker mode detected based on kernel version (linuxkit/native)",
-        examples=["linuxkit", "native"],
-        validation_alias=AliasChoices("docker-mode", "docker_mode"),
-        serialization_alias="docker-mode",
-    )
-    mount_path_uid_gid: Optional[str] = Field(
-        default=None,
-        description="Owner uid:gid of the mount directory",
-        examples=["root:root", "bai:bai"],
-        validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
-        serialization_alias="mount-path-uid-gid",
-    )
+    ]
+    rpc_listen_addr: Annotated[
+        HostPortPair,
+        Field(
+            default=HostPortPair(host="0.0.0.0", port=6001),
+            validation_alias=AliasChoices("rpc-listen-addr", "rpc_listen_addr"),
+            serialization_alias="rpc-listen-addr",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Network address and port where the agent listens for RPC calls from the manager. "
+                "The manager uses this endpoint to send commands like session creation, termination, "
+                "and resource queries. Use '0.0.0.0' to listen on all interfaces."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="0.0.0.0:6001", prod="0.0.0.0:6001"),
+        ),
+    ]
+    internal_addr: Annotated[
+        HostPortPair,
+        Field(
+            default=HostPortPair(host="0.0.0.0", port=6003),
+            validation_alias=AliasChoices("service-addr", "internal-addr", "service_addr"),
+            serialization_alias="internal-addr",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Network address and port for internal services within the agent. "
+                "Used for inter-process communication and internal API endpoints. "
+                "This address is typically not exposed externally."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="0.0.0.0:6003", prod="0.0.0.0:6003"),
+        ),
+    ]
+    announce_internal_addr: Annotated[
+        HostPortPair,
+        Field(
+            default=HostPortPair(host="host.docker.internal", port=6003),
+            validation_alias=AliasChoices(
+                "announce-addr", "announce-internal-addr", "announce_addr"
+            ),
+            serialization_alias="announce-internal-addr",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Address announced to containers for reaching the agent's internal services. "
+                "Containers use this address to communicate back with the agent. "
+                "Use 'host.docker.internal' for Docker on macOS/Windows, or the host's actual IP on Linux."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="host.docker.internal:6003", prod="192.168.1.100:6003"),
+        ),
+    ]
+    ssl_enabled: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("ssl-enabled", "ssl_enabled"),
+            serialization_alias="ssl-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables SSL/TLS encryption for RPC communication between the agent and manager. "
+                "When enabled, requires ssl_cert and ssl_key to be configured with valid certificates. "
+                "Recommended for production deployments to secure inter-component communication."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    ssl_cert: Annotated[
+        FilePath | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
+            serialization_alias="ssl-cert",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Path to the SSL/TLS certificate file (PEM format) for encrypted RPC communication. "
+                "Required when ssl_enabled is true. The certificate should be valid for the agent's "
+                "hostname and signed by a trusted CA or self-signed for internal use."
+            ),
+            added_version="25.12.0",
+            secret=True,
+            example=ConfigExample(local="/path/to/cert.pem", prod="/etc/backend.ai/ssl/agent.crt"),
+        ),
+    ]
+    ssl_key: Annotated[
+        FilePath | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("ssl-key", "ssl_key"),
+            serialization_alias="ssl-key",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Path to the SSL/TLS private key file (PEM format) corresponding to the ssl_cert. "
+                "Required when ssl_enabled is true. The key file should have restricted permissions "
+                "(e.g., 0600) and be readable only by the agent process."
+            ),
+            added_version="25.12.0",
+            secret=True,
+            example=ConfigExample(local="/path/to/key.pem", prod="/etc/backend.ai/ssl/agent.key"),
+        ),
+    ]
+    advertised_rpc_addr: Annotated[
+        HostPortPair | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("advertised-rpc-addr", "advertised_rpc_addr"),
+            serialization_alias="advertised-rpc-addr",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "External address that the agent advertises to the manager for RPC callbacks. "
+                "Use when the agent is behind NAT or a load balancer and the listen address "
+                "differs from the externally reachable address. If not set, uses rpc_listen_addr."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="192.168.1.100:6001", prod="192.168.1.100:6001"),
+        ),
+    ]
+    rpc_auth_manager_public_key: Annotated[
+        FilePath | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices(
+                "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
+            ),
+            serialization_alias="rpc-auth-manager-public-key",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Path to the manager's public key file for authenticating RPC messages. "
+                "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
+                "Part of the RPC security mechanism for preventing unauthorized access."
+            ),
+            added_version="25.12.0",
+            secret=True,
+            example=ConfigExample(
+                local="/path/to/public.key", prod="/etc/backend.ai/keys/manager.pub"
+            ),
+        ),
+    ]
+    rpc_auth_agent_keypair: Annotated[
+        FilePath | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
+            serialization_alias="rpc-auth-agent-keypair",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Path to the agent's keypair file for RPC authentication. "
+                "Contains both public and private keys used for ZeroMQ CURVE authentication. "
+                "The private key must be kept secure as it proves the agent's identity."
+            ),
+            added_version="25.12.0",
+            secret=True,
+            example=ConfigExample(
+                local="/path/to/keypair.key", prod="/etc/backend.ai/keys/agent.keypair"
+            ),
+        ),
+    ]
+    ipc_base_path: Annotated[
+        AutoDirectoryPath,
+        Field(
+            default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
+            validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
+            serialization_alias="ipc-base-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory path for Unix domain sockets and other IPC mechanisms. "
+                "Used for communication between the agent and its child processes. "
+                "Directory is created automatically with appropriate permissions."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
+        ),
+    ]
+    var_base_path: Annotated[
+        AutoDirectoryPath,
+        Field(
+            default=AutoDirectoryPath("./var/lib/backend.ai"),
+            validation_alias=AliasChoices("var-base-path", "var_base_path"),
+            serialization_alias="var-base-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory for the agent's variable data including runtime state, "
+                "temporary files, and data that persists across restarts but not upgrades. "
+                "Ensure sufficient disk space and appropriate permissions."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="./var/lib/backend.ai", prod="/var/lib/backend.ai"),
+        ),
+    ]
+    mount_path: Annotated[
+        AutoDirectoryPath | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("mount-path", "mount_path"),
+            serialization_alias="mount-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory path for mounting storage volumes into containers. "
+                "Virtual folders and other storage mounts are placed under this path. "
+                "Should be on a filesystem with sufficient space for user data."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="/mnt/backend.ai", prod="/mnt/backend.ai"),
+        ),
+    ]
+    cohabiting_storage_proxy: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("cohabiting-storage-proxy", "cohabiting_storage_proxy"),
+            serialization_alias="cohabiting-storage-proxy",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Indicates whether a storage proxy runs on the same host as the agent. "
+                "When true, the agent uses local filesystem paths for storage operations, "
+                "improving performance. When false, storage is accessed via network protocols."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    public_host: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("public-host", "public_host"),
+            serialization_alias="public-host",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Public hostname or IP address for this agent node. "
+                "Used for generating URLs that users can access to reach services "
+                "running on this agent, such as web terminals or application proxies."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="backend.ai", prod="compute1.backend.ai"),
+        ),
+    ]
+    region: Annotated[
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Cloud region identifier where this agent is deployed. "
+                "Used for geographic resource allocation and displayed in admin interfaces. "
+                "Use standard region codes like 'us-east-1', 'eu-west-1', or custom identifiers."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="us-east-1", prod="us-east-1"),
+        ),
+    ]
+    instance_type: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("instance-type", "instance_type"),
+            serialization_alias="instance-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Cloud instance type identifier for this agent's host machine. "
+                "Used for cost tracking, capacity planning, and displayed in admin interfaces. "
+                "Use cloud provider's instance type names like 'm5.large' or 'n1-standard-4'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="m5.large", prod="m5.xlarge"),
+        ),
+    ]
+    pid_file: Annotated[
+        Path,
+        Field(
+            default=Path(os.devnull),
+            validation_alias=AliasChoices("pid-file", "pid_file"),
+            serialization_alias="pid-file",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Path to the PID file where the agent writes its process ID. "
+                "Used by init systems and monitoring tools to track the agent process. "
+                "Set to /dev/null to disable PID file creation."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="/dev/null", prod="/var/run/backend.ai/agent.pid"),
+        ),
+    ]
+    event_loop: Annotated[
+        EventLoopType,
+        Field(
+            default=EventLoopType.ASYNCIO,
+            validation_alias=AliasChoices("event-loop", "event_loop"),
+            serialization_alias="event-loop",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Python async event loop implementation to use. "
+                "'asyncio' uses the standard library implementation (default, most compatible). "
+                "'uvloop' uses a faster libuv-based implementation (better performance, Linux only)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="asyncio", prod="asyncio"),
+        ),
+    ]
+    skip_manager_detection: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("skip-manager-detection", "skip_manager_detection"),
+            serialization_alias="skip-manager-detection",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Skips automatic detection of the manager during agent startup. "
+                "When true, the agent starts without verifying manager connectivity. "
+                "Useful for testing or when the manager becomes available after the agent starts."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+    aiomonitor_termui_port: Annotated[
+        int,
+        Field(
+            default=38200,
+            ge=1,
+            le=65535,
+            validation_alias=AliasChoices(
+                "aiomonitor-termui-port", "aiomonitor-port", "aiomonitor_termui_port"
+            ),
+            serialization_alias="aiomonitor-termui-port",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Port for the aiomonitor terminal UI debugging interface. "
+                "Provides real-time inspection of async tasks and event loop state. "
+                "Connect via telnet to this port for interactive debugging."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="38200", prod="38200"),
+        ),
+    ]
+    aiomonitor_webui_port: Annotated[
+        int,
+        Field(
+            default=39200,
+            ge=1,
+            le=65535,
+            validation_alias=AliasChoices("aiomonitor-webui-port", "aiomonitor_webui_port"),
+            serialization_alias="aiomonitor-webui-port",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Port for the aiomonitor web UI debugging interface. "
+                "Provides a browser-based interface for inspecting async tasks. "
+                "Access via http://agent-host:port for visual debugging."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="39200", prod="39200"),
+        ),
+    ]
+    metadata_server_bind_host: Annotated[
+        str,
+        Field(
+            default="0.0.0.0",
+            validation_alias=AliasChoices("metadata-server-bind-host", "metadata_server_bind_host"),
+            serialization_alias="metadata-server-bind-host",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Bind host for the container metadata server. "
+                "Containers connect to this server to retrieve session metadata and configuration. "
+                "Use '0.0.0.0' to listen on all interfaces or a specific IP for restricted access."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="0.0.0.0", prod="0.0.0.0"),
+        ),
+    ]
+    metadata_server_port: Annotated[
+        int,
+        Field(
+            default=40128,
+            ge=1,
+            le=65535,
+            validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
+            serialization_alias="metadata-server-port",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Port for the container metadata server. "
+                "Containers access metadata like session ID, access key, and environment variables "
+                "through this server. Similar to cloud provider instance metadata services."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="40128", prod="40128"),
+        ),
+    ]
+    allow_compute_plugins: Annotated[
+        set[str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
+            serialization_alias="allow-compute-plugins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Allowlist of compute plugin names that can be loaded by this agent. "
+                "If set, only plugins in this list are loaded. If null/empty, all discovered "
+                "plugins are loaded except those in block_compute_plugins. "
+                "Plugin names use Python package notation (e.g., 'ai.backend.accelerator.cuda')."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="", prod='["ai.backend.accelerator.cuda", "ai.backend.accelerator.rocm"]'
+            ),
+        ),
+    ]
+    block_compute_plugins: Annotated[
+        set[str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
+            serialization_alias="block-compute-plugins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Blocklist of compute plugin names that should not be loaded by this agent. "
+                "Plugins in this list are excluded even if discovered. "
+                "Use to disable specific accelerators or features on certain nodes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='["ai.backend.accelerator.mock"]'),
+        ),
+    ]
+    allow_network_plugins: Annotated[
+        set[str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
+            serialization_alias="allow-network-plugins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Allowlist of network plugin names that can be loaded by this agent. "
+                "Network plugins provide custom networking configurations for containers. "
+                "If set, only plugins in this list are loaded."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='["ai.backend.network.overlay"]'),
+        ),
+    ]
+    block_network_plugins: Annotated[
+        set[str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
+            serialization_alias="block-network-plugins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Blocklist of network plugin names that should not be loaded by this agent. "
+                "Use to disable specific network configurations on certain nodes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='["ai.backend.network.legacy"]'),
+        ),
+    ]
+    image_commit_path: Annotated[
+        AutoDirectoryPath,
+        Field(
+            default=AutoDirectoryPath("./tmp/backend.ai/commit"),
+            validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
+            serialization_alias="image-commit-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory path for storing temporary image commit data. "
+                "Used when users commit their running containers as new images. "
+                "Requires sufficient disk space for container filesystem layers."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="./tmp/backend.ai/commit", prod="/var/lib/backend.ai/commit"
+            ),
+        ),
+    ]
+    abuse_report_path: Annotated[
+        Path | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
+            serialization_alias="abuse-report-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory path for storing container abuse reports. "
+                "When suspicious or abusive behavior is detected in containers, "
+                "detailed reports are written here for review by administrators."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
+        ),
+    ]
+    use_experimental_redis_event_dispatcher: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices(
+                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
+            ),
+            serialization_alias="use-experimental-redis-event-dispatcher",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables the experimental Redis-based event dispatcher for agent-manager communication. "
+                "Provides improved event delivery reliability and scalability. "
+                "Requires Redis to be configured. Still in experimental phase."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    docker_mode: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("docker-mode", "docker_mode"),
+            serialization_alias="docker-mode",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Docker runtime mode, auto-detected based on the kernel version. "
+                "'linuxkit' indicates Docker Desktop with LinuxKit VM (macOS/Windows). "
+                "'native' indicates native Docker on Linux. Affects filesystem and networking behavior."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="linuxkit", prod="native"),
+        ),
+    ]
+    mount_path_uid_gid: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
+            serialization_alias="mount-path-uid-gid",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Owner UID:GID for mounted directories in format 'user:group'. "
+                "Controls ownership of files created in mounted volumes. "
+                "Use 'root:root' for privileged containers or match container user for unprivileged."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="bai:bai"),
+        ),
+    ]
 
     def real_mount_path(self, directory_path: str) -> Path:
         if self.mount_path is None:
@@ -604,58 +1069,129 @@ class OverridableAgentConfig(BaseConfigSchema):
     Agent settings that can be overridden per-agent in multi-agent mode.
     """
 
-    id: Optional[str] = Field(
-        default=None,
-        description="Agent ID",
-        examples=["agent-001"],
-    )
-    agent_sock_port: int = Field(
-        default=6007,
-        ge=1024,
-        le=65535,
-        description="Agent socket port",
-        examples=[6007],
-        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
-        serialization_alias="agent-sock-port",
-    )
-    scaling_group: str = Field(
-        default="default",
-        description="Scaling group name",
-        examples=["default", "gpu-group"],
-        validation_alias=AliasChoices("scaling-group", "scaling_group"),
-        serialization_alias="scaling-group",
-    )
-    scaling_group_type: ResourceGroupType = Field(
-        default=ResourceGroupType.COMPUTE,
-        description="Scaling group type",
-        examples=[item.value for item in ResourceGroupType],
-        validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
-        serialization_alias="scaling-group-type",
-    )
-    force_terminate_abusing_containers: bool = Field(
-        default=False,
-        description="Whether to force terminate abusing containers",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "force-terminate-abusing-containers", "force_terminate_abusing_containers"
+    id: Annotated[
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Unique identifier for this agent instance. "
+                "If not specified, a random UUID is generated. In multi-agent mode, "
+                "each agent must have a unique ID. Used for tracking, logging, and management."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="agent-local-1", prod="agent-prod-001"),
         ),
-        serialization_alias="force-terminate-abusing-containers",
-    )
-    kernel_creation_concurrency: int = Field(
-        default=4,
-        ge=1,
-        le=32,
-        description="Kernel creation concurrency",
-        examples=[4, 8],
-        validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
-        serialization_alias="kernel-creation-concurrency",
-    )
-    sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
-        default_factory=SyncContainerLifecyclesConfig,
-        description="Container lifecycle synchronization config",
-        validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
-        serialization_alias="sync-container-lifecycles",
-    )
+    ]
+    agent_sock_port: Annotated[
+        int,
+        Field(
+            default=6007,
+            ge=1024,
+            le=65535,
+            validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
+            serialization_alias="agent-sock-port",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Port number for the agent's socket communication with containers. "
+                "Containers connect to this port for the kernel runner protocol. "
+                "In multi-agent mode, each agent must use a unique port."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="6007", prod="6007"),
+        ),
+    ]
+    scaling_group: Annotated[
+        str,
+        Field(
+            default="default",
+            validation_alias=AliasChoices("scaling-group", "scaling_group"),
+            serialization_alias="scaling-group",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Name of the scaling group this agent belongs to. "
+                "Scaling groups organize agents into logical clusters for resource allocation. "
+                "Users can target specific scaling groups when creating sessions."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="default", prod="gpu-cluster"),
+        ),
+    ]
+    scaling_group_type: Annotated[
+        ResourceGroupType,
+        Field(
+            default=ResourceGroupType.COMPUTE,
+            validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
+            serialization_alias="scaling-group-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Type of resource group this agent serves. "
+                "'compute' for general-purpose computation nodes. "
+                "'storage' for storage-optimized nodes. "
+                "Determines how the agent is used in workload scheduling."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="compute", prod="compute"),
+        ),
+    ]
+    force_terminate_abusing_containers: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices(
+                "force-terminate-abusing-containers", "force_terminate_abusing_containers"
+            ),
+            serialization_alias="force-terminate-abusing-containers",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "When enabled, automatically terminates containers that exceed resource limits "
+                "or exhibit abusive behavior (e.g., crypto mining, excessive I/O). "
+                "Use with caution as it may interrupt legitimate workloads."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    kernel_creation_concurrency: Annotated[
+        int,
+        Field(
+            default=4,
+            ge=1,
+            le=32,
+            validation_alias=AliasChoices(
+                "kernel-creation-concurrency", "kernel_creation_concurrency"
+            ),
+            serialization_alias="kernel-creation-concurrency",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of containers that can be created simultaneously. "
+                "Higher values speed up bulk session creation but increase resource usage. "
+                "Lower values reduce resource contention during container startup."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="4", prod="8"),
+        ),
+    ]
+    sync_container_lifecycles: Annotated[
+        SyncContainerLifecyclesConfig,
+        Field(
+            default_factory=SyncContainerLifecyclesConfig,
+            validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
+            serialization_alias="sync-container-lifecycles",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for container lifecycle synchronization between agent and manager. "
+                "Ensures container states are consistent across the system."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -681,34 +1217,58 @@ class CommonContainerConfig(BaseConfigSchema):
     Container settings that cannot be overridden per-agent.
     """
 
-    bind_host: str = Field(
-        default="",
-        description="Bind host for containers",
-        examples=["0.0.0.0", ""],
-        validation_alias=AliasChoices("bind-host", "bind_host", "kernel-host"),
-        serialization_alias="bind-host",
-    )
-    advertised_host: Optional[str] = Field(
-        default=None,
-        description="Advertised host for containers",
-        examples=["192.168.1.100"],
-        validation_alias=AliasChoices("advertised-host", "advertised_host"),
-        serialization_alias="advertised-host",
-    )
-    krunner_volumes: Optional[Mapping[str, str]] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        KRunner volumes configuration, mapping container names to host paths.
-        This is used to specify volumes that should be mounted into containers
-        when using the KRunner backend.
-        This fields is filled by the agent at runtime based on the
-        `krunner_volumes` configuration in the agent's environment.
-        It is not intended to be set in the configuration file.
-        """),
-        examples=[],
-        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
-        serialization_alias="krunner-volumes",
-    )
+    bind_host: Annotated[
+        str,
+        Field(
+            default="",
+            validation_alias=AliasChoices("bind-host", "bind_host", "kernel-host"),
+            serialization_alias="bind-host",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Host address that containers bind their network ports to. "
+                "Empty string means binding to all available interfaces (equivalent to '0.0.0.0'). "
+                "Specify a particular IP to restrict container network access."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="0.0.0.0"),
+        ),
+    ]
+    advertised_host: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("advertised-host", "advertised_host"),
+            serialization_alias="advertised-host",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Host address advertised to clients for connecting to container services. "
+                "Used when the bind address differs from the externally reachable address, "
+                "such as when running behind NAT or in a cloud environment."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="192.168.1.100"),
+        ),
+    ]
+    krunner_volumes: Annotated[
+        Mapping[str, str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
+            serialization_alias="krunner-volumes",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "KRunner volumes configuration mapping container paths to host paths. "
+                "Specifies volumes to mount into containers for the kernel runner. "
+                "This is typically set automatically by the agent based on environment detection "
+                "and should not normally be configured manually."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='{ "/opt/krunner": "/opt/backend.ai/krunner" }'),
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -721,108 +1281,231 @@ class OverridableContainerConfig(BaseConfigSchema):
     Container settings that can be overridden per-agent in multi-agent mode.
     """
 
-    kernel_uid: UserID = Field(
-        default=UserID(-1),
-        description="Kernel user ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
-        serialization_alias="kernel-uid",
-    )
-    kernel_gid: GroupID = Field(
-        default=GroupID(-1),
-        description="Kernel group ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
-        serialization_alias="kernel-gid",
-    )
-    port_range: tuple[int, int] = Field(
-        default=(30000, 31000),
-        description=textwrap.dedent("""
-        Port range for containers.
-        If multiple agents are used, user must ensure that the port ranges
-        do not overlap between the agent, else it may cause subtle issues
-        late into the agent's runtime.
-         """),
-        examples=[(30000, 31000)],
-        validation_alias=AliasChoices("port-range", "port_range"),
-        serialization_alias="port-range",
-    )
-    stats_type: Optional[StatModes] = Field(
-        default=StatModes.DOCKER,
-        description="Statistics type",
-        examples=[item.value for item in StatModes],
-        validation_alias=AliasChoices("stats-type", "stats_type"),
-        serialization_alias="stats-type",
-    )
-    sandbox_type: ContainerSandboxType = Field(
-        default=ContainerSandboxType.DOCKER,
-        description="Sandbox type",
-        examples=[item.value for item in ContainerSandboxType],
-        validation_alias=AliasChoices("sandbox-type", "sandbox_type"),
-        serialization_alias="sandbox-type",
-    )
-    jail_args: list[str] = Field(
-        default_factory=list,
-        description="Jail arguments",
-        examples=[["--mount", "/tmp"]],
-        validation_alias=AliasChoices("jail-args", "jail_args"),
-        serialization_alias="jail-args",
-    )
-    scratch_type: ScratchType = Field(
-        default=ScratchType.HOSTDIR,
-        description="Scratch type",
-        examples=[item.value for item in ScratchType],
-        validation_alias=AliasChoices("scratch-type", "scratch_type"),
-        serialization_alias="scratch-type",
-    )
-    scratch_root: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./scratches"),
-        description="Scratch root directory",
-        examples=["./scratches"],
-        validation_alias=AliasChoices("scratch-root", "scratch_root"),
-        serialization_alias="scratch-root",
-    )
-    scratch_size: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("0"),
-        description="Scratch size",
-        examples=["1G", "500M"],
-        validation_alias=AliasChoices("scratch-size", "scratch_size"),
-        serialization_alias="scratch-size",
-    )
-    scratch_nfs_address: Optional[str] = Field(
-        default=None,
-        description="Scratch NFS address",
-        examples=["192.168.1.100:/export"],
-        validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
-        serialization_alias="scratch-nfs-address",
-    )
-    scratch_nfs_options: Optional[str] = Field(
-        default=None,
-        description="Scratch NFS options",
-        examples=["rw,sync"],
-        validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
-        serialization_alias="scratch-nfs-options",
-    )
-    alternative_bridge: Optional[str] = Field(
-        default=None,
-        description="Alternative bridge network",
-        examples=["br-backend"],
-        validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
-        serialization_alias="alternative-bridge",
-    )
-    swarm_enabled: bool = Field(
-        default=False,
-        description=textwrap.dedent("""
-        Whether to enable Docker Swarm mode.
-        This allows the agent to manage containers in a Docker Swarm cluster.
-        When enabled, the agent will use Docker Swarm APIs to manage containers,
-        networks, and services.
-        This field is only used when backend is set to 'docker'.
-        """),
-        examples=[True, False],
-        validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
-        serialization_alias="swarm-enabled",
-    )
+    kernel_uid: Annotated[
+        UserID,
+        Field(
+            default=UserID(-1),
+            validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
+            serialization_alias="kernel-uid",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User ID (UID) for processes running inside containers. "
+                "Value of -1 uses the container image's default UID. "
+                "Set to match the host user's UID for proper file permissions on mounted volumes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="-1", prod="1000"),
+        ),
+    ]
+    kernel_gid: Annotated[
+        GroupID,
+        Field(
+            default=GroupID(-1),
+            validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
+            serialization_alias="kernel-gid",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Group ID (GID) for processes running inside containers. "
+                "Value of -1 uses the container image's default GID. "
+                "Set to match the host group's GID for proper file permissions on mounted volumes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="-1", prod="1000"),
+        ),
+    ]
+    port_range: Annotated[
+        tuple[int, int],
+        Field(
+            default=(30000, 31000),
+            validation_alias=AliasChoices("port-range", "port_range"),
+            serialization_alias="port-range",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Range of host ports allocated to containers for network services. "
+                "Format is [start, end] inclusive. Containers get ports from this range for "
+                "SSH, Jupyter, and other services. In multi-agent mode, ensure non-overlapping ranges."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="[30000, 31000]", prod="[30000, 32000]"),
+        ),
+    ]
+    stats_type: Annotated[
+        StatModes | None,
+        Field(
+            default=StatModes.DOCKER,
+            validation_alias=AliasChoices("stats-type", "stats_type"),
+            serialization_alias="stats-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Method for collecting container resource statistics. "
+                "'docker' uses Docker's stats API (most compatible). "
+                "'cgroup' reads from cgroup filesystem directly (more accurate, requires root). "
+                "'null' disables statistics collection."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="docker", prod="docker"),
+        ),
+    ]
+    sandbox_type: Annotated[
+        ContainerSandboxType,
+        Field(
+            default=ContainerSandboxType.DOCKER,
+            validation_alias=AliasChoices("sandbox-type", "sandbox_type"),
+            serialization_alias="sandbox-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Container sandbox implementation for process isolation. "
+                "'docker' uses Docker containers (standard). "
+                "'jail' uses lightweight jailed containers for faster startup (x86_64 Linux only). "
+                "Jail provides better performance but with reduced isolation."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="docker", prod="docker"),
+        ),
+    ]
+    jail_args: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("jail-args", "jail_args"),
+            serialization_alias="jail-args",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Additional command-line arguments passed to the jail sandbox. "
+                "Only applicable when sandbox_type is 'jail'. "
+                "Use to customize jail behavior like mount points or resource limits."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='["--mount=/data", "--limit-mem=4G"]'),
+        ),
+    ]
+    scratch_type: Annotated[
+        ScratchType,
+        Field(
+            default=ScratchType.HOSTDIR,
+            validation_alias=AliasChoices("scratch-type", "scratch_type"),
+            serialization_alias="scratch-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Type of scratch space provided to containers for temporary data. "
+                "'hostdir' uses a directory on the host filesystem. "
+                "'hostfile' uses a loopback file with size limits (requires root). "
+                "'memory' uses RAM-backed tmpfs for fast but limited storage. "
+                "'k8s-nfs' uses NFS-backed storage for Kubernetes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="hostdir", prod="hostdir"),
+        ),
+    ]
+    scratch_root: Annotated[
+        AutoDirectoryPath,
+        Field(
+            default=AutoDirectoryPath("./scratches"),
+            validation_alias=AliasChoices("scratch-root", "scratch_root"),
+            serialization_alias="scratch-root",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Base directory for container scratch space storage. "
+                "Each container gets a subdirectory under this path for temporary files. "
+                "Should be on a fast filesystem with adequate space."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="./scratches", prod="/var/lib/backend.ai/scratches"),
+        ),
+    ]
+    scratch_size: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("0"),
+            validation_alias=AliasChoices("scratch-size", "scratch_size"),
+            serialization_alias="scratch-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Size limit for each container's scratch space when using 'hostfile' type. "
+                "Use binary size format (e.g., '1G', '500M'). "
+                "Value of '0' means no limit (only effective with 'hostdir' type)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="0", prod="10G"),
+        ),
+    ]
+    scratch_nfs_address: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
+            serialization_alias="scratch-nfs-address",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "NFS server address and export path for scratch storage. "
+                "Required when scratch_type is 'k8s-nfs'. "
+                "Format: 'server-ip:/export/path' or 'server-hostname:/export/path'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="192.168.1.50:/exports/scratch"),
+        ),
+    ]
+    scratch_nfs_options: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
+            serialization_alias="scratch-nfs-options",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "NFS mount options for scratch storage. "
+                "Required when scratch_type is 'k8s-nfs'. "
+                "Common options: 'rw,sync', 'rw,async,soft'."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="rw,sync"),
+        ),
+    ]
+    alternative_bridge: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
+            serialization_alias="alternative-bridge",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Name of an alternative Docker bridge network for container networking. "
+                "If not set, uses the default Docker bridge network. "
+                "Use to isolate Backend.AI containers on a dedicated network."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="br-backend"),
+        ),
+    ]
+    swarm_enabled: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
+            serialization_alias="swarm-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Enables Docker Swarm mode for container orchestration. "
+                "When enabled, the agent uses Docker Swarm APIs for managing containers, networks, "
+                "and services across multiple Docker hosts. Only applicable with Docker backend."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -882,30 +1565,48 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
 
 
 class ResourceAllocationConfig(BaseConfigSchema):
-    cpu: int = Field(
-        description=textwrap.dedent("""
-        Hard CPU allocation for this agent (e.g., 8 cores).
-        Only used in MANUAL allocation mode.
-        All agents must specify this value when allocation-mode is MANUAL.
-        """),
-        examples=[8, 16],
-    )
-    mem: BinarySizeField = Field(
-        description=textwrap.dedent("""
-        Hard memory allocation for this agent (e.g., "32G").
-        Only used in MANUAL allocation mode.
-        All agents must specify this value when allocation-mode is MANUAL.
-        """),
-        examples=["32G", "64G"],
-    )
-    devices: Mapping[SlotNameField, Decimal] = Field(
-        default_factory=dict,
-        description=textwrap.dedent("""
-        Device-specific per-slot resource allocations.
-        Only used in MANUAL allocation mode.
-        """),
-        examples=[{"cuda.mem": "0.3", "cuda.shares": "0.5"}],
-    )
+    cpu: Annotated[
+        int,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Number of CPU cores allocated to this agent for container workloads. "
+                "Only used when resource allocation_mode is 'manual'. "
+                "All agents in manual mode must specify this value. "
+                "The total allocation across all agents should not exceed available cores."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="4", prod="16"),
+        ),
+    ]
+    mem: Annotated[
+        BinarySizeField,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Amount of memory allocated to this agent for container workloads. "
+                "Only used when resource allocation_mode is 'manual'. "
+                "All agents in manual mode must specify this value. "
+                "Use binary size format (e.g., '32G', '64G')."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="8G", prod="64G"),
+        ),
+    ]
+    devices: Annotated[
+        Mapping[SlotNameField, Decimal],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description=(
+                "Device-specific resource allocations as key-value pairs. "
+                "Only used when resource allocation_mode is 'manual'. "
+                "Keys are slot names (e.g., 'cuda.mem', 'cuda.shares'), values are decimal amounts. "
+                "Use to allocate GPU memory, compute shares, and other accelerator resources."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod='{"cuda.mem": "0.5", "cuda.shares": "0.5"}'),
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -924,81 +1625,143 @@ class ResourceAllocationConfig(BaseConfigSchema):
 
 
 class ResourceConfig(BaseConfigSchema):
-    reserved_cpu: int = Field(
-        default=1,
-        description="The number of CPU cores reserved for the operating system and the agent service.",
-        examples=[1, 2],
-        validation_alias=AliasChoices("reserved-cpu", "reserved_cpu"),
-        serialization_alias="reserved-cpu",
-    )
-    reserved_mem: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("1G"),
-        description=(
-            "The memory space reserved for the operating system and the agent service. "
-            "It is subtracted from the reported main memory size and not available for user workload allocation. "
-            "Depending on the memory-align-size option and system configuration, "
-            "this may not be the exact value but have slightly less or more values within the memory-align-size."
+    reserved_cpu: Annotated[
+        int,
+        Field(
+            default=1,
+            validation_alias=AliasChoices("reserved-cpu", "reserved_cpu"),
+            serialization_alias="reserved-cpu",
         ),
-        examples=["1G", "2G"],
-        validation_alias=AliasChoices("reserved-mem", "reserved_mem"),
-        serialization_alias="reserved-mem",
-    )
-    reserved_disk: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("8G"),
-        description=(
-            "The disk space reserved for the operating system and the agent service. "
-            "Currently this value is unused. "
-            "In future releases, it may be used to preserve the minimum disk space "
-            "from the scratch disk allocation via loopback files."
+        BackendAIConfigMeta(
+            description=(
+                "Number of CPU cores reserved for the operating system and agent process. "
+                "These cores are not available for container workloads. "
+                "Increase if the agent or system services need more resources."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="1", prod="2"),
         ),
-        examples=["8G", "16G"],
-        validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
-        serialization_alias="reserved-disk",
-    )
-    allocation_mode: ResourceAllocationMode = Field(
-        default=ResourceAllocationMode.SHARED,
-        description=textwrap.dedent("""
-        Resource allocation mode for multi-agent scenarios.
-        - `shared`: All agents share the full resource pool (default, backward compatible).
-        - `auto-split`: Automatically divide resources equally (1/N) among all agents.
-        - `manual`: Manually specify per-agent resource allocations via config.
-        """),
-        examples=[item.value for item in ResourceAllocationMode],
-        validation_alias=AliasChoices("allocation-mode", "allocation_mode"),
-        serialization_alias="allocation-mode",
-    )
-    allocations: Optional[ResourceAllocationConfig] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Resource allocations.
-        Only used in MANUAL allocation mode.
-        """),
-    )
-    memory_align_size: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("16M"),
-        description=(
-            "The alignment of the reported main memory size to absorb tiny deviations "
-            "from per-node firmware/hardware settings. "
-            "Recommended to be multiple of the page/hugepage size (e.g., 2 MiB)."
+    ]
+    reserved_mem: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("1G"),
+            validation_alias=AliasChoices("reserved-mem", "reserved_mem"),
+            serialization_alias="reserved-mem",
         ),
-        examples=["2M", "32M"],
-        validation_alias=AliasChoices("memory-align-size", "memory_align_size"),
-        serialization_alias="memory-align-size",
-    )
-    allocation_order: list[str] = Field(
-        default=["cuda", "rocm", "tpu", "cpu", "mem"],
-        description="Resource allocation order",
-        examples=[["cuda", "rocm", "tpu", "cpu", "mem"]],
-        validation_alias=AliasChoices("allocation-order", "allocation_order"),
-        serialization_alias="allocation-order",
-    )
-    affinity_policy: AffinityPolicy = Field(
-        default=AffinityPolicy.INTERLEAVED,
-        description="Affinity policy",
-        examples=[item.name for item in AffinityPolicy],
-        validation_alias=AliasChoices("affinity-policy", "affinity_policy"),
-        serialization_alias="affinity-policy",
-    )
+        BackendAIConfigMeta(
+            description=(
+                "Amount of memory reserved for the operating system and agent process. "
+                "Subtracted from total memory when reporting available resources to the manager. "
+                "The actual reserved amount may vary slightly due to memory_align_size rounding."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="1G", prod="4G"),
+        ),
+    ]
+    reserved_disk: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("8G"),
+            validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
+            serialization_alias="reserved-disk",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Disk space reserved for the operating system and agent operations. "
+                "Currently unused but reserved for future features like guaranteed minimum scratch space. "
+                "Set based on expected system disk requirements."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="8G", prod="16G"),
+        ),
+    ]
+    allocation_mode: Annotated[
+        ResourceAllocationMode,
+        Field(
+            default=ResourceAllocationMode.SHARED,
+            validation_alias=AliasChoices("allocation-mode", "allocation_mode"),
+            serialization_alias="allocation-mode",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Resource allocation strategy for multi-agent deployments. "
+                "'shared' allows all agents to see full resources (may overcommit). "
+                "'auto-split' divides resources equally among agents (N agents get 1/N each). "
+                "'manual' requires explicit resource allocation per agent via allocations config."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="shared", prod="auto-split"),
+        ),
+    ]
+    allocations: Annotated[
+        ResourceAllocationConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Manual resource allocation configuration for this agent. "
+                "Required when allocation_mode is 'manual'. "
+                "Specifies exact CPU, memory, and device allocations for this agent."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    memory_align_size: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("16M"),
+            validation_alias=AliasChoices("memory-align-size", "memory_align_size"),
+            serialization_alias="memory-align-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Memory alignment granularity for reported memory sizes. "
+                "Absorbs small variations in available memory between nodes with similar hardware. "
+                "Should be a multiple of the system page size (typically 2MB for huge pages)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="16M", prod="32M"),
+        ),
+    ]
+    allocation_order: Annotated[
+        list[str],
+        Field(
+            default=["cuda", "rocm", "tpu", "cpu", "mem"],
+            validation_alias=AliasChoices("allocation-order", "allocation_order"),
+            serialization_alias="allocation-order",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Order in which resources are allocated to containers. "
+                "Resources are allocated in this sequence, which can affect placement "
+                "when multiple resource types compete for affinity (e.g., GPU and NUMA)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local='["cuda", "rocm", "tpu", "cpu", "mem"]',
+                prod='["cuda", "rocm", "tpu", "cpu", "mem"]',
+            ),
+        ),
+    ]
+    affinity_policy: Annotated[
+        AffinityPolicy,
+        Field(
+            default=AffinityPolicy.INTERLEAVED,
+            validation_alias=AliasChoices("affinity-policy", "affinity_policy"),
+            serialization_alias="affinity-policy",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "NUMA and device affinity policy for resource allocation. "
+                "'INTERLEAVED' spreads allocations across NUMA nodes for balance. "
+                "'PACKED' fills one NUMA node before moving to the next for locality. "
+                "Affects performance characteristics of multi-socket systems."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="INTERLEAVED", prod="INTERLEAVED"),
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -1011,61 +1774,46 @@ class ResourceConfig(BaseConfigSchema):
         if isinstance(v, str):
             try:
                 return AffinityPolicy[v.upper()]
-            except KeyError:
-                raise ValueError(f"Invalid affinity policy: {v}")
-        return v
-
-
-class EtcdConfig(BaseConfigSchema):
-    namespace: str = Field(
-        description="Etcd namespace",
-        examples=["local", "backend"],
-    )
-    addr: HostPortPair | list[HostPortPair] = Field(
-        description="Etcd address and port",
-        examples=[
-            {"host": "127.0.0.1", "port": 2379},  # single endpoint
-            [
-                {"host": "127.0.0.4", "port": 2379},
-                {"host": "127.0.0.5", "port": 2379},
-            ],  # multiple endpoints
-        ],
-    )
-    user: Optional[str] = Field(
-        default=None,
-        description="Etcd username",
-        examples=["backend"],
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="Etcd password",
-        examples=["PASSWORD"],
-    )
-
-    def to_dataclass(self) -> EtcdConfigData:
-        return EtcdConfigData(
-            namespace=self.namespace,
-            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
-            user=self.user,
-            password=self.password,
-        )
+            except KeyError as e:
+                raise ValueError(f"Invalid affinity policy: {v}") from e
+        return cast(AffinityPolicy, v)
 
 
 class ContainerLogsConfig(BaseConfigSchema):
-    max_length: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("10M"),
-        description="Maximum length of container logs",
-        examples=["10M", "50M"],
-        validation_alias=AliasChoices("max-length", "max_length"),
-        serialization_alias="max-length",
-    )
-    chunk_size: BinarySizeField = Field(
-        default=BinarySize.finite_from_str("64K"),
-        description="Chunk size for container logs",
-        examples=["64K", "128K"],
-        validation_alias=AliasChoices("chunk-size", "chunk_size"),
-        serialization_alias="chunk-size",
-    )
+    max_length: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("10M"),
+            validation_alias=AliasChoices("max-length", "max_length"),
+            serialization_alias="max-length",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum total size of container logs that the agent will retrieve and store. "
+                "Logs exceeding this size are truncated from the beginning. "
+                "Use binary size format (e.g., '10M', '50M')."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10M", prod="50M"),
+        ),
+    ]
+    chunk_size: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("64K"),
+            validation_alias=AliasChoices("chunk-size", "chunk_size"),
+            serialization_alias="chunk-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Size of chunks when reading container logs from Docker. "
+                "Larger chunks improve throughput but use more memory. "
+                "Use binary size format (e.g., '64K', '128K')."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="64K", prod="128K"),
+        ),
+    ]
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -1073,54 +1821,114 @@ class ContainerLogsConfig(BaseConfigSchema):
 
 
 class APIConfig(BaseConfigSchema):
-    pull_timeout: Optional[float] = Field(
-        default=7200.0,  # 2 hours
-        ge=0,
-        description="Image pull timeout in seconds",
-        examples=[7200.0, 3600.0],
-        validation_alias=AliasChoices("pull-timeout", "pull_timeout"),
-        serialization_alias="pull-timeout",
-    )
-    commit_timeout: Optional[float] = Field(
-        default=None,
-        ge=0,
-        description="Image commit timeout in seconds",
-        examples=[7200.0, 3600.0],
-        validation_alias=AliasChoices("commit-timeout", "commit_timeout"),
-        serialization_alias="commit-timeout",
-    )
-    push_timeout: Optional[float] = Field(
-        default=None,
-        ge=0,
-        description="Image push timeout in seconds",
-        examples=[7200.0, 3600.0],
-        validation_alias=AliasChoices("push-timeout", "push_timeout"),
-        serialization_alias="push-timeout",
-    )
+    pull_timeout: Annotated[
+        float | None,
+        Field(
+            default=7200.0,  # 2 hours
+            ge=0,
+            validation_alias=AliasChoices("pull-timeout", "pull_timeout"),
+            serialization_alias="pull-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for pulling container images from registries. "
+                "Large images or slow networks may require longer timeouts. "
+                "Default is 7200 seconds (2 hours)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="7200", prod="7200"),
+        ),
+    ]
+    commit_timeout: Annotated[
+        float | None,
+        Field(
+            default=None,
+            ge=0,
+            validation_alias=AliasChoices("commit-timeout", "commit_timeout"),
+            serialization_alias="commit-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for committing containers to images. "
+                "Used when users save their container state as a new image. "
+                "Set to None for no timeout (may be needed for large containers)."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="7200"),
+        ),
+    ]
+    push_timeout: Annotated[
+        float | None,
+        Field(
+            default=None,
+            ge=0,
+            validation_alias=AliasChoices("push-timeout", "push_timeout"),
+            serialization_alias="push-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for pushing committed images to registries. "
+                "Used when users push their committed images to external registries. "
+                "Set to None for no timeout."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="", prod="7200"),
+        ),
+    ]
 
 
 class KernelLifecyclesConfig(BaseConfigSchema):
-    init_polling_attempt: int = Field(
-        default=10,
-        description="Number of init polling attempts",
-        examples=[10, 20],
-        validation_alias=AliasChoices("init-polling-attempt", "init_polling_attempt"),
-        serialization_alias="init-polling-attempt",
-    )
-    init_polling_timeout_sec: float = Field(
-        default=60.0,
-        description="Init polling timeout in seconds",
-        examples=[60.0, 120.0],
-        validation_alias=AliasChoices("init-polling-timeout-sec", "init_polling_timeout_sec"),
-        serialization_alias="init-polling-timeout-sec",
-    )
-    init_timeout_sec: float = Field(
-        default=60.0,
-        description="Init timeout in seconds",
-        examples=[60.0, 120.0],
-        validation_alias=AliasChoices("init-timeout-sec", "init_timeout_sec"),
-        serialization_alias="init-timeout-sec",
-    )
+    init_polling_attempt: Annotated[
+        int,
+        Field(
+            default=10,
+            validation_alias=AliasChoices("init-polling-attempt", "init_polling_attempt"),
+            serialization_alias="init-polling-attempt",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Number of attempts to poll for container readiness during initialization. "
+                "The agent checks container health this many times before giving up. "
+                "Increase for containers with slower initialization."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10", prod="20"),
+        ),
+    ]
+    init_polling_timeout_sec: Annotated[
+        float,
+        Field(
+            default=60.0,
+            validation_alias=AliasChoices("init-polling-timeout-sec", "init_polling_timeout_sec"),
+            serialization_alias="init-polling-timeout-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum time in seconds to wait between polling attempts during container initialization. "
+                "If the container doesn't respond within this time, the attempt fails. "
+                "Total initialization time is approximately attempts * timeout."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="60.0", prod="120.0"),
+        ),
+    ]
+    init_timeout_sec: Annotated[
+        float,
+        Field(
+            default=60.0,
+            validation_alias=AliasChoices("init-timeout-sec", "init_timeout_sec"),
+            serialization_alias="init-timeout-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Overall timeout in seconds for container initialization. "
+                "If the container is not ready within this time, it's considered failed. "
+                "Should be large enough for containers with heavy startup processes."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="60.0", prod="120.0"),
+        ),
+    ]
 
 
 class DockerExtraConfig(BaseConfigSchema):
@@ -1128,13 +1936,23 @@ class DockerExtraConfig(BaseConfigSchema):
     For checking additional Docker configurations
     """
 
-    swarm_enabled: bool = Field(
-        default=False,
-        description="Whether Docker Swarm is enabled",
-        examples=[True, False],
-        validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
-        serialization_alias="swarm-enabled",
-    )
+    swarm_enabled: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
+            serialization_alias="swarm-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Indicates whether Docker Swarm mode is enabled on this host. "
+                "Used internally to verify Swarm compatibility when container.swarm_enabled is true. "
+                "This is typically auto-detected and not set manually."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
 
 
 class AgentGlobalConfig(BaseConfigSchema):
@@ -1143,65 +1961,162 @@ class AgentGlobalConfig(BaseConfigSchema):
     """
 
     # Local config
-    pyroscope: PyroscopeConfig = Field(
-        default_factory=PyroscopeConfig,
-        description="Pyroscope configuration",
-    )
-    logging: LoggingConfig = Field(
-        default_factory=LoggingConfig,
-        description="Logging configuration",
-    )
-    otel: OTELConfig = Field(
-        default_factory=OTELConfig,
-        description="OpenTelemetry configuration",
-    )
-    service_discovery: ServiceDiscoveryConfig = Field(
-        default_factory=ServiceDiscoveryConfig,
-        description="Service discovery configuration",
-        validation_alias=AliasChoices("service-discovery", "service_discovery"),
-        serialization_alias="service-discovery",
-    )
-    debug: DebugConfig = Field(
-        default_factory=DebugConfig,
-        description="Debug configuration",
-    )
-    etcd: EtcdConfig = Field(
-        description="Etcd configuration",
-    )
+    pyroscope: Annotated[
+        PyroscopeConfig,
+        Field(default_factory=PyroscopeConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Pyroscope continuous profiling configuration for the agent. "
+                "Pyroscope collects CPU and memory profiles to help identify performance bottlenecks "
+                "and memory issues in the agent process."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    logging: Annotated[
+        LoggingConfig,
+        Field(default_factory=LoggingConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Logging configuration for the agent. Controls log levels, output destinations, "
+                "and log formatting. Proper logging setup is essential for debugging and monitoring "
+                "agent behavior in production environments."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    otel: Annotated[
+        OTELConfig,
+        Field(default_factory=OTELConfig),
+        BackendAIConfigMeta(
+            description=(
+                "OpenTelemetry (OTEL) configuration for distributed tracing and metrics collection. "
+                "Enables integration with observability platforms like Jaeger, Zipkin, or Prometheus "
+                "for comprehensive monitoring of agent operations."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    service_discovery: Annotated[
+        ServiceDiscoveryConfig,
+        Field(
+            default_factory=ServiceDiscoveryConfig,
+            validation_alias=AliasChoices("service-discovery", "service_discovery"),
+            serialization_alias="service-discovery",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Service discovery configuration for the agent to register itself and discover "
+                "other Backend.AI services in the cluster. Enables dynamic service mesh integration "
+                "and load balancing across multiple agents."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    debug: Annotated[
+        DebugConfig,
+        Field(default_factory=DebugConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Debug and development configuration for the agent. Enables features like "
+                "asynchronous debugging, memory leak detection, and core dump collection. "
+                "Should be carefully configured in production to avoid performance overhead."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    etcd: Annotated[
+        EtcdConfig,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "etcd connection configuration for the agent. etcd is used as the distributed "
+                "key-value store for cluster coordination, configuration sharing, and service discovery. "
+                "All agents in a cluster must connect to the same etcd cluster."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     # Etcd config
-    container_logs: ContainerLogsConfig = Field(
-        default_factory=ContainerLogsConfig,
-        description="Container logs configuration",
-        validation_alias=AliasChoices("container-logs", "container_logs"),
-        serialization_alias="container-logs",
-    )
-    api: APIConfig = Field(
-        default_factory=APIConfig,
-        description="API configuration",
-    )
-    kernel_lifecycles: KernelLifecyclesConfig = Field(
-        default_factory=KernelLifecyclesConfig,
-        description="Kernel lifecycles configuration",
-        validation_alias=AliasChoices("kernel-lifecycles", "kernel_lifecycles"),
-        serialization_alias="kernel-lifecycles",
-    )
-    plugins: Any = Field(
-        default_factory=lambda: {},
-        description=textwrap.dedent("""
-        Plugins configuration.
-        This field is injected at runtime based on etcd configuration.
-        It is not intended to be set in the configuration file.
-        """),
-    )
-    redis: Optional[RedisConfig] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Redis configuration.
-        This field is injected at runtime based on etcd configuration.
-        It is not intended to be set in the other way.
-        """),
-    )
+    container_logs: Annotated[
+        ContainerLogsConfig,
+        Field(
+            default_factory=ContainerLogsConfig,
+            validation_alias=AliasChoices("container-logs", "container_logs"),
+            serialization_alias="container-logs",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Container log collection and retention configuration. "
+                "Controls how container stdout/stderr logs are collected, stored, and made "
+                "available to users. Important for debugging container applications."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    api: Annotated[
+        APIConfig,
+        Field(default_factory=APIConfig),
+        BackendAIConfigMeta(
+            description=(
+                "API timeout configuration for container image operations. "
+                "Defines timeout values for pulling, committing, and pushing container images. "
+                "Should be adjusted based on image sizes and network conditions."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    kernel_lifecycles: Annotated[
+        KernelLifecyclesConfig,
+        Field(
+            default_factory=KernelLifecyclesConfig,
+            validation_alias=AliasChoices("kernel-lifecycles", "kernel_lifecycles"),
+            serialization_alias="kernel-lifecycles",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Kernel (container) lifecycle timing configuration. "
+                "Controls polling intervals and timeouts during container initialization. "
+                "Affects how quickly the agent detects container startup success or failure."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    plugins: Annotated[
+        Any,
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin configuration injected at runtime from etcd. "
+                "This field should not be manually configured in the agent configuration file. "
+                "Plugin settings are managed centrally in etcd and distributed to agents automatically."
+            ),
+            added_version="25.12.0",
+        ),
+    ]
+    redis: Annotated[
+        RedisConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Redis configuration injected at runtime from etcd. "
+                "Redis is used for inter-agent communication, caching, and pub/sub messaging. "
+                "This field should not be manually configured as it is injected from etcd settings."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -1213,24 +2128,45 @@ class AgentSpecificConfig(BaseConfigSchema):
     Default values for agent, container, and resource config.
     """
 
-    agent: AgentConfig = Field(
-        description=textwrap.dedent("""
-        Agent configuration.
-        If agents field is populated, this field indicates the default values for all agents.
-        """),
-    )
-    container: ContainerConfig = Field(
-        description=textwrap.dedent("""
-        Container configuration.
-        If agents field is populated, this field indicates the default values for all agents.
-        """),
-    )
-    resource: ResourceConfig = Field(
-        description=textwrap.dedent("""
-        Resource configuration.
-        If agents field is populated, this field indicates the default values for all agents.
-        """),
-    )
+    agent: Annotated[
+        AgentConfig,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Agent-specific configuration including network settings, identity, and operational modes. "
+                "In multi-agent mode (when 'agents' field is populated), this serves as the default "
+                "configuration that individual agents inherit and can override."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    container: Annotated[
+        ContainerConfig,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Container runtime configuration including execution modes, user settings, and networking. "
+                "In multi-agent mode (when 'agents' field is populated), this serves as the default "
+                "configuration that individual agents inherit and can override."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    resource: Annotated[
+        ResourceConfig,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Resource allocation configuration including CPU, memory, and accelerator device settings. "
+                "In multi-agent mode (when 'agents' field is populated), this serves as the default "
+                "configuration that individual agents inherit and can override."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -1251,21 +2187,46 @@ class AgentOverrideConfig(BaseConfigSchema):
     Per-agent overrides in multi-agent mode.
     """
 
-    agent: OverridableAgentConfig = Field(
-        description=textwrap.dedent("""
-        Agent config overrides for the individual agent.
-        All fields except Agent ID are by default optional.
-        Only override fields if necessary.
-        """),
-    )
-    container: Optional[OverridableContainerConfig] = Field(
-        default=None,
-        description="Container config overrides for the individual agent",
-    )
-    resource: Optional[ResourceAllocationConfig] = Field(
-        default=None,
-        description="Resource config overrides for the individual agent",
-    )
+    agent: Annotated[
+        OverridableAgentConfig,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Agent configuration overrides for an individual agent in multi-agent mode. "
+                "Only the agent ID field is required; all other fields are optional and will "
+                "inherit from the global defaults if not specified. Use this to customize "
+                "specific settings like network ports or SSL certificates per agent."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    container: Annotated[
+        OverridableContainerConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Container runtime configuration overrides for an individual agent. "
+                "Optional field that allows customizing container settings like kernel UID/GID, "
+                "port ranges, or scratch directory paths for specific agents."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    resource: Annotated[
+        ResourceAllocationConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Resource allocation overrides for an individual agent. "
+                "Optional field that allows assigning specific CPU, memory, and device allocations "
+                "to individual agents when using MANUAL resource allocation mode."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -1301,18 +2262,21 @@ class AgentOverrideConfig(BaseConfigSchema):
 
 
 class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
-    agents: list[AgentOverrideConfig] = Field(
-        default_factory=list,
-        description=textwrap.dedent("""
-        Configuration overrides for multiple agents.
-        Use this field only to define 2 or more agents, as defining only one
-        agent using this field is redundant. Use the fields agent, container,
-        and resource to define the configuration at a global level.
-        Any field populated in the agents config will be treated as an
-        override to the global default values. Thus the global fields must still
-        be provided when defining multiple agents.
-        """),
-    )
+    agents: Annotated[
+        list[AgentOverrideConfig],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration overrides for running multiple agents from a single configuration file. "
+                "Use this field only when defining 2 or more agents; defining only one agent here is "
+                "redundant. When this field is populated, the global 'agent', 'container', and "
+                "'resource' fields serve as default values that each agent entry can override. "
+                "Each agent entry must have a unique agent ID."
+            ),
+            added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     # TODO: Remove me after changing config injection logic
     model_config = ConfigDict(
@@ -1337,8 +2301,8 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def update(
         self,
         *,
-        agent_update: Optional[Mapping[str, Any]] = None,
-        container_update: Optional[Mapping[str, Any]] = None,
+        agent_update: Mapping[str, Any] | None = None,
+        container_update: Mapping[str, Any] | None = None,
     ) -> None:
         # TODO: Replace setting update values with something like LoaderChain used in Manager.
         if agent_update:
@@ -1349,11 +2313,11 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def overwrite(
         self,
         *,
-        container_logs: Optional[ContainerLogsConfig] = None,
-        api: Optional[APIConfig] = None,
-        kernel_lifecycles: Optional[KernelLifecyclesConfig] = None,
-        redis: Optional[RedisConfig] = None,
-        plugins: Optional[Mapping[str, Any]] = None,
+        container_logs: ContainerLogsConfig | None = None,
+        api: APIConfig | None = None,
+        kernel_lifecycles: KernelLifecyclesConfig | None = None,
+        redis: RedisConfig | None = None,
+        plugins: Mapping[str, Any] | None = None,
     ) -> None:
         # TODO: Replace setting update values with something like LoaderChain used in Manager.
         if container_logs:

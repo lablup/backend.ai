@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,7 +26,7 @@ class EndpointTagsModel(BaseModel):
 
     id: str
     runtime_variant: str
-    existing_url: Optional[str] = None
+    existing_url: str | None = None
 
 
 class TagsModel(BaseModel):
@@ -46,10 +46,10 @@ class CreateEndpointRequestBody(BaseModel):
     version: str = Field(default="v2", description="API version")
     service_name: str = Field(description="Name of the service/endpoint")
     tags: TagsModel = Field(description="Metadata tags for the endpoint")
-    apps: dict = Field(default_factory=dict, description="Application configuration")
+    apps: dict[str, Any] = Field(default_factory=dict, description="Application configuration")
     open_to_public: bool = Field(
         default=False, description="Whether the endpoint is publicly accessible"
     )
-    health_check: Optional[ModelHealthCheck] = Field(
+    health_check: ModelHealthCheck | None = Field(
         default=None, description="Health check configuration"
     )

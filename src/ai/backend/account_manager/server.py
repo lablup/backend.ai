@@ -11,16 +11,13 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from logging import LoggerAdapter
 from pathlib import Path
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
-    Optional,
     cast,
 )
 
@@ -28,6 +25,7 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
@@ -44,7 +42,7 @@ from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
-from .config import AccountManagerConfig, ServerConfig
+from .config import ServerConfig
 from .config import load as load_config
 from .context import CleanupContext, RootContext
 from .exceptions import (
@@ -54,9 +52,10 @@ from .exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
+from .models.utils import connect_database
 from .types import AppCreator, EventLoopType, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 global_subapp_pkgs: Final[tuple[str, ...]] = (
@@ -75,16 +74,15 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
         raise ex
     request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
     request["request_id"] = request_id
-    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))  # type: ignore[name-defined]
-    resp = await _handler(request)
-    return resp
+    request["log"] = BraceStyleAdapter(logging.getLogger(f"{__spec__.name} - #{request_id}"))
+    return await _handler(request)
 
 
 @web.middleware
@@ -92,7 +90,7 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    log: LoggerAdapter = request["log"]
+    log: LoggerAdapter[logging.Logger] = request["log"]
 
     try:
         resp = await handler(request)
@@ -102,14 +100,14 @@ async def exception_middleware(
         raise
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -118,24 +116,23 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
 
-async def hello(request: web.Request) -> web.Response:
+async def hello(_request: web.Request) -> web.Response:
     return web.Response()
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -150,8 +147,6 @@ def handle_loop_error(
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -165,7 +160,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -190,8 +185,8 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Optional[Sequence[str]] = None,
-    scheduler_opts: Optional[Mapping[str, Any]] = None,
+    _subapp_pkgs: Sequence[str] | None = None,
+    _scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
@@ -223,7 +218,7 @@ def build_root_app(
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -238,7 +233,9 @@ def build_root_app(
             database_ctx,
         ]
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(
+        cctx: CleanupContext, app: web.Application
+    ) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         cctx_instance = cctx(app["_root.context"])
         app["_cctx_instances"].append(cctx_instance)
@@ -283,12 +280,12 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], _subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
-    local_config = cast(ServerConfig, root_ctx.local_config)
-    am_config = cast(AccountManagerConfig, local_config.account_manager)
+    local_config = root_ctx.local_config
+    am_config = local_config.account_manager
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config.pyroscope.enabled,
@@ -324,9 +321,8 @@ async def server_main(
     try:
         ssl_ctx = None
         if am_config.ssl_enabled:
-            assert am_config.ssl_cert is not None, (
-                "Should set `account_manager.ssl-cert` in config file."
-            )
+            if am_config.ssl_cert is None:
+                raise ValueError("Should set `account_manager.ssl-cert` in config file.")
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
                 str(am_config.ssl_cert),
@@ -426,7 +422,7 @@ async def server_main_logwrapper(
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Optional[Path],
+    config_path: Path | None,
     debug: bool,
     log_level: LogLevel,
 ) -> None:
@@ -437,7 +433,7 @@ def main(
     server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
-        account_manager_cfg = cast(AccountManagerConfig, server_config.account_manager)
+        account_manager_cfg = server_config.account_manager
         account_manager_cfg.pid_file.touch(exist_ok=True)
         account_manager_cfg.pid_file.write_text(str(os.getpid()))
         ipc_base_path = account_manager_cfg.ipc_base_path
@@ -462,8 +458,6 @@ def main(
                 log_config = logging.getLogger("ai.backend.account_manager.config")
                 log_config.debug("debug mode enabled.")
                 if account_manager_cfg.event_loop == EventLoopType.UVLOOP:
-                    import uvloop
-
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
                 try:

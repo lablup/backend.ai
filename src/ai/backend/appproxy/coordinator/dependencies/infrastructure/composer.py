@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.appproxy.common.etcd import TraefikEtcd
+from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
-from ...config import ServerConfig
-from ...models.utils import ExtendedAsyncSAEngine
 from .database import DatabaseProvider
 from .etcd import EtcdProvider
 from .redis import CoordinatorValkeyClients, RedisProvider

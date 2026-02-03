@@ -3,13 +3,12 @@ from typing import Self
 
 from pydantic import BaseModel
 
+from ai.backend.agent.kernel import KernelOwnershipData
+from ai.backend.agent.kernel_registry.types import KernelRecoveryData
+from ai.backend.agent.proxy import DomainSocketPathPair
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
-
-from ..kernel import KernelOwnershipData
-from ..kernel_registry.types import KernelRecoveryData
-from ..proxy import DomainSocketPathPair
-from ..resources import KernelResourceSpec
 
 
 class KernelRecoveryScratchData(BaseModel):

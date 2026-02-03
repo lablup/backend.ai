@@ -2,10 +2,9 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -27,7 +26,7 @@ class ScalingDeploymentHandler(DeploymentHandler):
         deployment_executor: DeploymentExecutor,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-    ):
+    ) -> None:
         self._deployment_executor = deployment_executor
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
@@ -38,9 +37,9 @@ class ScalingDeploymentHandler(DeploymentHandler):
         return "scaling-deployments"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
-        """No lock needed for scaling deployments."""
-        return None
+    def lock_id(self) -> LockID | None:
+        """Lock for scaling deployments."""
+        return LockID.LOCKID_DEPLOYMENT_AUTO_SCALER
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
@@ -48,21 +47,32 @@ class ScalingDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.SCALING]
 
     @classmethod
-    def next_status(cls) -> Optional[EndpointLifecycle]:
+    def next_status(cls) -> EndpointLifecycle | None:
         """Get the next deployment status after this handler's operation."""
         return EndpointLifecycle.READY
 
     @classmethod
-    def failure_status(cls) -> Optional[EndpointLifecycle]:
+    def failure_status(cls) -> EndpointLifecycle | None:
         return None
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for scaling deployment handler (BEP-1030).
+
+        - success: Deployment → READY
+        - failure: None (stays in current state)
+        """
+        return DeploymentStatusTransitions(
+            success=EndpointLifecycle.READY,
+            failure=None,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check and execute deployment scaling operations."""
         log.debug("Checking for deployment scaling requirements")
 
         # Execute scaling logic via executor
-        result = await self._deployment_executor.scale_deployment(deployments)
-        return result
+        return await self._deployment_executor.scale_deployment(deployments)
 
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after scaling deployments."""

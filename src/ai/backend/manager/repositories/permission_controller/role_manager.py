@@ -1,32 +1,29 @@
 import logging
 import uuid
 from collections.abc import Iterable, Mapping
-from typing import Protocol
+from typing import Protocol, cast
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesCreateInput,
-)
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionCreateInput,
-    ObjectPermissionData,
-)
+from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
 )
+from ai.backend.manager.data.permission.role import (
+    RoleData,
+)
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     RoleSource,
 )
-from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -34,12 +31,12 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-
-from ...data.permission.role import (
-    RoleCreateInput,
-    RoleData,
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.permission_controller.creators import (
+    AssociationScopesEntitiesCreatorSpec,
+    ObjectPermissionCreatorSpec,
+    RoleCreatorSpec,
 )
-from ...models.rbac_models.role import RoleRow
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -69,15 +66,15 @@ class RoleManager:
     async def _create_system_role(
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
-        input = RoleCreateInput(
-            name=data.role_name(),
-            source=RoleSource.SYSTEM,
+        creator = Creator(
+            spec=RoleCreatorSpec(
+                name=data.role_name(),
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+            )
         )
-        row = RoleRow.from_input(input)
-        db_session.add(row)
-        await db_session.flush()
-        await db_session.refresh(row)
-        return row.to_data()
+        result = await execute_creator(db_session, creator)
+        return result.row.to_data()
 
     async def _create_permission_group(
         self, db_session: SASession, data: ScopeSystemRoleData, role: RoleData
@@ -111,34 +108,22 @@ class RoleManager:
         await db_session.flush()
         return [row.to_data() for row in permission_rows]
 
-    async def map_user_to_role(
-        self, db_session: SASession, user_id: uuid.UUID, role_id: uuid.UUID
-    ) -> None:
-        creator = UserRoleCreateInput(
-            user_id=user_id,
-            role_id=role_id,
-        )
-        await db_session.execute(sa.insert(UserRoleRow).values(creator.fields_to_store()))
+    async def map_user_to_role(self, db_session: SASession, creator: Creator[UserRoleRow]) -> None:
+        await execute_creator(db_session, creator)
 
     async def map_entity_to_scope(
         self,
         db_session: SASession,
-        entity_id: ObjectId,
-        scope_id: ScopeId,
+        creator: Creator[AssociationScopesEntitiesRow],
     ) -> None:
-        creator = AssociationScopesEntitiesCreateInput(
-            scope_id=scope_id,
-            object_id=entity_id,
-        )
         try:
-            await db_session.execute(
-                sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
-            )
+            await execute_creator(db_session, creator)
         except IntegrityError:
+            spec = cast(AssociationScopesEntitiesCreatorSpec, creator.spec)
             log.exception(
                 "entity and scope mapping already exists: {}, {}. Skipping.",
-                entity_id.to_str(),
-                scope_id.to_str(),
+                spec.object_id.to_str(),
+                spec.scope_id.to_str(),
             )
 
     async def unmap_entity_from_scope(
@@ -168,25 +153,26 @@ class RoleManager:
         permission_group = await db_session.scalar(
             sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
         )
+        if permission_group is None:
+            raise ValueError(f"Permission group not found for user_id={user_id}")
         role_id = permission_group.role_id
+        permission_group_id = permission_group.id
 
         creators = [
-            ObjectPermissionCreateInput(
-                role_id=role_id,
-                entity_type=entity_id.entity_type,
-                entity_id=entity_id.entity_id,
-                operation=operation,
+            Creator(
+                spec=ObjectPermissionCreatorSpec(
+                    role_id=role_id,
+                    permission_group_id=permission_group_id,
+                    entity_type=entity_id.entity_type,
+                    entity_id=entity_id.entity_id,
+                    operation=operation,
+                )
             )
             for operation in operations
         ]
 
-        rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
-        db_session.add_all(rows)
-        await db_session.flush()
-        for row in rows:
-            await db_session.refresh(row)
-        result = [row.to_data() for row in rows]
-        return result
+        results = [await execute_creator(db_session, creator) for creator in creators]
+        return [result.row.to_data() for result in results]
 
     async def delete_object_permission_of_user(
         self,
@@ -197,6 +183,8 @@ class RoleManager:
         permission_group = await db_session.scalar(
             sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
         )
+        if permission_group is None:
+            raise ValueError(f"Permission group not found for user_id={user_id}")
         role_id = permission_group.role_id
         await db_session.execute(
             sa.delete(ObjectPermissionRow).where(

@@ -28,10 +28,9 @@ class ClusterConfigurationRule(SessionPreparerRule):
         if spec.cluster_size > 1:
             kernel_configs = self._prepare_cluster_kernels(spec)
         else:
-            # Single kernel session
             kernel_configs = spec.kernel_specs.copy()
             if kernel_configs and "cluster_role" not in kernel_configs[0]:
-                kernel_configs[0]["cluster_role"] = DEFAULT_ROLE
+                kernel_configs[0]["cluster_role"] = DEFAULT_ROLE  # type: ignore[unreachable]
 
         preparation_data["kernel_configs"] = kernel_configs
 
@@ -66,14 +65,14 @@ class ClusterConfigurationRule(SessionPreparerRule):
                 # Check if cluster_role is already defined
                 if "cluster_role" not in kernel_config:
                     # Assign default roles based on position
-                    if idx == 0:
+                    if idx == 0:  # type: ignore[unreachable]
                         kernel_config["cluster_role"] = DEFAULT_ROLE
                     else:
                         kernel_config["cluster_role"] = "sub"
 
                 # Set cluster_idx if not already set
                 if "cluster_idx" not in kernel_config:
-                    if kernel_config["cluster_role"] == DEFAULT_ROLE:
+                    if kernel_config["cluster_role"] == DEFAULT_ROLE:  # type: ignore[unreachable]
                         kernel_config["cluster_idx"] = 1
                     else:
                         # For sub kernels, find the count of previous sub kernels
@@ -84,11 +83,11 @@ class ClusterConfigurationRule(SessionPreparerRule):
 
                 # Set local_rank if not already set
                 if "local_rank" not in kernel_config:
-                    kernel_config["local_rank"] = idx
+                    kernel_config["local_rank"] = idx  # type: ignore[unreachable]
 
                 # Set cluster_hostname if not already set
                 if "cluster_hostname" not in kernel_config:
-                    role = kernel_config["cluster_role"]
+                    role = kernel_config["cluster_role"]  # type: ignore[unreachable]
                     idx_val = kernel_config["cluster_idx"]
                     kernel_config["cluster_hostname"] = f"{role}{idx_val}"
 

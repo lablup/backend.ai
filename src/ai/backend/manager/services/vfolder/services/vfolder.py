@@ -2,7 +2,7 @@ import logging
 import uuid
 from pathlib import PurePosixPath
 from typing import (
-    Optional,
+    cast,
 )
 
 import aiohttp
@@ -21,7 +21,9 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCreateParams,
     VFolderData,
+    VFolderMountPermission,
 )
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -52,8 +54,8 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.base import (
+from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
     CreateVFolderAction,
@@ -70,14 +72,20 @@ from ..actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def _check_vfolder_status(
@@ -146,11 +154,11 @@ class VFolderService:
             if action.group_id_or_name is not None:
                 raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
 
-        group_uuid: Optional[uuid.UUID] = None
-        group_type: Optional[ProjectType] = None
+        group_uuid: uuid.UUID | None = None
+        group_type: ProjectType | None = None
         max_vfolder_count: int
         max_quota_scope_size: int
-        container_uid: Optional[int] = None
+        container_uid: int | None = None
 
         # Get resource information using repository
         match group_id_or_name:
@@ -198,10 +206,6 @@ class VFolderService:
             )
 
         if group_type == ProjectType.MODEL_STORE:
-            if action.mount_permission != VFolderPermission.READ_WRITE:
-                raise VFolderInvalidParameter(
-                    "Setting custom permission is not supported for model store vfolder"
-                )
             if action.usage_mode != VFolderUsageMode.MODEL:
                 raise VFolderInvalidParameter(
                     "Only Model VFolder can be created under the model store project"
@@ -265,8 +269,6 @@ class VFolderService:
             action.mount_permission = VFolderPermission.READ_ONLY
 
         # Use repository to create VFolder
-        from ai.backend.manager.data.vfolder.types import VFolderCreateParams
-
         params = VFolderCreateParams(
             id=folder_id,
             name=action.name,
@@ -290,8 +292,8 @@ class VFolderService:
             await self._vfolder_repository.create_vfolder_with_permission(
                 params, create_owner_permission=create_owner_permission
             )
-        except sa_exc.DataError:
-            raise VFolderInvalidParameter
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
 
         return CreateVFolderActionResult(
             id=folder_id,
@@ -312,7 +314,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        modifier = action.modifier
+        spec = cast(VFolderAttributeUpdaterSpec, action.updater.spec)
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
@@ -336,7 +338,7 @@ class VFolderService:
 
         # Check for name conflicts if name is being updated
         try:
-            new_name = modifier.name.value()
+            new_name = spec.name.value()
         except ValueError:
             pass
         else:
@@ -347,8 +349,7 @@ class VFolderService:
                     )
 
         # Update the vfolder using repository
-        to_update = modifier.fields_to_update()
-        await self._vfolder_repository.update_vfolder_attribute(action.vfolder_uuid, to_update)
+        await self._vfolder_repository.update_vfolder_attribute(action.updater)
 
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -449,7 +450,9 @@ class VFolderService:
                     host=access_info.vfolder_data.host,
                     status=access_info.vfolder_data.status,
                     unmanaged_path=access_info.vfolder_data.unmanaged_path,
-                    mount_permission=access_info.effective_permission,
+                    # None means owner, who has full permissions
+                    mount_permission=access_info.effective_permission
+                    or VFolderMountPermission.RW_DELETE,
                     usage_mode=access_info.vfolder_data.usage_mode,
                     created_at=access_info.vfolder_data.created_at,
                     cloneable=access_info.vfolder_data.cloneable,
@@ -478,6 +481,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -490,6 +495,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -519,6 +526,8 @@ class VFolderService:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -526,12 +535,19 @@ class VFolderService:
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
+    async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
+        """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
+        data = await self._vfolder_repository.purge_vfolder(action.purger)
+        return PurgeVFolderActionResult(vfolder_uuid=data.id)
+
     async def force_delete(
         self, action: ForceDeleteVFolderAction
     ) -> ForceDeleteVFolderActionResult:
         # TODO: Implement proper permission checking and business logic
         # For now, use admin repository for the operation
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -730,7 +746,7 @@ class VFolderService:
                 await response.write(chunk)
 
         except aiohttp.ClientResponseError as e:
-            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message)
+            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message) from e
         finally:
             if prepared:
                 await response.write_eof()

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Any,
-    Optional,
 )
 
 from ai.backend.manager.models.vfolder import (
@@ -19,11 +18,11 @@ from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountP
 @dataclass
 class VFolderBaseInfo:
     id: uuid.UUID
-    quota_scope_id: Optional[QuotaScopeID]
+    quota_scope_id: QuotaScopeID | None
     name: str
     host: str
     status: VFolderOperationStatus
-    unmanaged_path: Optional[str]
+    unmanaged_path: str | None
     mount_permission: VFolderMountPermission
     usage_mode: VFolderUsageMode
     created_at: datetime
@@ -32,11 +31,11 @@ class VFolderBaseInfo:
 
 @dataclass
 class VFolderOwnershipInfo:
-    creator_email: Optional[str]
+    creator_email: str | None
     is_owner: bool
     ownership_type: VFolderOwnershipType
-    user_uuid: Optional[uuid.UUID]
-    group_uuid: Optional[uuid.UUID]
+    user_uuid: uuid.UUID | None
+    group_uuid: uuid.UUID | None
 
 
 @dataclass
@@ -54,7 +53,7 @@ class VFolderInvitationInfo:
     inviter_user_email: str
     mount_permission: VFolderMountPermission
     created_at: datetime
-    modified_at: Optional[datetime]
+    modified_at: datetime | None
     status: VFolderInvitationState
 
     def to_json(self) -> dict[str, Any]:

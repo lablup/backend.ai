@@ -28,13 +28,12 @@ from ai.backend.common.dto.storage.response import (
     VFSUploadResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.services.storages.vfs_storage import VFSStorageService
 from ai.backend.storage.types import MultipartFileUploadStreamReader
-
-from ....services.storages.vfs_storage import VFSStorageService
-from ....utils import log_client_api_entry
+from ai.backend.storage.utils import log_client_api_entry
 
 if TYPE_CHECKING:
-    from ....context import RootContext
+    from ai.backend.storage.context import RootContext
 
 _DEFAULT_CONTENT_TYPE: Final[str] = "application/octet-stream"
 

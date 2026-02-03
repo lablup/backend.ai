@@ -60,26 +60,21 @@ import contextlib
 import enum
 import logging
 import uuid
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    List,
-    Mapping,
     NotRequired,
-    Optional,
-    Sequence,
     TypeAlias,
     TypedDict,
+    cast,
 )
 
 import aiohttp
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import NetAppClientError, NetAppQTreeNotFoundError
-from ...types import QuotaConfig, QuotaUsage
+from ai.backend.storage.errors import NetAppClientError, NetAppQTreeNotFoundError
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
@@ -241,7 +236,7 @@ class NetAppClient:
         # return volume_qtree_cluster
 
     async def list_volumes(
-        self, extra_fields: Optional[Sequence[str]] = None
+        self, extra_fields: Sequence[str] | None = None
     ) -> Mapping[VolumeID, VolumeInfo]:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -267,7 +262,7 @@ class NetAppClient:
     async def get_volume_by_name(
         self,
         name: str,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> VolumeInfo:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -291,7 +286,7 @@ class NetAppClient:
     async def get_volume_by_id(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> VolumeInfo:
         default_extra_fields = ["nas.path"]
         _extra_fields = (
@@ -314,7 +309,7 @@ class NetAppClient:
     async def get_volume_metric_by_id(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -325,12 +320,13 @@ class NetAppClient:
             f"/api/storage/volumes/{volume_id}/metrics",
             params={"fields": ",".join(_extra_fields)},
         ) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     async def list_qtrees(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> Sequence[QTreeInfo]:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -356,7 +352,7 @@ class NetAppClient:
     async def get_default_qtree(
         self,
         volume_id: VolumeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         return await self.get_qtree_by_id(volume_id, 0, extra_fields=extra_fields)
 
@@ -364,7 +360,7 @@ class NetAppClient:
         self,
         volume_id: VolumeID,
         qtree_id: QTreeID,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -388,7 +384,7 @@ class NetAppClient:
         self,
         volume_id: VolumeID,
         name: str,
-        extra_fields: Optional[Sequence[str]] = None,
+        extra_fields: Sequence[str] | None = None,
     ) -> QTreeInfo:
         default_extra_fields = ["path"]
         _extra_fields = (
@@ -413,8 +409,7 @@ class NetAppClient:
                 )
                 qtree_info.update(record)
                 return qtree_info
-            else:
-                raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
+            raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
     async def create_qtree(
         self,
@@ -487,7 +482,8 @@ class NetAppClient:
                 raise NetAppClientError(
                     f"Quota rule not found for the volume {volume_id} and the qtree {qtree_name}"
                 )
-            return records[0]
+            result: dict[str, Any] = records[0]
+            return result
 
     async def update_quota_rule(
         self,
@@ -594,7 +590,7 @@ class NetAppClient:
                 limit_bytes=limit_bytes,
             )
 
-    async def get_qos_policies(self) -> List[Mapping[str, Any]]:
+    async def get_qos_policies(self) -> list[Mapping[str, Any]]:
         async with self.send_request(
             "get",
             "/api/storage/qos/policies",
@@ -607,14 +603,14 @@ class NetAppClient:
                 qos_policies.append(policy)
         return qos_policies
 
-    async def get_qos_by_uuid(self, qos_uuid) -> Mapping[str, Any]:
+    async def get_qos_by_uuid(self, qos_uuid: str) -> Mapping[str, Any]:
         async with self.send_request(
             "get",
             f"/api/storage/qos/policies/{qos_uuid}",
         ) as resp:
             data = await resp.json()
             fixed = data["fixed"]
-            qos_policy = {
+            return {
                 "uuid": data["uuid"],
                 "name": data["name"],
                 "fixed": {
@@ -626,12 +622,11 @@ class NetAppClient:
                 },
                 "svm": data["svm"],
             }
-            return qos_policy
 
-    async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
+    async def get_qos_by_volume_id(self, volume_uuid: str) -> Mapping[str, Any]:
         async with self.send_request(
             "get",
             f"/api/storage/volumes/{volume_uuid}?fields=qos",
         ) as resp:
             data = await resp.json()
-        return data["qos"]
+        return cast(Mapping[str, Any], data["qos"])

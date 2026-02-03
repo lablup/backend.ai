@@ -9,10 +9,14 @@ import logging
 import os
 import pwd
 import signal
+import socket
 import ssl
 import sys
 import traceback
 from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -20,16 +24,13 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Final,
-    Optional,
     cast,
 )
 
@@ -37,14 +38,20 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
+from zmq.auth.certs import load_certificate
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientPool,
+    tcp_client_session_factory,
+)
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -53,6 +60,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
     ValkeyContainerLogClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -83,7 +91,10 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.jwt.validator import JWTValidator
+from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
+from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -120,9 +131,21 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
+from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.scheduling_controller import (
+    SchedulingController,
+    SchedulingControllerArgs,
+)
 
 from . import __version__
+from .actions.monitors.audit_log import AuditLogMonitor
+from .actions.monitors.prometheus import PrometheusMonitor
+from .actions.monitors.reporter import ReporterMonitor
+from .agent_cache import AgentRPCCache
+from .api import ManagerStatus
 from .api.context import RootContext
+from .clients.agent import AgentClientPool, AgentPoolSpec
 from .config.bootstrap import BootstrapConfig
 from .config.loader.config_overrider import ConfigOverrider
 from .config.loader.etcd_loader import (
@@ -139,10 +162,40 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
-from .errors.common import ServerMisconfiguredError
+from .errors.api import InvalidAPIParameters
+from .errors.common import (
+    GenericBadRequest,
+    InternalServerError,
+    MethodNotAllowed,
+    ServerMisconfiguredError,
+    URLNotFound,
+)
 from .errors.resource import ConfigurationLoadFailed
+from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+from .exceptions import InvalidArgument
 from .health.database import DatabaseHealthChecker
+from .idle import init_idle_checkers
+from .models.storage import StorageSessionManager
+from .models.utils import connect_database
+from .notification import NotificationCenter
+from .pglock import PgAdvisoryLock
+from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+from .plugin.network import NetworkPluginContext
+from .plugin.webapp import WebappPluginContext
+from .public_api.health import hello as health_hello
+from .registry import AgentRegistry
+from .reporters.hub import ReporterHub, ReporterHubArgs
+from .reporters.smtp import SMTPReporter, SMTPSenderArgs
+from .repositories.repositories import Repositories
+from .repositories.types import RepositoryArgs
 from .server_bgtask_ctx import manager_bgtask_registry_ctx
+from .service.base import ServicesContext
+from .service.container_registry.base import PerProjectRegistryQuotaRepository
+from .service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+    PerProjectContainerRegistryQuotaService,
+)
+from .services.processors import ProcessorArgs, Processors, ServiceArgs
 from .sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -151,6 +204,14 @@ from .sokovan.deployment.route.route_controller import (
     RouteController,
     RouteControllerArgs,
 )
+from .sokovan.scheduler.coordinator import ScheduleCoordinator
+from .sokovan.scheduler.factory import (
+    CoordinatorHandlersArgs,
+    create_coordinator_handlers,
+    create_default_scheduler_components,
+)
+from .sokovan.scheduler.fair_share import FairShareAggregator, FairShareFactorCalculator
+from .sokovan.sokovan import SokovanOrchestrator
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
@@ -279,6 +340,11 @@ global_subapp_pkgs: Final[list[str]] = [
     ".object_storage",
     ".vfs_storage",
     ".notification",
+    ".deployment",
+    ".rbac",
+    ".scheduling_history",
+    ".fair_share",
+    ".export",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -286,7 +352,7 @@ global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
 
-async def hello(request: web.Request) -> web.Response:
+async def hello(_request: web.Request) -> web.Response:
     """
     Returns the API version number.
     """
@@ -296,14 +362,12 @@ async def hello(request: web.Request) -> web.Response:
     })
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
 @web.middleware
 async def api_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
-    from .errors.common import GenericBadRequest, InternalServerError
-
     _handler = handler
     method_override = request.headers.get("X-Method-Override", None)
     if method_override:
@@ -312,7 +376,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
@@ -332,8 +396,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
             return GenericBadRequest("Unsupported API version.")
     except (ValueError, KeyError):
         return GenericBadRequest("Unsupported API version.")
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 def _debug_error_response(
@@ -369,15 +432,6 @@ def _debug_error_response(
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
-    from .errors.api import InvalidAPIParameters
-    from .errors.common import (
-        GenericBadRequest,
-        InternalServerError,
-        MethodNotAllowed,
-        URLNotFound,
-    )
-    from .exceptions import InvalidArgument
-
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
@@ -389,11 +443,10 @@ async def exception_middleware(
     # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
-        elif len(ex.args) == 1:
-            raise InvalidAPIParameters(ex.args[0])
-        else:
-            raise InvalidAPIParameters()
+            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}") from ex
+        if len(ex.args) == 1:
+            raise InvalidAPIParameters(ex.args[0]) from ex
+        raise InvalidAPIParameters() from ex
     except BackendAIError as ex:
         if ex.status_code // 100 == 4:
             log.warning(
@@ -426,13 +479,13 @@ async def exception_middleware(
                 "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
             )
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
-        raise GenericBadRequest
+            ) from ex
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -445,8 +498,7 @@ async def exception_middleware(
         )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
-        else:
-            raise InternalServerError()
+        raise InternalServerError() from e
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
@@ -454,19 +506,17 @@ async def exception_middleware(
 
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
-    root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
-    try:
+    async with AsyncEtcd.create_from_config(etcd_config) as etcd:
+        root_ctx.etcd = etcd
         yield
-    finally:
-        await root_ctx.etcd.close()
 
 
 @asynccontextmanager
 async def config_provider_ctx(
     root_ctx: RootContext,
     log_level: LogLevel,
-    config_path: Optional[Path] = None,
-    extra_config: Optional[Mapping[str, Any]] = None,
+    config_path: Path | None = None,
+    extra_config: Mapping[str, Any] | None = None,
 ) -> AsyncIterator[ManagerConfigProvider]:
     loaders: list[AbstractConfigLoader] = []
 
@@ -496,7 +546,7 @@ async def config_provider_ctx(
     unified_config_loader = LoaderChain(loaders, base_config=extra_config)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
-    config_provider: Optional[ManagerConfigProvider] = None
+    config_provider: ManagerConfigProvider | None = None
     config_provider = await ManagerConfigProvider.create(
         unified_config_loader,
         etcd_watcher,
@@ -516,8 +566,6 @@ async def config_provider_ctx(
 
 @asynccontextmanager
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
-    from .plugin.webapp import WebappPluginContext
-
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(
         root_ctx.etcd,
@@ -542,8 +590,6 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .api import ManagerStatus
-
     if root_ctx.pidx == 0:
         mgr_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
@@ -554,7 +600,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now()))
+        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -622,8 +668,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.config_provider.config.db) as db:
         root_ctx.db = db
         yield
@@ -632,8 +676,6 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 def _make_registered_reporters(
     root_ctx: RootContext,
 ) -> dict[str, AbstractReporter]:
-    from .reporters.smtp import SMTPReporter, SMTPSenderArgs
-
     reporters: dict[str, AbstractReporter] = {}
     smtp_configs = root_ctx.config_provider.config.reporter.smtp
     for smtp_conf in smtp_configs:
@@ -676,8 +718,6 @@ def _make_action_reporters(
 
 @asynccontextmanager
 async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .notification import NotificationCenter
-
     root_ctx.notification_center = NotificationCenter()
     try:
         yield
@@ -687,12 +727,6 @@ async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .actions.monitors.audit_log import AuditLogMonitor
-    from .actions.monitors.prometheus import PrometheusMonitor
-    from .actions.monitors.reporter import ReporterMonitor
-    from .reporters.hub import ReporterHub, ReporterHubArgs
-    from .services.processors import ProcessorArgs, Processors, ServiceArgs
-
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
     reporter_hub = ReporterHub(
@@ -702,7 +736,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
-    audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    audit_log_monitor = AuditLogMonitor(root_ctx.repositories.audit_log.repository)
+
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -727,7 +762,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
-            )
+            ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
@@ -853,8 +888,6 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
-
     root_ctx.event_dispatcher = EventDispatcher(
         root_ctx.message_queue,
         log_events=root_ctx.config_provider.config.debug.log_events,
@@ -865,7 +898,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.valkey_container_log,
             root_ctx.valkey_stat,
             root_ctx.valkey_stream,
-            root_ctx.scheduler_dispatcher,
             root_ctx.sokovan_orchestrator.coordinator,
             root_ctx.scheduling_controller,
             root_ctx.sokovan_orchestrator.deployment_coordinator,
@@ -881,7 +913,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.storage_manager,
             root_ctx.config_provider,
             root_ctx.event_producer,
-            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -924,8 +955,6 @@ async def _make_message_queue(
 
 @asynccontextmanager
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .idle import init_idle_checkers
-
     root_ctx.idle_checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.config_provider,
@@ -941,8 +970,6 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.storage import StorageSessionManager
-
     root_ctx.storage_manager = StorageSessionManager(root_ctx.config_provider.config.volumes)
     try:
         yield
@@ -952,9 +979,6 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .repositories.repositories import Repositories
-    from .repositories.types import RepositoryArgs
-
     repositories = Repositories.create(
         args=RepositoryArgs(
             db=root_ctx.db,
@@ -972,8 +996,6 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .plugin.network import NetworkPluginContext
-
     ctx = NetworkPluginContext(
         root_ctx.etcd,
         root_ctx.config_provider.config.model_dump(by_alias=True),
@@ -1036,16 +1058,6 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
 @asynccontextmanager
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from zmq.auth.certs import load_certificate
-
-    from ai.backend.manager.sokovan.scheduling_controller import (
-        SchedulingController,
-        SchedulingControllerArgs,
-    )
-
-    from .agent_cache import AgentRPCCache
-    from .registry import AgentRegistry
-
     # Create scheduling controller first
     root_ctx.scheduling_controller = SchedulingController(
         SchedulingControllerArgs(
@@ -1082,10 +1094,19 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
     root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
+    root_ctx.agent_client_pool = AgentClientPool(
+        root_ctx.agent_cache,
+        AgentPoolSpec(
+            health_check_interval=30.0,
+            failure_threshold=3,
+            recovery_timeout=60.0,
+        ),
+    )
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
         root_ctx.agent_cache,
+        root_ctx.agent_client_pool,
         root_ctx.valkey_stat,
         root_ctx.valkey_live,
         root_ctx.valkey_image,
@@ -1098,44 +1119,18 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
-        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     try:
         yield
     finally:
+        await root_ctx.agent_client_pool.close()
         await root_ctx.registry.shutdown()
-
-
-@asynccontextmanager
-async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .scheduler.dispatcher import SchedulerDispatcher
-
-    root_ctx.scheduler_dispatcher = await SchedulerDispatcher.create(
-        root_ctx.config_provider,
-        root_ctx.etcd,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
-        root_ctx.registry,
-        root_ctx.valkey_live,
-        root_ctx.valkey_stat,
-        root_ctx.repositories.schedule.repository,
-    )
-    try:
-        yield
-    finally:
-        await root_ctx.scheduler_dispatcher.close()
 
 
 @asynccontextmanager
 async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Initialize leader election for distributed coordination."""
-    import socket
-
-    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
-    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
-    from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
-
     # Create ValkeyLeaderClient for leader election
     valkey_leader_client = await ValkeyLeaderClient.create(
         valkey_target=root_ctx.valkey_profile_target.profile_target(RedisRole.STREAM),
@@ -1197,33 +1192,19 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .clients.agent import AgentPool
-    from .sokovan.scheduler.factory import create_default_scheduler
-    from .sokovan.sokovan import SokovanOrchestrator
-
-    # Create agent pool for scheduler
-    agent_pool = AgentPool(root_ctx.agent_cache)
-
-    # Create scheduler with default components
-    scheduler = create_default_scheduler(
+    # Create scheduler components
+    scheduler_components = create_default_scheduler_components(
         root_ctx.repositories.scheduler.repository,
         root_ctx.repositories.deployment.repository,
+        root_ctx.repositories.fair_share.repository,
         root_ctx.config_provider,
-        root_ctx.distributed_lock_factory,
-        agent_pool,
+        root_ctx.agent_client_pool,
         root_ctx.network_plugin_ctx,
         root_ctx.event_producer,
         root_ctx.valkey_schedule,
     )
 
     # Create HTTP client pool for deployment operations
-    from ai.backend.common.clients.http_client.client_pool import (
-        ClientPool,
-        tcp_client_session_factory,
-    )
-    from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
-    from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
-
     client_pool = ClientPool(tcp_client_session_factory)
 
     # Create deployment coordinator
@@ -1252,13 +1233,40 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         service_discovery=root_ctx.service_discovery,
     )
 
-    # Create sokovan orchestrator with lock factory for timers
-    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
-        scheduler=scheduler,
-        event_producer=root_ctx.event_producer,
+    # Create fair share aggregator for usage tracking
+    # FairShareAggregator is now pure computation (no repositories)
+    fair_share_aggregator = FairShareAggregator()
+    fair_share_calculator = FairShareFactorCalculator()
+
+    # Create coordinator handlers using factory
+    coordinator_handlers = create_coordinator_handlers(
+        CoordinatorHandlersArgs(
+            provisioner=scheduler_components.provisioner,
+            launcher=scheduler_components.launcher,
+            terminator=scheduler_components.terminator,
+            repository=scheduler_components.repository,
+            valkey_schedule=root_ctx.valkey_schedule,
+            scheduling_controller=root_ctx.scheduling_controller,
+            fair_share_aggregator=fair_share_aggregator,
+            fair_share_calculator=fair_share_calculator,
+            resource_usage_repository=root_ctx.repositories.resource_usage_history.repository,
+            fair_share_repository=root_ctx.repositories.fair_share.repository,
+        )
+    )
+
+    # Create schedule coordinator
+    schedule_coordinator = ScheduleCoordinator(
         valkey_schedule=root_ctx.valkey_schedule,
-        lock_factory=root_ctx.distributed_lock_factory,
+        components=scheduler_components,
+        handlers=coordinator_handlers,
         scheduling_controller=root_ctx.scheduling_controller,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+    )
+
+    # Create sokovan orchestrator with all coordinators injected
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        schedule_coordinator=schedule_coordinator,
         deployment_coordinator=deployment_coordinator,
         route_coordinator=route_coordinator,
     )
@@ -1274,8 +1282,6 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
 
 @asynccontextmanager
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-
     ectx = ManagerErrorPluginContext(
         root_ctx.etcd, root_ctx.config_provider.config.model_dump(by_alias=True)
     )
@@ -1306,13 +1312,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .service.base import ServicesContext
-    from .service.container_registry.base import PerProjectRegistryQuotaRepository
-    from .service.container_registry.harbor import (
-        PerProjectContainerRegistryQuotaClientPool,
-        PerProjectContainerRegistryQuotaService,
-    )
-
     db = root_ctx.db
 
     per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
@@ -1338,7 +1337,7 @@ class background_task_ctx:
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         pass
 
     async def shutdown(self) -> None:
@@ -1373,7 +1372,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -1401,22 +1400,18 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
-            from ai.backend.common.lock import FileLock
-
-            return lambda lock_id, lifetime_hint: FileLock(
+            return lambda lock_id, lifetime_hint: FileLock(  # noqa: ARG005
                 ipc_base_path / f"{manager_id}.{lock_id}.lock",
                 timeout=0,
             )
         case "pg_advisory":
-            from .pglock import PgAdvisoryLock
-
-            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
+            return lambda lock_id, lifetime_hint: PgAdvisoryLock(  # noqa: ARG005
+                root_ctx.db, lock_id
+            )
         case "redlock":
-            from ai.backend.common.lock import RedisLock
-
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
             redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
-            redis_lock = redis_helper.get_redis_object(
+            redis_lock = redis_helper.get_redis_object_for_lock(
                 redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
                 name="lock",  # distributed locks
                 db=REDIS_STREAM_LOCK,
@@ -1428,8 +1423,6 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
                 lock_retry_interval=redlock_config["lock_retry_interval"],
             )
         case "etcd":
-            from ai.backend.common.lock import EtcdLock
-
             return lambda lock_id, lifetime_hint: EtcdLock(
                 str(lock_id),
                 root_ctx.etcd,
@@ -1443,13 +1436,10 @@ def build_root_app(
     pidx: int,
     bootstrap_config: BootstrapConfig,
     *,
-    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
-    subapp_pkgs: Optional[Sequence[str]] = None,
-    scheduler_opts: Optional[Mapping[str, Any]] = None,
+    cleanup_contexts: Sequence[CleanupContext] | None = None,
+    subapp_pkgs: Sequence[str] | None = None,
+    scheduler_opts: Mapping[str, Any] | None = None,
 ) -> web.Application:
-    from .sweeper.kernel import stale_kernel_sweeper_ctx
-    from .sweeper.session import stale_session_sweeper_ctx
-
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1492,7 +1482,7 @@ def build_root_app(
 
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -1527,14 +1517,11 @@ def build_root_app(
             event_dispatcher_plugin_ctx,
             idle_checker_ctx,
             agent_registry_ctx,
-            sched_dispatcher_ctx,
             service_discovery_ctx,
             sokovan_orchestrator_ctx,
             leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
-            stale_session_sweeper_ctx,
-            stale_kernel_sweeper_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
             gql_adapters_ctx,
@@ -1542,19 +1529,24 @@ def build_root_app(
         ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise ServerMisconfiguredError("cleanup_contexts is not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
-                cctx_instance = cctx(root_ctx)
-                if hasattr(cctx_instance, "shutdown"):
-                    shutdown_context_instances.append(cctx_instance)
-                await stack.enter_async_context(cctx_instance)
+                cctx_name = cctx.__name__
+                try:
+                    cctx_instance = cctx(root_ctx)
+                    if hasattr(cctx_instance, "shutdown"):
+                        shutdown_context_instances.append(cctx_instance)
+                    await stack.enter_async_context(cctx_instance)
+                except Exception:
+                    log.exception("Failed to initialize cleanup context: {}", cctx_name)
+                    raise
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:
@@ -1574,7 +1566,7 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     if not isinstance(vendor_path, Path):
@@ -1586,13 +1578,14 @@ def build_root_app(
 def build_prometheus_service_discovery_handler(
     root_ctx: RootContext,
 ) -> Handler:
-    async def _handler(request: web.Request) -> web.Response:
+    async def _handler(_request: web.Request) -> web.Response:
         services = await root_ctx.service_discovery.discover()
         resp = []
         for service in services:
             resp.append({
                 "targets": [f"{service.endpoint.prometheus_address}"],
                 "labels": {
+                    **service.labels,
                     "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
@@ -1610,8 +1603,6 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
-    from .public_api.health import hello as health_hello
-
     app = web.Application()
     app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
@@ -1635,7 +1626,7 @@ def build_public_app(
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 
@@ -1894,10 +1885,9 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match bootstrap_cfg.manager.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

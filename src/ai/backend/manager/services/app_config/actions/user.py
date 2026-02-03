@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigModifier
+from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 
 from .base import AppConfigAction
 
@@ -23,7 +24,7 @@ class GetUserConfigAction(AppConfigAction):
         return "app_config_user"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id
 
     @override
@@ -36,10 +37,10 @@ class GetUserConfigAction(AppConfigAction):
 class GetUserConfigActionResult(BaseActionResult):
     """Result of get user config action."""
 
-    result: Optional[AppConfigData]
+    result: AppConfigData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.result.scope_id if self.result else None
 
 
@@ -48,7 +49,7 @@ class UpsertUserConfigAction(AppConfigAction):
     """Action to create or update user-level app configuration."""
 
     user_id: str
-    modifier: AppConfigModifier
+    updater_spec: AppConfigUpdaterSpec
 
     @override
     @classmethod
@@ -56,7 +57,7 @@ class UpsertUserConfigAction(AppConfigAction):
         return "app_config_user"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id
 
     @override
@@ -72,7 +73,7 @@ class UpsertUserConfigActionResult(BaseActionResult):
     result: AppConfigData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.result.scope_id
 
 
@@ -88,7 +89,7 @@ class DeleteUserConfigAction(AppConfigAction):
         return "app_config_user"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id
 
     @override
@@ -105,5 +106,5 @@ class DeleteUserConfigActionResult(BaseActionResult):
     user_id: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.user_id if self.deleted else None

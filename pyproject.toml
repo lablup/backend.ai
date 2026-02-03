@@ -82,15 +82,105 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
+extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    # "C",  # flake8-comprehensions
-    # "B",  # flake8-bugbear
+    "E",      # pycodestyle errors: PEP8 style violations
+    "W",      # pycodestyle warnings: PEP8 style warnings
+    "F",      # pyflakes: detects unused imports, undefined names, and other logical errors
+    "I",      # isort: enforces consistent import ordering
+    "T10",    # flake8-debugger: prevents debugger statements (pdb, breakpoint) in production code
+    "FA",     # flake8-future-annotations: enforces `from __future__ import annotations`
+    "ISC",    # flake8-implicit-str-concat: detects implicit string concatenation bugs
+    "EXE",    # flake8-executable: validates shebang and file permissions consistency
+    "LOG",    # flake8-logging: enforces logging best practices (warn -> warning, etc.)
+    "FLY",    # flynt: converts old-style string formatting to f-strings
+    "PIE",    # flake8-pie: catches misc. code smells (duplicate class fields, unnecessary pass, etc.)
+    "FURB",   # refurb: suggests modern Python idioms (Path.read_text, etc.)
+    "RSE",    # flake8-raise: enforces proper raise statement usage
+    "PERF",   # perflint: detects performance anti-patterns
+    "SIM",    # flake8-simplify: suggests code simplification
+    "RUF",    # ruff-specific: Ruff's own linting rules
+    "C4",     # flake8-comprehensions: optimizes list/set/dict comprehensions
+    "B",      # flake8-bugbear: detects likely bugs and design issues
+    "UP",     # pyupgrade: modernizes Python syntax to latest version
+    "A",      # flake8-builtins: prevents shadowing Python builtins
+    "RET",    # flake8-return: enforces consistent return statement usage
+    "T20",    # flake8-print: detects print statements (should use logging)
+    "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
+    "PLC0415", # pylint-convention: import-outside-toplevel - enforce imports at module level
+    "ANN",    # flake8-annotations: enforces type annotations
+    "DTZ",    # flake8-datetimez: enforces timezone-aware datetime usage
+    "S101",   # flake8-bandit: detects use of assert in production code
+    "ASYNC",  # flake8-async: async/await best practices
+    "PTH",    # flake8-use-pathlib: use pathlib instead of os.path
+    "ARG",    # flake8-unused-arguments: unused function arguments
 ]
-ignore = ["E203","E731","E501"]
+ignore = [
+    "E203",   # whitespace before ':' - conflicts with Black formatter
+    "E731",   # lambda assignment - sometimes useful for simple callbacks
+    "E501",   # line too long - handled by formatter
+    # PIE
+    "PIE790", # unnecessary-pass - sometimes useful for readability in empty blocks
+    # FURB
+    "FURB157", # verbose-decimal-constructor - Decimal("0") is intentional for precision
+    "FURB187", # use-list-reverse - Sequence type cannot be reversed in place
+    # FLY
+    "FLY002", # static-join-to-f-string - unsafe fix, may change behavior
+    # PIE
+    "PIE796", # non-unique-enums - intentional aliases for backward compatibility
+    # RSE
+    "RSE102", # unnecessary-paren-on-raise-exception - stylistic, explicit () is common practice
+    # PERF
+    "PERF102", # incorrect-dict-iterator - dict.items() iteration is often intentional for clarity
+    "PERF401", # manual-list-comprehension - requires careful refactoring, may affect readability
+    "PERF402", # manual-list-copy - existing pattern is explicit
+    "PERF403", # manual-dict-comprehension - requires careful refactoring
+    # SIM
+    "SIM102", # collapsible-if - nested if statements often improve readability
+    "SIM105", # suppressible-exception - explicit try-except is clearer for error handling
+    "SIM108", # if-else-block-instead-of-if-exp - ternary can reduce readability for complex conditions
+    "SIM110", # reimplemented-builtin - explicit loops are sometimes clearer than any()/all()
+    "SIM115", # open-file-with-context-handler - some file operations need explicit close control
+    "SIM117", # multiple-with-statements - nested with statements often improve readability
+    "SIM118", # in-dict-keys - explicit .keys() is sometimes clearer
+    # RUF
+    "RUF003", # ambiguous-unicode-character-comment - intentional use of special characters (e.g., × for multiplication)
+    "RUF005", # collection-literal-concatenation - explicit concatenation is sometimes clearer
+    "RUF006", # asyncio-dangling-task - fire-and-forget tasks are intentional in some cases
+    "RUF009", # function-call-in-dataclass-default - cast() in dataclass defaults is intentional
+    "RUF012", # mutable-class-default - existing codebase uses mutable defaults intentionally
+    "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
+    "RUF022", # unsorted-dunder-all - semantic ordering may be preferred over alphabetical
+    "RUF032", # decimal-from-float-literal - intentional float to Decimal conversion
+    "RUF059", # unused-unpacked-variable - _ convention not always followed
+    # C4
+    "C408",  # unnecessary-collection-call - dict()/tuple()/list() can be clearer than literals in some cases
+    "C416",  # unnecessary-comprehension - explicit comprehension can be clearer
+    "C417",  # unnecessary-map - map() is valid Python and sometimes preferred
+    # B (bugbear)
+    "B007",  # unused-loop-control-variable - intentional in many cases (e.g., async for chunk in stream)
+    "B010",  # set-attr-with-constant - setattr with constant needed for mypy compatibility on dynamic attributes
+    "B012",  # return-in-finally - intentional pattern in some response handlers
+    "B017",  # assert-raises-exception - testing generic Exception is sometimes needed
+    "B023",  # function-uses-loop-variable - many false positives with for-else, nested functions
+    "B024",  # abstract-base-class-without-abstract-method - intentional design pattern
+    "B027",  # empty-method-without-abstract-decorator - intentional empty methods for extensibility
+    "B028",  # no-explicit-stacklevel - stacklevel can be omitted in many logging calls
+    "B911",  # batched-without-explicit-strict - Python 3.13+ feature
+    # UP (pyupgrade) - defer large-scale changes for gradual adoption
+    "UP043",  # unnecessary-default-type-args - defer for review (256 violations)
+    # A (builtins) - GraphQL API uses id/filter/input as standard parameter names
+    "A001",  # builtin-variable-shadowing - mostly id/filter/input in GraphQL (75 violations)
+    "A002",  # builtin-argument-shadowing - mostly id/filter/input in GraphQL (297 violations)
+    # ANN (annotations) - defer for gradual migration, mypy handles type checking
+    "ANN002",  # missing-type-args - *args type annotation, low practical value
+    "ANN003",  # missing-type-kwargs - **kwargs type annotation, low practical value
+    "ANN401",  # dynamically-typed-expression - Any needed for GraphQL resolvers, dynamic APIs
+    # ARG (unused arguments) - exceptions for common patterns
+    "ARG002",  # unused-method-argument - Protocol/ABC methods may not use all arguments
+    # PTH (pathlib) - defer some conversions
+    # ASYNC (async best practices) - exceptions
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
@@ -101,6 +191,84 @@ split-on-trailing-comma = true
 [tool.ruff.lint.per-file-ignores]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
+"src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
+"src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
+# UP040 (type alias) exceptions - cannot use `type` statement when used as callable or base class
+"src/ai/backend/storage/volumes/netapp/netappclient.py" = ["UP040"]  # StorageID/VolumeID/QTreeID used as callables
+"src/ai/backend/manager/api/utils.py" = ["UP040"]  # LegacyBaseRequestModel used as base class
+"src/ai/backend/common/types.py" = ["UP040"]  # VolumeID used as callable
+# T20 (print statements) exceptions:
+# PLC0415 (import-outside-toplevel) exceptions for CLI lazy loading:
+# - CLI modules are allowed to use print for user-facing output and lazy imports for startup performance
+"src/ai/backend/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/*/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/*/*/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/client/cli/**/*.py" = ["T20", "PLC0415"]
+"src/ai/backend/plugin/cli.py" = ["T20", "PLC0415"]
+# - Client output module is designed for console printing and uses lazy imports for optional dependencies
+"src/ai/backend/client/output/*.py" = ["T20", "PLC0415"]
+# - Client modules use lazy imports for optional dependencies and circular import resolution
+"src/ai/backend/client/config.py" = ["PLC0415"]
+"src/ai/backend/client/session.py" = ["PLC0415"]
+"src/ai/backend/client/utils.py" = ["PLC0415"]
+# - Client func vfolder has progress printing
+"src/ai/backend/client/func/vfolder.py" = ["T20"]
+# - Alembic migrations may print progress and have standard signatures
+"src/ai/backend/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
+"src/ai/backend/*/*/models/alembic/**/*.py" = ["T20", "ANN", "PLC0415", "S101"]
+# - Model modules may have circular dependencies between Row classes
+"src/ai/backend/*/models/**/*.py" = ["PLC0415"]
+"src/ai/backend/*/*/models/**/*.py" = ["PLC0415"]
+# - Config files print debug info to stderr
+"src/ai/backend/*/config.py" = ["T20"]
+"src/ai/backend/*/*/config.py" = ["T20"]
+"src/ai/backend/*/config_legacy.py" = ["T20"]
+"src/ai/backend/storage/config/**/*.py" = ["T20"]
+# - Server files print debug config info
+"src/ai/backend/*/server.py" = ["T20"]
+"src/ai/backend/*/*/server.py" = ["T20"]
+# - Installer prints progress info and uses lazy imports for rich dependencies
+"src/ai/backend/install/**/*.py" = ["T20", "PLC0415"]
+# - Runner scripts for containers
+"src/ai/backend/runner/**/*.py" = ["T20"]
+# - Kernel vendor scripts
+"src/ai/backend/kernel/vendor/**/*.py" = ["T20"]
+# - Helpers package
+"src/ai/backend/helpers/**/*.py" = ["T20"]
+# - Watcher modules
+"src/ai/backend/*/watcher/**/*.py" = ["T20"]
+"src/ai/backend/storage/watcher.py" = ["T20"]
+# - Common modules may have circular dependencies during refactoring
+"src/ai/backend/common/**/*.py" = ["PLC0415"]
+# - Agent modules may have circular dependencies between submodules
+"src/ai/backend/agent/**/*.py" = ["PLC0415"]
+# - Common utilities with debug functions
+"src/ai/backend/common/utils.py" = ["T20"]
+"src/ai/backend/common/configs/sample_generator.py" = ["T20"]
+# - OpenAPI generator
+"src/ai/backend/manager/openapi.py" = ["T20"]
+# - Storage migration scripts
+"src/ai/backend/storage/migration.py" = ["T20"]
+# - Logging handler (prints to stderr by design)
+"src/ai/backend/logging/handler/**/*.py" = ["T20"]
+# - Logging modules use lazy imports for optional driver dependencies (logstash, graylog, otel)
+"src/ai/backend/logging/logger.py" = ["PLC0415"]
+"src/ai/backend/logging/utils.py" = ["PLC0415"]
+# - Test files may use print for debugging, have flexible type annotations, and unused fixtures
+"tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+"src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+# - GraphQL legacy and modern resolvers may have unused parameters for GraphQL interface compatibility
+"src/ai/backend/manager/api/gql_legacy/**/*.py" = ["ARG"]
+"src/ai/backend/manager/api/gql/**/*.py" = ["ARG"]
+# - Type stub files have their own conventions
+"stubs/**/*.pyi" = ["ANN"]
+# - Vec2D class intentionally overrides tuple operators with incompatible return types for vector math
+"src/ai/backend/kernel/python/drawing/turtle.py" = ["ANN204"]
+# - GraphQL resolvers may have circular dependencies with error/types modules
+"src/ai/backend/*/api/gql/**/*.py" = ["PLC0415"]
+"src/ai/backend/*/api/gql_legacy/**/*.py" = ["PLC0415"]
+# - Container registry factory uses lazy imports to avoid circular dependencies with models
+"src/ai/backend/manager/container_registry/factory.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
@@ -112,19 +280,55 @@ preview = true
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
-ignore_missing_imports = true
-follow_untyped_imports = false
-mypy_path = "stubs:src:tools/pants-plugins"
+strict = true
+mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
-disable_error_code = ["typeddict-unknown-key"]
+disable_error_code = ["typeddict-unknown-key", "import-untyped"]
+enable_error_code = ["possibly-undefined"]
+warn_unreachable = true
+
+# Disable errors in client CLI, web server, and tests
+# Client SDK will be rewritten, so defer all type fixes
+# "None not callable" errors occur because mypy doesn't understand the APIFunctionMeta metaclass magic
+# that wraps async API functions to work in both sync (Session) and async (AsyncSession) contexts
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.client.cli.*",
+    "ai.backend.client.session",
+    "ai.backend.client.helper",
+    "ai.backend.client.func.resource",
+    "ai.backend.web.server",
+    "ai.backend.test.*",
+    "tests.unit.client.*",
+]
+disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
+
+# ServerAddr.face is typed as HostPortPair | None but __post_init__ always sets it
+# Disable union-attr errors for install module until types are properly refactored
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.install.*",
+]
+disable_error_code = ["union-attr", "misc"]
+
+# Ignore errors in vendor code, accelerators, and build tools
+# These are external/generated code or low-priority plugins
+[[tool.mypy.overrides]]
+module = [
+    "ai.backend.kernel.vendor.*",
+    "ai.backend.accelerator.*",
+    "tools.build-macros",
+]
+ignore_errors = true
 
 [tool.pyright]
 pythonVersion = "3.13"
+extraPaths = ["src"]
 include = [
     "src",
-    "tools/pants-plugins",
+    "tests",
 ]
 stubPath = "stubs"
 exclude = [
@@ -136,6 +340,7 @@ exclude = [
 venvPath = "dist/export/python/virtualenvs/python-default"
 venv = "3.13.7"
 typeCheckingMode = "standard"
+reportMatchNotExhaustive = "error"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

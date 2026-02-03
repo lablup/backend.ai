@@ -1,12 +1,12 @@
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator, Optional
 
 _request_id_var: ContextVar[str] = ContextVar("request_id")
 
 
-def current_request_id() -> Optional[str]:
+def current_request_id() -> str | None:
     """
     Get the current request ID from the context.
     Returns None if not set.
@@ -18,7 +18,7 @@ def current_request_id() -> Optional[str]:
 
 
 @contextmanager
-def with_request_id(request_id: Optional[str] = None) -> Iterator[None]:
+def with_request_id(request_id: str | None = None) -> Iterator[None]:
     """
     context manager to set up the request ID.
     If request_id is not provided, generates a new UUID.

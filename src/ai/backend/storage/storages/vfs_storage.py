@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import mimetypes
 import shutil
 import tarfile
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Optional, override
+from typing import Any, override
 
 import aiofiles
 import aiofiles.os
@@ -33,7 +34,7 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.utils import normalize_filepath
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFSFileDownloadServerStreamReader(StreamReader):
@@ -59,7 +60,7 @@ class VFSFileDownloadServerStreamReader(StreamReader):
                 yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/octet-stream"
 
 
@@ -68,7 +69,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
 
     _directory_path: Path
     _chunk_size: int
-    _temp_file: Optional[Path]
+    _temp_file: Path | None
 
     def __init__(self, directory_path: Path, chunk_size: int) -> None:
         self._directory_path = directory_path
@@ -106,7 +107,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
                 log.debug(f"Cleaned up temp file: {self._temp_file}")
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return "application/x-tar"
 
     def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
@@ -132,7 +133,7 @@ class VFSStorage(AbstractStorage):
     _upload_chunk_size: int
     _download_chunk_size: int
     _temporary: bool
-    _max_file_size: Optional[int]
+    _max_file_size: int | None
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
         self._name = name
@@ -193,12 +194,12 @@ class VFSStorage(AbstractStorage):
         # Ensure the resolved path is within base_path
         try:
             full_path.relative_to(self._base_path)
-        except ValueError:
-            raise InvalidPathError(f"Path traversal not allowed: {filepath}")
+        except ValueError as e:
+            raise InvalidPathError(f"Path traversal not allowed: {filepath}") from e
 
         return full_path
 
-    def _validate_upload_constraints(self, filepath: str, file_size: Optional[int] = None) -> None:
+    def _validate_upload_constraints(self, filepath: str, file_size: int | None = None) -> None:
         """Validate upload constraints (file extension, size, read-only mode)."""
         # Check file size
         if self._max_file_size and file_size and file_size > self._max_file_size:
@@ -247,7 +248,7 @@ class VFSStorage(AbstractStorage):
                             )
 
         except Exception as e:
-            raise FileStreamUploadError(f"Upload failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Upload failed: {e!s}") from e
 
     @override
     async def stream_download(self, filepath: str) -> StreamReader:
@@ -271,11 +272,10 @@ class VFSStorage(AbstractStorage):
                 return VFSDirectoryDownloadServerStreamReader(
                     target_path, self._download_chunk_size
                 )
-            else:
-                return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
+            return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
-            raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"Download failed: {e!s}") from e
 
     @override
     async def get_file_info(self, filepath: str) -> VFSFileMetaResponse:
@@ -299,8 +299,6 @@ class VFSStorage(AbstractStorage):
             # Determine content type based on file extension
             content_type = "application/octet-stream"  # Default
             if target_path.suffix:
-                import mimetypes
-
                 guessed_type, _ = mimetypes.guess_type(str(target_path))
                 if guessed_type:
                     content_type = guessed_type
@@ -320,7 +318,7 @@ class VFSStorage(AbstractStorage):
             )
 
         except Exception as e:
-            raise ObjectInfoFetchError(f"Get file info failed: {str(e)}") from e
+            raise ObjectInfoFetchError(f"Get file info failed: {e!s}") from e
 
     @override
     async def delete_file(self, filepath: str) -> None:
@@ -348,7 +346,7 @@ class VFSStorage(AbstractStorage):
                 raise FileStreamUploadError(f"Cannot delete: {filepath}")
 
         except Exception as e:
-            raise FileStreamUploadError(f"Delete failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Delete failed: {e!s}") from e
 
     async def list_directory(self, directory: str) -> list[VFSFileInfo]:
         """
@@ -387,7 +385,7 @@ class VFSStorage(AbstractStorage):
             return entries
 
         except Exception as e:
-            raise FileStreamDownloadError(f"List directory failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"List directory failed: {e!s}") from e
 
     async def list_files_recursive(self, directory: str) -> VFSListFilesResponse:
         """
@@ -413,7 +411,7 @@ class VFSStorage(AbstractStorage):
             return VFSListFilesResponse(files=files)
 
         except Exception as e:
-            raise FileStreamDownloadError(f"List files recursively failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"List files recursively failed: {e!s}") from e
 
     async def _collect_files_recursive(
         self, current_path: Path, relative_base: str
@@ -470,9 +468,9 @@ class VFSStorage(AbstractStorage):
             target_path.mkdir(parents=True, exist_ok=True)
 
         except Exception as e:
-            raise FileStreamUploadError(f"Create directory failed: {str(e)}") from e
+            raise FileStreamUploadError(f"Create directory failed: {e!s}") from e
 
-    async def get_disk_usage(self) -> dict:
+    async def get_disk_usage(self) -> dict[str, Any]:
         """
         Get disk usage information for the base path.
 
@@ -493,7 +491,7 @@ class VFSStorage(AbstractStorage):
             }
 
         except Exception as e:
-            raise FileStreamDownloadError(f"Get disk usage failed: {str(e)}") from e
+            raise FileStreamDownloadError(f"Get disk usage failed: {e!s}") from e
 
     async def generate_presigned_upload_url(self, key: str) -> PresignedUploadObjectResponse:
         raise NotImplementedAPI("VFS storage doesn't support presigned upload URLs")

@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Optional, Protocol
+from typing import Protocol
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath, VolumeIDPath
@@ -14,8 +14,7 @@ from ai.backend.common.dto.storage.response import (
     VFolderMetadataResponse,
 )
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
-
-from ...volumes.types import (
+from ai.backend.storage.volumes.types import (
     QuotaScopeKey,
     QuotaScopeMeta,
     VFolderKey,
@@ -30,13 +29,13 @@ class VFolderServiceProtocol(Protocol):
     async def get_volumes(self) -> list[VolumeMeta]: ...
 
     async def create_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None: ...
 
     async def get_quota_scope(self, quota_scope_key: QuotaScopeKey) -> QuotaScopeMeta: ...
 
     async def update_quota_scope(
-        self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
+        self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None: ...
 
     async def delete_quota_scope(self, quota_scope_key: QuotaScopeKey) -> None: ...

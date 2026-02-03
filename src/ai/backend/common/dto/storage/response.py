@@ -1,13 +1,12 @@
 import uuid
-from typing import Optional
 
 from pydantic import Field
 
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 
-from ...api_handlers import BaseResponseModel
 from .field import VFolderMetaField, VolumeMetaField
 
 
@@ -24,11 +23,11 @@ class GetVolumesResponse(BaseResponseModel):
 
 
 class QuotaScopeResponse(BaseResponseModel):
-    used_bytes: Optional[int] = Field(
+    used_bytes: int | None = Field(
         default=0,
         description="Indicates the current usage within a quota scope, used for enforcing storage limits.",
     )
-    limit_bytes: Optional[int] = Field(
+    limit_bytes: int | None = Field(
         default=0,
         description="Defines the maximum allowed storage capacity within a quota scope, ensuring controlled resource allocation.",
     )
@@ -50,10 +49,10 @@ class PresignedDownloadObjectResponse(BaseResponseModel):
 
 
 class ObjectMetaResponse(BaseResponseModel):
-    content_length: Optional[int]
-    content_type: Optional[str]
-    last_modified: Optional[str]
-    etag: Optional[str]
+    content_length: int | None
+    content_type: str | None
+    last_modified: str | None
+    etag: str | None
     metadata: dict[str, str]
 
 
@@ -140,7 +139,7 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
 class HuggingFaceGetCommitHashResponse(BaseResponseModel):
     """Response for getting HuggingFace model commit hash."""
 
-    commit_hash: Optional[str] = Field(
+    commit_hash: str | None = Field(
         description="""
         The commit hash (SHA) for the specific model revision.
         Returns null if commit hash is not available.
@@ -166,10 +165,10 @@ class VFSFileMetaResponse(BaseResponseModel):
     """Response for VFS file metadata operations."""
 
     filepath: str = Field(description="The file path within VFS storage.")
-    content_length: Optional[int] = Field(description="Size of the file in bytes.")
-    content_type: Optional[str] = Field(description="MIME type of the file.")
-    last_modified: Optional[float] = Field(description="Last modification time as Unix timestamp.")
-    created: Optional[float] = Field(description="Creation time as Unix timestamp.")
+    content_length: int | None = Field(description="Size of the file in bytes.")
+    content_type: str | None = Field(description="MIME type of the file.")
+    last_modified: float | None = Field(description="Last modification time as Unix timestamp.")
+    created: float | None = Field(description="Creation time as Unix timestamp.")
     is_directory: bool = Field(description="Whether this is a directory.")
     metadata: dict[str, str] = Field(default_factory=dict, description="Additional file metadata.")
 
@@ -177,7 +176,7 @@ class VFSFileMetaResponse(BaseResponseModel):
 class VFSOperationResponse(BaseResponseModel):
     """Generic response for VFS operations that don't return specific data."""
 
-    filepath: Optional[str] = Field(
+    filepath: str | None = Field(
         default=None, description="The file/directory path that was operated on."
     )
 
@@ -199,7 +198,7 @@ class VFSFileInfo(BaseResponseModel):
 
     name: str = Field(description="Name of the file or directory.")
     type: str = Field(description="Type of the entry: 'file' or 'directory'.")
-    size: Optional[int] = Field(
+    size: int | None = Field(
         default=None, description="Size of the file in bytes (None for directories)."
     )
     modified: float = Field(description="Last modification time as Unix timestamp.")
@@ -218,7 +217,7 @@ class VFSListFilesResponse(BaseResponseModel):
 class GetVerificationResultResponse(BaseResponseModel):
     """Response for getting verification result of an artifact revision."""
 
-    verification_result: Optional[VerificationStepResult] = Field(
+    verification_result: VerificationStepResult | None = Field(
         default=None,
         description="The verification result for the artifact revision.",
     )

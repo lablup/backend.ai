@@ -20,7 +20,7 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
         sse_dep = SSEContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         listener = asyncio.create_task(
             asyncio.wait_for(

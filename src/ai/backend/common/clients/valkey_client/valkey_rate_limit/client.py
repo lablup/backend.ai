@@ -1,7 +1,7 @@
 import logging
 import time
 from decimal import Decimal
-from typing import Final, Optional, Self, cast
+from typing import Final, Self, cast
 
 from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary, Script
 
@@ -131,8 +131,7 @@ class ValkeyRateLimitClient:
         )
 
         # The last result is the count
-        count = cast(int, result)
-        return count
+        return cast(int, result)
 
     @valkey_rate_limit_resilience.apply()
     async def get_rolling_count(self, access_key: str) -> int:
@@ -187,7 +186,7 @@ class ValkeyRateLimitClient:
         return 0
 
     @valkey_rate_limit_resilience.apply()
-    async def get_rate_limit_data(self, key: str) -> Optional[str]:
+    async def get_rate_limit_data(self, key: str) -> str | None:
         """
         Get rate limit data by key.
 
@@ -198,7 +197,7 @@ class ValkeyRateLimitClient:
         return result.decode("utf-8") if result else None
 
     @valkey_rate_limit_resilience.apply()
-    async def get_key(self, key: str) -> Optional[str]:
+    async def get_key(self, key: str) -> str | None:
         """
         Get the value of a key (deprecated: use get_rate_limit_data).
 

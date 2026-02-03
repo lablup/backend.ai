@@ -1,7 +1,6 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from ai.backend.common.types import AccessKey, SecretKey
 
@@ -30,12 +29,12 @@ class KeyPairData:
 
     is_active: bool
     is_admin: bool
-    created_at: Optional[datetime]
-    modified_at: Optional[datetime]
+    created_at: datetime | None
+    modified_at: datetime | None
 
     resource_policy_name: str
     rate_limit: int
-    ssh_public_key: Optional[str]
-    ssh_private_key: Optional[str]
-    dotfiles: str
+    ssh_public_key: str | None
+    ssh_private_key: str | None
+    dotfiles: bytes
     bootstrap_script: str

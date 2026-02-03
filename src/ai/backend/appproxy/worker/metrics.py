@@ -26,7 +26,7 @@ from .types import (
     RootContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CACHE_LIFESPAN: Final[int] = 120
 
@@ -49,7 +49,7 @@ async def gather_prometheus_inference_measures(
     client_pool: ClientPool,
     routes: list[RouteInfo],
     request_path: str = "/metrics",
-) -> list[InferenceMeasurement]:
+) -> list[InferenceMeasurement[Measurement | HistogramMeasurement]]:
     histogram_metrics_labels: dict[str, tuple[str, ...]] = {}  # [metric name: (bucket label, ...)]
 
     histogram_bucket_metrics: defaultdict[str, dict[UUID, tuple[Decimal, ...]]] = defaultdict(
@@ -122,7 +122,7 @@ async def gather_prometheus_inference_measures(
                             continue
                         counter_metrics[metric_name][route.route_id] = Decimal(value)
 
-    measures: list[InferenceMeasurement] = []
+    measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
         aggregated_buckets = add_matrices(*per_route_histogram_metrics.values())
         aggregated_count = sum([
@@ -135,7 +135,9 @@ async def gather_prometheus_inference_measures(
         aggregated_histogram_measurement = HistogramMeasurement(
             buckets={
                 label: Decimal(value)
-                for label, value in zip(histogram_metrics_labels[metric_name], aggregated_buckets)
+                for label, value in zip(
+                    histogram_metrics_labels[metric_name], aggregated_buckets, strict=True
+                )
             },
             count=aggregated_count,
             sum=aggregated_sum,
@@ -144,7 +146,9 @@ async def gather_prometheus_inference_measures(
             route_id: HistogramMeasurement(
                 buckets={
                     label: Decimal(value)
-                    for label, value in zip(histogram_metrics_labels[metric_name], values)
+                    for label, value in zip(
+                        histogram_metrics_labels[metric_name], values, strict=True
+                    )
                 },
                 count=count,
                 sum=sum,
@@ -160,6 +164,7 @@ async def gather_prometheus_inference_measures(
                     histogram_sum_metrics[metric_name].get(route_id)
                     for route_id in per_route_histogram_metrics.keys()
                 ],
+                strict=True,
             )
         }
         measures.append(
@@ -201,12 +206,12 @@ async def gather_prometheus_inference_measures(
 
 async def gather_inference_measures(
     client_pool: ClientPool, circuit: Circuit
-) -> list[InferenceMeasurement] | None:
+) -> list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None:
     if not isinstance(circuit.app_info, InferenceAppInfo):
         raise InvalidAppInfoTypeError(
             f"Expected InferenceAppInfo, got {type(circuit.app_info).__name__}"
         )
-    measures: list[InferenceMeasurement] = []
+    measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
 
     match circuit.app_info.runtime_variant:
         case RuntimeVariant.VLLM:
@@ -266,7 +271,7 @@ async def gather_inference_measures(
             return None
 
 
-async def collect_inference_metric(root_ctx: RootContext, interval: float) -> None:
+async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> None:
     try:
         inference_circuits = [
             circuit
@@ -277,13 +282,15 @@ async def collect_inference_metric(root_ctx: RootContext, interval: float) -> No
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
-        _tasks: list[asyncio.Task[list[InferenceMeasurement] | None]] = [
+        _tasks: list[
+            asyncio.Task[list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None]
+        ] = [
             asyncio.create_task(gather_inference_measures(root_ctx.http_client_pool, c))
             for c in inference_circuits
         ]
 
         results = await asyncio.gather(*_tasks, return_exceptions=True)
-        for circuit, result in zip(inference_circuits, results):
+        for circuit, result in zip(inference_circuits, results, strict=True):
             if not result:  # Unsupported runtime variant (custom, Triton, ...)
                 continue
             if isinstance(result, BaseException):

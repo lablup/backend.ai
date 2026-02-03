@@ -7,13 +7,14 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, Optional, cast, override
+from typing import Any, Final, cast, override
 
 import aiofiles
 import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -35,6 +36,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
@@ -49,7 +51,6 @@ from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportPipeline,
     ImportStep,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
@@ -73,7 +74,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
         client: ManagerHTTPClient,
         storage_name: str,
         filepath: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._filepath = filepath
@@ -86,7 +87,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
             yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         # Guess content type from file extension
         content_type, _ = mimetypes.guess_type(self._filepath)
         return content_type or "application/octet-stream"
@@ -101,7 +102,7 @@ class ReservoirVFSFileDownloader:
     _model_id: str
     _revision: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
+    _progress_task: asyncio.Task[None] | None
     _bytes_downloaded: int
 
     def __init__(
@@ -111,7 +112,7 @@ class ReservoirVFSFileDownloader:
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._client = client
         self._storage_name = storage_name
         self._redis_client = redis_client
@@ -197,7 +198,7 @@ class ReservoirVFSFileDownloader:
                         f"Network error during download: {e}, Downloaded {self._bytes_downloaded} bytes before failure"
                     )
                     raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.error(f"Timeout after downloading {self._bytes_downloaded} bytes")
                     raise
         except Exception as e:
@@ -251,12 +252,12 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
     _size: int
     _options: BucketCopyOptions
     _download_chunk_size: int
-    _content_type: Optional[str]
+    _content_type: str | None
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
+    _progress_task: asyncio.Task[None] | None
 
     def __init__(
         self,
@@ -265,11 +266,11 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
         size: int,
         options: BucketCopyOptions,
         download_chunk_size: int,
-        content_type: Optional[str],
+        content_type: str | None,
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-    ):
+    ) -> None:
         self._src_s3_client = src_s3_client
         self._key = key
         self._size = size
@@ -388,7 +389,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                 log.warning(f"Failed to update final status in Redis: {redis_err}")
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type
 
 
@@ -415,7 +416,7 @@ class ReservoirService:
     _manager_client_pool: ManagerHTTPClientPool
     _redis_client: ValkeyArtifactDownloadTrackingClient
 
-    def __init__(self, args: ReservoirServiceArgs):
+    def __init__(self, args: ReservoirServiceArgs) -> None:
         self._background_task_manager = args.background_task_manager
         self._event_producer = args.event_producer
         self._reservoir_registry_configs = args.reservoir_registry_configs
@@ -429,7 +430,7 @@ class ReservoirService:
         self,
         registry_name: str,
         artifact_revision_id: uuid.UUID,
-    ) -> Optional[VerificationStepResult]:
+    ) -> VerificationStepResult | None:
         """
         Fetch verification result from remote reservoir manager.
 
@@ -467,9 +468,10 @@ class ReservoirService:
         registry_name: str,
         model: ModelTarget,
         reporter: ProgressReporter,
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_id: uuid.UUID,
+        storage_prefix: str | None = None,
     ) -> None:
         """
         Import a single model from a reservoir registry to a reservoir storage.
@@ -481,9 +483,12 @@ class ReservoirService:
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline to execute
             artifact_revision_id: The artifact revision ID for verification result lookup
+            storage_prefix: Custom prefix path for storing imported models.
+                If None, uses default path.
+                If "/", stores files at root.
         """
         success = False
-        verification_result: Optional[VerificationStepResult] = None
+        verification_result: VerificationStepResult | None = None
         try:
             if model.revision is None:
                 raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
@@ -495,6 +500,7 @@ class ReservoirService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
+                custom_storage_prefix=storage_prefix,
             )
 
             # Execute import pipeline
@@ -524,11 +530,12 @@ class ReservoirService:
         self,
         registry_name: str,
         models: list[ModelTarget],
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
         artifact_revision_ids: list[uuid.UUID],
+        storage_prefix: str | None = None,
     ) -> uuid.UUID:
-        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
+        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult[Any]:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")
@@ -563,6 +570,7 @@ class ReservoirService:
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
                             artifact_revision_id=artifact_revision_id,
+                            storage_prefix=storage_prefix,
                         )
 
                         successful_models += 1
@@ -572,7 +580,7 @@ class ReservoirService:
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{model_count}"
+                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
                         )
                         errors.append(str(e))
                     finally:
@@ -592,13 +600,12 @@ class ReservoirService:
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {str(e)}")
-                return DispatchResult.error(f"Batch import failed: {str(e)}")
+                log.error(f"Batch model import failed: {e!s}")
+                return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
 
-        bgtask_id = await self._background_task_manager.start(_import_models_batch)
-        return bgtask_id
+        return await self._background_task_manager.start(_import_models_batch)
 
 
 # Import Pipeline Steps
@@ -635,11 +642,13 @@ class ReservoirDownloadStep(ImportStep[None]):
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
         # Get storage mapping for download step
-        download_storage_name = context.storage_step_mappings.get(
+        download_storage_target: StorageTarget | None = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
-        if not download_storage_name:
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
+
+        download_storage_name = download_storage_target.name
 
         # Get registry configuration
         registry_config = self._registry_configs.get(context.registry_name)
@@ -653,7 +662,10 @@ class ReservoirDownloadStep(ImportStep[None]):
         # In a real implementation, you'd query the database to get this information
         model = context.model
         revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        model_prefix = f"{model.model_id}/{revision}"
+
+        # Default prefix: {model_id}/{revision}
+        default_prefix = f"{model.model_id}/{revision}"
+        model_prefix = self._resolve_storage_prefix(context, default_prefix)
 
         # Determine storage type based on the actual download storage object type
         if isinstance(self._download_storage, VFSStorage):
@@ -668,9 +680,11 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         if storage_type == "vfs":
             # Handle VFS storage type
-            dest_path = (
-                cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
-            )
+            base_path = cast(VFSStorage, self._download_storage).base_path
+            if model_prefix:
+                dest_path = base_path / model_prefix
+            else:
+                dest_path = base_path
             bytes_copied = await self._handle_vfs_download(
                 registry_config, context, model_prefix, dest_path
             )
@@ -786,7 +800,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             return total_bytes
 
         except Exception as e:
-            log.error(f"VFS download failed for {model_prefix}: {str(e)}")
+            log.error(f"VFS download failed for {model_prefix}: {e!s}")
             raise
 
     async def _handle_object_storage_download(
@@ -826,8 +840,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool and verify it's ObjectStorage type
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(
@@ -860,8 +874,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         options: BucketCopyOptions,
         model_id: str,
         revision: str,
-        progress_reporter: Optional[ProgressReporter],
-        key_prefix: Optional[str] = None,
+        progress_reporter: ProgressReporter | None,
+        key_prefix: str | None = None,
     ) -> tuple[list[tuple[FileObjectData, str]], int]:
         """Direct copy from Reservoir S3 to target storage"""
         dst_client, bucket_name = self._get_s3_client(storage_pool, storage_name)
@@ -869,8 +883,8 @@ class ReservoirDownloadStep(ImportStep[None]):
         # Get storage from pool to access configuration
         try:
             storage = storage_pool.get_storage(storage_name)
-        except KeyError:
-            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+        except KeyError as e:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool") from e
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage type")
@@ -955,7 +969,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 )
 
                 log.trace("[stream_bucket_to_bucket] done key={} bytes={}", key, size)
-                return size if size >= 0 else 0
+                return max(size, 0)
 
         # TODO: Replace this with global semaphore
         sizes = await asyncio.gather(*(_copy_single_object(k) for k in target_keys))
@@ -983,7 +997,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         self,
         *,
         s3_client: S3Client,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
     ) -> tuple[list[str], dict[str, int], int]:
         """
         List all non-marker object keys in the given bucket (optionally under a prefix).
@@ -1052,9 +1066,9 @@ class ReservoirArchiveStep(ModelArchiveStep):
 
 
 def create_reservoir_import_pipeline(
-    storage_pool: StoragePool,
+    storage_pool: AbstractStoragePool,
     registry_configs: dict[str, Any],
-    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
@@ -1067,11 +1081,11 @@ def create_reservoir_import_pipeline(
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
         # Get the download storage object from the pool
-        download_storage_name = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
-        if not download_storage_name:
+        download_storage_target = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
-        download_storage = storage_pool.get_storage(download_storage_name)
+        download_storage = download_storage_target.resolve_storage(storage_pool)
         steps.append(
             ReservoirDownloadStep(
                 registry_configs,
@@ -1095,7 +1109,7 @@ class TarExtractor:
 
     _stream_reader: StreamReader
 
-    def __init__(self, stream_reader: StreamReader):
+    def __init__(self, stream_reader: StreamReader) -> None:
         self._stream_reader = stream_reader
 
     async def extract_to(self, target_dir: Path) -> int:

@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.clients.valkey_client.valkey_cache import ValkeyCache
-from ai.backend.manager.data.app_config.types import (
-    AppConfigCreator,
-    AppConfigData,
-    AppConfigModifier,
-)
-from ai.backend.manager.models.app_config import AppConfigScopeType
+from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
+from ai.backend.manager.repositories.base.creator import Creator
 
 from .cache_source import AppConfigCacheSource
 from .db_source import AppConfigDBSource
@@ -50,7 +48,7 @@ class AppConfigRepository:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-    ) -> Optional[AppConfigData]:
+    ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
         return await self._db_source.get_config(scope_type, scope_id)
 
@@ -79,7 +77,7 @@ class AppConfigRepository:
 
         return merged_config.merged_config
 
-    async def create_config(self, creator: AppConfigCreator) -> AppConfigData:
+    async def create_config(self, creator: Creator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         return await self._db_source.create_config(creator)
 
@@ -87,14 +85,14 @@ class AppConfigRepository:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-        modifier: AppConfigModifier,
+        spec: AppConfigUpdaterSpec,
     ) -> AppConfigData:
         """
         Create or update app configuration.
 
         Invalidates cache after update.
         """
-        result = await self._db_source.upsert_config(scope_type, scope_id, modifier)
+        result = await self._db_source.upsert_config(scope_type, scope_id, spec)
         await self._cache_source.invalidate_config(scope_type, scope_id)
 
         return result

@@ -6,6 +6,7 @@ Create Date: 2023-07-05 23:39:21.631462
 
 """
 
+import uuid
 from collections import defaultdict
 from typing import Any
 
@@ -44,31 +45,33 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id = sa.Column(
+        id: sa.Column[GUID[uuid.UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
             nullable=False,
             primary_key=True,
         )
-        agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
+        agent_ids: sa.Column[list[str] | None] = sa.Column(
+            "agent_ids", sa.ARRAY(sa.String), nullable=True
+        )
 
-    kernel_cnt = conn.execute(sa.select([sa.func.count()]).select_from(kernels)).scalar()
+    kernel_cnt: int = conn.execute(sa.select(sa.func.count()).select_from(kernels)).scalar() or 0
 
     for offset in range(0, kernel_cnt, PAGE_SIZE):
-        session_agent_ids_map = defaultdict(set)
+        session_agent_ids_map: dict[Any, set[Any]] = defaultdict(set)
         session_id_query = (
-            sa.select([sa.distinct(kernels.c.session_id)])
+            sa.select(sa.distinct(kernels.c.session_id))
             .where(kernels.c.agent.is_not(None))
             .order_by(kernels.c.session_id)
             .offset(offset)
             .limit(PAGE_SIZE)
         )
         session_ids = conn.execute(session_id_query).scalars().all()
-        stmt = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
-        kernel_rows: list[dict[str, Any]] = conn.execute(stmt).fetchall()
+        stmt = sa.select(kernels).where(kernels.c.session_id.in_(session_ids))
+        kernel_rows = conn.execute(stmt).fetchall()
         for row in kernel_rows:
-            session_agent_ids_map[row["session_id"]].add(row["agent"])
+            session_agent_ids_map[row.session_id].add(row.agent)
         if session_agent_ids_map:
             conn.execute(
                 sa.update(SessionRow)

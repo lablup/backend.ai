@@ -20,9 +20,7 @@ from collections.abc import (
 from pathlib import Path
 from typing import (
     Any,
-    Optional,
     TypedDict,
-    Union,
 )
 
 import attrs
@@ -37,7 +35,7 @@ log = BraceStyleAdapter(logging.getLogger())
 class Action(TypedDict):
     action: str
     args: Mapping[str, str]
-    ref: Optional[str]
+    ref: str | None
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -50,7 +48,7 @@ class ServiceDefinition:
     env: Mapping[str, str] = attrs.Factory(dict)
     allowed_envs: list[str] = attrs.Factory(list)
     allowed_arguments: list[str] = attrs.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, list[str]]] = attrs.Factory(dict)
+    default_arguments: Mapping[str, None | str | list[str]] = attrs.Factory(dict)
 
 
 class ServiceParser:
@@ -65,27 +63,27 @@ class ServiceParser:
         for service_def_file in path.glob("*.json"):
             log.debug(f"loading service-definition from {service_def_file}")
             try:
-                with open(service_def_file.absolute(), "rb") as fr:
+                with service_def_file.absolute().open("rb") as fr:
                     raw_service_def = json.load(fr)
                     # translate naming differences
                     if "prestart" in raw_service_def:
                         raw_service_def["prestart_actions"] = raw_service_def["prestart"]
                         del raw_service_def["prestart"]
-            except IOError:
+            except OSError as e:
                 raise InvalidServiceDefinition(
                     f"could not read the service-def file: {service_def_file.name}"
-                )
-            except json.JSONDecodeError:
+                ) from e
+            except json.JSONDecodeError as e:
                 raise InvalidServiceDefinition(
                     f"malformed JSON in service-def file: {service_def_file.name}"
-                )
+                ) from e
             name = service_def_file.stem
             try:
                 self.services[name] = ServiceDefinition(**raw_service_def)
             except TypeError as e:
-                raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+                raise InvalidServiceDefinition(e.args[0][11:]) from e  # lstrip "__init__() "
 
-    def add_model_service(self, name, model_service_info) -> None:
+    def add_model_service(self, name: str, model_service_info: dict[str, Any]) -> None:
         service_def = ServiceDefinition(
             model_service_info["start_command"],
             shell=model_service_info["shell"],
@@ -98,7 +96,7 @@ class ServiceParser:
         service_name: str,
         frozen_envs: Collection[str],
         opts: Mapping[str, Any],
-    ) -> tuple[Optional[Sequence[str]], Mapping[str, str]]:
+    ) -> tuple[Sequence[str] | None, Mapping[str, str]]:
         if service_name not in self.services.keys():
             return None, {}
         service = self.services[service_name]
@@ -108,10 +106,10 @@ class ServiceParser:
         for action in service.prestart_actions:
             try:
                 action_impl = getattr(service_actions, action["action"])
-            except AttributeError:
+            except AttributeError as e:
                 raise InvalidServiceDefinition(
                     f"Service-def for {service_name} used invalid action: {action['action']}"
-                )
+                ) from e
             ret = await action_impl(self.variables, **action["args"])
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
@@ -146,7 +144,7 @@ class ServiceParser:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} not allowed for service {service_name}"
                     )
-                elif env_name in frozen_envs:
+                if env_name in frozen_envs:
                     raise DisallowedEnvironment(
                         f"Environment variable {env_name} can't be overwritten"
                     )
@@ -203,9 +201,9 @@ class ServiceArgumentInterpolator:
                 if last_index < start:
                     yield TokenType.TEXT, s[last_index:start]
                 # the matched expression
-                if (token := match.group("expr1")) is not None:
-                    yield TokenType.EXPR, token
-                elif (token := match.group("expr2")) is not None:
+                if (token := match.group("expr1")) is not None or (
+                    token := match.group("expr2")
+                ) is not None:
                     yield TokenType.EXPR, token
                 last_index = end
             # the rest of string

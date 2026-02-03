@@ -72,7 +72,7 @@ class UserRole(enum.StrEnum):
 class Tables:
     @staticmethod
     def get_users_table() -> sa.Table:
-        users_table = sa.Table(
+        return sa.Table(
             "users",
             mapper_registry.metadata,
             IDColumn("uuid"),
@@ -81,11 +81,10 @@ class Tables:
             sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
             extend_existing=True,
         )
-        return users_table
 
     @staticmethod
     def get_groups_table() -> sa.Table:
-        groups_table = sa.Table(
+        return sa.Table(
             "groups",
             mapper_registry.metadata,
             IDColumn(),
@@ -99,11 +98,10 @@ class Tables:
             ),
             extend_existing=True,
         )
-        return groups_table
 
     @staticmethod
     def get_association_groups_users_table() -> sa.Table:
-        association_groups_users_table = sa.Table(
+        return sa.Table(
             "association_groups_users",
             mapper_registry.metadata,
             IDColumn(),
@@ -116,12 +114,13 @@ class Tables:
             ),
             extend_existing=True,
         )
-        return association_groups_users_table
 
 
 class RoleCreator:
     @classmethod
-    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    def _create_admin_roles(
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
+    ) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_project_id_map: dict[str, uuid.UUID] = {}
@@ -135,7 +134,9 @@ class RoleCreator:
         return role_name_project_id_map
 
     @classmethod
-    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    def _create_member_roles(
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
+    ) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_project_id_map: dict[str, uuid.UUID] = {}
@@ -197,7 +198,7 @@ class RoleCreator:
 
     @classmethod
     def _create_project_admin_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_project_id_map = cls._create_admin_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_project_id_map.keys()))
@@ -211,7 +212,7 @@ class RoleCreator:
 
     @classmethod
     def _create_project_member_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_project_id_map = cls._create_member_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_project_id_map.keys()))
@@ -224,7 +225,9 @@ class RoleCreator:
         cls._create_member_permissions(db_conn, permission_group_ids)
 
     @classmethod
-    def _query_project_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_project_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all project rows with pagination.
         """
@@ -258,7 +261,7 @@ class RoleMapper:
     @classmethod
     def _query_admin_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query admin role rows with their associated users.
         All projects in a domain is queried with domain admin users.
@@ -337,7 +340,7 @@ class RoleMapper:
     @classmethod
     def _query_member_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query member role rows with their associated users.
         """

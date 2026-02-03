@@ -1,13 +1,13 @@
 import shutil
 import sys
-from typing import Any, Callable, Iterator, List, Literal, Mapping, Optional, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, Literal
 
 import click
 from tabulate import tabulate
 
 from ai.backend.client.output.types import FieldSpec
-
-from ..pagination import MAX_PAGE_SIZE
+from ai.backend.client.pagination import MAX_PAGE_SIZE
 
 
 def get_preferred_page_size() -> int:
@@ -21,24 +21,28 @@ def tabulate_items(
     items: Iterator[_Item],
     fields: Sequence[FieldSpec],
     *,
-    page_size: Optional[int] = None,
-    item_formatter: Optional[Callable[[_Item], None]] = None,
+    page_size: int | None = None,
+    item_formatter: Callable[[_Item], None] | None = None,
     tablefmt: Literal["simple", "plain", "github"] = "simple",
 ) -> Iterator[str]:
     is_first = True
     output_count = 0
-    buffered_items: List[_Item] = []
+    buffered_items: list[_Item] = []
 
     # check table header/footer sizes
     header_height = 0
     if tablefmt in ("simple", "github"):
         header_height = 2
-    assert header_height >= 0
+    if header_height < 0:
+        raise ValueError("Header height must be non-negative")
 
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(
             [
-                [f.formatter.format_console(v, f) for f, v in zip(fields, item.values())]
+                [
+                    f.formatter.format_console(v, f)
+                    for f, v in zip(fields, item.values(), strict=True)
+                ]
                 for item in buffered_items
             ],
             headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),
@@ -75,7 +79,7 @@ def tabulate_items(
 
 def echo_via_pager(
     text_generator: Iterator[str],
-    break_callback: Optional[Callable[[], None]] = None,
+    break_callback: Callable[[], None] | None = None,
 ) -> None:
     """
     A variant of ``click.echo_via_pager()`` which implements our own simplified pagination.

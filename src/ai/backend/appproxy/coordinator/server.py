@@ -10,15 +10,16 @@ import logging
 import os
 import pwd
 import signal
+import socket
 import ssl
 import sys
 import time
 import traceback
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
 import aiohttp_cors
@@ -29,6 +30,7 @@ import click
 import jinja2
 import memray
 import pyroscope
+import uvloop
 from aiohttp import web
 from pydantic import ValidationError
 from setproctitle import setproctitle
@@ -50,6 +52,8 @@ from ai.backend.appproxy.common.errors import (
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
+    DoCheckWorkerLostEvent,
+    DoHealthCheckEvent,
     WorkerLostEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -69,6 +73,7 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.config import ModelHealthCheck
@@ -82,6 +87,14 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
+from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+from ai.backend.common.leader.tasks import (
+    EventProducerTask,
+    EventTaskSpec,
+    LeaderCron,
+    PeriodicTask,
+)
+from ai.backend.common.lock import FileLock, RedisLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -120,8 +133,10 @@ from .errors import (
     MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
+from .health_checker import HealthCheckEngine
 from .models import Circuit, Endpoint, Worker
-from .models.utils import execute_with_txn_retry
+from .models.utils import connect_database, execute_with_txn_retry
+from .pglock import PgAdvisoryLock
 from .types import (
     CircuitManager,
     CleanupContext,
@@ -134,7 +149,7 @@ from .types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 global_subapp_pkgs: Final[list[str]] = [
     ".circuit_v1",
@@ -158,8 +173,7 @@ async def request_context_aware_middleware(
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await handler(request)
-    return resp
+    return await handler(request)
 
 
 @web.middleware
@@ -172,13 +186,12 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
         raise ex
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -190,7 +203,7 @@ async def exception_middleware(
         resp = await handler(request)
     except ValidationError as ex:
         log.exception("Failed to create response model: {}", ex.json(indent=2))
-        raise InternalServerError()
+        raise InternalServerError() from ex
     except BackendAIError as ex:
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
@@ -201,23 +214,22 @@ async def exception_middleware(
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-        else:
-            return aiohttp_jinja2.render_template(
-                "error",
-                request,
-                ex.body_dict,
-                status=ex.status_code,
-            )
+        return aiohttp_jinja2.render_template(
+            "error",
+            request,
+            ex.body_dict,
+            status=ex.status_code,
+        )
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -226,9 +238,8 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
@@ -253,7 +264,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     # Keep redis_lock for distributed locking (not yet migrated)
-    root_ctx.redis_lock = redis_helper.get_redis_object(
+    root_ctx.redis_lock = redis_helper.get_redis_object_for_lock(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
@@ -280,8 +291,8 @@ async def _make_message_queue(
     node_id: str,
     redis_config: RedisConfig,
     *,
-    anycast_stream_key=APPPROXY_ANYCAST_STREAM_KEY,
-    broadcast_channel=APPPROXY_BROADCAST_CHANNEL,
+    anycast_stream_key: str = APPPROXY_ANYCAST_STREAM_KEY,
+    broadcast_channel: str = APPPROXY_BROADCAST_CHANNEL,
     use_experimental_redis_event_dispatcher: bool = False,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config.to_dict())
@@ -306,11 +317,10 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    else:
-        return await RedisQueue.create(
-            stream_redis_target,
-            args,
-        )
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
+    )
 
 
 @asynccontextmanager
@@ -365,20 +375,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     This replaces the GlobalTimer-based approach with a leader-based approach
     where only the elected leader coordinator instance runs periodic tasks.
     """
-    import socket
-
-    from ai.backend.appproxy.common.events import (
-        DoCheckWorkerLostEvent,
-        DoHealthCheckEvent,
-    )
-    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
-    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
-    from ai.backend.common.leader.tasks import (
-        EventProducerTask,
-        EventTaskSpec,
-        LeaderCron,
-        PeriodicTask,
-    )
 
     # Create ValkeyLeaderClient for leader election
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
@@ -453,8 +449,16 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         if traefik_config.etcd.password:
             creds = {"password": traefik_config.etcd.password}
 
+        # Handle addr as either single HostPortPair or list
+        addr = traefik_config.etcd.addr
+        if isinstance(addr, list):
+            # Use first address from the list
+            host_port = addr[0]
+        else:
+            host_port = addr
+
         root_ctx.traefik_etcd = TraefikEtcd(
-            HostPortPair(traefik_config.etcd.addr.host, traefik_config.etcd.addr.port),
+            HostPortPair(host_port.host, host_port.port),
             traefik_config.etcd.namespace,
             {ConfigScopes.GLOBAL: ""},
             credentials=creds,
@@ -466,7 +470,7 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 async def on_worker_lost_event(
     context: RootContext,
-    worker_id: AgentId,
+    _worker_id: AgentId,
     event: WorkerLostEvent,
 ) -> None:
     log.warning("detected termination of proxy worker {}", event.worker_id)
@@ -485,7 +489,7 @@ async def on_worker_lost_event(
 
 async def on_route_update_event(
     context: RootContext,
-    worker_id: AgentId,
+    _worker_id: AgentId,
     event: EndpointRouteListUpdatedEvent,
 ) -> None:
     (
@@ -589,8 +593,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.utils import connect_database
-
     async with connect_database(root_ctx.local_config.db) as db:
         root_ctx.db = db
         yield
@@ -604,9 +606,6 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from ..common.events import DoHealthCheckEvent
-    from .health_checker import HealthCheckEngine
-
     health_engine = HealthCheckEngine(
         root_ctx.db,
         root_ctx.core_event_producer,
@@ -618,7 +617,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.health_engine = health_engine
     await health_engine.start()
 
-    async def _check_health(context: None, src: AgentId, event: DoHealthCheckEvent) -> None:
+    async def _check_health(_context: None, _src: AgentId, _event: DoHealthCheckEvent) -> None:
         try:
             # Check all endpoints with health checking enabled
             # This now only performs individual route health checks
@@ -644,7 +643,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    async def _collect(context: None, src: AgentId, event: DoCheckUnusedPortEvent) -> None:
+    async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
         try:
 
             async def _update(sess: SASession) -> list[Circuit]:
@@ -656,7 +655,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 if len(non_inference_http_circuits) == 0:
                     return []
                 last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                    f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                    f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
                 ])
                 unused_circuits: list[Circuit] = []
 
@@ -667,8 +666,11 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                     if access:
                         last_access_time = current_time - float(access.decode("utf-8"))
                     else:
+                        circuit_created_at = non_inference_http_circuits[idx].created_at
                         last_access_time = (
-                            current_time - non_inference_http_circuits[idx].created_at.timestamp()
+                            current_time - circuit_created_at.timestamp()
+                            if circuit_created_at
+                            else 0.0
                         )
                     if (
                         last_access_time
@@ -825,17 +827,16 @@ async def metrics(request: web.Request) -> web.Response:
         remote_ip = ipaddress.IPv4Network(request.remote)
         if not remote_ip.subnet_of(allowed_network):
             raise GenericForbidden
-    except ValueError:
-        raise GenericForbidden
+    except ValueError as e:
+        raise GenericForbidden from e
 
-    response = web.Response(
+    return web.Response(
         text=root_ctx.metrics.to_prometheus(),
         content_type="text/plain",
     )
-    return response
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -843,19 +844,15 @@ async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
     advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
-    if advertised_addr is None:
-        return web.json_response({
-            "api_version": "v2",
-        })
     return web.json_response({
         "api_version": "v2",
-        "advertise_address": str(advertised_addr),
+        "advertise_address": advertised_addr,
     })
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -876,7 +873,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -903,19 +900,15 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
-            from ai.backend.common.lock import FileLock
-
-            return lambda lock_id, lifetime_hint: FileLock(
+            return lambda lock_id, lifetime_hint: FileLock(  # noqa: ARG005
                 ipc_base_path / f"{coordinator_id}.{lock_id}.lock",
                 timeout=0,
             )
         case "pg_advisory":
-            from .pglock import PgAdvisoryLock
-
-            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
+            return lambda lock_id, lifetime_hint: PgAdvisoryLock(  # noqa: ARG005
+                root_ctx.db, lock_id
+            )
         case "redlock":
-            from ai.backend.common.lock import RedisLock
-
             redlock_config = root_ctx.local_config.proxy_coordinator.redlock_config
 
             return lambda lock_id, lifetime_hint: RedisLock(
@@ -933,7 +926,7 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] = [],
+    subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
     root_ctx.metrics = CoordinatorMetricRegistry.instance()
@@ -953,7 +946,7 @@ def build_root_app(
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -979,7 +972,7 @@ def build_root_app(
         ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
@@ -991,7 +984,7 @@ def build_root_app(
                 await stack.enter_async_context(cctx_instance)
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:
@@ -1005,13 +998,11 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
-    if subapp_pkgs is None:
-        subapp_pkgs = []
     for pkg_name in subapp_pkgs:
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.coordinator.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 
@@ -1025,7 +1016,7 @@ async def server_main(
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
-    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None]:
+    async def aiomonitor_ctx(root_app: web.Application) -> AsyncGenerator[None, None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -1053,7 +1044,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None]:
+    async def webapp_ctx() -> AsyncGenerator[None, None]:
         ssl_ctx = None
         if local_config.proxy_coordinator.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -1159,7 +1150,7 @@ async def server_main_logwrapper(
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
+def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-coordinator service as a foreground process.
     """
@@ -1206,10 +1197,9 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match server_config.proxy_coordinator.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

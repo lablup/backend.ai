@@ -19,12 +19,16 @@ from ai.backend.manager.services.vfs_storage.actions.list import (
     ListVFSStorageAction,
     ListVFSStorageActionResult,
 )
+from ai.backend.manager.services.vfs_storage.actions.search import (
+    SearchVFSStoragesAction,
+    SearchVFSStoragesActionResult,
+)
 from ai.backend.manager.services.vfs_storage.actions.update import (
     UpdateVFSStorageAction,
     UpdateVFSStorageActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFSStorageService:
@@ -40,7 +44,7 @@ class VFSStorageService:
         """
         Create a new VFS storage.
         """
-        log.info("Creating VFS storage with data: {}", action.creator.fields_to_store())
+        log.info("Creating VFS storage with data: {}", action.creator)
         storage_data = await self._vfs_storage_repository.create(action.creator)
         return CreateVFSStorageActionResult(result=storage_data)
 
@@ -48,8 +52,8 @@ class VFSStorageService:
         """
         Update an existing VFS storage.
         """
-        log.info("Updating VFS storage with data: {}", action.modifier.fields_to_update())
-        storage_data = await self._vfs_storage_repository.update(action.id, action.modifier)
+        log.info("Updating VFS storage with id: {}", action.updater.pk_value)
+        storage_data = await self._vfs_storage_repository.update(action.updater)
         return UpdateVFSStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteVFSStorageAction) -> DeleteVFSStorageActionResult:
@@ -74,10 +78,23 @@ class VFSStorageService:
 
         return GetVFSStorageActionResult(result=storage_data)
 
-    async def list(self, action: ListVFSStorageAction) -> ListVFSStorageActionResult:
+    async def list(self, _action: ListVFSStorageAction) -> ListVFSStorageActionResult:
         """
         List all VFS storages.
         """
         log.info("Listing VFS storages")
         storage_data_list = await self._vfs_storage_repository.list_vfs_storages()
         return ListVFSStorageActionResult(data=storage_data_list)
+
+    async def search(self, action: SearchVFSStoragesAction) -> SearchVFSStoragesActionResult:
+        """
+        Search VFS storages with pagination and filtering.
+        """
+        log.info("Searching VFS storages with querier: {}", action.querier)
+        result = await self._vfs_storage_repository.search(action.querier)
+        return SearchVFSStoragesActionResult(
+            storages=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

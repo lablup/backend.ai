@@ -3,12 +3,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.health.database import DatabaseHealthChecker
+from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.health_checker import ServiceHealthChecker
-
-from ...config import ServerConfig
-from ...health.database import DatabaseHealthChecker
-from ...models.utils import ExtendedAsyncSAEngine, connect_database
 
 
 class DatabaseProvider(DependencyProvider[ServerConfig, ExtendedAsyncSAEngine]):

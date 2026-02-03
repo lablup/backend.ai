@@ -3,15 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator, Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Final,
-    Iterable,
-    Mapping,
-    Optional,
-    Tuple,
 )
 from weakref import WeakSet
 
@@ -52,15 +48,16 @@ from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.resource import NoCurrentTaskContext, ProjectNotFound
+from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
+from ai.backend.manager.exceptions import InvalidArgument
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.types import Sentinel
 
-from ..errors.common import GenericForbidden
-from ..errors.kernel import SessionNotFound
-from ..errors.resource import NoCurrentTaskContext, ProjectNotFound
-from ..events.hub.propagators.session import SessionEventPropagator
-from ..exceptions import InvalidArgument
-from ..models import UserRole, groups
-from ..models.session import SessionRow
-from ..types import Sentinel
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
@@ -73,7 +70,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.TOKEN
 
-SessionEventInfo = Tuple[str, dict, str, Optional[int]]
+SessionEventInfo = tuple[str, dict[str, Any], str, int | None]
 
 
 @server_status_required(READ_ALLOWED)
@@ -140,12 +137,12 @@ async def push_session_events(
         group_id = WILDCARD
     else:
         async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
-            query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
+            query = sa.select(groups.c.id).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
             if row is None:
                 raise ProjectNotFound
-            group_id = row["id"]
+            group_id = row.id
 
     filters = {
         "user_role": user_role,
@@ -167,8 +164,31 @@ async def push_session_events(
                 raise InvalidArgument(f"Invalid scope: {scope}")
 
     async with sse_response(request) as resp:
-        while not resp.prepared:
-            await asyncio.sleep(0.1)
+        # Wait for response to be prepared using asyncio.Event pattern
+        ready_event = asyncio.Event()
+
+        async def check_prepared() -> None:
+            # Poll until prepared, setting event when ready
+            max_iterations = 50  # 5 seconds timeout at 0.1s per iteration
+            for _ in range(max_iterations):
+                if resp.prepared:
+                    ready_event.set()
+                    return
+                await asyncio.sleep(0.1)
+            # If not ready after timeout, still set the event to avoid hanging
+            ready_event.set()
+
+        check_task = asyncio.create_task(check_prepared())
+        try:
+            await ready_event.wait()
+        finally:
+            if not check_task.done():
+                check_task.cancel()
+                try:
+                    await check_task
+                except asyncio.CancelledError:
+                    pass
+
         propagator = SessionEventPropagator(resp, root_ctx.db, filters)
         root_ctx.event_hub.register_event_propagator(propagator, aliases)
         try:
@@ -233,7 +253,7 @@ async def push_background_task_events(
 
 async def _propagate_events(
     app: web.Application,
-    agent_id: AgentId,
+    _agent_id: AgentId,
     event: BaseSessionEvent | BaseKernelEvent | SchedulingBroadcastEvent,
 ) -> None:
     """
@@ -261,14 +281,10 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     # Keep legacy event dispatcher subscriptions for backward compatibility
     # These now delegate to the event hub
     event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, app, _propagate_events)
-    # event_dispatcher.subscribe(SessionScheduledBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
     event_dispatcher.subscribe(KernelPreparingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelPullingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelCreatingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelStartedBroadcastEvent, app, _propagate_events)
-    # event_dispatcher.subscribe(SessionPreparingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
-    # event_dispatcher.subscribe(SessionCreatingBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
-    # event_dispatcher.subscribe(SessionStartedBroadcastEvent, app, _propagate_events)  # replaced by SchedulingBroadcastEvent
     event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, app, _propagate_events)
     event_dispatcher.subscribe(KernelCancelledBroadcastEvent, app, _propagate_events)
@@ -280,8 +296,8 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
 
     # NOTE: SchedulingBroadcastEvent will replace most other session-related events
     #       since the Sokovan scheduler has been introduced.
-    #       Currently its propagation to the Event Hub is already handled in the
-    #       scheduler.dispatcher module.
+    #       Currently its propagation to the Event Hub is already handled by the
+    #       Sokovan scheduler itself.
     # FYI: In the future, we don't have to subscribe the events manually as the
     #      event dispatching mechanism will be centralized and migrated into the
     #      Event Hub's implementation detail.
@@ -306,7 +322,7 @@ async def events_shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "events"
     app["events.context"] = PrivateContext()

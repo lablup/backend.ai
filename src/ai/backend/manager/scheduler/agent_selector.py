@@ -2,32 +2,36 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Optional, Sequence, override
+from typing import override
 
 import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
     ArchName,
+    ResourceGroupID,
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.session import SessionRow
 
-from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
+    AbstractResourceGroupState,
     NullAgentSelectorState,
     RoundRobinState,
     RRAgentSelectorState,
-    T_ResourceGroupState,
 )
 from .utils import (
     get_requested_architecture,
     sort_requested_slots_by_priority,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
@@ -51,7 +55,9 @@ def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
     return num_extras
 
 
-class BaseAgentSelector(AbstractAgentSelector[T_ResourceGroupState]):
+class BaseAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractAgentSelector[T_ResourceGroupState]
+):
     @property
     @override
     def config_iv(self) -> t.Dict:
@@ -91,7 +97,7 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -106,7 +112,7 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
                 *[agent.available_slots.get(key, -sys.maxsize) for key in resource_priorities],
             ],
         )
-        return chosen_agent.id
+        return AgentId(chosen_agent.id)
 
 
 class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
@@ -120,15 +126,20 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         if isinstance(pending_session_or_kernel, KernelRow):
             sgroup_name = pending_session_or_kernel.scaling_group
-            requested_architecture = ArchName(pending_session_or_kernel.architecture)
+            arch_str = pending_session_or_kernel.architecture
         else:
             sgroup_name = pending_session_or_kernel.scaling_group_name
-            requested_architecture = ArchName(get_requested_architecture(pending_session_or_kernel))
+            arch_str = get_requested_architecture(pending_session_or_kernel)
+        if sgroup_name is None:
+            return None
+        if arch_str is None:
+            return None
+        requested_architecture = ArchName(arch_str)
 
-        state = await self.state_store.load(sgroup_name, "agselector.roundrobin")
+        state = await self.state_store.load(ResourceGroupID(sgroup_name), "agselector.roundrobin")
         rr_state = state.roundrobin_states.get(requested_architecture, None)
 
         if rr_state is None:
@@ -153,12 +164,12 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
                     next_index=(inspected_idx + 1) % len(agents)
                 )
                 break
-        await self.state_store.store(sgroup_name, "agselector.roundrobin", state)
+        await self.state_store.store(ResourceGroupID(sgroup_name), "agselector.roundrobin", state)
 
         if not chosen_agent:
             return None
 
-        return chosen_agent.id
+        return AgentId(chosen_agent.id)
 
 
 class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
@@ -181,7 +192,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -209,7 +220,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
             ),
         )
 
-        return chosen_agent.id
+        return AgentId(chosen_agent.id)
 
 
 class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
@@ -223,7 +234,7 @@ class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -241,4 +252,4 @@ class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
                 ],
             ],
         )
-        return chosen_agent.id
+        return AgentId(chosen_agent.id)

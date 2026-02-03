@@ -4,8 +4,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.base import (
+from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
     CreateVFolderAction,
@@ -22,12 +21,14 @@ from ..actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
 class VFolderProcessors(AbstractProcessorPackage):
@@ -46,13 +47,14 @@ class VFolderProcessors(AbstractProcessorPackage):
     delete_forever_vfolder: SingleEntityActionProcessor[
         DeleteForeverVFolderAction, DeleteForeverVFolderActionResult
     ]
+    purge_vfolder: SingleEntityActionProcessor[PurgeVFolderAction, PurgeVFolderActionResult]
     force_delete_vfolder: SingleEntityActionProcessor[
         ForceDeleteVFolderAction, ForceDeleteVFolderActionResult
     ]
     clone_vfolder: SingleEntityActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: SingleEntityActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
 
-    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]):
+    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]) -> None:
         self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.get_vfolder = SingleEntityActionProcessor(service.get, action_monitors)
         self.list_vfolder = ScopeActionProcessor(service.list, action_monitors)
@@ -68,6 +70,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.delete_forever_vfolder = SingleEntityActionProcessor(
             service.delete_forever, action_monitors
         )
+        self.purge_vfolder = SingleEntityActionProcessor(service.purge, action_monitors)
         self.force_delete_vfolder = SingleEntityActionProcessor(
             service.force_delete, action_monitors
         )
@@ -84,6 +87,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             MoveToTrashVFolderAction.spec(),
             RestoreVFolderFromTrashAction.spec(),
             DeleteForeverVFolderAction.spec(),
+            PurgeVFolderAction.spec(),
             ForceDeleteVFolderAction.spec(),
             CloneVFolderAction.spec(),
             GetTaskLogsAction.spec(),

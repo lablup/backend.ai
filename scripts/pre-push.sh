@@ -1,5 +1,19 @@
 #! /bin/bash
-# implementation: backend.ai monorepo standard pre-push hook
+
+# Make it interruptible.
+PGID="$(ps -o pgid= $$ | tr -d ' ')"
+cleanup() {
+  local sig="$1"
+  trap - SIGINT SIGTERM
+  echo -e "\nPre-push hook is interrupted ($sig)." >&2
+  kill -s "${sig}" -- "-${PGID}"
+}
+trap 'cleanup INT' SIGINT
+trap 'cleanup TERM' SIGTERM
+
+# --- Hook Body ---
+set -Eeuo pipefail
+
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 if [ -f .pants.rc ]; then
   local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
@@ -14,7 +28,7 @@ if ! command -v gh &> /dev/null; then
   pants lint check ::
 else
   # Get the base branch name from GitHub if we are on a pull request.
-  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null)
+  BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null || true)
   if [[ -z "$BASE_BRANCH" ]]; then
     if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}/p')" ]; then
       # if we are on the release branch, use it as the base branch.
@@ -40,6 +54,6 @@ else
     ORIGIN="origin"
   fi
   echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
-  pants tailor --check update-build-files --check ::
+  pants tailor --check update-build-files --check --changed-since="${ORIGIN}/${BASE_BRANCH}"
   pants lint check --changed-since="${ORIGIN}/${BASE_BRANCH}"
 fi

@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.scope import BaseScopeAction
+from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import ScopePermissionCheckInput
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
@@ -10,8 +11,6 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-
-from ...validator.scope import ScopeActionValidator
 
 
 class ScopeActionRBACValidator(ScopeActionValidator):

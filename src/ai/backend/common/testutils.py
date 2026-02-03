@@ -1,27 +1,28 @@
+from typing import Any
 from unittest import mock
 
 try:
     # Since Python 3.8, AsyncMock is now part of the stdlib.
     # Python 3.8 also adds magic-mocking async iterators and async context managers.
-    from unittest.mock import AsyncMock  # type: ignore
+    from unittest.mock import AsyncMock
 except ImportError:
     from asynctest import CoroutineMock as AsyncMock  # type: ignore
 
 
-def mock_corofunc(return_value):
+def mock_corofunc(return_value: Any) -> mock.Mock:
     """
     Return mock coroutine function.
 
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs):
+    async def _mock_corofunc(*_args: Any, **_kargs: Any) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs):
+async def mock_awaitable(**kwargs: Any) -> AsyncMock:
     """
     Mock awaitable.
 
@@ -41,13 +42,15 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: Any
+    ) -> None:
         pass

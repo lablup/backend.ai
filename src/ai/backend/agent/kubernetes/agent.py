@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import hashlib
@@ -8,20 +10,13 @@ import shutil
 import signal
 import sys
 import uuid
+from collections.abc import Coroutine, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    FrozenSet,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
     override,
 )
 
@@ -32,7 +27,30 @@ from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    AgentClass,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.exception import K8sError, UnsupportedResource
+from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
+from ai.backend.agent.kernel_registry.recovery.kubernetes_recovery import (
+    KubernetesKernelRegistryRecovery,
+    KubernetesKernelRegistryRecoveryArgs,
+)
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
@@ -61,29 +79,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    AgentClass,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig, ScratchType
-from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel, KernelRegistry
-from ..kernel_registry.recovery.kubernetes_recovery import (
-    KubernetesKernelRegistryRecovery,
-    KubernetesKernelRegistryRecoveryArgs,
-)
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..types import Container, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -110,13 +105,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     scratch_dir: Path
     work_dir: Path
     config_dir: Path
-    internal_mounts: List[Mount] = []
+    internal_mounts: list[Mount] = []
     static_pvc_name: str
     workers: Mapping[str, Mapping[str, str]]
-    config_maps: List[ConfigMap]
+    config_maps: list[ConfigMap]
     agent_sockpath: Path
-    volume_mounts: List[KubernetesVolumeMount]
-    volumes: List[KubernetesAbstractVolume]
+    volume_mounts: list[KubernetesVolumeMount]
+    volumes: list[KubernetesAbstractVolume]
 
     def __init__(
         self,
@@ -174,15 +169,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         loop = current_loop()
         if self.restarting:
             await kube_config.load_kube_config()
 
-            def _kernel_resource_spec_read():
-                with open((self.config_dir / "resource.txt").resolve(), "r") as f:
-                    resource_spec = KernelResourceSpec.read_from_file(f)
-                return resource_spec
+            def _kernel_resource_spec_read() -> KernelResourceSpec:
+                resource_file = (self.config_dir / "resource.txt").resolve()
+                with resource_file.open() as f:
+                    return KernelResourceSpec.read_from_file(f)
 
             resource_spec = await loop.run_in_executor(None, _kernel_resource_spec_read)
             resource_opts = None
@@ -228,7 +223,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             raise K8sError("PVC not Bound")
         self.static_pvc_name = pvc.metadata.name
 
-        def _create_scratch_dirs():
+        def _create_scratch_dirs() -> None:
             self.work_dir.resolve().mkdir(parents=True, exist_ok=True)
             self.work_dir.chmod(0o755)
             self.config_dir.resolve().mkdir(parents=True, exist_ok=True)
@@ -243,7 +238,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             # we need to touch them first to avoid their "ghost" files are created
             # as root in the host-side filesystem, which prevents deletion of scratch
             # directories when the agent is running as non-root.
-            def _clone_dotfiles():
+            def _clone_dotfiles() -> None:
                 jupyter_custom_css_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
                 )
@@ -289,7 +284,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-        mounts: List[Mount] = [
+        mounts: list[Mount] = [
             # Mount scratch directory
             Mount(
                 MountTypes.K8S_GENERIC,
@@ -399,8 +394,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ])
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
-        for i, mount in zip(range(len(mounts)), mounts):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
+        for i, mount in enumerate(mounts):
             if mount.type == MountTypes.K8S_GENERIC:
                 name = (mount.opts or {})["name"]
                 self.volume_mounts.append(
@@ -437,10 +432,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -455,7 +450,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     async def process_volumes(
         self,
-        volumes: List[KubernetesAbstractVolume],
+        volumes: list[KubernetesAbstractVolume],
     ) -> None:
         self.volumes += volumes
 
@@ -494,7 +489,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             resource_spec.mounts.append(mount)
 
     @override
-    async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
+    async def apply_accelerator_allocation(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> None:
         # update_nested_dict(
         #     self.computer_docker_args,
         #     await computer.generate_docker_args(self.docker, device_alloc))
@@ -506,17 +505,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     async def generate_deployment_object(
         self,
         image: str,
         environ: Mapping[str, Any],
-        ports: List[int],
-        command: List[str],
+        ports: list[int],
+        command: list[str],
         labels: Mapping[str, Any] = {},
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "apiVersion": "apps/v1",
             "kind": "Deployment",
@@ -555,7 +554,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: Any,
         cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
         loop = current_loop()
@@ -564,7 +563,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         else:
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
-                def _write_user_bootstrap_script():
+                def _write_user_bootstrap_script() -> None:
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if KernelFeatures.UID_MATCH in self.kernel_features:
                         uid = self.local_config.container.kernel_uid
@@ -574,7 +573,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
-            def _write_config(file_name: str, content: str):
+            def _write_config(file_name: str, content: str) -> None:
                 file_path = self.config_dir / file_name
                 file_path.write_text(content)
                 if KernelFeatures.UID_MATCH in self.kernel_features:
@@ -675,7 +674,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 
-        kernel_obj = KubernetesKernel(
+        return KubernetesKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
@@ -686,15 +685,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             environ=environ,
             data={},
         )
-        return kernel_obj
 
     @override
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
-        resource_opts,
-        preopen_ports,
+        cmdargs: list[str],
+        resource_opts: Any,
+        preopen_ports: Any,
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         image_labels = self.kernel_config["image"]["labels"]
@@ -734,14 +732,19 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             f"kernel-{self.kernel_id}-expose",
             [
                 (port, f"kernel-{self.kernel_id}-svc-{index}")
-                for index, port in zip(range(len(exposed_ports)), exposed_ports)
+                for index, port in enumerate(exposed_ports)
             ],
         )
 
         async def rollup(
-            functions: List[Tuple[Optional[functools.partial], Optional[functools.partial]]],
-        ):
-            rollback_functions: List[Optional[functools.partial]] = []
+            functions: list[
+                tuple[
+                    functools.partial[Coroutine[Any, Any, None]] | None,
+                    functools.partial[Coroutine[Any, Any, None]] | None,
+                ]
+            ],
+        ) -> None:
+            rollback_functions: list[functools.partial[Coroutine[Any, Any, None]] | None] = []
 
             for rollup_function, future_rollback_function in functions:
                 try:
@@ -755,7 +758,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     log.exception("Error while rollup: {}", e)
                     raise
 
-        arguments: List[Tuple[Optional[functools.partial], Optional[functools.partial]]] = []
+        arguments: list[
+            tuple[
+                functools.partial[Coroutine[Any, Any, None]] | None,
+                functools.partial[Coroutine[Any, Any, None]] | None,
+            ]
+        ] = []
 
         try:
             expose_service_api_response: V1Service = await core_api.create_namespaced_service(
@@ -767,7 +775,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         if expose_service_api_response.spec is None:
             raise K8sError("expose_service_api_response.spec is None")
-        node_ports: List[V1ServicePort] = expose_service_api_response.spec.ports
+        node_ports: list[V1ServicePort] = expose_service_api_response.spec.ports
         arguments.append((
             None,
             functools.partial(
@@ -803,6 +811,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ctnr_host_port_map: MutableMapping[int, int] = {}
         stdin_port = 0
         stdout_port = 0
+        repl_in_port: int
+        repl_out_port: int
         for idx, port in enumerate(exposed_ports):
             host_port = assigned_ports[port]
 
@@ -851,7 +861,7 @@ class KubernetesAgent(
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
@@ -891,7 +901,7 @@ class KubernetesAgent(
         # Agent socket handler initialization
         # K8s event monitor task initialization
 
-    async def check_krunner_pv_status(self):
+    async def check_krunner_pv_status(self) -> None:
         capacity = format(self.local_config.container.scratch_size, "g")[:-1]
 
         await kube_config.load_kube_config()
@@ -914,18 +924,21 @@ class KubernetesAgent(
         if len(pv.items) == 0:
             # PV does not exists; create one
             if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
-                new_pv = NFSPersistentVolume(
-                    self.local_config.container.scratch_nfs_address,
+                scratch_nfs_address = self.local_config.container.scratch_nfs_address
+                if scratch_nfs_address is None:
+                    raise K8sError("scratch_nfs_address must be set when using K8S_NFS")
+                new_pv: NFSPersistentVolume | HostPathPersistentVolume = NFSPersistentVolume(
+                    scratch_nfs_address,
                     "backend-ai-static-pv",
                     capacity,
                 )
                 new_pv.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config.container.scratch_nfs_address,
+                    scratch_nfs_address,
                 )
-                new_pv.options = [
-                    x.strip() for x in self.local_config.container.scratch_nfs_options.split(",")
-                ]
+                scratch_nfs_options = self.local_config.container.scratch_nfs_options
+                if scratch_nfs_options is not None:
+                    new_pv.options = [x.strip() for x in scratch_nfs_options.split(",")]
             elif self.local_config.container.scratch_type == ScratchType.HOSTDIR:
                 new_pv = HostPathPersistentVolume(
                     self.local_config.container.scratch_root.as_posix(),
@@ -955,9 +968,12 @@ class KubernetesAgent(
                 capacity,
             )
             if self.local_config.container.scratch_type == ScratchType.K8S_NFS:
+                scratch_nfs_address = self.local_config.container.scratch_nfs_address
+                if scratch_nfs_address is None:
+                    raise K8sError("scratch_nfs_address must be set when using K8S_NFS")
                 new_pvc.label(
                     "backend.ai/backend-ai-scratch-volume",
-                    self.local_config.container.scratch_nfs_address,
+                    scratch_nfs_address,
                 )
             else:
                 new_pvc.label("backend.ai/backend-ai-scratch-volume", "hostPath")
@@ -970,7 +986,7 @@ class KubernetesAgent(
                 log.exception("Error: {}", e)
                 raise
 
-    async def fetch_workers(self):
+    async def fetch_workers(self) -> None:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         nodes = await core_api.list_node()
@@ -984,7 +1000,7 @@ class KubernetesAgent(
                 if addr.type == "ExternalIP":
                     self.workers[node.metadata.name]["ExternalIP"] = addr.address
 
-    async def shutdown(self, stop_signal: signal.Signals):
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop agent socket handler task
 
         try:
@@ -1024,8 +1040,8 @@ class KubernetesAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -1034,8 +1050,8 @@ class KubernetesAgent(
         for deployment in (await core_api.list_namespaced_pod("backend-ai")).items:
             # Additional check to filter out real worker pods only?
 
-            async def _fetch_container_info(pod: Any):
-                kernel_id: Union[KernelId, str, None] = "(unknown)"
+            async def _fetch_container_info(pod: Any) -> None:
+                kernel_id: KernelId | str | None = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
                     if kernel_id is None or kernel_id not in self.kernel_registry:
@@ -1081,11 +1097,11 @@ class KubernetesAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         raise NotImplementedError
 
-    async def handle_agent_socket(self):
+    async def handle_agent_socket(self) -> None:
         # TODO: Add support for remote agent socket mechanism
         pass
 
@@ -1095,7 +1111,7 @@ class KubernetesAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout_seconds: float | None,
     ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
@@ -1121,7 +1137,7 @@ class KubernetesAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> KubernetesKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
@@ -1139,22 +1155,20 @@ class KubernetesAgent(
         )
 
     @override
-    async def destroy_kernel(
-        self, kernel_id: KernelId, container_id: Optional[ContainerId]
-    ) -> None:
+    async def destroy_kernel(self, kernel_id: KernelId, container_id: ContainerId | None) -> None:
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
 
-        async def force_cleanup(reason="self-terminated"):
-            await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)
+        async def force_cleanup(_reason: str = "self-terminated") -> None:
+            await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)  # type: ignore[attr-defined]
 
         try:
             kernel = self.kernel_registry[kernel_id]
         except Exception:
             log.warning("_destroy_kernel({0}) kernel missing (already dead?)", kernel_id)
             await asyncio.shield(self.k8s_ptask_group.create_task(force_cleanup()))
-            return None
+            return
         deployment_name = kernel["deployment_name"]
         try:
             await core_api.delete_namespaced_service(f"{deployment_name}-service", "backend-ai")
@@ -1167,7 +1181,7 @@ class KubernetesAgent(
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         loop = current_loop()
@@ -1218,7 +1232,7 @@ class KubernetesAgent(
         )
 
 
-async def get_kernel_id_from_deployment(pod: Any) -> Optional[KernelId]:
+async def get_kernel_id_from_deployment(pod: Any) -> KernelId | None:
     # TODO: create function which extracts kernel id from pod object
     if (kernel_id := pod.get("metadata", {}).get("name")) is not None:
         return KernelId(uuid.UUID(kernel_id))

@@ -4,7 +4,8 @@ import decimal
 import json
 import textwrap
 from collections import defaultdict
-from typing import Any, Callable, Mapping, Optional
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 import humanize
 
@@ -13,7 +14,7 @@ from ai.backend.common.types import MetricValue
 from .types import AbstractOutputFormatter, FieldSpec
 
 
-def format_stats(raw_stats: Optional[str], indent="") -> str:
+def format_stats(raw_stats: str | None, indent: str = "") -> str:
     if raw_stats is None:
         return "(unavailable)"
     stats = json.loads(raw_stats)
@@ -31,7 +32,7 @@ def format_multiline(value: Any, indent_length: int) -> str:
     return "\n".join(buf)
 
 
-def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
+def format_nested_dicts(value: Mapping[str, Mapping[str, Any] | None]) -> str:
     """
     Format a mapping from string keys to sub-mappings.
     """
@@ -80,13 +81,13 @@ class OutputFormatter(AbstractOutputFormatter):
             return "(null)"
         if isinstance(value, (dict, list, set)) and not value:
             return "(empty)"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return (
                 "{"
                 + ", ".join(f"{k}: {self.format_console(v, field)}" for k, v in value.items())
                 + "}"
             )
-        elif isinstance(value, (list, tuple, set)):
+        if isinstance(value, (list, tuple, set)):
             return "[" + ", ".join(self.format_console(v, field) for v in value) + "]"
         return str(value)
 
@@ -95,9 +96,9 @@ class OutputFormatter(AbstractOutputFormatter):
             return None
         if isinstance(value, decimal.Decimal):
             return str(value)
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return {k: self.format_json(v, field) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             return [self.format_json(v, field) for v in value]
         return value
 
@@ -155,13 +156,15 @@ class CustomizedImageOutputFormatter(OutputFormatter):
         customized_name = [
             label["value"] for label in labels if label["key"] == "ai.backend.customized-image.name"
         ]
-        assert len(customized_name) == 1
+        if len(customized_name) != 1:
+            raise ValueError("Expected exactly one customized image name label")
         owner_email = [
             label["value"]
             for label in labels
             if label["key"] == "ai.backend.customized-image.user.email"
         ]
-        assert len(owner_email) == 1
+        if len(owner_email) != 1:
+            raise ValueError("Expected exactly one owner email label")
         return f"{customized_name[0]} (Owner: {owner_email[0]})"
 
     def format_console(self, value: Any, field: FieldSpec) -> str:
@@ -229,7 +232,7 @@ class AgentStatFormatter(OutputFormatter):
                     "" if unit_hint == "count" else unit_hint,
                 ),
             )
-            return formatter(metric, binary)
+            return cast(str, formatter(metric, binary))  # type: ignore[no-untyped-call]
 
         bufs = []
         node_metric_bufs = []
@@ -297,7 +300,8 @@ class KernelStatFormatter(OutputFormatter):
 
 class NestedObjectFormatter(OutputFormatter):
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        assert isinstance(value, list)
+        if not isinstance(value, list):
+            raise ValueError("NestedObjectFormatter expects a list value")
         return [
             {
                 f.alt_name: f.formatter.format_json(item[f.field_name], f)
@@ -310,13 +314,13 @@ class NestedObjectFormatter(OutputFormatter):
 def _fit_multiline_in_cell(text: str, indent: str) -> str:
     if "\n" in text:
         return "\n" + textwrap.indent(text, indent)
-    else:
-        return text
+    return text
 
 
 class ContainerListFormatter(NestedObjectFormatter):
-    def format_console(self, value: Any, field: FieldSpec, indent="") -> str:
-        assert isinstance(value, list)
+    def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
+        if not isinstance(value, list):
+            raise ValueError("ContainerListFormatter expects a list value")
         if len(value) == 0:
             text = "(no sub-containers belonging to the session)"
         else:
@@ -325,7 +329,7 @@ class ContainerListFormatter(NestedObjectFormatter):
                 text += f"+ {item['id']}\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"
                     for f in field.subfields.values()
                     if f.field_name != "id"
                 )
@@ -333,8 +337,9 @@ class ContainerListFormatter(NestedObjectFormatter):
 
 
 class DependencyListFormatter(NestedObjectFormatter):
-    def format_console(self, value: Any, field: FieldSpec, indent="") -> str:
-        assert isinstance(value, list)
+    def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
+        if not isinstance(value, list):
+            raise ValueError("DependencyListFormatter expects a list value")
         if len(value) == 0:
             text = "(no dependency tasks)"
         else:
@@ -343,7 +348,7 @@ class DependencyListFormatter(NestedObjectFormatter):
                 text += f"+ {item['name']} ({item['id']})\n"
                 text += "\n".join(
                     f"  - {f.humanized_name}: "
-                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"  # noqa
+                    f"{_fit_multiline_in_cell(f.formatter.format_console(item[f.field_name], f), '    ')}"
                     for f in field.subfields.values()
                     if f.field_name not in ("id", "name")
                 )

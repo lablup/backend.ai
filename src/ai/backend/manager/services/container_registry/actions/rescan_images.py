@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
@@ -11,11 +11,11 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class RescanImagesAction(ContainerRegistryAction):
     registry: str
-    project: Optional[str]
-    progress_reporter: Optional[ProgressReporter]
+    project: str | None
+    progress_reporter: ProgressReporter | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -31,5 +31,5 @@ class RescanImagesActionResult(BaseActionResult):
     errors: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.registry.id)

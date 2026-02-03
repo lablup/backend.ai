@@ -1,7 +1,6 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from ai.backend.manager.models.user import UserRole, UserStatus
 
@@ -24,21 +23,21 @@ class AuthorizationResult:
 @dataclass
 class UserData:
     uuid: uuid.UUID
-    username: str
+    username: str | None
     email: str
-    password: str
+    password: str | None
     need_password_change: bool
-    full_name: str
-    description: str
+    full_name: str | None
+    description: str | None
     is_active: bool
     status: UserStatus
-    status_info: Optional[str]
-    created_at: datetime
-    modified_at: datetime
-    password_changed_at: Optional[datetime]
+    status_info: str | None
+    created_at: datetime | None
+    modified_at: datetime | None
+    password_changed_at: datetime | None
     domain_name: str
     role: UserRole
-    integration_id: Optional[str]
+    integration_id: str | None
     resource_policy: str
     sudo_session_enabled: bool
 

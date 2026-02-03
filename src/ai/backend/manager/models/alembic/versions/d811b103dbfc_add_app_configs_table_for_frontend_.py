@@ -53,4 +53,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_app_configs_scope_type"), table_name="app_configs")
     op.drop_index(op.f("ix_app_configs_scope_id"), table_name="app_configs")
     op.drop_table("app_configs")
+    op.execute("DROP TYPE IF EXISTS app_config_scope_type")
     # ### end Alembic commands ###

@@ -4,9 +4,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from ai.backend.appproxy.worker.config import ServerConfig
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
-from ...config import ServerConfig
 from .redis import RedisProvider, WorkerValkeyClients
 
 

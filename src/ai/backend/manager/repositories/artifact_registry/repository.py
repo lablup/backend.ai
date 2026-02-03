@@ -6,11 +6,15 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.artifact_registries.types import (
+    ArtifactRegistryData,
+    ArtifactRegistryListResult,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact_registry.db_source.db_source import (
     ArtifactRegistryDBSource,
 )
+from ai.backend.manager.repositories.base import BatchQuerier
 
 artifact_registry_repository_resilience = Resilience(
     policies=[
@@ -58,3 +62,11 @@ class ArtifactRegistryRepository:
     @artifact_registry_repository_resilience.apply()
     async def list_artifact_registry_data(self) -> list[ArtifactRegistryData]:
         return await self._db_source.list_artifact_registry_data()
+
+    @artifact_registry_repository_resilience.apply()
+    async def search_artifact_registries(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactRegistryListResult:
+        """Searches artifact registries with total count."""
+        return await self._db_source.search_artifact_registries(querier=querier)

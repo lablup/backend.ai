@@ -105,6 +105,9 @@ Start each component in separate terminals:
 Set up client environment:
 ```bash
 source env-local-user-session.sh
+# This script prints your default User ID and Password;
+./backend.ai login
+# When prompted, enter the User ID and Password shown above.
 ```
 
 Run a simple Python session:
@@ -303,8 +306,13 @@ Backend.AI supports plugin-based extensibility via Python package entrypoints:
 **Accelerator Plugins** (`backendai_accelerator_v21`)
 - [CUDA](src/ai/backend/accelerator/cuda_open) - NVIDIA GPU support
 - [CUDA Mock](src/ai/backend/accelerator/cuda_mock) - Development without actual GPUs
-- ROCm - AMD GPU support
-- More available in the enterprise edition
+- [ROCm](src/ai/backend/accelerator/rocm) - AMD GPU support
+- [Furiosa](src/ai/backend/accelerator/furiosa) - Furiosa NPU (Warboy / RNGD) support
+- [Hyperaccel](src/ai/backend/accelerator/hyperaccel) - Hyperaccel LPU support
+- [IPU](src/ai/backend/accelerator/ipu) - Graphcore IPU support
+- [Rebellions](src/ai/backend/accelerator/rebellions) - Rebellions NPU (ATOM, ATOM+, ATOM Max) support
+- [Tenstorrent](src/ai/backend/accelerator/tenstorrent) - Tenstorrent NPU (Wormhole, Blackhole) support
+- [TPU](src/ai/backend/accelerator/tpu) - Google TPU (v2, v3) support
 
 **Monitoring Plugins**
 - [`backendai_monitor_stats_v10`](https://github.com/lablup/backend.ai-monitor-datadog) - Datadog statistics collector

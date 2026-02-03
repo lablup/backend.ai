@@ -44,7 +44,7 @@ class OldSessionTypes(enum.StrEnum):
     INFERENCE = "inference"
 
 
-def upgrade():
+def upgrade() -> None:
     connection = op.get_bind()
 
     # Relax the sessions.session_type from enum to varchar(64).
@@ -137,7 +137,7 @@ def upgrade():
     op.drop_column("kernels", "role")
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
 
     kernel_role_values = ["INFERENCE", "COMPUTE", "SYSTEM"]
@@ -217,8 +217,9 @@ def downgrade():
 
     connection.execute(
         text(
-            "CREATE TYPE sessiontypes AS ENUM (%s)"
-            % (",".join(f"'{choice.name}'" for choice in OldSessionTypes))
+            "CREATE TYPE sessiontypes AS ENUM ({})".format(
+                ",".join(f"'{choice.name}'" for choice in OldSessionTypes)
+            )
         )
     )
     # Revert sessions.session_type to enum

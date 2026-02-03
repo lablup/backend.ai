@@ -16,7 +16,7 @@ class ParseError(Exception):
     pass
 
 
-def get_path_parameters(resource: AbstractResource) -> list[dict]:
+def get_path_parameters(resource: AbstractResource) -> list[dict[str, Any]]:
     params = []
     if isinstance(resource, DynamicResource):
         if groupindex := resource._pattern.groupindex:
@@ -28,7 +28,7 @@ def get_path_parameters(resource: AbstractResource) -> list[dict]:
 
 
 def generate_openapi(
-    component: str, subapps: list[web.Application], verbose=False
+    component: str, subapps: list[web.Application], verbose: bool = False
 ) -> dict[str, Any]:
     openapi: dict[str, Any] = {
         "openapi": "3.1.0",
@@ -52,7 +52,7 @@ def generate_openapi(
             },
             "schemas": {},
         },
-        "paths": defaultdict(lambda: {}),
+        "paths": defaultdict(dict),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
     for app in subapps:
@@ -92,7 +92,7 @@ def generate_openapi(
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 preconds = []
-                handler_attrs = getattr(route.handler, "_backend_attrs")
+                handler_attrs = route.handler._backend_attrs
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"X-BackendAI-Token": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):
@@ -131,7 +131,7 @@ def generate_openapi(
             route_def["description"] = "\n".join(description)
             type_hints = get_type_hints(route.handler)
 
-            def _parse_schema(model_cls: type[BaseModel]) -> dict:
+            def _parse_schema(model_cls: type[BaseModel]) -> dict[str, Any]:
                 if not issubclass(model_cls, BaseModel):
                     raise RuntimeError(f"{model_cls} not considered as a valid response type")
 

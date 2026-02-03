@@ -35,7 +35,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "am": "ai.backend.account_manager.cli.__main__:main",
-            "am.start-server": "ai.backend.account_manager.server:main",
+            "am.start-server": "ai.backend.account_manager.cli.start_server:main",
         },
     },
     generate_setup=True,

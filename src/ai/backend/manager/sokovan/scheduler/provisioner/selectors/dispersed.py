@@ -6,8 +6,8 @@ workloads across the cluster.
 """
 
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence, Union
 
 from .selector import (
     AbstractAgentSelector,
@@ -53,8 +53,8 @@ class DispersedAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker to disperse workloads.
@@ -67,7 +67,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
         )
 
         # Choose the tracker with maximum available resources (to disperse workloads)
-        def tracker_sort_key(tracker: AgentStateTracker) -> list[Union[int, Decimal]]:
+        def tracker_sort_key(tracker: AgentStateTracker) -> list[int | Decimal]:
             occupied_slots = tracker.get_current_occupied_slots()
             return [
                 # First, prefer agents with fewer unutilized capabilities
@@ -81,6 +81,4 @@ class DispersedAgentSelector(AbstractAgentSelector):
                 ],
             ]
 
-        chosen_tracker = max(trackers, key=tracker_sort_key)
-
-        return chosen_tracker
+        return max(trackers, key=tracker_sort_key)

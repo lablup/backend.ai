@@ -4,7 +4,6 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -46,6 +45,16 @@ class Platform(enum.StrEnum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+class FrontendMode(enum.StrEnum):
+    PORT = "port"
+    WILDCARD = "wildcard"
+
+
+class EndpointProtocol(enum.StrEnum):
+    HTTP = "http"
+    HTTPS = "https"
+
+
 @dataclasses.dataclass()
 class CliArgs:
     mode: InstallModes | None
@@ -53,7 +62,13 @@ class CliArgs:
     show_guide: bool
     non_interactive: bool
     public_facing_address: str
-    accelerator: Optional[str] = None
+    accelerator: str | None = None
+    fqdn_prefix: str | None = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -99,7 +114,7 @@ class InstallInfo(BaseModel):
     base_path: Path
     halfstack_config: HalfstackConfig
     service_config: ServiceConfig
-    accelerator: Optional[Accelerator] = None
+    accelerator: Accelerator | None = None
 
 
 @dataclasses.dataclass()
@@ -117,7 +132,7 @@ class OSInfo(RichCast):
 @dataclasses.dataclass()
 class ServerAddr:
     bind: HostPortPair  # the server-bind address (e.g., 0.0.0.0:8080)
-    face: HostPortPair = cast(HostPortPair, None)  # the client-facing address (e.g., 10.1.2.3:9090)
+    face: HostPortPair | None = None  # the client-facing address (e.g., 10.1.2.3:9090)
 
     def __post_init__(self) -> None:
         # Ensure that face is always initialized, while its unspecified value is None.
@@ -184,4 +199,34 @@ class ServiceConfig:
 @dataclasses.dataclass
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
-    accelerator: Optional[Accelerator] = None
+    accelerator: Accelerator | None = None
+    fqdn_prefix: str | None = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
+
+    @property
+    def apphub_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def app_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.app.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def wildcard_domain(self) -> str | None:
+        if self.fqdn_prefix:
+            return f".{self.fqdn_prefix}.app.backend.ai"
+        return None
+
+    @property
+    def storage_public_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        return self.public_facing_address

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Annotated, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -18,10 +19,10 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import pydantic_api_handler, pydantic_api_response_handler
+from ai.backend.appproxy.coordinator.models import Circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 
-from ..models import Circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import StubResponseModel
 from .utils import auth_required
 
@@ -128,7 +129,9 @@ async def get_circuit_statistics(request: web.Request) -> PydanticResponse[Circu
     ])
     # Handle bytes data from valkey
     last_access_value = (
-        float(last_access.decode("utf-8")) if last_access else circuit.created_at.timestamp()
+        float(last_access.decode("utf-8"))
+        if last_access
+        else (circuit.created_at.timestamp() if circuit.created_at else 0.0)
     )
     requests_value = int(requests.decode("utf-8")) if requests else 0
 
@@ -149,11 +152,11 @@ async def get_circuit_statistics(request: web.Request) -> PydanticResponse[Circu
     )
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

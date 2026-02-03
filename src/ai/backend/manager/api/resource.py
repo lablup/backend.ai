@@ -8,13 +8,12 @@ import functools
 import json
 import logging
 import re
+from collections.abc import Iterable
 from decimal import Decimal
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Tuple,
 )
 
 import aiohttp_cors
@@ -25,6 +24,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
@@ -46,7 +46,6 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 
-from ..errors.api import InvalidAPIParameters
 from .auth import auth_required, superadmin_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -83,7 +82,7 @@ async def list_presets(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict({
         t.Key("scaling_group", default=None): t.Null | t.String,
-        t.Key("group", default="default"): t.String,
+        t.Key("group"): t.String,
     })
 )
 async def check_presets(request: web.Request, params: Any) -> web.Response:
@@ -101,7 +100,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         # scaling_group = request.query.get('scaling_group')
         # assert scaling_group is not None, 'scaling_group parameter is missing.'
     except (json.decoder.JSONDecodeError, AssertionError) as e:
-        raise InvalidAPIParameters(extra_msg=str(e.args[0]))
+        raise InvalidAPIParameters(extra_msg=str(e.args[0])) from e
 
     log.info(
         "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
@@ -262,7 +261,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
 
 # TODO: get_watcher_info overlaps with service-side method.
 # Keeping it because it's used by vfolder.
-async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
+async def get_watcher_info(request: web.Request, agent_id: str) -> dict[str, Any]:
     """
     Get watcher information.
 
@@ -378,7 +377,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
     app["prefix"] = "resource"

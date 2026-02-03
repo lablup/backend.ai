@@ -1,11 +1,12 @@
 import asyncio
 import logging
 import uuid
-from typing import Optional
+from typing import Any
 
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -13,13 +14,12 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
+from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
-    ArtifactRegistryType,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
@@ -67,10 +67,6 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.list import (
-    ListArtifactsAction,
-    ListArtifactsActionResult,
-)
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
@@ -90,6 +86,14 @@ from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.search import (
+    SearchArtifactsAction,
+    SearchArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.search_with_revisions import (
+    SearchArtifactsWithRevisionsAction,
+    SearchArtifactsWithRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
@@ -134,7 +138,7 @@ class ArtifactService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
-    async def _get_storage_client(self, storage_name: str):
+    async def _get_storage_client(self, storage_name: str) -> Any:
         """Get storage client by trying object_storage first, then vfs_storage as fallback"""
         try:
             storage = await self._object_storage_repository.get_by_name(storage_name)
@@ -342,17 +346,21 @@ class ArtifactService:
         artifact = await self._artifact_repository.get_artifact_by_id(action.artifact_id)
         return GetArtifactActionResult(result=artifact)
 
-    async def list(self, action: ListArtifactsAction) -> ListArtifactsActionResult:
-        artifacts_data, total_count = await self._artifact_repository.list_artifacts_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+    async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
+        result = await self._artifact_repository.search_artifacts(
+            querier=action.querier,
         )
-        return ListArtifactsActionResult(data=artifacts_data, total_count=total_count)
+        return SearchArtifactsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def list_with_revisions(
         self, action: ListArtifactsWithRevisionsAction
     ) -> ListArtifactsWithRevisionsActionResult:
+        # Old-style pagination for REST API compatibility
         (
             artifacts_data,
             total_count,
@@ -361,7 +369,23 @@ class ArtifactService:
             ordering=action.ordering,
             filters=action.filters,
         )
-        return ListArtifactsWithRevisionsActionResult(data=artifacts_data, total_count=total_count)
+        return ListArtifactsWithRevisionsActionResult(
+            data=artifacts_data, total_count=total_count or 0
+        )
+
+    async def search_with_revisions(
+        self, action: SearchArtifactsWithRevisionsAction
+    ) -> SearchArtifactsWithRevisionsActionResult:
+        """Search artifacts with their revisions using BatchQuerier pattern."""
+        result = await self._artifact_repository.search_artifacts_with_revisions(
+            querier=action.querier,
+        )
+        return SearchArtifactsWithRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_revisions(
         self, action: GetArtifactRevisionsAction
@@ -370,9 +394,7 @@ class ArtifactService:
         return GetArtifactRevisionsActionResult(revisions=revisions)
 
     async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
-        updated_artifact = await self._artifact_repository.update_artifact(
-            action.artifact_id, action.modifier
-        )
+        updated_artifact = await self._artifact_repository.update_artifact(action.updater)
         return UpdateArtifactActionResult(result=updated_artifact)
 
     async def upsert_artifacts_with_revisions(
@@ -482,7 +504,7 @@ class ArtifactService:
         return RestoreArtifactsActionResult(artifacts=restored_artifacts)
 
     async def _resolve_artifact_registry_meta(
-        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: ArtifactType | None, registry_id_or_none: uuid.UUID | None
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             # TODO: Handle `artifact_type` for other types
@@ -585,13 +607,6 @@ class ArtifactService:
             order=action.order,
         )
         client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
-
-        if client_resp is None:
-            log.warning(
-                "Failed to connect to reservoir registry after {}",
-                registry_data.endpoint,
-            )
-            raise ReservoirConnectionError("Failed to connect to remote reservoir")
 
         RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
         parsed_resp = RespTypeAdapter.validate_python(client_resp)

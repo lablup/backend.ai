@@ -4,7 +4,7 @@ import os
 import site
 import traceback
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 __all__ = (
     "current_loop",
@@ -15,19 +15,21 @@ __all__ = (
 
 
 if hasattr(asyncio, "get_running_loop"):
-    current_loop = asyncio.get_running_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_running_loop
 else:
-    current_loop = asyncio.get_event_loop  # type: ignore  # noqa
+    current_loop = asyncio.get_event_loop
 
 CLOCK_TICK: Final = os.sysconf("SC_CLK_TCK")
 
 
-def find_executable(*paths):
+def find_executable(*paths: Path | str | bytes) -> Path | None:
     """
     Find the first executable regular file in the given list of paths.
     """
     for path in paths:
-        if isinstance(path, (str, bytes)):
+        if isinstance(path, bytes):
+            path = Path(path.decode("utf-8"))
+        elif isinstance(path, str):
             path = Path(path)
         if not path.exists():
             continue
@@ -58,13 +60,13 @@ class TracebackSourceFilter(logging.Filter):
         return True
 
 
-async def safe_close_task(task):
+async def safe_close_task(task: asyncio.Task[Any] | None) -> None:
     if task is not None and not task.done():
         task.cancel()
         await task
 
 
-async def wait_local_port_open(port):
+async def wait_local_port_open(port: int) -> None:
     while True:
         try:
             async with asyncio.timeout(10.0):
@@ -72,7 +74,7 @@ async def wait_local_port_open(port):
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)
             continue
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception:
             raise
@@ -83,20 +85,20 @@ async def wait_local_port_open(port):
             break
 
 
-def scan_proc_stats() -> dict[int, dict]:
-    pid_set = dict()
+def scan_proc_stats() -> dict[int, dict[str, Any]]:
+    pid_set: dict[int, dict[str, Any]] = {}
     for p in Path("/proc").iterdir():
         if p.name.isdigit():
             pid = int(p.name)
             try:
                 stat = parse_proc_stat(pid)
                 pid_set[pid] = stat
-            except IOError:
+            except OSError:
                 pass
     return pid_set
 
 
-def parse_proc_stat(pid):
+def parse_proc_stat(pid: int) -> dict[str, Any]:
     data = Path(f"/proc/{pid}/stat").read_bytes()
     name_begin = data.find(b"(")
     name_end = data.rfind(b")")
@@ -110,7 +112,7 @@ def parse_proc_stat(pid):
     #  T  Stopped (on a signal) or (before Linux 2.6.33) trace stopped
     #  t  Tracing stop (Linux 2.6.33 onward)
     #  X  Dead (from Linux 2.6.0 onward)
-    stat = {
+    return {
         "name": name,
         "cmdline": Path(f"/proc/{pid}/cmdline").read_bytes(),
         "status": fields[0],
@@ -122,4 +124,3 @@ def parse_proc_stat(pid):
         "vsize": int(fields[20]),  # bytes
         "rss": int(fields[21]),  # num pages
     }
-    return stat

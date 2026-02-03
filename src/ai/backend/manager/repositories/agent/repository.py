@@ -1,6 +1,6 @@
 import logging
-from collections.abc import Sequence
-from typing import Any, Mapping, cast
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
@@ -17,10 +17,10 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -33,9 +33,11 @@ from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSou
 from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
     AgentStatefulSource,
 )
+from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
-
-from .query import QueryCondition, QueryOrder
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -71,8 +73,16 @@ class AgentRepository:
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
-        self._stateful_source = AgentStatefulSource(valkey_image)
+        self._stateful_source = AgentStatefulSource(valkey_image, valkey_stat)
         self._config_provider = config_provider
+
+    @agent_repository_resilience.apply()
+    async def load_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
+        """Load container counts for the given agent IDs.
+
+        Returns counts in the same order as the input agent_ids.
+        """
+        return await self._stateful_source.read_agent_container_counts(agent_ids)
 
     @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
@@ -114,13 +124,14 @@ class AgentRepository:
         return upsert_result
 
     @agent_repository_resilience.apply()
-    async def cleanup_agent_on_exit(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+    async def cleanup_agent_on_exit(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
         with suppress_with_log(
             [Exception], message=f"Failed to remove last seen for agent: {agent_id}"
         ):
             await self._cache_source.remove_agent_last_seen(agent_id)
 
-        await self._db_source.update_agent_status_exit(agent_id, modifier)
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status_exit(updater)
 
         with suppress_with_log(
             [Exception], message=f"Failed to remove agent: {agent_id} from all images"
@@ -128,8 +139,9 @@ class AgentRepository:
             await self._cache_source.remove_agent_from_all_images(agent_id)
 
     @agent_repository_resilience.apply()
-    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
-        await self._db_source.update_agent_status(agent_id, modifier)
+    async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
+        updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
+        await self._db_source.update_agent_status(updater)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible
@@ -165,7 +177,7 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select = (
+        stmt: sa.sql.Select[Any] = (
             sa.select(AgentRow)
             .select_from(
                 sa.join(
@@ -200,3 +212,11 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
+
+    @agent_repository_resilience.apply()
+    async def search_agents(
+        self,
+        querier: BatchQuerier,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+        return await self._db_source.search_agents(querier=querier)

@@ -5,6 +5,8 @@ The kernel main program.
 from __future__ import annotations
 
 import argparse
+import ctypes
+import ctypes.util
 import importlib
 import os
 import signal
@@ -18,9 +20,6 @@ from .compat import asyncio_run_forever
 def setproctitle(title: str) -> None:
     # setproctitle package doesn't work for unknown reasons
     # We don't need a portable implementation, so here is a Linux-only version
-    import ctypes
-    import ctypes.util
-
     libc_path = ctypes.util.find_library("c")
     libc = ctypes.CDLL(libc_path)
     PR_SET_NAME = 15
@@ -56,7 +55,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Replace stdin with a "null" file
     # (trying to read stdin will raise EOFError immediately afterwards.)
-    sys.stdin = open(os.devnull, "r", encoding="latin1")
+    sys.stdin = Path(os.devnull).open(encoding="latin1")
     setproctitle("backend.ai: kernel runner")
     asyncio_run_forever(
         runner._init(args),

@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint(
         "fk_vfolder_attachment_vfolder_vfolders", "vfolder_attachment", type_="foreignkey"
     )
@@ -41,7 +41,7 @@ def upgrade():
         existing_type=postgresql.UUID(),
         type_=sa.String(length=64),
         nullable=True,
-        existing_server_default=sa.text("uuid_generate_v4()"),
+        existing_server_default="uuid_generate_v4()",
     )
     op.create_index(op.f("ix_kernels_sess_id"), "kernels", ["sess_id"], unique=False)
     op.create_index(op.f("ix_kernels_sess_id_role"), "kernels", ["sess_id", "role"], unique=False)
@@ -65,7 +65,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(
         "fk_vfolder_attachment_vfolder_vfolders", "vfolder_attachment", type_="foreignkey"
     )
@@ -81,7 +81,7 @@ def downgrade():
         existing_type=sa.String(length=64),
         type_=postgresql.UUID(),
         nullable=False,
-        existing_server_default=sa.text("uuid_generate_v4()"),
+        existing_server_default="uuid_generate_v4()",
         postgresql_using="sess_id::uuid",
     )
     op.create_primary_key("pk_kernels", "kernels", ["sess_id"])

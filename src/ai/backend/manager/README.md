@@ -73,11 +73,11 @@ HTTP Request → Middleware Stack → REST Handler → Action Processor → Serv
 
 **Location**:
 - Strawberry: `src/ai/backend/manager/api/gql/`
-- Graphene (Legacy): `src/ai/backend/manager/models/gql_models/`
+- Graphene (Legacy): `src/ai/backend/manager/api/gql_legacy/`
 
 **Related Documentation**:
 - [GraphQL API (Strawberry)](./api/gql/README.md)
-- [Legacy GraphQL (Graphene)](./models/gql_models/README.md) - DEPRECATED
+- [Legacy GraphQL (Graphene)](./api/gql_legacy/README.md) - DEPRECATED
 
 ### 3. Event Dispatcher
 

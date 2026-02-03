@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import enum
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
-from datetime import timezone as tz
+from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, AsyncIterator, Optional, Union
+from typing import Any
 
 import trafaret as t
 from aiohttp import web
@@ -18,6 +18,7 @@ from .errors import (
     InvalidConfigurationSourceError,
     InvalidPathError,
 )
+from .volumes.types import LoggingInternalMeta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -27,18 +28,19 @@ class CheckParamSource(enum.Enum):
     QUERY = 1
 
 
-def fstime2datetime(t: Union[float, int]) -> datetime:
-    return datetime.utcfromtimestamp(t).replace(tzinfo=tz.utc)
+def fstime2datetime(t: float | int) -> datetime:
+    return datetime.fromtimestamp(t, tz=UTC)
 
 
 @actxmgr
 async def check_params(
     request: web.Request,
-    checker: Optional[t.Trafaret],
+    checker: t.Trafaret | None,
     *,
     read_from: CheckParamSource = CheckParamSource.BODY,
-    auth_required: bool = True,
+    _auth_required: bool = True,
 ) -> AsyncIterator[Any]:
+    raw_params: Any = None
     if checker is None:
         if request.can_read_body:
             raise web.HTTPBadRequest(
@@ -73,8 +75,8 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
-    except NotImplementedError:
+        ) from e
+    except NotImplementedError as e:
         raise web.HTTPBadRequest(
             text=dump_json_str(
                 {
@@ -83,11 +85,11 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
+        ) from e
 
 
 async def log_manager_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
@@ -102,12 +104,14 @@ async def log_manager_api_entry(
                 params["dst_vfid"],
             )
         elif "relpaths" in params:
+            relpaths = params["relpaths"]
+            paths_summary = str(relpaths[0]) + "..." if relpaths else "(empty)"
             log.info(
                 "ManagerAPI::{}(v:{}, f:{}, p*:{})",
                 name.upper(),
                 params["volume"],
                 params["vfid"],
-                str(params["relpaths"][0]) + "...",
+                paths_summary,
             )
         elif "relpath" in params:
             log.info(
@@ -138,12 +142,10 @@ async def log_manager_api_entry(
 
 
 async def log_manager_api_entry_new(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
-    from .volumes.types import LoggingInternalMeta
-
     if params is None:
         log.info(
             "ManagerAPI::{}()",
@@ -164,12 +166,10 @@ async def log_manager_api_entry_new(
 
 
 async def log_client_api_entry(
-    log: Union[logging.Logger, BraceStyleAdapter],
+    log: logging.Logger | BraceStyleAdapter,
     name: str,
     params: Any,
 ) -> None:
-    from .volumes.types import LoggingInternalMeta
-
     if params is None:
         log.info(
             "ClientFacingAPI::{}()",
@@ -219,7 +219,4 @@ def normalize_filepath(filepath: str) -> str:
     normalized = str(path).replace("\\", "/")
 
     # Remove leading slash if present (we want relative paths)
-    if normalized.startswith("/"):
-        normalized = normalized[1:]
-
-    return normalized
+    return normalized.removeprefix("/")

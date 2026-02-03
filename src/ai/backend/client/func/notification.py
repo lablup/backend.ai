@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ai.backend.client.request import Request
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -16,7 +18,6 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
-    NotificationRuleType,
     NotificationRuleTypeSchemaResponse,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
@@ -30,7 +31,6 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleResponse,
 )
 
-from ..request import Request
 from .base import BaseFunction, api_function
 
 __all__ = ("Notification",)

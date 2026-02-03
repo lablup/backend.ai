@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
-from ..types import BroadcastPayload
+from ai.backend.common.message_queue.types import BroadcastPayload
 
 
 class AbstractBroadcaster(ABC):
@@ -40,7 +41,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         """
         Retrieve a cached broadcast message.
 

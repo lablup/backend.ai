@@ -14,12 +14,16 @@ from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
     RegisterNamespaceActionResult,
 )
+from ai.backend.manager.services.storage_namespace.actions.search import (
+    SearchStorageNamespacesAction,
+    SearchStorageNamespacesActionResult,
+)
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
     UnregisterNamespaceActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class StorageNamespaceService:
@@ -53,10 +57,25 @@ class StorageNamespaceService:
         return GetNamespacesActionResult(result=namespaces)
 
     async def get_all_namespaces(
-        self, action: GetAllNamespacesAction
+        self, _action: GetAllNamespacesAction
     ) -> GetAllNamespacesActionResult:
         log.info("Getting all namespaces grouped by storage")
         namespaces_by_storage = (
             await self._storage_namespace_repository.get_all_namespaces_by_storage()
         )
         return GetAllNamespacesActionResult(result=namespaces_by_storage)
+
+    async def search(
+        self, action: SearchStorageNamespacesAction
+    ) -> SearchStorageNamespacesActionResult:
+        """
+        Search storage namespaces with pagination and filtering.
+        """
+        log.info("Searching storage namespaces with querier: {}", action.querier)
+        result = await self._storage_namespace_repository.search(action.querier)
+        return SearchStorageNamespacesActionResult(
+            namespaces=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

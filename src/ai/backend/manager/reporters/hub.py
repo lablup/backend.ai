@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.reporters.base import (
@@ -23,8 +23,8 @@ class ReporterHub(AbstractReporter):
     _finish_queue: asyncio.Queue[FinishedActionMessage]
     _reporters: dict[str, list[AbstractReporter]]  # Key: action type, Value: reporters list
     _closed: bool
-    _start_task: asyncio.Task
-    _finish_task: asyncio.Task
+    _start_task: asyncio.Task[Any]
+    _finish_task: asyncio.Task[Any]
 
     def __init__(self, args: ReporterHubArgs) -> None:
         self._start_queue = asyncio.Queue()

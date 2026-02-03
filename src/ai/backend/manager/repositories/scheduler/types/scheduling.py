@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
 
 from ai.backend.common.types import ResourceSlot
 
@@ -20,7 +19,7 @@ class SchedulingData:
     scaling_group: ScalingGroupMeta
     pending_sessions: PendingSessions
     agents: list[AgentMeta]
-    snapshot_data: Optional[SnapshotData]
+    snapshot_data: SnapshotData | None
     spec: SchedulingSpec
 
     @cached_property

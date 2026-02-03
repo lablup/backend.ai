@@ -6,10 +6,14 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
+    AliasImageByIdAction,
+    AliasImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
+    ClearImageCustomResourceLimitByIdAction,
+    ClearImageCustomResourceLimitByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
@@ -18,8 +22,6 @@ from ai.backend.manager.services.image.actions.dealias_image import (
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
-)
-from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
@@ -27,19 +29,15 @@ from ai.backend.manager.services.image.actions.get_all_images import (
     GetAllImagesAction,
     GetAllImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.get_image_by_id import (
-    GetImageByIdAction,
-    GetImageByIdActionResult,
-)
-from ai.backend.manager.services.image.actions.get_image_by_identifier import (
-    GetImageByIdentifierAction,
-    GetImageByIdentifierActionResult,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
 )
-from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+from ai.backend.manager.services.image.actions.get_images import (
+    GetImageByIdAction,
+    GetImageByIdActionResult,
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
@@ -51,19 +49,25 @@ from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
     PreloadImageActionResult,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import (
-    PurgeImageByIdAction,
-    PurgeImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageAction,
     PurgeImageActionResult,
+    PurgeImageByIdAction,
+    PurgeImageByIdActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
+)
+from ai.backend.manager.services.image.actions.search_images import (
+    SearchImagesAction,
+    SearchImagesActionResult,
+)
+from ai.backend.manager.services.image.actions.set_image_resource_limit import (
+    SetImageResourceLimitByIdAction,
+    SetImageResourceLimitByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
@@ -82,6 +86,7 @@ class ImageProcessors(AbstractProcessorPackage):
     forget_image_by_id: ActionProcessor[ForgetImageByIdAction, ForgetImageByIdActionResult]
     purge_image_by_id: ActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
     alias_image: ActionProcessor[AliasImageAction, AliasImageActionResult]
+    alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
     modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
     preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
@@ -96,6 +101,13 @@ class ImageProcessors(AbstractProcessorPackage):
         ClearImageCustomResourceLimitAction,
         ClearImageCustomResourceLimitActionResult,
     ]
+    clear_image_custom_resource_limit_by_id: ActionProcessor[
+        ClearImageCustomResourceLimitByIdAction,
+        ClearImageCustomResourceLimitByIdActionResult,
+    ]
+    set_image_resource_limit_by_id: ActionProcessor[
+        SetImageResourceLimitByIdAction, SetImageResourceLimitByIdActionResult
+    ]
     get_image_by_id: ActionProcessor[GetImageByIdAction, GetImageByIdActionResult]
     get_image_by_identifier: ActionProcessor[
         GetImageByIdentifierAction, GetImageByIdentifierActionResult
@@ -107,6 +119,7 @@ class ImageProcessors(AbstractProcessorPackage):
         GetImageInstalledAgentsAction, GetImageInstalledAgentsActionResult
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
+    search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
         self.get_image_installed_agents = ActionProcessor(
@@ -124,6 +137,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.forget_image_by_id = ActionProcessor(service.forget_image_by_id, action_monitors)
         self.purge_image_by_id = ActionProcessor(service.purge_image_by_id, action_monitors)
         self.alias_image = ActionProcessor(service.alias_image, action_monitors)
+        self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
         self.modify_image = ActionProcessor(service.modify_image, action_monitors)
         self.preload_image = ActionProcessor(service.preload_image, action_monitors)
@@ -137,6 +151,13 @@ class ImageProcessors(AbstractProcessorPackage):
         self.clear_image_custom_resource_limit = ActionProcessor(
             service.clear_image_custom_resource_limit, action_monitors
         )
+        self.clear_image_custom_resource_limit_by_id = ActionProcessor(
+            service.clear_image_custom_resource_limit_by_id, action_monitors
+        )
+        self.set_image_resource_limit_by_id = ActionProcessor(
+            service.set_image_resource_limit_by_id, action_monitors
+        )
+        self.search_images = ActionProcessor(service.search_images, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -145,6 +166,7 @@ class ImageProcessors(AbstractProcessorPackage):
             ForgetImageByIdAction.spec(),
             PurgeImageByIdAction.spec(),
             AliasImageAction.spec(),
+            AliasImageByIdAction.spec(),
             DealiasImageAction.spec(),
             ModifyImageAction.spec(),
             PreloadImageAction.spec(),
@@ -153,4 +175,6 @@ class ImageProcessors(AbstractProcessorPackage):
             ScanImageAction.spec(),
             PurgeImagesAction.spec(),
             ClearImageCustomResourceLimitAction.spec(),
+            ClearImageCustomResourceLimitByIdAction.spec(),
+            SetImageResourceLimitByIdAction.spec(),
         ]

@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
@@ -21,6 +21,10 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
+
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -54,7 +58,7 @@ class ImageEnvironment(BaseModel):
 
 
 class ModelServiceDefinition(BaseModel):
-    environment: Optional[ImageEnvironment] = Field(
+    environment: ImageEnvironment | None = Field(
         default=None,
         description="""
         Environment in which the model service will run.
@@ -66,7 +70,7 @@ class ModelServiceDefinition(BaseModel):
             }
         ],
     )
-    resource_slots: Optional[dict[str, Any]] = Field(
+    resource_slots: dict[str, Any] | None = Field(
         default=None,
         description="""
         Resource slots used by the model service session.
@@ -75,7 +79,7 @@ class ModelServiceDefinition(BaseModel):
             {"cpu": 1, "mem": "2gb"},
         ],
     )
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] | None = Field(
         default=None,
         description="""
         Environment variables to set for the model service.
@@ -97,7 +101,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def active_route_statuses(cls) -> set["RouteStatus"]:
+    def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
             RouteStatus.HEALTHY,
@@ -107,7 +111,7 @@ class RouteStatus(enum.Enum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def inactive_route_statuses(cls) -> set["RouteStatus"]:
+    def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:
@@ -126,6 +130,55 @@ class RouteStatus(enum.Enum):
         return priority_map.get(self, 0)
 
 
+class RouteTrafficStatus(enum.StrEnum):
+    """Traffic routing status for a route.
+
+    Controls whether traffic should be sent to this route.
+    Actual traffic delivery depends on RouteStatus being HEALTHY.
+
+    - ACTIVE: Traffic enabled (will receive traffic when RouteStatus is HEALTHY)
+    - INACTIVE: Traffic disabled (will not receive traffic regardless of RouteStatus)
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+# ========== Status Transition Types (BEP-1030) ==========
+
+
+@dataclass(frozen=True)
+class DeploymentStatusTransitions:
+    """Status transitions for deployment handlers.
+
+    Deployment handlers only have success/failure outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target lifecycle when handler succeeds, None means no change
+        failure: Target lifecycle when handler fails, None means no change
+    """
+
+    success: EndpointLifecycle | None = None
+    failure: EndpointLifecycle | None = None
+
+
+@dataclass(frozen=True)
+class RouteStatusTransitions:
+    """Status transitions for route handlers.
+
+    Route handlers have success/failure/stale outcomes (no expired/give_up).
+
+    Attributes:
+        success: Target status when handler succeeds, None means no change
+        failure: Target status when handler fails, None means no change
+        stale: Target status when route becomes stale, None means no change
+    """
+
+    success: RouteStatus | None = None
+    failure: RouteStatus | None = None
+    stale: RouteStatus | None = None
+
+
 @dataclass
 class ScalingGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
@@ -142,8 +195,9 @@ class DeploymentMetadata:
     resource_group: str
     created_user: UUID
     session_owner: UUID
-    created_at: Optional[datetime]
-    tag: Optional[str] = None
+    created_at: datetime | None
+    revision_history_limit: int
+    tag: str | None = None
 
 
 @dataclass
@@ -168,7 +222,7 @@ class MountInfo:
 @dataclass
 class MountMetadata:
     model_vfolder_id: UUID
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
     model_mount_destination: str = "/models"
     extra_mounts: list[VFolderMount] = field(default_factory=list)
 
@@ -188,7 +242,7 @@ class MountMetadata:
 @dataclass
 class ReplicaSpec:
     replica_count: int
-    desired_replica_count: Optional[int] = None
+    desired_replica_count: int | None = None
 
     @property
     def target_replica_count(self) -> int:
@@ -205,16 +259,16 @@ class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Mapping[str, Any]
-    resource_opts: Optional[Mapping[str, Any]] = None
+    resource_opts: Mapping[str, Any] | None = None
 
 
 class ExecutionSpec(ConfiguredModel):
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    environ: Optional[dict[str, str]] = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    environ: dict[str, str] | None = None
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
-    callback_url: Optional[yarl.URL] = None
-    inference_runtime_config: Optional[Mapping[str, Any]] = None
+    callback_url: yarl.URL | None = None
+    inference_runtime_config: Mapping[str, Any] | None = None
 
 
 class ModelRevisionSpec(ConfiguredModel):
@@ -236,15 +290,15 @@ class ModelRevisionSpec(ConfiguredModel):
 
 
 class ImageIdentifierDraft(ConfiguredModel):
-    canonical: Optional[str]
-    architecture: Optional[str]
+    canonical: str | None
+    architecture: str | None
 
 
 class ResourceSpecDraft(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
-    resource_slots: Optional[Mapping[str, Any]]
-    resource_opts: Optional[Mapping[str, Any]] = None
+    resource_slots: Mapping[str, Any] | None
+    resource_opts: Mapping[str, Any] | None = None
 
 
 class ModelRevisionSpecDraft(ConfiguredModel):
@@ -257,9 +311,9 @@ class ModelRevisionSpecDraft(ConfiguredModel):
 @dataclass
 class DeploymentNetworkSpec:
     open_to_public: bool
-    access_token_ids: Optional[list[UUID]] = None
-    url: Optional[str] = None
-    preferred_domain_name: Optional[str] = None
+    access_token_ids: list[UUID] | None = None
+    url: str | None = None
+    preferred_domain_name: str | None = None
 
 
 @dataclass
@@ -270,8 +324,9 @@ class DeploymentInfo:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
+    current_revision_id: UUID | None = None
 
-    def target_revision(self) -> Optional[ModelRevisionSpec]:
+    def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
             return self.model_revisions[0]
         return None
@@ -287,11 +342,12 @@ class DeploymentSessionSpec:
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
+    target_revision_id: UUID | None = None
 
 
 @dataclass
 class DefinitionFiles:
-    service_definition: Optional[dict[str, Any]]
+    service_definition: dict[str, Any] | None
     model_definition: dict[str, Any]
 
 
@@ -301,10 +357,12 @@ class RouteInfo:
 
     route_id: UUID
     endpoint_id: UUID
-    session_id: Optional[SessionId]
+    session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime
+    created_at: datetime | None
+    revision_id: UUID | None
+    traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 
 
@@ -330,12 +388,12 @@ class ModelDeploymentAutoScalingRuleData:
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: Optional[Decimal]
-    max_threshold: Optional[Decimal]
+    min_threshold: Decimal | None
+    max_threshold: Decimal | None
     step_size: int
     time_window: int
-    min_replicas: Optional[int]
-    max_replicas: Optional[int]
+    min_replicas: int | None
+    max_replicas: int | None
     created_at: datetime
     last_triggered_at: datetime
 
@@ -359,7 +417,6 @@ class ModelReplicaData:
     weight: int
     detail: dict[str, Any]
     created_at: datetime
-    live_stat: dict[str, Any]
 
 
 @dataclass
@@ -378,21 +435,21 @@ class ResourceConfigData:
 @dataclass
 class ModelRuntimeConfigData:
     runtime_variant: RuntimeVariant
-    inference_runtime_config: Optional[Mapping[str, Any]] = None
-    environ: Optional[dict[str, Any]] = None
+    inference_runtime_config: Mapping[str, Any] | None = None
+    environ: dict[str, Any] | None = None
 
 
 @dataclass
 class ModelMountConfigData:
-    vfolder_id: UUID
-    mount_destination: str
+    vfolder_id: UUID | None
+    mount_destination: str | None
     definition_path: str
 
 
 @dataclass
 class ExtraVFolderMountData:
     vfolder_id: UUID
-    mount_destination: str
+    mount_destination: str  # PurePosixPath should be converted to str
 
 
 @dataclass
@@ -430,13 +487,13 @@ class ModelDeploymentData:
     id: UUID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkSpec
-    revision: Optional[ModelRevisionData]
+    revision: ModelRevisionData | None
     revision_history_ids: list[UUID]
     scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: Optional[UUID] = None
+    access_token_ids: UUID | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
@@ -457,3 +514,135 @@ class ReplicaOrderField(enum.StrEnum):
 
 class AccessTokenOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
+
+
+class AutoScalingRuleOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+
+
+# ========== Scheduling History Types ==========
+
+
+@dataclass
+class DeploymentHistoryData:
+    """Domain model for deployment history."""
+
+    id: UUID
+    deployment_id: UUID
+
+    phase: str  # DeploymentLifecycleType value
+    from_status: ModelDeploymentStatus | None
+    to_status: ModelDeploymentStatus | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    sub_steps: list[SubStepResult]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class RouteHistoryData:
+    """Domain model for route history."""
+
+    id: UUID
+    route_id: UUID
+    deployment_id: UUID
+
+    phase: str  # RouteLifecycleType value
+    from_status: RouteStatus | None
+    to_status: RouteStatus | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    sub_steps: list[SubStepResult]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentHistoryListResult:
+    """Search result with pagination for deployment history."""
+
+    items: list[DeploymentHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RouteHistoryListResult:
+    """Search result with pagination for route history."""
+
+    items: list[RouteHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RevisionSearchResult:
+    """Search result with pagination for deployment revisions."""
+
+    items: list[ModelRevisionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class RouteSearchResult:
+    """Search result with pagination for routes."""
+
+    items: list[RouteInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentSearchResult:
+    """Search result with pagination for deployments."""
+
+    items: list[ModelDeploymentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentInfoSearchResult:
+    """Search result with pagination for deployment info."""
+
+    items: list[DeploymentInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AutoScalingRuleSearchResult:
+    """Search result with pagination for auto-scaling rules."""
+
+    items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class AccessTokenSearchResult:
+    """Search result with pagination for access tokens."""
+
+    items: list[ModelDeploymentAccessTokenData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from ..base import DependencyStack
+from ai.backend.common.dependencies.base import DependencyStack
 
 if TYPE_CHECKING:
+    from ai.backend.common.dependencies.base import (
+        DependencyComposer,
+        DependencyProvider,
+        ResourcesT,
+        ResourceT,
+        SetupInputT,
+    )
     from ai.backend.common.health_checker import ServiceHealthChecker
     from ai.backend.common.health_checker.types import ServiceGroup
-
-    from ..base import DependencyComposer, DependencyProvider, ResourcesT, ResourceT, SetupInputT
 
 
 class DependencyBuilderStack(DependencyStack):
@@ -97,7 +102,9 @@ class DependencyBuilderStack(DependencyStack):
         await self._stack.__aenter__()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool | None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> bool | None:
         """
         Exit the async context and cleanup resources in LIFO order.
         """

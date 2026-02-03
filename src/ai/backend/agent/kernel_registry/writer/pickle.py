@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import pickle
 import time
 from collections.abc import MutableMapping
@@ -36,7 +35,7 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             return  # don't save too frequently
         last_registry_file = self._last_registry_file_path
         try:
-            with open(last_registry_file, "wb") as f:
+            with last_registry_file.open("wb") as f:
                 pickle.dump(dict(data), f)
             self._last_saved_time = now
             log.debug("Saved kernel registry to {}", str(last_registry_file))
@@ -47,6 +46,6 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 str(e),
             )
             try:
-                os.remove(last_registry_file)
+                last_registry_file.unlink()
             except FileNotFoundError:
                 pass

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Generic, NamedTuple, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 import sqlalchemy as sa
 
@@ -14,31 +15,40 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.orm.attributes.InstrumentedAttribute
+    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.Column[Any]
 
 
 TEnum = TypeVar("TEnum", bound=Enum)
 
 
-class EnumFieldItem(NamedTuple, Generic[TEnum]):
+class EnumFieldItem[TEnum: Enum](NamedTuple):
     column_name: str
     enum_cls: TEnum
 
 
 FieldSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem | ORMFieldItem, Callable[[str], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem,
+    Callable[[str], Any] | None,
 ]
 OrderSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem, Callable[[sa.Column], Any] | None
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any],
+    Callable[[sa.Column[Any]], Any] | None,
 ]
 
 
-def get_col_from_table(table, column_name: str):
-    try:
-        return table.c[column_name]
-    except AttributeError:
-        # For ORM class table
-        return getattr(table, column_name)
+def get_col_from_table(
+    table: sa.Table | sa.sql.Join | type, column_name: str
+) -> (
+    sa.Column[Any]
+    | sa.orm.attributes.InstrumentedAttribute[Any]
+    | sa.sql.elements.KeyedColumnElement[Any]
+):
+    if isinstance(table, (sa.Table, sa.sql.Join)):
+        col: sa.Column[Any] | sa.sql.elements.KeyedColumnElement[Any] = table.c[column_name]
+        return col
+    # For ORM class table
+    attr: sa.orm.attributes.InstrumentedAttribute[Any] = getattr(table, column_name)
+    return attr
 
 
 class ExternalTableFilterSpec:
@@ -53,7 +63,7 @@ class ExternalTableFilterSpec:
         field_name: str,
         target_table: sa.Table,
         target_column: str,
-        join_builder: Callable[[sa.Table], sa.sql.Join],
+        join_builder: Callable[[sa.Table | sa.sql.Join], sa.sql.Join],
         transform: Callable[[str], Any] | None = None,
     ) -> None:
         """
@@ -61,7 +71,7 @@ class ExternalTableFilterSpec:
             field_name: Name of the field in the filter expression (e.g., "project_name")
             target_table: SQLAlchemy table to apply the filter on (e.g., GroupRow.__table__)
             target_column: Column name in the target table (e.g., "name")
-            join_builder: Function that builds the JOIN clause given the base table
+            join_builder: Function that builds the JOIN clause given the base table or existing join
             transform: Optional transform function for the field value
         """
         self.field_name = field_name

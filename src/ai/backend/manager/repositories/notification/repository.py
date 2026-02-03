@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -13,21 +14,18 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelListResult,
-    NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleModifier,
-    NotificationRuleType,
 )
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import NotificationDBSource
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("NotificationRepository",)
@@ -71,7 +69,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_channel(
         self,
-        creator: NotificationChannelCreator,
+        creator: Creator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         return await self._db_source.create_channel(creator)
@@ -79,14 +77,10 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def update_channel(
         self,
-        channel_id: UUID,
-        modifier: NotificationChannelModifier,
+        updater: Updater[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Updates an existing notification channel."""
-        return await self._db_source.update_channel(
-            channel_id=channel_id,
-            modifier=modifier,
-        )
+        return await self._db_source.update_channel(updater=updater)
 
     @notification_repository_resilience.apply()
     async def delete_channel(self, channel_id: UUID) -> bool:
@@ -96,7 +90,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def create_rule(
         self,
-        creator: NotificationRuleCreator,
+        creator: Creator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         return await self._db_source.create_rule(creator)
@@ -104,14 +98,10 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def update_rule(
         self,
-        rule_id: UUID,
-        modifier: NotificationRuleModifier,
+        updater: Updater[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Updates an existing notification rule."""
-        return await self._db_source.update_rule(
-            rule_id=rule_id,
-            modifier=modifier,
-        )
+        return await self._db_source.update_rule(updater=updater)
 
     @notification_repository_resilience.apply()
     async def delete_rule(self, rule_id: UUID) -> bool:
@@ -131,7 +121,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_channels(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         return await self._db_source.search_channels(querier=querier)
@@ -139,7 +129,7 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def search_rules(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         return await self._db_source.search_rules(querier=querier)

@@ -56,11 +56,10 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from zmq.auth.certs import load_certificate
 
     from ai.backend.common.auth import PublicKey, SecretKey
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.models.utils import create_async_engine
 
-    from ..agent_cache import AgentRPCCache
-    from ..models.utils import create_async_engine
-
-    async def _impl():
+    async def _impl() -> None:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         manager_public_key, manager_secret_key = load_certificate(
             bootstrap_config.manager.rpc_auth_manager_keypair
@@ -88,7 +87,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 # result = await rpc.call.gather_hwinfo()
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.error("Timeout occurred while reading the response from ag:{}", agent_id)
         except Exception:
             log.exception("Exception occurred while reading the response from ag:{}", agent_id)

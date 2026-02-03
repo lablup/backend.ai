@@ -1,5 +1,6 @@
 import logging
-from typing import AsyncIterator, override
+from collections.abc import AsyncIterator
+from typing import override
 
 import aiohttp
 
@@ -10,7 +11,7 @@ from .base import (
     BaseContainerRegistry,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GitHubRegistry(BaseContainerRegistry):
@@ -21,7 +22,8 @@ class GitHubRegistry(BaseContainerRegistry):
 
         project = self.registry_info.project
         access_token = self.registry_info.password
-        entity_type = self.registry_info.extra.get("entity_type", None)
+        extra = self.registry_info.extra or {}
+        entity_type = extra.get("entity_type", None)
 
         if entity_type is None:
             raise RuntimeError("Entity type is not provided for GitHub registry!")

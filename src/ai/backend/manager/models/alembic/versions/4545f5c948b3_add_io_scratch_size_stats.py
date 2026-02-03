@@ -16,12 +16,12 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("kernels", sa.Column("io_max_scratch_size", sa.BigInteger(), nullable=True))
     op.drop_column("kernels", "mem_cur_bytes")
 
 
-def downgrade():
+def downgrade() -> None:
     op.add_column(
         "kernels", sa.Column("mem_cur_bytes", sa.BIGINT(), autoincrement=False, nullable=True)
     )

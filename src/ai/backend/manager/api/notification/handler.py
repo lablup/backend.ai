@@ -5,14 +5,16 @@ Provides CRUD endpoints for notification channels and rules.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import Iterable, Tuple
 
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.notification import NotifiableMessage
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
@@ -25,7 +27,6 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
-    NotificationRuleType,
     NotificationRuleTypeSchemaResponse,
     PaginationInfo,
     SearchNotificationChannelsRequest,
@@ -39,6 +40,8 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
 )
+from ai.backend.manager.api.auth import auth_required_for_method
+from ai.backend.manager.api.types import CORSOptions, WebMiddleware
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.notification_request import (
     DeleteNotificationChannelPathParam,
@@ -50,6 +53,11 @@ from ai.backend.manager.dto.notification_request import (
     UpdateNotificationRulePathParam,
     ValidateNotificationChannelPathParam,
     ValidateNotificationRulePathParam,
+)
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
 )
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
@@ -66,9 +74,6 @@ from ai.backend.manager.services.notification.actions import (
     ValidateRuleAction,
 )
 
-from ...data.notification import NotificationChannelCreator, NotificationRuleCreator
-from ..auth import auth_required_for_method
-from ..types import CORSOptions, WebMiddleware
 from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
 __all__ = ("create_app",)
@@ -97,15 +102,17 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can create notification channels.")
 
         # Convert request to creator
-        # config validator in request DTO ensures this is WebhookConfig
-
-        creator = NotificationChannelCreator(
-            name=body.parsed.name,
-            description=body.parsed.description,
-            channel_type=body.parsed.channel_type,
-            config=body.parsed.config,
-            enabled=body.parsed.enabled,
-            created_by=me.user_id,
+        # spec validator in request DTO ensures this is WebhookSpec or EmailSpec
+        validated_spec = body.parsed.spec
+        creator = Creator(
+            spec=NotificationChannelCreatorSpec(
+                name=body.parsed.name,
+                description=body.parsed.description,
+                channel_type=body.parsed.channel_type,
+                spec=validated_spec,
+                enabled=body.parsed.enabled,
+                created_by=me.user_id,
+            )
         )
 
         # Call service action
@@ -190,11 +197,9 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can update notification channels.")
 
         # Call service action
+        channel_id = path.parsed.channel_id
         action_result = await processors.notification.update_channel.wait_for_complete(
-            UpdateChannelAction(
-                channel_id=path.parsed.channel_id,
-                modifier=self.channel_adapter.build_modifier(body.parsed),
-            )
+            UpdateChannelAction(updater=self.channel_adapter.build_updater(body.parsed, channel_id))
         )
 
         # Build response
@@ -302,8 +307,6 @@ class NotificationAPIHandler:
         path: PathParam[RuleTypePathParam],
     ) -> APIResponse:
         """Get JSON schema for a notification rule type's message format."""
-        from ai.backend.common.data.notification import NotifiableMessage
-
         me = current_user()
         if me is None or not me.is_superadmin:
             raise web.HTTPForbidden(
@@ -335,14 +338,16 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can create notification rules.")
 
         # Convert request to creator
-        creator = NotificationRuleCreator(
-            name=body.parsed.name,
-            description=body.parsed.description,
-            rule_type=body.parsed.rule_type,
-            channel_id=body.parsed.channel_id,
-            message_template=body.parsed.message_template,
-            enabled=body.parsed.enabled,
-            created_by=me.user_id,
+        creator = Creator(
+            spec=NotificationRuleCreatorSpec(
+                name=body.parsed.name,
+                description=body.parsed.description,
+                rule_type=body.parsed.rule_type,
+                channel_id=body.parsed.channel_id,
+                message_template=body.parsed.message_template,
+                enabled=body.parsed.enabled,
+                created_by=me.user_id,
+            )
         )
 
         # Call service action
@@ -427,11 +432,9 @@ class NotificationAPIHandler:
             raise web.HTTPForbidden(reason="Only superadmin can update notification rules.")
 
         # Call service action
+        rule_id = path.parsed.rule_id
         action_result = await processors.notification.update_rule.wait_for_complete(
-            UpdateRuleAction(
-                rule_id=path.parsed.rule_id,
-                modifier=self.rule_adapter.build_modifier(body.parsed),
-            )
+            UpdateRuleAction(updater=self.rule_adapter.build_updater(body.parsed, rule_id))
         )
 
         # Build response
@@ -465,7 +468,7 @@ class NotificationAPIHandler:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     """Create aiohttp application for notification API endpoints."""
     app = web.Application()
     app["api_versions"] = (4, 5)

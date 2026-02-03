@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import cast
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
@@ -10,8 +10,8 @@ async def verify_session_events(
     expected_event: str,
     failure_events: set[str],
     *,
-    expected_termination_reason: Optional[str] = None,
-    expected_failure_reason: Optional[str] = None,
+    expected_termination_reason: str | None = None,
+    expected_failure_reason: str | None = None,
 ) -> None:
     """
     Verify that a specific event occurs during session lifecycle.
@@ -54,7 +54,7 @@ async def verify_bgtask_events(
     bgtask_id: str,
     expected_event: str,
     failure_events: set[str],
-) -> Optional[str]:
+) -> str | None:
     """
     Verify that a specific background task event occurs.
 
@@ -70,7 +70,7 @@ async def verify_bgtask_events(
         async for ev in response:
             if ev.event == expected_event:
                 data = load_json(ev.data)
-                return data.get("message")
+                return cast(str | None, data.get("message"))
 
             if ev.event in failure_events:
                 raise RuntimeError(

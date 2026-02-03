@@ -13,12 +13,13 @@ import logging
 import os
 import sys
 import warnings
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from itertools import groupby
 from pathlib import Path
 from queue import Queue
-from typing import Any, Final, Mapping, cast
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
 import trafaret as t
@@ -106,14 +107,14 @@ images_table = sa.Table(
 )
 
 
-def get_container_registry_row_schema():
-    class ContainerRegistryRow(Base):
+def get_container_registry_row_schema() -> type[Any]:
+    class ContainerRegistryRow(Base):  # type: ignore[misc]
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
         url = sa.Column("url", sa.String(length=512), index=True)
         registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
+        type: sa.Column[Any] = sa.Column(
             "type",
             StrEnumType(ContainerRegistryType),
             default=ContainerRegistryType.DOCKER,
@@ -152,12 +153,12 @@ def get_async_etcd() -> AsyncEtcd:
 
 
 def delete_old_etcd_container_registries() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
-        def delete_etcd_container_registries():
-            async def _delete_container_registries():
+        def delete_etcd_container_registries() -> None:
+            async def _delete_container_registries() -> None:
                 etcd = get_async_etcd()
                 await etcd.delete_prefix(ETCD_CONTAINER_REGISTRY_KEY)
 
@@ -167,20 +168,20 @@ def delete_old_etcd_container_registries() -> None:
 
 
 def migrate_data_etcd_to_psql() -> None:
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
 
-        def backup(etcd_container_registries: Mapping[str, Any]):
+        def backup(etcd_container_registries: Mapping[str, Any]) -> None:
             backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
-            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
-            with open(backup_path, "w") as f:
+            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())  # noqa: DTZ005
+            with backup_path.open("w") as f:
                 json.dump(dict(etcd_container_registries), f, indent=4)
 
         # If there are no container registries, it returns an empty list.
         # If an error occurs while saving backup, it returns error.
-        def get_etcd_container_registries(queue: Queue):
-            async def _get_container_registries():
+        def get_etcd_container_registries(queue: Queue[Any]) -> None:
+            async def _get_container_registries() -> Mapping[str, Any] | Exception:
                 etcd = get_async_etcd()
                 result = await etcd.get_prefix(ETCD_CONTAINER_REGISTRY_KEY)
                 try:
@@ -204,13 +205,10 @@ def migrate_data_etcd_to_psql() -> None:
             file=sys.stderr,
         )
         raise RuntimeError(err_msg) from maybe_registries
-    else:
-        registries = cast(Mapping[str, Any], maybe_registries)
+    registries = cast(Mapping[str, Any], maybe_registries)
 
     old_format_container_registries = {
-        hostname: etcd_container_registry_iv.check(item)
-        for hostname, item in registries.items()
-        # type: ignore
+        hostname: etcd_container_registry_iv.check(item) for hostname, item in registries.items()
     }
 
     input_configs = []
@@ -263,7 +261,7 @@ def revert_data_psql_to_etcd() -> None:
     db_connection = op.get_bind()
 
     rows = db_connection.execute(
-        sa.select([
+        sa.select(
             ContainerRegistryRow.url,
             ContainerRegistryRow.registry_name,
             ContainerRegistryRow.type,
@@ -271,7 +269,7 @@ def revert_data_psql_to_etcd() -> None:
             ContainerRegistryRow.username,
             ContainerRegistryRow.password,
             ContainerRegistryRow.ssl_verify,
-        ])
+        )
     ).fetchall()
     items = []
 
@@ -298,7 +296,7 @@ def revert_data_psql_to_etcd() -> None:
     # information loss can occur while the reverting process.
     grouped_items = {k: list(v) for k, v in groupby(items, key=lambda x: x["hostname"])}
 
-    def merge_items(items):
+    def merge_items(items: list[dict[str, Any]]) -> dict[str, Any]:
         for item in items:
             if "project" not in item:
                 return items[0]
@@ -313,7 +311,7 @@ def revert_data_psql_to_etcd() -> None:
 
     merged_items = [merge_items(items) for items in grouped_items.values()]
 
-    def put_etcd_container_registries(merged_items: list[Any], queue: Queue):
+    def put_etcd_container_registries(merged_items: list[Any], queue: Queue[Any]) -> None:
         etcd = get_async_etcd()
         for item in merged_items:
             hostname = item.pop("hostname")
@@ -321,7 +319,7 @@ def revert_data_psql_to_etcd() -> None:
 
         queue.put(True)
 
-    queue: Queue = Queue()
+    queue: Queue[Any] = Queue()
 
     with ThreadPoolExecutor() as executor:
         executor.submit(put_etcd_container_registries, merged_items, queue)
@@ -334,11 +332,11 @@ def insert_registry_id_to_images() -> None:
     ContainerRegistry = get_container_registry_row_schema()
 
     registry_infos = db_connection.execute(
-        sa.select([
+        sa.select(
             ContainerRegistry.id,
             ContainerRegistry.registry_name,
             ContainerRegistry.project,
-        ])
+        )
     ).fetchall()
 
     if registry_infos:
@@ -392,12 +390,12 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
         registry_name, project = namespace
 
         registry_info = db_connection.execute(
-            sa.select([
+            sa.select(
                 ContainerRegistryRow.url,
                 ContainerRegistryRow.registry_name,
                 ContainerRegistryRow.type,
                 ContainerRegistryRow.ssl_verify,
-            ]).where(ContainerRegistryRow.registry_name == registry_name)
+            ).where(ContainerRegistryRow.registry_name == registry_name)
         ).fetchone()
 
         if not registry_info:
@@ -405,15 +403,14 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
 
         if project in added_projects:
             continue
-        else:
-            added_projects.append(project)
+        added_projects.append(project)
 
-        registry_info = dict(registry_info)
-        registry_info["project"] = project
+        registry_info_dict: dict[str, Any] = dict(registry_info._mapping)
+        registry_info_dict["project"] = project
 
         registry_id = db_connection.execute(
             sa.insert(ContainerRegistryRow)
-            .values(**registry_info)
+            .values(**registry_info_dict)
             .returning(ContainerRegistryRow.id)
         ).scalar_one()
 
@@ -421,10 +418,8 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
             sa.update(images_table)
             .values(registry_id=registry_id)
             .where(
-                (
-                    images_table.c.name.startswith(f"{registry_name}/{project}")
-                    & (images_table.c.registry_id.is_(None))
-                )
+                images_table.c.name.startswith(f"{registry_name}/{project}")
+                & (images_table.c.registry_id.is_(None))
             )
         )
 
@@ -467,7 +462,7 @@ def mark_local_images_with_missing_registry_id() -> None:
     }
 
     local_registry_id = db_connection.execute(
-        sa.select([ContainerRegistryRow.id]).where(
+        sa.select(ContainerRegistryRow.id).where(
             ContainerRegistryRow.type == ContainerRegistryType.LOCAL
         )
     ).scalar_one_or_none()
@@ -485,11 +480,11 @@ def mark_local_images_with_missing_registry_id() -> None:
             registry_id=local_registry_id,
             is_local=True,
         )
-        .where((images_table.c.registry_id.is_(None)))
+        .where(images_table.c.registry_id.is_(None))
     )
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
         "container_registries",
@@ -532,7 +527,7 @@ def upgrade():
     delete_old_etcd_container_registries()
 
 
-def downgrade():
+def downgrade() -> None:
     revert_data_psql_to_etcd()
 
     op.drop_table("container_registries")

@@ -1,5 +1,3 @@
-from typing import Tuple as _Tuple
-
 from trafaret.base import And as And
 from trafaret.base import Any as Any
 from trafaret.base import Atom as Atom
@@ -58,5 +56,5 @@ from trafaret.numeric import ToInt as ToInt
 from trafaret.regexp import Regexp as Regexp
 from trafaret.regexp import RegexpRaw as RegexpRaw
 
-__all__: _Tuple[str]
-__VERSION__: _Tuple[int, int, int]
+__all__: tuple[str]
+__VERSION__: tuple[int, int, int]

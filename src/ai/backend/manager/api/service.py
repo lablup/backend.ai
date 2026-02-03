@@ -2,9 +2,9 @@ import logging
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import aiohttp_cors
 import aiotools
@@ -48,14 +48,18 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ResourceSpecDraft,
 )
-from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
     MountOption,
-    RequesterCtx,
     ServiceConfig,
     ServiceInfo,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.endpoint import ModelServiceHelper
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.vfolder import query_accessible_vfolders, vfolders
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
@@ -65,13 +69,6 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.clear_error import ClearErrorAction
-from ai.backend.manager.services.model_serving.actions.create_model_service import (
-    CreateModelServiceAction,
-    CreateModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.actions.delete_model_service import (
-    DeleteModelServiceAction,
-)
 from ai.backend.manager.services.model_serving.actions.delete_route import DeleteRouteAction
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
@@ -91,18 +88,8 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.types import MountOptionModel, UserScope
 
-from ..errors.api import InvalidAPIParameters
-from ..errors.auth import InvalidAuthParameters
-from ..errors.storage import VFolderNotFound
-from ..models import (
-    ModelServiceHelper,
-    UserRole,
-    UserRow,
-    query_accessible_vfolders,
-    vfolders,
-)
-from ..types import MountOptionModel, UserScope
 from .auth import auth_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
@@ -113,7 +100,6 @@ from .utils import (
     get_access_key_scopes,
     pydantic_params_api_handler,
     pydantic_response_api_handler,
-    undefined,
 )
 
 if TYPE_CHECKING:
@@ -129,13 +115,14 @@ async def is_user_allowed_to_access_resource(
 ) -> bool:
     if request["user"]["is_superadmin"]:
         return True
-    elif request["user"]["is_admin"]:
+    if request["user"]["is_admin"]:
         query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
         result = await db_sess.execute(query)
         user = result.scalar()
-        return user.domain_name == request["user"]["domain_name"]
-    else:
-        return request["user"]["uyud"] == resource_owner
+        if user is None:
+            return False
+        return cast(bool, user.domain_name == request["user"]["domain_name"])
+    return cast(bool, request["user"]["uuid"] == resource_owner)
 
 
 class ListServeRequestModel(LegacyBaseRequestModel):
@@ -209,9 +196,7 @@ class RouteInfoModel(BaseFieldModel):
             " relationship with the inference session."
         )
     )
-    session_id: Optional[uuid.UUID] = Field(
-        description="Unique ID referencing the inference session."
-    )
+    session_id: uuid.UUID | None = Field(description="Unique ID referencing the inference session.")
     traffic_ratio: NonNegativeFloat
 
 
@@ -317,12 +302,6 @@ async def get_info(request: web.Request) -> ServeInfoModel:
     )
 
     action = GetModelServiceInfoAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
     result: GetModelServiceInfoActionResult = (
@@ -361,7 +340,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default_factory=dict,
     )
 
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
@@ -370,7 +349,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: Optional[dict[str, str | int]] = Field(
+    resources: dict[str, str | int] | None = Field(
         examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
@@ -400,13 +379,13 @@ class ServiceConfigModel(LegacyBaseRequestModel):
 @dataclass
 class ValidationResult:
     model_id: uuid.UUID
-    model_definition_path: Optional[str]
+    model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
     owner_role: UserRole
     group_id: uuid.UUID
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
 
@@ -423,7 +402,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
     )
-    image: Optional[str] = Field(
+    image: str | None = Field(
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
         alias="lang",
@@ -433,8 +412,8 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="Type of the inference runtime the image will try to load.",
         default=RuntimeVariant.CUSTOM,
     )
-    architecture: Optional[str] = Field(
-        description="Image architecture",
+    architecture: str | None = Field(
+        description="Changed to nullable in 26.1. Image architecture. If not provided, defaults to the Manager's architecture.",
         alias="arch",
         default=None,
     )
@@ -483,46 +462,6 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default=False,
     )
     config: ServiceConfigModel
-
-    def to_create_action(
-        self,
-        validation_result: ValidationResult,
-        request_user_id: uuid.UUID,
-        sudo_session_enabled: bool,
-    ) -> CreateModelServiceAction:
-        return CreateModelServiceAction(
-            request_user_id=request_user_id,
-            creator=ModelServiceCreator(
-                service_name=self.service_name,
-                replicas=self.replicas,
-                image=self.image,
-                runtime_variant=self.runtime_variant,
-                architecture=self.architecture,
-                group_name=self.group_name,
-                domain_name=self.domain_name,
-                cluster_size=self.cluster_size,
-                cluster_mode=ClusterMode(self.cluster_mode),
-                tag=self.tag,
-                startup_command=self.startup_command,
-                bootstrap_script=self.bootstrap_script,
-                callback_url=self.callback_url,
-                open_to_public=self.open_to_public,
-                config=self.config.to_dataclass(),
-                sudo_session_enabled=sudo_session_enabled,
-                model_service_prepare_ctx=ModelServicePrepareCtx(
-                    model_id=validation_result.model_id,
-                    model_definition_path=validation_result.model_definition_path,
-                    requester_access_key=validation_result.requester_access_key,
-                    owner_access_key=validation_result.owner_access_key,
-                    owner_uuid=validation_result.owner_uuid,
-                    owner_role=validation_result.owner_role,
-                    group_id=validation_result.group_id,
-                    resource_policy=validation_result.resource_policy,
-                    scaling_group=validation_result.scaling_group,
-                    extra_mounts=validation_result.extra_mounts,
-                ),
-            ),
-        )
 
     def to_start_action(
         self,
@@ -604,9 +543,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
     scopes_param = {
-        "owner_access_key": (
-            None if params.owner_access_key is undefined else params.owner_access_key
-        ),
+        "owner_access_key": params.owner_access_key,
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
@@ -629,7 +566,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         owner_uuid, group_id, resource_policy = await query_userinfo(
             request, params.model_dump(by_alias=True), conn
         )
-        query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
+        query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
         if not owner_role:
             raise InvalidAuthParameters("Owner role is required to create a model service")
@@ -650,7 +587,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         except Exception as e:
             # just catching ValueError | VFolderNotFound will raise
             # TypeError: catching classes that do not inherit from BaseException is not allowed
-            if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
+            if isinstance(e, (ValueError, VFolderNotFound)):
                 try:
                     extra_vf_conds = (vfolders.c.name == params.config.model) & (
                         vfolders.c.usage_mode == VFolderUsageMode.MODEL
@@ -741,50 +678,35 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     root_ctx: RootContext = request.app["_root.context"]
 
     validation_result = await _validate(request, params)
-    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
-    if (
-        root_ctx.config_provider.config.manager.use_sokovan
-        and root_ctx.processors.deployment is not None
-    ):
-        # Create deployment using the new deployment controller
-        deployment_action = CreateLegacyDeploymentAction(
-            draft=DeploymentCreationDraft(
-                metadata=DeploymentMetadata(
-                    name=params.service_name,
-                    domain=params.domain_name,
-                    project=validation_result.group_id,
-                    resource_group=validation_result.scaling_group,
-                    created_user=request["user"]["uuid"],
-                    session_owner=validation_result.owner_uuid,
-                    created_at=None,  # Will be set by controller
-                    tag=params.tag,
-                ),
-                replica_spec=ReplicaSpec(
-                    replica_count=params.replicas,
-                ),
-                draft_model_revision=params.to_model_revision(validation_result),
-                network=DeploymentNetworkSpec(
-                    open_to_public=params.open_to_public,
-                ),
-            )
+    # Create deployment using the deployment controller
+    deployment_action = CreateLegacyDeploymentAction(
+        draft=DeploymentCreationDraft(
+            metadata=DeploymentMetadata(
+                name=params.service_name,
+                domain=params.domain_name,
+                project=validation_result.group_id,
+                resource_group=validation_result.scaling_group,
+                created_user=request["user"]["uuid"],
+                session_owner=validation_result.owner_uuid,
+                created_at=None,  # Will be set by controller
+                revision_history_limit=10,
+                tag=params.tag,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=params.replicas,
+            ),
+            draft_model_revision=params.to_model_revision(validation_result),
+            network=DeploymentNetworkSpec(
+                open_to_public=params.open_to_public,
+            ),
         )
-        deployment_result: CreateLegacyDeploymentActionResult = (
-            await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
-                deployment_action
-            )
+    )
+    deployment_result: CreateLegacyDeploymentActionResult = (
+        await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
+            deployment_action
         )
-        return ServeInfoModel.from_deployment_info(deployment_result.data)
-    else:
-        # Fall back to model_serving
-        action = params.to_create_action(
-            validation_result=validation_result,
-            request_user_id=request["user"]["uuid"],
-            sudo_session_enabled=request["user"]["sudo_session_enabled"],
-        )
-        result: CreateModelServiceActionResult = (
-            await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
-        )
-        return ServeInfoModel.from_dto(result.data)
+    )
+    return ServeInfoModel.from_deployment_info(deployment_result.data)
 
 
 class TryStartResponseModel(LegacyBaseResponseModel):
@@ -825,36 +747,14 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         "SERVE.DELETE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
-    if (
-        root_ctx.config_provider.config.manager.use_sokovan
-        and root_ctx.processors.deployment is not None
-    ):
-        # Use deployment destroy action
-        deployment_action = DestroyDeploymentAction(
-            endpoint_id=service_id,
-        )
-        deployment_result: DestroyDeploymentActionResult = (
-            await root_ctx.processors.deployment.destroy_deployment.wait_for_complete(
-                deployment_action
-            )
-        )
-        return SuccessResponseModel(success=deployment_result.success)
-    else:
-        # Fall back to model_serving
-        action = DeleteModelServiceAction(
-            service_id=service_id,
-            requester_ctx=RequesterCtx(
-                is_authorized=request["is_authorized"],
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-                domain_name=request["user"]["domain_name"],
-            ),
-        )
-        result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(
-            action
-        )
-        return SuccessResponseModel(success=result.success)
+    # Use deployment destroy action
+    deployment_action = DestroyDeploymentAction(
+        endpoint_id=service_id,
+    )
+    deployment_result: DestroyDeploymentActionResult = (
+        await root_ctx.processors.deployment.destroy_deployment.wait_for_complete(deployment_action)
+    )
+    return SuccessResponseModel(success=deployment_result.success)
 
 
 @auth_required
@@ -874,12 +774,6 @@ async def sync(request: web.Request) -> SuccessResponseModel:
 
     action = ForceSyncAction(
         service_id=service_id,
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
     )
     result = await root_ctx.processors.model_serving.force_sync.wait_for_complete(action)
 
@@ -912,12 +806,6 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
     )
 
     action = ScaleServiceReplicasAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         max_session_count_per_model_session=request["user"]["resource_policy"][
             "max_session_count_per_model_session"
         ],
@@ -961,12 +849,6 @@ async def update_route(
     )
 
     action = UpdateRouteAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         route_id=route_id,
         traffic_ratio=params.traffic_ratio,
@@ -997,12 +879,6 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
     )
 
     action = DeleteRouteAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         route_id=route_id,
     )
@@ -1027,7 +903,7 @@ class TokenRequestModel(LegacyBaseRequestModel):
 
     @model_validator(mode="after")
     def check_lifetime(self) -> Self:
-        now = datetime.now()
+        now = datetime.now(UTC)
         if self.valid_until is not None:
             self.expires_at = self.valid_until
         elif self.duration is not None:
@@ -1064,12 +940,6 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
     )
 
     action = GenerateTokenAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
         duration=params.duration,
         valid_until=params.valid_until,
@@ -1113,12 +983,6 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
     )
 
     action = ListErrorsAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
 
@@ -1148,12 +1012,6 @@ async def clear_error(request: web.Request) -> web.Response:
     )
 
     action = ClearErrorAction(
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
         service_id=service_id,
     )
 
@@ -1174,7 +1032,9 @@ class RuntimeInfoModel(LegacyBaseResponseModel):
 @auth_required
 @server_status_required(READ_ALLOWED)
 @pydantic_response_api_handler
-async def list_supported_runtimes(request: web.Request) -> RuntimeInfoModel:
+async def list_supported_runtimes(
+    request: web.Request,  # noqa: ARG001
+) -> RuntimeInfoModel:
     return RuntimeInfoModel(
         runtimes=[
             RuntimeInfo(name=v.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name)

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -10,35 +12,33 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountInfo,
-    MountMetadata,
     ReplicaSpec,
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass
 class VFolderMountsCreator:
     model_vfolder_id: UUID
-    model_definition_path: Optional[str] = None
+    model_definition_path: str | None = None
     model_mount_destination: str = "/models"
     extra_mounts: list[MountInfo] = field(default_factory=list)
 
 
 @dataclass
 class ModelRevisionCreator:
-    image_identifier: ImageIdentifier
+    """Creator for model revision.
+
+    Note: Uses image_id directly instead of image_identifier.
+    The image_id is resolved by the GQL layer before being passed here.
+    """
+
+    image_id: UUID
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
-
-    def to_revision_spec(self, mount_metadata: MountMetadata) -> ModelRevisionSpec:
-        return ModelRevisionSpec(
-            image_identifier=self.image_identifier,
-            resource_spec=self.resource_spec,
-            mounts=mount_metadata,
-            execution=self.execution,
-        )
 
 
 @dataclass
@@ -47,6 +47,7 @@ class DeploymentCreator:
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionSpec
+    policy: DeploymentPolicyConfig | None = None
 
     # Accessor properties for backward compatibility
     @property
@@ -111,8 +112,21 @@ class DeploymentCreationDraft:
 
 
 @dataclass
+class DeploymentPolicyConfig:
+    """Configuration for deployment policy.
+
+    Passed from GQL layer to service layer for policy creation/update.
+    """
+
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool = False
+
+
+@dataclass
 class NewDeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
     model_revision: ModelRevisionCreator
+    policy: DeploymentPolicyConfig | None = None

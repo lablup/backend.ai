@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import logging
-import os
 import pickle
 import shutil
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
+from ai.backend.agent.kernel_registry.exception import (
+    KernelRegistryLoadError,
+    KernelRegistryNotFound,
+)
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import KernelRegistryLoadError, KernelRegistryNotFound
 from .abc import AbstractKernelRegistryLoader
 
 if TYPE_CHECKING:
@@ -34,7 +36,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
         legacy_registry_file = self._legacy_registry_file_path
         final_file_path = self._last_registry_file_path
         try:
-            if os.path.isfile(legacy_registry_file):
+            if legacy_registry_file.is_file():
                 shutil.move(legacy_registry_file, final_file_path)
         except Exception as e:
             log.warning(
@@ -44,9 +46,8 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 str(e),
             )
         try:
-            with open(final_file_path, "rb") as f:
-                result = pickle.load(f)
-                return result
+            with final_file_path.open("rb") as f:
+                return cast("MutableMapping[KernelId, AbstractKernel]", pickle.load(f))
         except EOFError as e:
             log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
             raise KernelRegistryLoadError from e

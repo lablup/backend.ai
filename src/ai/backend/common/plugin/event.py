@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
+from ai.backend.common.events.types import AbstractEvent
+from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..events.types import AbstractEvent
-from ..types import AgentId
 from . import AbstractPlugin, BasePluginContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractEventDispatcherPlugin(AbstractPlugin, metaclass=ABCMeta):
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:

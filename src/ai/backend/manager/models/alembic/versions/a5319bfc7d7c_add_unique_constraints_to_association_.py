@@ -18,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
 
     association_groups_users = sa.Table(
@@ -118,12 +118,12 @@ def upgrade():
         extend_existing=True,
     )
 
-    def ensure_unique(table, field_1: str, field_2: str) -> None:
+    def ensure_unique(table: sa.Table, field_1: str, field_2: str) -> None:
         # Leave only one duplicate record and delete all of it
         t1 = table.alias("t1")
         t2 = table.alias("t2")
         subq = (
-            sa.select([t1.c.id])
+            sa.select(t1.c.id)
             .where(t1.c[field_1] == t2.c[field_1])
             .where(t1.c[field_2] == t2.c[field_2])
             .where(t1.c.id > t2.c.id)
@@ -150,7 +150,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(
         "uq_association_user_id_group_id", "association_groups_users", type_="unique"
     )

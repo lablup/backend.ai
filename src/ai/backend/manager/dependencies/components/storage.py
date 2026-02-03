@@ -46,4 +46,4 @@ class StorageManagerDependency(ComponentDependency[StorageSessionManager]):
         Returns:
             None (no health checks)
         """
-        return None
+        return

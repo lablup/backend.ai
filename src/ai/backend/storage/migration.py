@@ -4,11 +4,12 @@ import enum
 import logging
 import os
 import re
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Optional, TypedDict
+from typing import TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -55,8 +56,8 @@ class MigrationFolderInfo(TypedDict):
     quota_scope_id: str
     src_path: Path
     dst_path: Path
-    current_size: Optional[int]
-    old_quota: Optional[int]
+    current_size: int | None
+    old_quota: int | None
 
 
 class VFolderMigrationStatus(enum.StrEnum):
@@ -102,11 +103,11 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 
 
 async def upgrade_2_to_3(
-    ctx: RootContext,
+    _ctx: RootContext,
     dsn: str,
     volume: AbstractVolume,
     outfile: str,
-    report_path: Optional[Path] = None,
+    report_path: Path | None = None,
     force_scan_folder_size: bool = False,
 ) -> None:
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
@@ -130,7 +131,7 @@ async def upgrade_2_to_3(
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
-            old_quota_map: dict[UUID, Optional[int]] = {}
+            old_quota_map: dict[UUID, int | None] = {}
             quota_scope_map: dict[UUID, str] = {}
             async with connect_database(dsn) as conn:
                 for target in target_chunk:
@@ -156,11 +157,7 @@ async def upgrade_2_to_3(
                     quota_scope_id = quota_scope_map[folder_id]
                 except KeyError:
                     continue
-                progbar.set_description(
-                    "inspecting contents of vfolder {}".format(
-                        folder_id,
-                    )
-                )
+                progbar.set_description(f"inspecting contents of vfolder {folder_id}")
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:
@@ -228,9 +225,9 @@ async def check_and_upgrade(
     local_config: StorageProxyUnifiedConfig,
     dsn: str,
     outfile: str,
-    report_path: Optional[Path] = None,
+    report_path: Path | None = None,
     force_scan_folder_size: bool = False,
-):
+) -> None:
     etcd = make_etcd(local_config)
     raw_redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
@@ -278,7 +275,7 @@ async def check_and_upgrade(
         volume_pool=None,  # type: ignore[arg-type]
         storage_pool=None,  # type: ignore[arg-type]
         background_task_manager=None,  # type: ignore[arg-type]
-        artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
+        artifact_verifier_ctx=ArtifactVerifierContext(),
         metric_registry=CommonMetricRegistry(),
         cors_options={},
         manager_client_pool=manager_client_pool,
@@ -286,6 +283,8 @@ async def check_and_upgrade(
         backends={**DEFAULT_BACKENDS},
         volumes={},
         health_probe=health_probe,
+        volume_stats_observer=None,  # type: ignore[arg-type]
+        volume_stats_state=None,  # type: ignore[arg-type]
     )
 
     volumes_to_upgrade = await check_latest(ctx)
@@ -357,9 +356,9 @@ async def check_and_upgrade(
 )
 def main(
     outfile: str,
-    config_path: Optional[Path],
+    config_path: Path | None,
     dsn: str,
-    report_path: Optional[Path],
+    report_path: Path | None,
     force_scan_folder_size: bool,
     log_level: LogLevel,
     debug: bool,

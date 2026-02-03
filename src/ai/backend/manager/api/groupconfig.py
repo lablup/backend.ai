@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Tuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -10,26 +11,27 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-
-from ..errors.api import InvalidAPIParameters
-from ..errors.common import GenericForbidden
-from ..errors.resource import ProjectNotFound
-from ..errors.storage import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ..models import (
-    MAXIMUM_DOTFILE_SIZE,
+from ai.backend.manager.models.domain import MAXIMUM_DOTFILE_SIZE, verify_dotfile_name
+from ai.backend.manager.models.group import (
+    association_groups_users as agus,
+)
+from ai.backend.manager.models.group import (
     groups,
     query_group_domain,
     query_group_dotfiles,
-    verify_dotfile_name,
 )
-from ..models import association_groups_users as agus
+
 from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
@@ -61,7 +63,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
 
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -124,7 +126,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -145,7 +147,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
             else:
                 # check if user (non-admin) is in the group
                 query = (
-                    sa.select([agus.c.group_id])
+                    sa.select(agus.c.group_id)
                     .select_from(agus)
                     .where(agus.c.user_id == request["user"]["uuid"])
                 )
@@ -162,17 +164,16 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
                 if dotfile["path"] == params["path"]:
                     return web.json_response(dotfile)
             raise DotfileNotFound
-        else:
-            dotfiles, _ = await query_group_dotfiles(conn, group_id)
-            if dotfiles is None:
-                raise ProjectNotFound
-            for entry in dotfiles:
-                resp.append({
-                    "path": entry["path"],
-                    "permission": entry["perm"],
-                    "data": entry["data"],
-                })
-            return web.json_response(resp)
+        dotfiles, _ = await query_group_dotfiles(conn, group_id)
+        if dotfiles is None:
+            raise ProjectNotFound
+        for entry in dotfiles:
+            resp.append({
+                "path": entry["path"],
+                "permission": entry["perm"],
+                "data": entry["data"],
+            })
+        return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)
@@ -197,7 +198,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -251,7 +252,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == params["domain"])
                 .where(groups.c.name == group_id_or_name)
@@ -289,7 +290,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

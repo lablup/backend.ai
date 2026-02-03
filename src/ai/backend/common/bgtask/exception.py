@@ -1,6 +1,12 @@
 from typing import override
 
-from ..exception import BackendAIError, ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 
 
 class InvalidTaskMetadataError(BackendAIError):

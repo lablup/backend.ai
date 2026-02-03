@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import (
@@ -73,32 +72,32 @@ class DeploymentStatusFilter:
 class DeploymentFilterOptions:
     """Filtering options for deployments."""
 
-    name: Optional[StringFilter] = None
-    status: Optional[DeploymentStatusFilter] = None
-    open_to_public: Optional[bool] = None
-    tags: Optional[StringFilter] = None
-    endpoint_url: Optional[StringFilter] = None
-    id: Optional[UUID] = None
+    name: StringFilter | None = None
+    status: DeploymentStatusFilter | None = None
+    open_to_public: bool | None = None
+    tags: StringFilter | None = None
+    endpoint_url: StringFilter | None = None
+    id: UUID | None = None
 
     # Logical operations
-    AND: Optional[list["DeploymentFilterOptions"]] = None
-    OR: Optional[list["DeploymentFilterOptions"]] = None
-    NOT: Optional[list["DeploymentFilterOptions"]] = None
+    AND: list[DeploymentFilterOptions] | None = None
+    OR: list[DeploymentFilterOptions] | None = None
+    NOT: list[DeploymentFilterOptions] | None = None
 
 
 @dataclass
 class ModelRevisionFilterOptions:
     """Filtering options for model revisions."""
 
-    name: Optional[StringFilter] = None
-    deployment_id: Optional[UUID] = None
-    id: Optional[UUID] = None
-    ids_in: Optional[list[UUID]] = None
+    name: StringFilter | None = None
+    deployment_id: UUID | None = None
+    id: UUID | None = None
+    ids_in: list[UUID] | None = None
 
     # Logical operations
-    AND: Optional[list["ModelRevisionFilterOptions"]] = None
-    OR: Optional[list["ModelRevisionFilterOptions"]] = None
-    NOT: Optional[list["ModelRevisionFilterOptions"]] = None
+    AND: list[ModelRevisionFilterOptions] | None = None
+    OR: list[ModelRevisionFilterOptions] | None = None
+    NOT: list[ModelRevisionFilterOptions] | None = None
 
 
 class ReadinessStatusFilterType(Enum):
@@ -144,13 +143,13 @@ class ActivenessStatusFilter:
 class ModelReplicaFilterOptions:
     """Filtering options for model replicas."""
 
-    readiness_status_filter: Optional[ReadinessStatusFilter] = None
-    liveness_status_filter: Optional[LivenessStatusFilter] = None
-    activeness_status_filter: Optional[ActivenessStatusFilter] = None
-    id: Optional[UUID] = None
-    ids_in: Optional[list[UUID]] = None
+    readiness_status_filter: ReadinessStatusFilter | None = None
+    liveness_status_filter: LivenessStatusFilter | None = None
+    activeness_status_filter: ActivenessStatusFilter | None = None
+    id: UUID | None = None
+    ids_in: list[UUID] | None = None
 
     # Logical operations
-    AND: Optional[list["ModelReplicaFilterOptions"]] = None
-    OR: Optional[list["ModelReplicaFilterOptions"]] = None
-    NOT: Optional[list["ModelReplicaFilterOptions"]] = None
+    AND: list[ModelReplicaFilterOptions] | None = None
+    OR: list[ModelReplicaFilterOptions] | None = None
+    NOT: list[ModelReplicaFilterOptions] | None = None

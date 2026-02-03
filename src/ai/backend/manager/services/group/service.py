@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Optional, Sequence
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
@@ -17,7 +19,6 @@ from ai.backend.manager.models.resource_usage import (
     parse_total_resource_group,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.create_group import (
@@ -53,7 +54,6 @@ class GroupService:
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
     _group_repository: GroupRepository
-    _admin_group_repository: AdminGroupRepository
 
     def __init__(
         self,
@@ -66,15 +66,12 @@ class GroupService:
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
-        self._admin_group_repository = group_repositories.admin_repository
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        group_data = await self._group_repository.create(action.input)
+        group_data = await self._group_repository.create(action.creator)
         return CreateGroupActionResult(data=group_data)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        from ai.backend.manager.models.user import UserRole
-
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()
@@ -82,13 +79,11 @@ class GroupService:
             user_uuids_converted = [UUID(user_uuid) for user_uuid in user_uuids_list]
 
         group_data = await self._group_repository.modify_validated(
-            action.group_id,
-            action.modifier,
-            UserRole.USER,  # Default role since group operations don't require role-based logic
+            action.updater,
             action.user_update_mode.optional_value(),
             user_uuids_converted,
         )
-        # If no group data is returned, it means only user updates were performed
+        # If no group data is returned, it means only user updates were performed or no updates at all
         return ModifyGroupActionResult(data=group_data)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
@@ -96,14 +91,14 @@ class GroupService:
         return DeleteGroupActionResult(group_id=action.group_id)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
-        await self._admin_group_repository.purge_group_force(action.group_id)
+        await self._group_repository.purge_group(action.group_id)
         return PurgeGroupActionResult(group_id=action.group_id)
 
     async def _get_project_stats_for_period(
         self,
         start_date: datetime,
         end_date: datetime,
-        project_ids: Optional[Sequence[UUID]] = None,
+        project_ids: Sequence[UUID] | None = None,
     ) -> dict[UUID, ProjectResourceUsage]:
         kernels = await self._group_repository.fetch_project_resource_usage(
             start_date, end_date, project_ids=project_ids
@@ -123,8 +118,8 @@ class GroupService:
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
             end_date = start_date + relativedelta(months=+1)
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         result = await self._group_repository.get_container_stats_for_period(
             start_date, end_date, action.group_ids
         )
@@ -142,8 +137,8 @@ class GroupService:
             end_date = end_date + timedelta(days=1)  # include sessions in end_date
             if end_date - start_date > timedelta(days=100):
                 raise InvalidAPIParameters("Cannot query more than 100 days")
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         if end_date <= start_date:
             raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
         log.info(

@@ -10,12 +10,12 @@ from .base import (
 from .stacks import DependencyBuilderStack
 
 __all__ = [
-    "DependencyProvider",
-    "DependencyComposer",
-    "DependencyStack",
     "DependencyBuilderStack",
+    "DependencyComposer",
+    "DependencyProvider",
+    "DependencyStack",
     "NonMonitorableDependencyProvider",
-    "SetupInputT",
     "ResourceT",
     "ResourcesT",
+    "SetupInputT",
 ]

@@ -3,8 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.file import (
+from ai.backend.manager.services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
@@ -20,7 +19,7 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..services.file import VFolderFileService
+from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 
 
 class VFolderFileProcessors(AbstractProcessorPackage):

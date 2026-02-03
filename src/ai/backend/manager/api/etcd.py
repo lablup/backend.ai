@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import collections
 import logging
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    Iterable,
-    Mapping,
     cast,
 )
 
@@ -21,9 +19,9 @@ from ai.backend.common.json import load_json
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_container_registries
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.agent import AgentRow, AgentStatus
 
-from ..errors.api import InvalidAPIParameters
-from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
@@ -121,7 +119,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 
     # Optionally filter by the slots reported by the given resource group's agents
     if params["sgroup"] is not None:
-        available_slot_keys = set()
+        available_slot_keys: set[str] = set()
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).where(
                 (AgentRow.status == AgentStatus.ALIVE)
@@ -188,9 +186,8 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
         # Flatten the returned ChainMap object for JSON serialization
         tree_value = dict(await root_ctx.etcd.get_prefix_dict(params["key"]))
         return web.json_response({"result": tree_value})
-    else:
-        scalar_value = await root_ctx.etcd.get(params["key"])
-        return web.json_response({"result": scalar_value})
+    scalar_value = await root_ctx.etcd.get(params["key"])
+    return web.json_response({"result": scalar_value})
 
 
 @superadmin_required
@@ -214,7 +211,7 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
     if isinstance(params["value"], Mapping):
         updates = {}
 
-        def flatten(prefix, o):
+        def flatten(prefix: str, o: Mapping[str, Any]) -> None:
             for k, v in o.items():
                 inner_prefix = prefix if k == "" else f"{prefix}/{k}"
                 if isinstance(v, Mapping):
@@ -287,7 +284,7 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
 
 
 @superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
+async def get_docker_registries(request: web.Request) -> web.StreamResponse:
     """
     Returns the list of all registered docker registries.
     """

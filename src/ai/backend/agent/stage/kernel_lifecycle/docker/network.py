@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.agent.exception import NetworkPluginNotFound
 from ai.backend.agent.plugin.network import NetworkPluginContext
@@ -20,7 +20,7 @@ from ai.backend.common.types import (
 
 @dataclass
 class NetworkConfig:
-    mode: Optional[str]
+    mode: str | None
     network_name: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,10 +38,10 @@ class NetworkSpec:
     replicas: Mapping[str, int]  # per-role kernel counts
     network_config: NetworkConfig
     ssh_keypair: ClusterSSHKeyPair
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
 
-    gwbridge_subnet: Optional[str]
-    alternative_bridge: Optional[str]
+    gwbridge_subnet: str | None
+    alternative_bridge: str | None
 
 
 class NetworkSpecGenerator(ArgsSpecGenerator[NetworkSpec]):
@@ -109,8 +109,8 @@ class NetworkProvisioner(Provisioner[NetworkSpec, NetworkResult]):
     async def _prepare_plugin_network(self, spec: NetworkSpec, mode: str) -> list[dict[str, Any]]:
         try:
             plugin = self.network_plugin_ctx.plugins[mode]
-        except KeyError:
-            raise NetworkPluginNotFound(f"Network plugin {mode} not loaded!")
+        except KeyError as e:
+            raise NetworkPluginNotFound(f"Network plugin {mode} not loaded!") from e
 
         cluster_info = ClusterInfo(
             mode=spec.kernel_config["cluster_mode"],

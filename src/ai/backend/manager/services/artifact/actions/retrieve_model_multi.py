@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.manager.actions.action import BaseActionResult
@@ -10,11 +10,11 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class RetrieveModelsAction(ArtifactAction):
-    registry_id: Optional[uuid.UUID]
+    registry_id: uuid.UUID | None
     models: list[ModelTarget]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,5 +28,5 @@ class RetrieveModelsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

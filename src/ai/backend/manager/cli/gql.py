@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import click
 import graphene
 
-from ..models.gql import Mutation, Query
+from ai.backend.manager.api.gql_legacy.schema import Mutation, Query
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -16,13 +16,13 @@ log = logging.getLogger(__spec__.name)
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 
 @cli.command()
 @click.pass_obj
-def show(cli_ctx: CLIContext) -> None:
+def show(_cli_ctx: CLIContext) -> None:
     warnings.warn(
         "The 'gql' subcommand is deprecated. Use the 'api' subcommand.",
         DeprecationWarning,

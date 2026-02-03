@@ -25,6 +25,7 @@ In the :doc:`development setup </dev/development-setup>`, all these components r
    resources
    users
    networking
+   security
    storage
    configuration
    monitoring

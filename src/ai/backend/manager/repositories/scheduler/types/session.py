@@ -1,22 +1,22 @@
 """Session related types."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelWorkload, SessionWorkload
+from ai.backend.manager.sokovan.data import KernelWorkload, SessionWorkload
 
 
 @dataclass
@@ -27,7 +27,7 @@ class KernelData:
     image: str
     architecture: str
     requested_slots: ResourceSlot
-    agent: Optional[AgentId]
+    agent: AgentId | None
 
     def to_kernel_workload(self) -> KernelWorkload:
         """Convert to KernelWorkload entity."""
@@ -53,9 +53,9 @@ class PendingSessionData:
     priority: int
     session_type: SessionTypes
     cluster_mode: ClusterMode
-    starts_at: Optional[datetime]
+    starts_at: datetime | None
     is_private: bool
-    designated_agent_ids: Optional[list[AgentId]]
+    designated_agent_ids: list[AgentId] | None
     kernels: list[KernelData]
 
     def to_session_workload(self) -> SessionWorkload:
@@ -110,11 +110,11 @@ class PendingSessions:
 class TerminatingKernelData:
     """Kernel data for termination processing."""
 
-    kernel_id: str
+    kernel_id: KernelId
     status: KernelStatus
-    container_id: Optional[str]
-    agent_id: Optional[AgentId]
-    agent_addr: Optional[str]
+    container_id: str | None
+    agent_id: AgentId | None
+    agent_addr: str | None
     occupied_slots: ResourceSlot
 
 
@@ -135,41 +135,22 @@ class TerminatingSessionData:
 class TerminatingKernelWithAgentData:
     """Kernel data with agent status for lost agent cleanup."""
 
-    kernel_id: str
+    kernel_id: KernelId
     session_id: SessionId
     status: KernelStatus
-    agent_id: Optional[AgentId]
-    agent_status: Optional[str]  # Agent status from AgentRow
+    agent_id: AgentId | None
+    agent_status: str | None  # Agent status from AgentRow
 
 
 @dataclass
 class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
-    kernel_id: str
-    agent_id: Optional[AgentId]
+    kernel_id: KernelId
+    agent_id: AgentId | None
     occupied_slots: ResourceSlot
     success: bool
-    error: Optional[str] = None
-
-
-@dataclass
-class SessionTerminationResult:
-    """Result of termination for a session and its kernels."""
-
-    session_id: SessionId
-    access_key: AccessKey
-    creation_id: str
-    session_type: SessionTypes
-    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
-    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
-
-    @property
-    def should_terminate_session(self) -> bool:
-        """Check if all kernels in the session were successfully terminated."""
-        if not self.kernel_results:
-            return False
-        return all(kernel.success for kernel in self.kernel_results)
+    error: str | None = None
 
 
 @dataclass

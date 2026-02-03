@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 
 class UserEvent(ABC):
     @abstractmethod
-    def event_name(self) -> Optional[str]:
+    def event_name(self) -> str | None:
         """Get the name of the event."""
         raise NotImplementedError
 
     @abstractmethod
-    def retry_count(self) -> Optional[int]:
+    def retry_count(self) -> int | None:
         """Get the retry count for the event."""
         raise NotImplementedError
 

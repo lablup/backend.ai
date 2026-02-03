@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from aiodocker import Docker
 
@@ -47,7 +47,7 @@ class DockerHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing status for docker component
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         try:
             await self._docker.version()

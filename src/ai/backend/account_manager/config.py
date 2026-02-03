@@ -65,13 +65,12 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
 
 @dataclass
@@ -84,27 +83,27 @@ class UserID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
+            if not cls.default_uid:
+                raise ValueError("value is None but default_uid not provided")
             return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
                     return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getuid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        assert False, f"no such user {value} in system"
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -156,26 +155,27 @@ class GroupID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+            if not cls.default_gid:
+                raise ValueError("value is None but default_gid not provided")
+            return cls.default_gid
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
                     return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getgid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        assert False, f"no such user {value} in system"
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -421,7 +421,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return server_config
 
@@ -435,19 +435,23 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
-) -> dict | list:
+    schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
+    parent: list[str] | None = None,
+) -> dict[str, Any] | list[Any]:
+    if parent is None:
+        parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    elif isinstance(schema, types.GenericAlias):
+    if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseSchema):
+    if issubclass(schema, BaseSchema):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise ValueError(f"Field {name} in {schema} has no annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]
@@ -462,5 +466,4 @@ def generate_example_json(
                     else:
                         raise
         return res
-    else:
-        raise UnsupportedTypeError(str(schema))
+    raise UnsupportedTypeError(str(schema))

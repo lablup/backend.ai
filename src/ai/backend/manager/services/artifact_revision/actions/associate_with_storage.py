@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.actions.action import BaseActionResult
@@ -15,7 +15,7 @@ class AssociateWithStorageAction(ArtifactRevisionAction):
     storage_type: ArtifactStorageType
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.artifact_revision_id)
 
     @override
@@ -29,5 +29,5 @@ class AssociateWithStorageActionResult(BaseActionResult):
     result: AssociationArtifactsStoragesData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

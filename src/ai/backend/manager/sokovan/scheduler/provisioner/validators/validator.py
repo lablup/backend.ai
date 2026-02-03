@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from ai.backend.manager.sokovan.scheduler.types import (
-    SchedulingPredicate,
+from ai.backend.common.types import SessionId
+from ai.backend.manager.sokovan.data import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.recorder import RecorderContext
 
 from .exceptions import MultipleValidationErrors, SchedulingValidationError
 
@@ -56,38 +57,33 @@ class SchedulingValidator:
         self,
         snapshot: SystemSnapshot,
         workload: SessionWorkload,
-        passed_phases: list[SchedulingPredicate],
-        failed_phases: list[SchedulingPredicate],
     ) -> None:
         """
-        Validate a session workload and update passed/failed phases lists.
+        Validate a session workload using the recorder context.
+
+        Each validation rule is recorded as a step within the current phase.
+        The recorder must be accessible via RecorderContext.current_pool().
 
         Args:
             snapshot: The current system state snapshot
             workload: The session workload to validate
-            passed_phases: List to update with passed validation phases
-            failed_phases: List to update with failed validation phases
 
         Raises:
             SchedulingValidationError: If any validation fails
         """
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(workload.session_id)
         errors: list[SchedulingValidationError] = []
 
         for rule in self._rules:
             try:
-                rule.validate(snapshot, workload)
-                # Validation passed - add to the passed list
-                passed_phases.append(
-                    SchedulingPredicate(name=rule.name(), msg=rule.success_message())
-                )
+                with recorder.step(rule.name(), success_detail=rule.success_message()):
+                    rule.validate(snapshot, workload)
             except SchedulingValidationError as e:
-                # Validation failed - add to failed list and collect error
-                failed_phases.append(SchedulingPredicate(name=rule.name(), msg=str(e)))
                 errors.append(e)
 
         # If there were any failures, raise the appropriate exception
         if errors:
             if len(errors) == 1:
                 raise errors[0]
-            else:
-                raise MultipleValidationErrors(errors)
+            raise MultipleValidationErrors(errors)

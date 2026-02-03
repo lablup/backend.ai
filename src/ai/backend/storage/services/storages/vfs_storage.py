@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from ai.backend.common.dto.storage.response import (
     VFSFileInfo,
@@ -120,7 +121,7 @@ class VFSStorageService:
         storage = self._resolve_storage(storage_name)
         await storage.create_directory(directory)
 
-    async def get_disk_usage(self, storage_name: str) -> dict:
+    async def get_disk_usage(self, storage_name: str) -> dict[str, Any]:
         """
         Get disk usage information for the storage.
 
@@ -151,5 +152,7 @@ class VFSStorageService:
             if not isinstance(storage, VFSStorage):
                 raise StorageTypeInvalidError(f"Storage '{storage_name}' is not a VFS storage")
             return storage
-        except KeyError:
-            raise StorageNotFoundError(f"No VFS storage configuration found for: {storage_name}")
+        except KeyError as e:
+            raise StorageNotFoundError(
+                f"No VFS storage configuration found for: {storage_name}"
+            ) from e

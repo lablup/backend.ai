@@ -1,21 +1,22 @@
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import AliasChoices, Field
 
-from ...api_handlers import BaseRequestModel
-from ...typed_validators import VFolderName
-from ...types import VFolderUsageMode
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.types import VFolderUsageMode
+
 from .field import VFolderPermissionField
 
 
 class VFolderCreateReq(BaseRequestModel):
     name: VFolderName = Field(description="Name of the vfolder")
-    folder_host: Optional[str] = Field(default=None, alias="host")
+    folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
-    unmanaged_path: Optional[str] = Field(default=None, alias="unmanagedPath")
-    group_id: Optional[uuid.UUID] = Field(
+    unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
+    group_id: uuid.UUID | None = Field(
         default=None,
         validation_alias=AliasChoices("group", "groupId"),
     )
@@ -34,11 +35,11 @@ class GraphQLReq(BaseRequestModel):
     query: str = Field(
         description="GraphQL query string, defining the operations to be performed.",
     )
-    variables: Optional[dict[str, Any]] = Field(
+    variables: dict[str, Any] | None = Field(
         default=None,
         description="Variables for the GraphQL query.",
     )
-    operation_name: Optional[str] = Field(
+    operation_name: str | None = Field(
         default=None,
         alias="operationName",
     )
@@ -64,8 +65,8 @@ class UpdateArtifactPathParam(BaseRequestModel):
 
 
 class UpdateArtifactReq(BaseRequestModel):
-    description: Optional[str] = Field(default=None, description="Updated description")
-    readonly: Optional[bool] = Field(
+    description: str | None = Field(default=None, description="Updated description")
+    readonly: bool | None = Field(
         default=None, description="Whether the artifact should be readonly."
     )
 
@@ -90,12 +91,12 @@ class ObjectStoragePathParam(BaseRequestModel):
 
 
 class UpdateObjectStorageReq(BaseRequestModel):
-    name: Optional[str] = Field(default=None, description="Updated name of the object storage")
-    host: Optional[str] = Field(default=None, description="Updated host address")
-    access_key: Optional[str] = Field(default=None, description="Updated access key")
-    secret_key: Optional[str] = Field(default=None, description="Updated secret key")
-    endpoint: Optional[str] = Field(default=None, description="Updated endpoint URL")
-    region: Optional[str] = Field(default=None, description="Updated region")
+    name: str | None = Field(default=None, description="Updated name of the object storage")
+    host: str | None = Field(default=None, description="Updated host address")
+    access_key: str | None = Field(default=None, description="Updated access key")
+    secret_key: str | None = Field(default=None, description="Updated secret key")
+    endpoint: str | None = Field(default=None, description="Updated endpoint URL")
+    region: str | None = Field(default=None, description="Updated region")
 
 
 class CreateHuggingFaceRegistryReq(BaseRequestModel):
@@ -104,7 +105,7 @@ class CreateHuggingFaceRegistryReq(BaseRequestModel):
         description="Endpoint URL of the Hugging Face model registry",
         examples=["https://huggingface.co"],
     )
-    token: Optional[str] = Field(
+    token: str | None = Field(
         description="Authentication token for the Hugging Face model registry",
         examples=["your_token_here"],
     )
@@ -119,7 +120,7 @@ class GetPresignedDownloadURLReq(BaseRequestModel):
         description="The unique identifier of the artifact revision"
     )
     key: str = Field(description="Object key")
-    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
+    expiration: int | None = Field(default=None, description="URL expiration time in seconds")
 
 
 class GetPresignedUploadURLReq(BaseRequestModel):
@@ -127,10 +128,10 @@ class GetPresignedUploadURLReq(BaseRequestModel):
         description="The unique identifier of the artifact revision"
     )
     key: str = Field(description="Object key")
-    content_type: Optional[str] = Field(default=None, description="Content type of the object")
-    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
-    min_size: Optional[int] = Field(default=None, description="Minimum file size")
-    max_size: Optional[int] = Field(default=None, description="Maximum file size")
+    content_type: str | None = Field(default=None, description="Content type of the object")
+    expiration: int | None = Field(default=None, description="URL expiration time in seconds")
+    min_size: int | None = Field(default=None, description="Minimum file size")
+    max_size: int | None = Field(default=None, description="Maximum file size")
 
 
 class DeleteFilesAsyncPathParam(BaseRequestModel):

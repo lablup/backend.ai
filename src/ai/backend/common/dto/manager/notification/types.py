@@ -6,19 +6,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ai.backend.common.data.notification import (
-    NotificationChannelType,
-    NotificationRuleType,
-    WebhookConfig,
-)
-
 __all__ = (
-    "NotificationChannelType",
-    "NotificationRuleType",
-    "WebhookConfig",
-    "OrderDirection",
     "NotificationChannelOrderField",
     "NotificationRuleOrderField",
+    "OrderDirection",
 )
 
 

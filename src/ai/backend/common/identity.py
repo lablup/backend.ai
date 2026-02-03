@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import asyncio.staggered
 import base64
@@ -8,26 +10,27 @@ import logging
 import os
 import socket
 import uuid
+from collections.abc import Awaitable, Callable, Iterable
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import _BaseNetwork as BaseIPNetwork
 from ipaddress import ip_address
 from pathlib import Path, PosixPath
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Any
 
 import aiodns
 import aiohttp
 import ifaddr
 import psutil
 
-from .utils import curl
+from .networking import curl
 
 __all__ = (
-    "detect_cloud",
     "current_provider",
+    "detect_cloud",
     "get_instance_id",
     "get_instance_ip",
-    "get_instance_type",
     "get_instance_region",
+    "get_instance_type",
     "get_root_fs_type",
     "get_wsl_version",
 )
@@ -47,10 +50,8 @@ def is_containerized() -> bool:
     """
     try:
         cginfo = Path("/proc/self/cgroup").read_text()
-        if "/docker/" in cginfo or "/lxc/" in cginfo:
-            return True
-        return False
-    except IOError:
+        return "/docker/" in cginfo or "/lxc/" in cginfo
+    except OSError:
         return False
 
 
@@ -78,7 +79,7 @@ async def _detect_gcp(session: aiohttp.ClientSession) -> CloudProvider:
         return CloudProvider.GCP
 
 
-async def detect_cloud() -> Optional[CloudProvider]:
+async def detect_cloud() -> CloudProvider | None:
     """
     Detect the cloud provider using asyncio.staggered_race()
     to get the fastest returning result from multiple metadata URL detectors.
@@ -97,21 +98,24 @@ async def detect_cloud() -> Optional[CloudProvider]:
             delay=0.001,
         )
         if winner_value is not None:
-            return winner_value
+            result: CloudProvider | None = winner_value
+            return result
     return None
 
 
-def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
+def fetch_local_ipaddrs(cidr: BaseIPNetwork[Any]) -> Iterable[BaseIPAddress]:
     proto = socket.AF_INET if cidr.version == 4 else socket.AF_INET6
     for adapter in ifaddr.get_adapters():
         if not adapter.ips:
             continue
         for entry in adapter.ips:
             if entry.is_IPv4 and proto == socket.AF_INET:
-                assert isinstance(entry.ip, str)
+                if not isinstance(entry.ip, str):
+                    raise TypeError(f"Expected str for IPv4 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip)
             elif entry.is_IPv6 and proto == socket.AF_INET6:
-                assert isinstance(entry.ip, tuple)
+                if not isinstance(entry.ip, tuple):
+                    raise TypeError(f"Expected tuple for IPv6 address, got {type(entry.ip)}")
                 addr = ip_address(entry.ip[0])
             else:
                 continue
@@ -146,9 +150,12 @@ def get_wsl_version() -> int:
 # Detect upon module load.
 try:
     try:
-        loop = asyncio.get_running_loop()
-        current_provider = loop.run_until_complete(detect_cloud())
+        asyncio.get_running_loop()
+        # If there's already a running loop, skip detection at module load
+        # to avoid "cannot be called from a running event loop" error
+        current_provider = None
     except RuntimeError:
+        # No running loop, safe to use asyncio.run()
         current_provider = asyncio.run(detect_cloud())
 except Exception as e:
     log.warning(f"Failed to detect cloud provider: {e}")
@@ -163,12 +170,12 @@ else:
 
 _defined: bool = False
 get_instance_id: Callable[[], Awaitable[str]]
-get_instance_ip: Callable[[Optional[BaseIPNetwork]], Awaitable[str]]
+get_instance_ip: Callable[[BaseIPNetwork[Any] | None], Awaitable[str]]
 get_instance_type: Callable[[], Awaitable[str]]
 get_instance_region: Callable[[], Awaitable[str]]
 
 
-def _define_functions():
+def _define_functions() -> None:
     global _defined
     global get_instance_id
     global get_instance_ip
@@ -188,7 +195,7 @@ def _define_functions():
                     _metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}"
                 )
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
             async def _get_instance_type() -> str:
@@ -220,7 +227,7 @@ def _define_functions():
                 vm_id_hash = base64.b32encode(vm_id.bytes[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 data = await curl(
                     _metadata_prefix,
                     None,
@@ -230,7 +237,10 @@ def _define_functions():
                 if data is None:
                     return "127.0.0.1"
                 o = json.loads(data)
-                return o["network"]["interface"][0]["ipv4"]["ipAddress"][0]["privateIpAddress"]
+                result: str = o["network"]["interface"][0]["ipv4"]["ipAddress"][0][
+                    "privateIpAddress"
+                ]
+                return result
 
             async def _get_instance_type() -> str:
                 data = await curl(
@@ -242,7 +252,8 @@ def _define_functions():
                 if data is None:
                     return "unknown"
                 o = json.loads(data)
-                return o["compute"]["vmSize"]
+                result: str = o["compute"]["vmSize"]
+                return result
 
             async def _get_instance_region() -> str:
                 data = await curl(
@@ -277,7 +288,7 @@ def _define_functions():
                 vm_id_hash = base64.b32encode(int(vm_id).to_bytes(8, "big")[-5:]).decode().lower()
                 return f"i-{vm_name}-{vm_id_hash}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
                 return await curl(
                     _metadata_prefix + "instance/network-interfaces/0/ip",
                     "127.0.0.1",
@@ -302,24 +313,24 @@ def _define_functions():
                 return f"google/{region}"
 
         case _:
-            _metadata_prefix = None
 
             async def _get_instance_id() -> str:
                 return f"i-{socket.gethostname()}"
 
-            async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
-                if subnet_hint is not None and subnet_hint.prefixlen > 0:
-                    local_ipaddrs = [*fetch_local_ipaddrs(subnet_hint)]
+            async def _get_instance_ip(_subnet_hint: BaseIPNetwork[Any] | None = None) -> str:
+                if _subnet_hint is not None and _subnet_hint.prefixlen > 0:
+                    local_ipaddrs = [*fetch_local_ipaddrs(_subnet_hint)]
                     if local_ipaddrs:
                         return str(local_ipaddrs[0])
                     raise RuntimeError(
-                        f"Could not find my IP address bound to subnet {subnet_hint}"
+                        f"Could not find my IP address bound to subnet {_subnet_hint}"
                     )
                 try:
                     myself = socket.gethostname()
                     resolver = aiodns.DNSResolver()
                     result = await resolver.gethostbyname(myself, socket.AF_INET)
-                    return result.addresses[0]
+                    address: str = result.addresses[0]
+                    return address
                 except aiodns.error.DNSError:
                     return "127.0.0.1"
 

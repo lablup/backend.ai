@@ -39,12 +39,16 @@ from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.search import (
+    SearchObjectStoragesAction,
+    SearchObjectStoragesActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
     UpdateObjectStorageActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageService:
@@ -72,7 +76,7 @@ class ObjectStorageService:
         """
         Create a new object storage.
         """
-        log.info("Creating object storage with data: {}", action.creator.fields_to_store())
+        log.info("Creating object storage with data: {}", action.creator)
         storage_data = await self._object_storage_repository.create(action.creator)
         return CreateObjectStorageActionResult(result=storage_data)
 
@@ -80,8 +84,8 @@ class ObjectStorageService:
         """
         Update an existing object storage.
         """
-        log.info("Updating object storage with data: {}", action.modifier.fields_to_update())
-        storage_data = await self._object_storage_repository.update(action.id, action.modifier)
+        log.info("Updating object storage with id: {}", action.updater.pk_value)
+        storage_data = await self._object_storage_repository.update(action.updater)
         return UpdateObjectStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteObjectStorageAction) -> DeleteObjectStorageActionResult:
@@ -101,13 +105,25 @@ class ObjectStorageService:
         return GetObjectStorageActionResult(result=storage_data)
 
     # TODO: Add filtering logic
-    async def list(self, action: ListObjectStorageAction) -> ListObjectStorageActionResult:
+    async def list(self, _action: ListObjectStorageAction) -> ListObjectStorageActionResult:
         """
         List all object storages.
         """
         log.info("Listing object storages")
         storage_data_list = await self._object_storage_repository.list_object_storages()
         return ListObjectStorageActionResult(data=storage_data_list)
+
+    async def search(self, action: SearchObjectStoragesAction) -> SearchObjectStoragesActionResult:
+        """Searches Object storages."""
+        result = await self._object_storage_repository.search(
+            querier=action.querier,
+        )
+        return SearchObjectStoragesActionResult(
+            storages=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_presigned_download_url(
         self, action: GetDownloadPresignedURLAction

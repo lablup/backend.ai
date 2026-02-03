@@ -1,26 +1,27 @@
 import json
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Any
 from unittest import mock
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from aioresponses import CallbackResult
 
 
-def mock_corofunc(return_value):
+def mock_corofunc(return_value: Any) -> Mock:
     """
     Return mock coroutine function.
 
     Python's default mock module does not support coroutines.
     """
 
-    async def _mock_corofunc(*args, **kargs):
+    async def _mock_corofunc(*_args: Any, **_kargs: Any) -> Any:
         return return_value
 
     return mock.Mock(wraps=_mock_corofunc)
 
 
-async def mock_awaitable(**kwargs):
+async def mock_awaitable(**kwargs: Any) -> AsyncMock:
     """
     Mock awaitable.
 
@@ -40,15 +41,17 @@ class AsyncContextManagerMock:
     passing `kwargs`.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.context = kwargs
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncMock":
         return AsyncMock(**self.context)
 
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -58,28 +61,28 @@ class MockableZMQAsyncSock:
     # which does not have such side effects.
 
     @classmethod
-    def create_mock(cls):
+    def create_mock(cls) -> Mock:
         return mock.Mock(cls())
 
-    def bind(self, addr):
+    def bind(self, addr: str) -> None:
         pass
 
-    def connect(self, addr):
+    def connect(self, addr: str) -> None:
         pass
 
-    def close(self):
+    def close(self) -> None:
         pass
 
-    async def send(self, frame):
+    async def send(self, frame: bytes) -> None:
         pass
 
-    async def send_multipart(self, msg):
+    async def send_multipart(self, msg: list[bytes]) -> None:
         pass
 
-    async def recv(self):
+    async def recv(self) -> None:
         pass
 
-    async def recv_multipart(self):
+    async def recv_multipart(self) -> None:
         pass
 
 
@@ -108,10 +111,12 @@ class AsyncContextMock(mock.Mock):
             # result is {'hello': 'world'}
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -123,10 +128,12 @@ class AsyncContextMagicMock(mock.MagicMock):
           ...
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextMagicMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -155,10 +162,12 @@ class AsyncContextCoroutineMock(AsyncMock):
             # result is {'hello': 'world'}
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncContextCoroutineMock":
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
         pass
 
 
@@ -172,7 +181,7 @@ def mock_aioresponses_sequential_payloads(
     """
     cb_call_counter = 0
 
-    def _callback(*args, **kwargs) -> CallbackResult:
+    def _callback(*_args: Any, **_kwargs: Any) -> CallbackResult:
         nonlocal cb_call_counter
 
         if cb_call_counter >= len(mock_responses):
@@ -186,8 +195,8 @@ def mock_aioresponses_sequential_payloads(
 
 
 def setup_dockerhub_mocking(
-    aiohttp_request_mock, registry_url: str, dockerhub_responses_mock: dict[str, Any]
-):
+    aiohttp_request_mock: Any, registry_url: str, dockerhub_responses_mock: dict[str, Any]
+) -> None:
     # /v2/ endpoint
     aiohttp_request_mock.get(
         f"{registry_url}/v2/",

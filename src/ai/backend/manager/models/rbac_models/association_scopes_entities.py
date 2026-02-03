@@ -4,46 +4,48 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-
-from ..base import (
+from ai.backend.manager.models.base import (
+    GUID,
     Base,
-    IDColumn,
     StrEnumType,
 )
 
 
-class AssociationScopesEntitiesRow(Base):
+class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("scope_type", "scope_id", "entity_id", name="uq_scope_id_entity_id"),
     )
 
-    id: uuid.UUID = IDColumn()
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
-    scope_type: ScopeType = sa.Column(
+    scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", StrEnumType(ScopeType, length=32), nullable=False
     )
-    scope_id: str = sa.Column(
+    scope_id: Mapped[str] = mapped_column(
         "scope_id",
         sa.String(64),
         nullable=False,
     )  # e.g., "global", "domain_id", "project_id", "user_id" etc.
-    entity_type: EntityType = sa.Column(
+    entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
     )
-    entity_id: str = sa.Column(
+    entity_id: Mapped[str] = mapped_column(
         "entity_id",
         sa.String(64),
         nullable=False,
     )
-    registered_at: datetime = sa.Column(
+    registered_at: Mapped[datetime] = mapped_column(
         "registered_at",
         sa.DateTime(timezone=True),
         nullable=False,

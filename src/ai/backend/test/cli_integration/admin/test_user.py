@@ -1,12 +1,13 @@
 import json
+from collections.abc import Callable
 from contextlib import closing
-from typing import Callable, Tuple
+from typing import Any
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import User
+from ai.backend.test.cli_integration.conftest import User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_add_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]) -> None:
     """
     Testcase for user addition.
     """
@@ -48,7 +49,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     assert isinstance(user_list, list), "Expected user list"
     added_users = tuple(get_user_from_list(user_list, user.username) for user in users)
 
-    for i, (added_user, user) in enumerate(zip(added_users, users)):
+    for i, (added_user, user) in enumerate(zip(added_users, users, strict=True)):
         assert bool(added_user), f"Added account doesn't exist: Account#{i + 1}"
         assert added_user.get("email") == user.email, f"E-mail mismatch: Account#{i + 1}"
         assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i + 1}"
@@ -61,10 +62,10 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
 
 def test_update_user(
     run_admin: ClientRunnerFunc,
-    users: Tuple[User, ...],
+    users: tuple[User, ...],
     gen_username: Callable[[], str],
     gen_fullname: Callable[[], str],
-):
+) -> None:
     """
     Run this testcase after test_add_user.
     Testcase for user update.
@@ -88,7 +89,7 @@ def test_update_user(
     )
 
     # Update user
-    for updated_user, user in zip(updated_users, users):
+    for updated_user, user in zip(updated_users, users, strict=True):
         update_arguments = [
             "--output=json",
             "admin",
@@ -120,7 +121,7 @@ def test_update_user(
         assert isinstance(updated_user_list, list), "Expected user list"
 
     for i, updated_user in enumerate(updated_users):
-        user_dict: dict = get_user_from_list(updated_user_list, updated_user.username)
+        user_dict: dict[str, Any] = get_user_from_list(updated_user_list, updated_user.username)
         assert bool(user_dict), f"Account not found - Account#{i + 1}"
         assert user_dict.get("full_name") == updated_user.full_name, (
             f"Full name mismatch: Account#{i + 1}"
@@ -137,7 +138,7 @@ def test_update_user(
         )
 
 
-def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
+def test_delete_user(run_admin: ClientRunnerFunc, users: tuple[User, ...]) -> None:
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.
@@ -153,7 +154,7 @@ def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
             assert response.get("ok") is True, f"Account deletion failed: Account#{i + 1}"
 
 
-def test_list_user(run_admin: ClientRunnerFunc):
+def test_list_user(run_admin: ClientRunnerFunc) -> None:
     """
     Testcase for user listing.
     """
@@ -165,7 +166,7 @@ def test_list_user(run_admin: ClientRunnerFunc):
         assert isinstance(user_list, list)
 
 
-def get_user_from_list(users: list, username: str) -> dict:
+def get_user_from_list(users: list[dict[str, Any]], username: str) -> dict[str, Any]:
     for user in users:
         if user.get("username") == username:
             return user

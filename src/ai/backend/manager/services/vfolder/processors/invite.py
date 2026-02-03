@@ -3,8 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-
-from ..actions.invite import (
+from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     AcceptInvitationActionResult,
     InviteVFolderAction,
@@ -22,7 +21,7 @@ from ..actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
     UpdateInvitedVFolderMountPermissionActionResult,
 )
-from ..services.invite import VFolderInviteService
+from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 
 
 class VFolderInviteProcessors(AbstractProcessorPackage):
@@ -41,7 +40,7 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         UpdateInvitedVFolderMountPermissionAction, UpdateInvitedVFolderMountPermissionActionResult
     ]
 
-    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]):
+    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]) -> None:
         self.invite_vfolder = ActionProcessor(service.invite, action_monitors)
         self.accept_invitation = ActionProcessor(service.accept_invitation, action_monitors)
         self.reject_invitation = ActionProcessor(service.reject_invitation, action_monitors)

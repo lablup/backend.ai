@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import urllib.parse
-from typing import Any, AsyncIterator, Mapping, Optional, cast, override
+from collections.abc import AsyncIterator, Mapping
+from typing import Any, cast, override
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -14,8 +15,12 @@ from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.json import read_json
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import (
+    ContainerRegistryProjectEmpty,
+    ScanImageError,
+    ScanTagError,
+)
 
-from ..exceptions import ContainerRegistryProjectEmpty, ScanImageError, ScanTagError
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,
@@ -42,7 +47,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                 self.credentials["username"],
                 self.credentials["password"],
             )
-        project_list_url: Optional[yarl.URL]
+        project_list_url: yarl.URL | None
         project_list_url = (api_url / "projects").with_query(
             {"page_size": "30"},
         )
@@ -63,7 +68,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
         if not project_ids:
             log.warning("There is no given project.")
             return
-        repo_list_url: Optional[yarl.URL]
+        repo_list_url: yarl.URL | None
         for project_id in project_ids:
             repo_list_url = (api_url / "repositories").with_query(
                 {"project_id": project_id, "page_size": "30"},
@@ -200,7 +205,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.credentials["password"],
             )
 
-        repo_list_url: Optional[yarl.URL]
+        repo_list_url: yarl.URL | None
         repo_list_url = (
             api_url / "projects" / self.registry_info.project / "repositories"
         ).with_query(
@@ -249,7 +254,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
 
         try:
             async with aiotools.TaskGroup() as tg:
-                artifact_url: Optional[yarl.URL] = (
+                artifact_url: yarl.URL | None = (
                     api_url / "projects" / project / "repositories" / repository / "artifacts"
                 ).with_query(
                     {"page_size": "30"},
@@ -259,7 +264,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         resp.raise_for_status()
                         body = await resp.json()
                         for image_info in body:
-                            skip_reason: Optional[str] = None
+                            skip_reason: str | None = None
                             tag = image_info["digest"]
                             try:
                                 if not image_info["tags"] or len(image_info["tags"]) == 0:
@@ -459,7 +464,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -608,7 +613,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         async with concurrency_sema.get():
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"

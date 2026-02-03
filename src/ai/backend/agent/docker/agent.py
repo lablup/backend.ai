@@ -11,7 +11,7 @@ import shutil
 import signal
 import struct
 import sys
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import AsyncGenerator, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -22,14 +22,7 @@ from subprocess import CalledProcessError
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Final,
-    FrozenSet,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Union,
     cast,
     override,
 )
@@ -42,13 +35,76 @@ import pkg_resources
 import zmq
 import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
-from aiodocker.exceptions import DockerError
+from aiodocker.exceptions import DockerContainerError, DockerError
 from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 
+from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    AgentClass,
+    ScanImagesResult,
+)
+from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.exception import (
+    ContainerCreationError,
+    InvalidArgumentError,
+    UnsupportedResource,
+)
+from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
+from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
+from ai.backend.agent.kernel_registry.adapter import (
+    KernelRecoveryDataAdapter,
+    KernelRecoveryDataAdapterTarget,
+)
+from ai.backend.agent.kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.pickle.creator import (
+    PickleBasedKernelRegistryCreatorArgs,
+    PickleBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
+    DockerKernelRegistryRecovery,
+)
+from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.plugin.network import (
+    ContainerNetworkCapability,
+    ContainerNetworkInfo,
+    NetworkPluginContext,
+)
+from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
+from ai.backend.agent.resources import (
+    AbstractComputePlugin,
+    ComputerContext,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
+from ai.backend.agent.types import (
+    AgentEventData,
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+    Port,
+    VolumeInfo,
+)
+from ai.backend.agent.utils import (
+    closing_async,
+    container_pid_to_host_pid,
+    get_kernel_id_from_container,
+    get_safe_ulimit,
+    host_pid_to_container_pid,
+    update_nested_dict,
+)
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
@@ -63,6 +119,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import (
     dump_json,
     load_json,
@@ -93,64 +150,9 @@ from ai.backend.common.types import (
     SlotName,
     current_resource_slots,
 )
-from ai.backend.common.utils import (
-    AsyncFileWriter,
-    current_loop,
-)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
-from ..agent import (
-    ACTIVE_STATUS_SET,
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    AgentClass,
-    ScanImagesResult,
-)
-from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ..exception import ContainerCreationError, InvalidArgumentError, UnsupportedResource
-from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel, KernelRegistry
-from ..kernel_registry.adapter import KernelRecoveryDataAdapter, KernelRecoveryDataAdapterTarget
-from ..kernel_registry.container.creator import (
-    ContainerBasedKernelRegistryCreatorArgs,
-    ContainerBasedLoaderWriterCreator,
-)
-from ..kernel_registry.pickle.creator import (
-    PickleBasedKernelRegistryCreatorArgs,
-    PickleBasedLoaderWriterCreator,
-)
-from ..kernel_registry.recovery.docker_recovery import (
-    DockerKernelRegistryRecovery,
-)
-from ..kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
-from ..proxy import DomainSocketProxy, proxy_connection
-from ..resources import (
-    AbstractComputePlugin,
-    ComputerContext,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..scratch import create_loop_filesystem, destroy_loop_filesystem
-from ..types import (
-    AgentEventData,
-    Container,
-    KernelOwnershipData,
-    LifecycleEvent,
-    MountInfo,
-    Port,
-    VolumeInfo,
-)
-from ..utils import (
-    closing_async,
-    container_pid_to_host_pid,
-    get_kernel_id_from_container,
-    get_safe_ulimit,
-    host_pid_to_container_pid,
-    update_nested_dict,
-)
 from .kernel import DockerKernel
 from .utils import PersistentServiceContainer
 
@@ -189,11 +191,11 @@ deeplearning_sample_volume = VolumeInfo(
 )
 
 
-async def get_extra_volumes(docker, lang):
-    avail_volumes = (await docker.volumes.list())["Volumes"]
+async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
+    avail_volumes = (await docker.volumes.list())["Volumes"]  # type: ignore[no-untyped-call]
     if not avail_volumes:
         return []
-    avail_volume_names = set(v["Name"] for v in avail_volumes)
+    avail_volume_names = {v["Name"] for v in avail_volumes}
 
     # deeplearning specialization
     # TODO: extract as config
@@ -262,14 +264,14 @@ async def _clean_scratch(
         pass
 
 
-def _DockerError_reduce(self):
+def _DockerError_reduce(self: DockerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, *self.args),
     )
 
 
-def _DockerContainerError_reduce(self):
+def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
@@ -288,14 +290,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     tmp_dir: Path
     config_dir: Path
     work_dir: Path
-    container_configs: List[Mapping[str, Any]]
-    domain_socket_proxies: List[DomainSocketProxy]
-    computer_docker_args: Dict[str, Any]
-    port_pool: Set[int]
+    container_configs: list[Mapping[str, Any]]
+    domain_socket_proxies: list[DomainSocketProxy]
+    computer_docker_args: dict[str, Any]
+    port_pool: set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
-    gwbridge_subnet: Optional[str]
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
+    gwbridge_subnet: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -308,13 +310,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         distro: str,
         local_config: AgentUnifiedConfig,
         computers: Mapping[DeviceName, ComputerContext],
-        port_pool: Set[int],
+        port_pool: set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
-        gwbridge_subnet: Optional[str] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
+        gwbridge_subnet: str | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -348,17 +350,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         self.network_plugin_ctx = network_plugin_ctx
 
-    def _kernel_resource_spec_read(self, filename):
-        with open(filename, "r") as f:
-            resource_spec = KernelResourceSpec.read_from_file(f)
-        return resource_spec
+    def _kernel_resource_spec_read(self, filename: Path | str) -> KernelResourceSpec:
+        filepath = Path(filename)
+        with filepath.open() as f:
+            return KernelResourceSpec.read_from_file(f)
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
         return {}
 
     @override
-    async def prepare_resource_spec(self) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
         loop = current_loop()
         if self.restarting:
             resource_spec = await loop.run_in_executor(
@@ -389,16 +391,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
-    def _chown_paths_if_root(
-        self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]
-    ) -> None:
+    def _chown_paths_if_root(self, paths: Iterable[Path], uid: int | None, gid: int | None) -> None:
         if os.geteuid() == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
                     valid_uid = uid if uid is not None else self.local_config.container.kernel_uid
                     valid_gid = gid if gid is not None else self.local_config.container.kernel_gid
                 else:
-                    stat = os.stat(p)
+                    stat = p.stat()
                     valid_uid = uid if uid is not None else stat.st_uid
                     valid_gid = gid if gid is not None else stat.st_gid
                 try:
@@ -434,7 +434,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         else:
             await loop.run_in_executor(None, partial(self.scratch_dir.mkdir, exist_ok=True))
 
-        def _create_scratch_dirs():
+        def _create_scratch_dirs() -> None:
             self.config_dir.mkdir(parents=True, exist_ok=True)
             self.config_dir.chmod(0o755)
             self.work_dir.mkdir(parents=True, exist_ok=True)
@@ -447,7 +447,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # we need to touch them first to avoid their "ghost" files are created
             # as root in the host-side filesystem, which prevents deletion of scratch
             # directories when the agent is running as non-root.
-            def _clone_dotfiles():
+            def _clone_dotfiles() -> None:
                 jupyter_custom_css_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
                 )
@@ -477,7 +477,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
 
-                def chown_scratch(uid: Optional[int], gid: Optional[int]) -> None:
+                def chown_scratch(uid: int | None, gid: int | None) -> None:
                     paths = [
                         self.work_dir,
                         self.work_dir / ".jupyter",
@@ -513,7 +513,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         loop = current_loop()
 
         # scratch/config/tmp mounts
-        mounts: List[Mount] = [
+        mounts: list[Mount] = [
             Mount(
                 MountTypes.BIND, self.config_dir, Path("/home/config"), MountPermission.READ_ONLY
             ),
@@ -583,9 +583,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # extra mounts
         async with closing_async(Docker()) as docker:
             extra_mount_list = await get_extra_volumes(docker, self.image_ref.short)
-        mounts.extend(
-            Mount(MountTypes.VOLUME, v.name, v.container_path, v.mode) for v in extra_mount_list
-        )
+        for v in extra_mount_list:
+            permission = MountPermission.READ_ONLY if v.mode == "ro" else MountPermission.READ_WRITE
+            mounts.append(
+                Mount(MountTypes.VOLUME, Path(v.name), Path(v.container_path), permission)
+            )
 
         # debug mounts
         if self.local_config.debug.coredump.enabled:
@@ -640,7 +642,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return mounts
 
     @override
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path(
             pkg_resources.resource_filename(
                 "ai.backend.runner",
@@ -652,10 +654,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
-        opts: Optional[Mapping[str, Any]] = None,
+        opts: Mapping[str, Any] | None = None,
     ) -> Mount:
         return Mount(
             type,
@@ -685,8 +687,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case mode if mode:
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
-                except KeyError:
-                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                except KeyError as e:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!") from e
 
                 container_config = await plugin.join_network(
                     self.kernel_config, cluster_info, **cluster_info["network_config"]
@@ -723,7 +725,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if sshkey is None:
             return
 
-        def _write_config():
+        def _write_config() -> None:
             try:
                 priv_key_path = self.config_dir / "ssh" / "id_cluster"
                 pub_key_path = self.config_dir / "ssh" / "id_cluster.pub"
@@ -731,7 +733,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.write_text(sshkey["private_key"])
                 pub_key_path.write_text(sshkey["public_key"])
 
-                def chown_keyfile(uid: Optional[int], gid: Optional[int]) -> None:
+                def chown_keyfile(uid: int | None, gid: int | None) -> None:
                     self._chown_paths_if_root([priv_key_path, pub_key_path], uid, gid)
 
                 do_override = False
@@ -759,7 +761,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         current_loop().run_in_executor(None, _write_config)  # ???
 
     @override
-    async def process_mounts(self, mounts: Sequence[Mount]):
+    async def process_mounts(self, mounts: Sequence[Mount]) -> None:
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -802,7 +804,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         src_path = self.config_dir / str(computer.key)
         src_path.mkdir(exist_ok=True)
         return await computer.generate_mounts(src_path, device_alloc)
@@ -812,7 +814,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports: List[ServicePort],
+        service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
@@ -825,7 +827,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # Create bootstrap.sh into workdir if needed
             if bootstrap := self.kernel_config.get("bootstrap_script"):
 
-                def _write_user_bootstrap_script():
+                def _write_user_bootstrap_script() -> None:
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
                         self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
@@ -888,7 +890,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
                 ssh_dir = self.work_dir / ".ssh"
 
-                def _populate_ssh_config():
+                def _populate_ssh_config() -> None:
                     ssh_dir.mkdir(parents=True, exist_ok=True)
                     ssh_dir.chmod(0o700)
                     (ssh_dir / "authorized_keys").write_bytes(pubkey)
@@ -899,7 +901,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     (self.work_dir / "id_container").write_bytes(privkey)
                     (self.work_dir / "id_container").chmod(0o600)
 
-                    def chown_idfile(uid: Optional[int], gid: Optional[int]) -> None:
+                    def chown_idfile(uid: int | None, gid: int | None) -> None:
                         paths = [
                             ssh_dir,
                             ssh_dir / "authorized_keys",
@@ -952,7 +954,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.local_config.container.kernel_gid,
                     )
 
-        kernel_obj = DockerKernel(
+        return DockerKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
@@ -964,7 +966,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             environ=environ,
             data={},
         )
-        return kernel_obj
 
     @property
     @override
@@ -990,7 +991,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
             return
 
-        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
+        async with aiofiles.open(default_seccomp_path) as fp:
             seccomp_profile = load_json(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
@@ -1010,9 +1011,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
-        resource_opts,
-        preopen_ports,
+        cmdargs: list[str],
+        resource_opts: Mapping[str, Any] | None,
+        preopen_ports: list[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         loop = current_loop()
@@ -1051,9 +1052,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             if sport["name"] in self.protected_services:
                 protected_service_ports.update(sport["container_ports"])
         for eport in exposed_ports:
-            if eport in self.repl_ports:  # always protected
-                host_ips.append("127.0.0.1")
-            elif eport in protected_service_ports:  # check if protected by resource group type
+            if eport in self.repl_ports or eport in protected_service_ports:  # always protected
                 host_ips.append("127.0.0.1")
             else:
                 host_ips.append(str(container_bind_host))
@@ -1066,15 +1065,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
             try:
                 plugin = self.network_plugin_ctx.plugins[mode]
-            except KeyError:
-                raise RuntimeError(f"Network plugin {mode} not loaded!")
+            except KeyError as e:
+                raise RuntimeError(f"Network plugin {mode} not loaded!") from e
             if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
                 await plugin.prepare_port_forward(
                     kernel_obj,
                     str(container_bind_host),
                     [
                         (host_port, container_port)
-                        for host_port, container_port in zip(host_ports, exposed_ports)
+                        for host_port, container_port in zip(host_ports, exposed_ports, strict=True)
                     ],
                 )
 
@@ -1114,7 +1113,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "Init": True,
                 "PortBindings": {
                     f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": hip}]
-                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips)
+                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips, strict=True)
                 },
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
@@ -1156,9 +1155,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
+            # Only set ShmSize limit for tmpfs (/dev/shm).
+            # Do NOT subtract shmem from Memory/MemorySwap because:
+            # - shm (tmpfs) and app memory share the Memory cgroup space
+            # - Pre-deducting would unnecessarily reduce available memory
             self.computer_docker_args["HostConfig"]["ShmSize"] = shmem
-            self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
-            self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
         service_ports_label: list[str] = []
         service_ports_label += image_labels.get(LabelName.SERVICE_PORTS, "").split(",")
@@ -1181,7 +1182,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 try:
                     extra_container_opts = load_json(extra_container_opts_file.read_bytes())
                     update_nested_dict(container_config, extra_container_opts)
-                except IOError:
+                except OSError:
                     pass
 
         # The final container config is settled down here.
@@ -1202,7 +1203,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
-            container: Optional[DockerContainer] = None
+            container: DockerContainer | None = None
             try:
                 container = await docker.containers.create(
                     config=container_config, name=kernel_name
@@ -1219,12 +1220,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ) as writer:
                     await writer.write(f"CID={cid}\n")
 
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
                         message="Container creation was cancelled",
-                    )
+                    ) from e
                 raise
             except Exception as e:
                 # Oops, we have to restore the allocated resources!
@@ -1232,24 +1233,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container is not None:
                     raise ContainerCreationError(
                         container_id=ContainerId(container.id),
-                        message=f"Unexpected error during container creation: {repr(e)}",
-                    )
+                        message=f"Unexpected error during container creation: {e!r}",
+                    ) from e
                 raise
 
             try:
                 await container.start()
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
                 await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
                     message="Container start was cancelled",
-                )
+                ) from e
             except Exception as e:
                 await _rollback_container_creation()
                 raise ContainerCreationError(
                     container_id=cid,
-                    message=f"Unexpected error during container start: {repr(e)}",
-                )
+                    message=f"Unexpected error during container start: {e!r}",
+                ) from e
 
             if self.internal_data.get("sudo_session_enabled", False):
                 exec = await container.exec(
@@ -1269,7 +1270,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         message=f"sudoers provision failed: {shell_response.decode()}",
                     )
 
-            additional_network_names: Set[str] = set()
+            additional_network_names: set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
                 n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
                 additional_network_names |= set(n)
@@ -1279,23 +1280,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: Optional[ContainerNetworkInfo] = None
+            container_network_info: ContainerNetworkInfo | None = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
-                except KeyError:
-                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                except KeyError as e:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!") from e
                 if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
                     container_network_info = await plugin.expose_ports(
                         kernel_obj,
                         str(container_bind_host),
                         [
                             (host_port, container_port)
-                            for host_port, container_port in zip(host_ports, exposed_ports)
+                            for host_port, container_port in zip(
+                                host_ports, exposed_ports, strict=True
+                            )
                         ],
                     )
 
-            created_host_ports: Tuple[int, ...]
+            created_host_ports: tuple[int, ...]
             repl_in_port = 0
             repl_out_port = 0
             if container_network_info:
@@ -1320,7 +1323,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if not ports:
                         raise ContainerCreationError(
                             container_id=cid,
@@ -1368,12 +1371,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_info: Mapping[str, Any]
-    monitor_docker_task: asyncio.Task
+    monitor_docker_task: asyncio.Task[Any]
     agent_sockpath: Path
-    agent_sock_task: asyncio.Task
+    agent_sock_task: asyncio.Task[Any]
     docker_ptask_group: aiotools.PersistentTaskGroup
-    gwbridge_subnet: Optional[str]
-    checked_invalid_images: Set[str]
+    gwbridge_subnet: str | None
+    checked_invalid_images: set[str]
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1385,7 +1388,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
-        agent_public_key: Optional[PublicKey],
+        agent_public_key: PublicKey | None,
         kernel_registry: KernelRegistry,
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
@@ -1520,7 +1523,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             blocklist=self.local_config.agent.block_network_plugins,
         )
 
-    async def shutdown(self, stop_signal: signal.Signals):
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()
@@ -1568,30 +1571,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     def get_cgroup_version(self) -> str:
-        return self.docker_info["CgroupVersion"]
+        return cast(str, self.docker_info["CgroupVersion"])
 
     @override
-    async def extract_image_command(self, image: str) -> Optional[str]:
+    async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
-            return result["Config"].get("Cmd")
+            return cast(str | None, result["Config"].get("Cmd"))
 
     @override
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         result = []
         fetch_tasks = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
 
-                async def _fetch_container_info(container):
-                    kernel_id = "(unknown)"
+                async def _fetch_container_info(container: DockerContainer) -> None:
+                    kernel_id_str: str = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
                         if kernel_id is None:
                             return
+                        kernel_id_str = str(kernel_id)
                         if container["State"]["Status"] in status_filter:
                             owner_id = AgentId(
                                 container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
@@ -1615,7 +1619,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         log.exception(
                             "error while fetching container information (cid:{}, k:{})",
                             container._id,
-                            kernel_id,
+                            kernel_id_str,
                         )
 
                 fetch_tasks.append(_fetch_container_info(container))
@@ -1726,7 +1730,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 removed_images=removed_images,
             )
 
-    async def handle_agent_socket(self):
+    async def handle_agent_socket(self) -> None:
         """
         A simple request-reply socket handler for in-container processes.
         For ease of implementation in low-level languages such as C,
@@ -1762,6 +1766,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     msg = await agent_sock.recv_multipart()
                     if not msg:
                         break
+                    reply: list[bytes]
                     try:
                         if msg[0] == b"host-pid-to-container-pid":
                             container_id = msg[1].decode()
@@ -1802,7 +1807,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         raise
                     except Exception as e:
                         log.exception("handle_agent_socket(): internal error")
-                        reply = [struct.pack("i", -1), f"Error: {e}".encode("utf-8")]
+                        reply = [struct.pack("i", -1), f"Error: {e}".encode()]
                     await agent_sock.send_multipart(reply)
             except asyncio.CancelledError:
                 terminating = True
@@ -1823,7 +1828,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
+        timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1832,22 +1837,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         reg_passwd = registry_conf.get("password")
         log.info("pushing image {} to registry", image_ref.canonical)
         if reg_user and reg_passwd:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }
 
         async with closing_async(Docker()) as docker:
             kwargs: dict[str, Any] = {"auth": auth_config}
-            if timeout != Sentinel.TOKEN:
-                kwargs["timeout"] = timeout
+            if timeout_seconds != Sentinel.TOKEN:
+                kwargs["timeout"] = timeout_seconds
             result = await docker.images.push(image_ref.canonical, **kwargs)
 
             if not result:
                 raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
-            elif error := result[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to push image: {error}")
 
     @override
@@ -1856,27 +1859,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: Optional[float],
+        timeout_seconds: float | None,
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
         if reg_user and reg_passwd:
-            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")
             auth_config = {
                 "auth": encoded_creds,
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
             result = await docker.images.pull(
-                image_ref.canonical, auth=auth_config, timeout=timeout
+                image_ref.canonical, auth=auth_config, timeout=timeout_seconds
             )
 
             if not result:
                 raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
-            elif error := result[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
     async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
@@ -1889,19 +1890,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
-        async with closing_async(Docker()) as docker:
-            async with TaskGroup() as tg:
-                tasks = [
-                    tg.create_task(
-                        self._purge_image(
-                            docker,
-                            DockerPurgeImageReq(
-                                image=image, force=request.force, noprune=request.noprune
-                            ),
-                        )
+        async with closing_async(Docker()) as docker, TaskGroup() as tg:
+            tasks = [
+                tg.create_task(
+                    self._purge_image(
+                        docker,
+                        DockerPurgeImageReq(
+                            image=image, force=request.force, noprune=request.noprune
+                        ),
                     )
-                    for image in request.images
-                ]
+                )
+                for image in request.images
+            ]
 
         results = []
         for task in tasks:
@@ -1923,12 +1923,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             log.info("found the local up-to-date image for {}", image_ref.canonical)
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
-                if auto_pull == AutoPullBehavior.DIGEST:
+                if auto_pull == AutoPullBehavior.DIGEST or auto_pull == AutoPullBehavior.TAG:
                     return True
-                elif auto_pull == AutoPullBehavior.TAG:
-                    return True
-                elif auto_pull == AutoPullBehavior.NONE:
-                    raise ImageNotAvailable(image_ref)
+                if auto_pull == AutoPullBehavior.NONE:
+                    raise ImageNotAvailable(image_ref) from e
             else:
                 raise
         return False
@@ -1941,7 +1939,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> DockerKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
@@ -1999,7 +1997,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
     ) -> None:
         if container_id is None:
             return
@@ -2028,7 +2026,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def clean_kernel(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
+        container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
         loop = current_loop()
@@ -2036,13 +2034,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if container_id is not None:
                 container = docker.containers.container(container_id)
 
-                async def log_iter():
+                async def log_iter() -> AsyncGenerator[bytes, None]:
                     it = container.log(
                         stdout=True,
                         stderr=True,
                         follow=True,
                     )
-                    async with aiotools.aclosing(it):
+                    async with aiotools.aclosing(it):  # type: ignore[type-var]
                         async for line in it:
                             yield line.encode("utf-8")
 
@@ -2058,7 +2056,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         )
                     else:
                         raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     log.warning(
                         "timeout for collecting container logs (k:{}, cid:{})",
                         kernel_id,
@@ -2080,7 +2078,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         await domain_socket_proxy.proxy_server.wait_closed()
                         try:
                             domain_socket_proxy.host_proxy_path.unlink()
-                        except IOError:
+                        except OSError:
                             pass
 
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
@@ -2089,17 +2087,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
+                    if (
+                        e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
+                    ) or e.status == HTTPStatus.NOT_FOUND:
                         return
-                    elif e.status == HTTPStatus.NOT_FOUND:
-                        return
-                    else:
-                        log.exception(
-                            "unexpected docker error while deleting container (k:{}, c:{})",
-                            kernel_id,
-                            container_id,
-                        )
-                except asyncio.TimeoutError:
+                    log.exception(
+                        "unexpected docker error while deleting container (k:{}, c:{})",
+                        kernel_id,
+                        container_id,
+                    )
+                except TimeoutError:
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
@@ -2114,10 +2111,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if kernel.network_driver != "bridge":
                         try:
                             plugin = self.network_plugin_ctx.plugins[kernel.network_driver]
-                        except KeyError:
+                        except KeyError as e:
                             raise RuntimeError(
                                 f"Network plugin {kernel.network_driver} not loaded!"
-                            )
+                            ) from e
                         await plugin.leave_network(kernel)
 
     @override
@@ -2150,8 +2147,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log
-    async def monitor_docker_events(self):
+    @preserve_termination_log  # type: ignore[misc]
+    async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
         ) -> None:
@@ -2185,7 +2182,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
 
         async def handle_action_oom(
-            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+            _session_id: SessionId, kernel_id: KernelId, _evdata: Mapping[str, Any]
         ) -> None:
             kernel_obj = self.kernel_registry.get(kernel_id, None)
             if kernel_obj is None:
@@ -2199,7 +2196,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         while True:
             async with closing_async(Docker()) as docker:
-                subscriber = docker.events.subscribe(create_task=True)
+                subscriber = docker.events.subscribe(create_task=True)  # type: ignore[no-untyped-call]
                 try:
                     while True:
                         try:
@@ -2259,6 +2256,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 finally:
                     await asyncio.shield(
                         self.docker_ptask_group.create_task(
-                            docker.events.stop(),
+                            docker.events.stop(),  # type: ignore[no-untyped-call]
                         )
                     )

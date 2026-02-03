@@ -5,18 +5,18 @@ import logging
 import socket
 import ssl
 from collections import OrderedDict
-from datetime import datetime
-from typing import override
+from datetime import UTC, datetime
+from typing import Any, override
 
 import zmq
 
-from ..exceptions import ConfigurationError
+from ai.backend.logging.exceptions import ConfigurationError
 
 
 class LogstashHandler(logging.Handler):
-    _sock: socket.socket | zmq.Socket | None
+    _sock: socket.socket | zmq.Socket[Any] | None
     _sslctx: ssl.SSLContext | None
-    _zmqctx: zmq.Context | None
+    _zmqctx: zmq.Context[Any] | None
 
     def __init__(
         self,
@@ -88,7 +88,7 @@ class LogstashHandler(logging.Handler):
 
         # This log format follows logstash's event format.
         log = OrderedDict([
-            ("@timestamp", datetime.now().isoformat()),
+            ("@timestamp", datetime.now(UTC).isoformat()),
             ("@version", 1),
             ("host", self._myhost),
             ("logger", record.name),
@@ -100,9 +100,11 @@ class LogstashHandler(logging.Handler):
             ("tags", list(tags)),
         ])
         if self._protocol.startswith("zmq"):
-            assert isinstance(self._sock, zmq.Socket)
+            if not isinstance(self._sock, zmq.Socket):
+                raise RuntimeError(f"Expected ZMQ socket for protocol {self._protocol}")
             self._sock.send_json(log)
         else:
             # TODO: reconnect if disconnected
-            assert isinstance(self._sock, socket.socket)
+            if not isinstance(self._sock, socket.socket):
+                raise RuntimeError(f"Expected socket.socket for protocol {self._protocol}")
             self._sock.sendall(json.dumps(log).encode("utf-8"))

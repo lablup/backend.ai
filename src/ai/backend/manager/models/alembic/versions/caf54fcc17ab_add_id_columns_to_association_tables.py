@@ -20,7 +20,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "association_groups_users",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
@@ -58,7 +58,7 @@ def upgrade():
     op.create_primary_key("pk_sgroups_for_keypairs", "sgroups_for_keypairs", ["id"])
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint("pk_association_groups_users", "association_groups_users", type_="primary")
     op.drop_constraint("pk_sgroups_for_domains", "sgroups_for_domains", type_="primary")
     op.drop_constraint("pk_sgroups_for_groups", "sgroups_for_groups", type_="primary")

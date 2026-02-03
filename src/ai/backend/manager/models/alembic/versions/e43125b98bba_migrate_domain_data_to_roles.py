@@ -71,7 +71,7 @@ class UserRole(enum.StrEnum):
 class Tables:
     @staticmethod
     def get_users_table() -> sa.Table:
-        users_table = sa.Table(
+        return sa.Table(
             "users",
             mapper_registry.metadata,
             IDColumn("uuid"),
@@ -80,11 +80,10 @@ class Tables:
             sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
             extend_existing=True,
         )
-        return users_table
 
     @staticmethod
     def get_groups_table() -> sa.Table:
-        groups_table = sa.Table(
+        return sa.Table(
             "groups",
             mapper_registry.metadata,
             IDColumn(),
@@ -97,22 +96,20 @@ class Tables:
             ),
             extend_existing=True,
         )
-        return groups_table
 
     @staticmethod
     def get_domains_table() -> sa.Table:
-        domains_table = sa.Table(
+        return sa.Table(
             "domains",
             mapper_registry.metadata,
             sa.Column("name", sa.Unicode(length=64), primary_key=True),
             extend_existing=True,
         )
-        return domains_table
 
 
 class RoleCreator:
     @classmethod
-    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, str]:
+    def _create_admin_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, str]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_domain_name_map: dict[str, str] = {}
@@ -125,7 +122,7 @@ class RoleCreator:
         return role_name_domain_name_map
 
     @classmethod
-    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, str]:
+    def _create_member_roles(cls, db_conn: Connection, rows: Sequence[Row[Any]]) -> dict[str, str]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_domain_name_map: dict[str, str] = {}
@@ -186,7 +183,7 @@ class RoleCreator:
 
     @classmethod
     def _create_domain_admin_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_domain_name_map = cls._create_admin_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_domain_name_map.keys()))
@@ -201,7 +198,7 @@ class RoleCreator:
 
     @classmethod
     def _create_domain_member_roles_and_permissions(
-        cls, db_conn: Connection, rows: Sequence[Row]
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
     ) -> None:
         role_name_domain_name_map = cls._create_member_roles(db_conn, rows)
         role_rows = query_role_rows_by_name(db_conn, list(role_name_domain_name_map.keys()))
@@ -215,7 +212,9 @@ class RoleCreator:
         cls._create_member_permissions(db_conn, permission_group_ids)
 
     @classmethod
-    def _query_domain_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_domain_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all domain rows with pagination.
         """
@@ -249,7 +248,7 @@ class RoleMapper:
     @classmethod
     def _query_role_with_user(
         cls, db_conn: Connection, offset: int, page_size: int, *, is_admin: bool
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         users_table = Tables.get_users_table()
         roles_table = get_roles_table()
         permission_groups_table = get_permission_groups_table()
@@ -360,7 +359,9 @@ class RoleMapper:
         cls._map_member_users_to_domain(db_conn)
 
     @classmethod
-    def _query_project_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_project_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all project rows with pagination.
         """

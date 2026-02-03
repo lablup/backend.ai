@@ -1,18 +1,19 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
-from ai.backend.manager.services.resource_preset.types import ResourcePresetCreator
 
 
 @dataclass
 class CreateResourcePresetAction(ResourcePresetAction):
-    creator: ResourcePresetCreator
+    creator: Creator[ResourcePresetRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -26,7 +27,7 @@ class CreateResourcePresetActionResult(BaseActionResult):
     resource_preset: ResourcePresetData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.resource_preset.id)
 
 

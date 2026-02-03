@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Final, Optional, cast
+from typing import Final
 from uuid import UUID
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -17,7 +17,11 @@ from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+    ArtifactStorageType,
+    VFolderStorageTarget,
+)
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceGetCommitHashReqPathParam,
@@ -25,14 +29,13 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
+from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
     ReservoirConfig,
-    ReservoirObjectStorageConfig,
-    ReservoirVFSStorageConfig,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
@@ -41,7 +44,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import DelegateImportArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
+    ImportArtifactsOptions,
+)
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -61,6 +67,7 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
+from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -106,19 +113,19 @@ from ai.backend.manager.services.artifact_revision.actions.import_revision impor
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.list import (
-    ListArtifactRevisionsAction,
-    ListArtifactRevisionsActionResult,
-)
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.search import (
+    SearchArtifactRevisionsAction,
+    SearchArtifactRevisionsActionResult,
 )
 
 _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 30  # seconds
 _REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRevisionService:
@@ -129,6 +136,7 @@ class ArtifactRevisionService:
     _storage_namespace_repository: StorageNamespaceRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
+    _vfolder_repository: VfolderRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _background_task_manager: BackgroundTaskManager
@@ -142,6 +150,7 @@ class ArtifactRevisionService:
         storage_namespace_repository: StorageNamespaceRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
+        vfolder_repository: VfolderRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
@@ -154,6 +163,7 @@ class ArtifactRevisionService:
         self._storage_namespace_repository = storage_namespace_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
+        self._vfolder_repository = vfolder_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_artifact_client = valkey_artifact_client
@@ -168,9 +178,9 @@ class ArtifactRevisionService:
         """
         match reservoir_config.config.storage_type:
             case ArtifactStorageType.OBJECT_STORAGE.value:
-                return cast(ReservoirObjectStorageConfig, reservoir_config.config).bucket_name
+                return reservoir_config.config.bucket_name
             case ArtifactStorageType.VFS_STORAGE.value:
-                return cast(ReservoirVFSStorageConfig, reservoir_config.config).subpath
+                return reservoir_config.config.subpath
             case _:
                 raise UnsupportedStorageTypeError(
                     f"Unsupported storage type: {reservoir_config.config.storage_type}"
@@ -253,7 +263,7 @@ class ArtifactRevisionService:
         )
 
         # 4. Query remote progress when delegation is enabled
-        remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
+        remote_download_progress: ArtifactRevisionDownloadProgress | None = None
 
         # Only set remote for RESERVOIR type
         if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
@@ -331,18 +341,18 @@ class ArtifactRevisionService:
 
         return GetDownloadProgressActionResult(download_progress=combined_progress)
 
-    async def list_revision(
-        self, action: ListArtifactRevisionsAction
-    ) -> ListArtifactRevisionsActionResult:
-        (
-            artifacts_data,
-            total_count,
-        ) = await self._artifact_repository.list_artifact_revisions_paginated(
-            pagination=action.pagination,
-            ordering=action.ordering,
-            filters=action.filters,
+    async def search_revision(
+        self, action: SearchArtifactRevisionsAction
+    ) -> SearchArtifactRevisionsActionResult:
+        result = await self._artifact_repository.search_artifact_revisions(
+            querier=action.querier,
         )
-        return ListArtifactRevisionsActionResult(data=artifacts_data, total_count=total_count)
+        return SearchArtifactRevisionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def approve(
         self, action: ApproveArtifactRevisionAction
@@ -402,6 +412,16 @@ class ArtifactRevisionService:
             )
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
+
+            # Look up vfolder to get volume_name (host) if vfolder_id is provided
+            vfolder_id: VFolderID | None = None
+            volume_name: str | None = None
+            if action.vfolder_id:
+                vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+                if vfolder_data:
+                    vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+                    _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+
             task_id: UUID
             match artifact.registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
@@ -423,7 +443,10 @@ class ArtifactRevisionService:
 
                     # Skip import if artifact revision is already Available and commit hash matches
                     # If current_commit_hash is None, always proceed with import
-                    if self._is_latest_commit_hash(revision_data, latest_commit_hash):
+                    # If force is True, skip this check and always re-download
+                    if not action.force and self._is_latest_commit_hash(
+                        revision_data, latest_commit_hash
+                    ):
                         # Return early without calling import API
                         return ImportArtifactRevisionActionResult(
                             result=revision_data, task_id=None
@@ -433,13 +456,25 @@ class ArtifactRevisionService:
                         action.artifact_revision_id, ArtifactStatus.PULLING
                     )
 
+                    vfolder_target: VFolderStorageTarget | None = None
+                    if vfolder_id is not None and volume_name is not None:
+                        vfolder_target = VFolderStorageTarget(
+                            vfolder_id=vfolder_id,
+                            volume_name=volume_name,
+                        )
+
                     huggingface_result = await storage_proxy_client.import_huggingface_models(
                         HuggingFaceImportModelsReq(
                             models=[
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                            storage_step_target_mappings=(
+                                dict.fromkeys(ArtifactStorageImportStep, vfolder_target)
+                                if vfolder_target is not None
+                                else reservoir_config.resolve_storage_step_selection()
+                            ),
+                            storage_prefix=action.storage_prefix,
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -450,7 +485,7 @@ class ArtifactRevisionService:
                         )
                     )
 
-                    async def _task(reporter: ProgressReporter) -> None:
+                    async def _task(_reporter: ProgressReporter) -> None:
                         # When use_delegation is True, if remote status is not AVAILABLE, delegate import
                         if reservoir_config.use_delegation:
                             remote_reservoir_client = ReservoirRegistryClient(
@@ -529,6 +564,13 @@ class ArtifactRevisionService:
                             action.artifact_revision_id, ArtifactStatus.PULLING
                         )
 
+                        vfolder_target: VFolderStorageTarget | None = None
+                        if vfolder_id is not None and volume_name is not None:
+                            vfolder_target = VFolderStorageTarget(
+                                vfolder_id=vfolder_id,
+                                volume_name=volume_name,
+                            )
+
                         # TODO: Utilize this internal import task_id
                         _result = await storage_proxy_client.import_reservoir_models(
                             ReservoirImportModelsReq(
@@ -538,8 +580,13 @@ class ArtifactRevisionService:
                                     )
                                 ],
                                 registry_name=registry_data.name,
-                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                storage_step_target_mappings=(
+                                    dict.fromkeys(ArtifactStorageImportStep, vfolder_target)
+                                    if vfolder_target is not None
+                                    else reservoir_config.resolve_storage_step_selection()
+                                ),
                                 artifact_revision_ids=[str(action.artifact_revision_id)],
+                                storage_prefix=action.storage_prefix,
                             )
                         )
 
@@ -672,7 +719,10 @@ class ArtifactRevisionService:
                 result: list[ArtifactRevisionData] = []
                 for revision_id in action.artifact_revision_ids:
                     import_result = await self.import_revision(
-                        ImportArtifactRevisionAction(artifact_revision_id=revision_id)
+                        ImportArtifactRevisionAction(
+                            artifact_revision_id=revision_id,
+                            force=action.force,
+                        )
                     )
                     task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
@@ -714,6 +764,7 @@ class ArtifactRevisionService:
             delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
+            options=ImportArtifactsOptions(force=action.force),
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
@@ -727,7 +778,7 @@ class ArtifactRevisionService:
         )
 
     async def _resolve_artifact_registry_meta(
-        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+        self, _artifact_type: ArtifactType | None, registry_id_or_none: uuid.UUID | None
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
             artifact_registry_cfg = self._config_provider.config.artifact_registry
@@ -750,16 +801,14 @@ class ArtifactRevisionService:
         return registry_meta
 
     def _is_latest_commit_hash(
-        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: Optional[str]
+        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: str | None
     ) -> bool:
         """
         Used in huggingface import to check if the latest commit hash matches the stored digest.
         """
         if latest_commit_hash is None:
             return False
-        if (
+        return (
             artifact_revision.status == ArtifactStatus.AVAILABLE
             and artifact_revision.digest == latest_commit_hash
-        ):
-            return True
-        return False
+        )

@@ -4,6 +4,7 @@ import asyncio
 import importlib.resources
 import logging
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import click
@@ -32,7 +33,7 @@ class RevisionHistory(TypedDict):
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 
@@ -45,15 +46,15 @@ def cli(args) -> None:
     help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
-def show(cli_ctx: CLIContext, alembic_config) -> None:
+def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """Show the current schema information."""
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -95,7 +96,7 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     help="Output file path (default: stdout)",
 )
 @click.pass_obj
-def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
+def dump_history(_cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     """Dump current alembic history in a serialiazable format."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
@@ -123,7 +124,7 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     if output == "-" or output is None:
         print(pretty_json_str(dump))
     else:
-        with open(output, mode="w") as fw:
+        with Path(output).open(mode="w") as fw:
             fw.write(pretty_json_str(dump))
 
 
@@ -145,7 +146,7 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
 )
 @click.pass_obj
 def apply_missing_revisions(
-    cli_ctx: CLIContext, previous_version: str, alembic_config: str, dry_run: bool
+    _cli_ctx: CLIContext, previous_version: str, alembic_config: str, dry_run: bool
 ) -> None:
     """
     Compare current alembic revision paths with the given serialized
@@ -162,7 +163,7 @@ def apply_missing_revisions(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
         try:
-            with open(f / f"{previous_version}.json", "r") as fr:
+            with (f / f"{previous_version}.json").open() as fr:
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
@@ -191,7 +192,7 @@ def apply_missing_revisions(
         with EnvironmentContext(
             alembic_cfg,
             script_directory,
-            fn=lambda rev, con: [
+            fn=lambda _rev, _con: [
                 MigrationStep.upgrade_from_script(script_directory.revision_map, script_to_apply)
                 for script_to_apply in scripts
             ],
@@ -210,7 +211,7 @@ def apply_missing_revisions(
     help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
-def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
+def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.
@@ -225,9 +226,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.base import metadata
-    from ..models.utils import create_async_engine
+    from ai.backend.manager.models.alembic import invoked_programmatically
+    from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+    from ai.backend.manager.models.utils import create_async_engine
+
+    ensure_all_tables_registered()
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -238,7 +241,11 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
-        head_rev = script.get_heads()[0]
+        heads = script.get_heads()
+        if not heads:
+            log.warning("No alembic migration heads found, skipping version stamping")
+            return
+        head_rev = heads[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 

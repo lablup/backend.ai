@@ -12,7 +12,7 @@ __all__ = [
     "AgentInfrastructureComposer",
     "AgentInfrastructureInput",
     "AgentInfrastructureResources",
-    "DockerDependency",
     "AgentValkeyClients",
     "AgentValkeyDependency",
+    "DockerDependency",
 ]

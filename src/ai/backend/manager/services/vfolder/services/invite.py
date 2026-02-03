@@ -18,8 +18,7 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-
-from ..actions.invite import (
+from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     AcceptInvitationActionResult,
     InviteVFolderAction,
@@ -37,7 +36,7 @@ from ..actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
     UpdateInvitedVFolderMountPermissionActionResult,
 )
-from ..types import VFolderInvitationInfo
+from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 # TODO: Detach privilege check from the service.
 #       The service should only handle the business logic.
@@ -63,6 +62,8 @@ class VFolderInviteService:
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, action.user_uuid, user.domain_name
         )
@@ -130,8 +131,6 @@ class VFolderInviteService:
 
         # Get target vfolder
         vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
-        if not vfolder_data:
-            raise VFolderNotFound
 
         # Prevent accepting vfolder with duplicated name
         count = await self._vfolder_repository.count_vfolder_with_name_for_user(
@@ -184,11 +183,11 @@ class VFolderInviteService:
             # Update invitation state
             await self._vfolder_repository.update_invitation_state(action.invitation_id, state)
 
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             raise
         except Exception as e:
             if not isinstance(e, (VFolderInvitationNotFound, VFolderNotFound, Forbidden)):
-                raise InternalServerError(f"unexpected error: {e}")
+                raise InternalServerError(f"unexpected error: {e}") from e
             raise
         return RejectInvitationActionResult(action.invitation_id)
 
@@ -246,6 +245,8 @@ class VFolderInviteService:
     ) -> LeaveInvitedVFolderActionResult:
         # Get vfolder info
         user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )

@@ -10,18 +10,20 @@ import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Optional, Self, override
+from typing import Any, Self, override
 
 import msgpack
 import yarl
 import zmq
-from glide.exceptions import ConfigurationError
+from glide import ConfigurationError
 from pydantic import ByteSize
 
 from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .abc import AbstractLogger
 from .config import (
+    ConsoleConfig,
+    LogDriver,
     LoggerConfig,
     LoggingConfig,
     LogHandlerConfig,
@@ -35,7 +37,7 @@ from .formatter import (
     SerializedExceptionFormatter,
 )
 from .handler.intrinsic import RelayHandler
-from .types import LogLevel, MsgpackOptions
+from .types import LogFormat, LogLevel, MsgpackOptions
 from .utils import _register_custom_loglevels
 
 is_active: ContextVar[bool] = ContextVar("is_active", default=False)
@@ -51,14 +53,14 @@ class NoopLogger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         pass
 
 
 class LocalLogger(AbstractLogger):
     def __init__(
         self,
-        config: Optional[LoggingConfig] = None,
+        config: LoggingConfig | None = None,
         *,
         log_level: LogLevel = LogLevel.NOTSET,
     ) -> None:
@@ -70,6 +72,8 @@ class LocalLogger(AbstractLogger):
         """
         if config is None:
             self.config = LoggingConfig(
+                version=1,
+                level=LogLevel.INFO,
                 disable_existing_loggers=False,
                 handlers={
                     "null": LogHandlerConfig(class_="logging.NullHandler"),
@@ -84,6 +88,12 @@ class LocalLogger(AbstractLogger):
                         for k, v in default_pkg_ns.items()
                     },
                 },
+                drivers=[LogDriver.CONSOLE],
+                console=ConsoleConfig(colored=None, format=LogFormat.VERBOSE),
+                file=None,
+                logstash=None,
+                graylog=None,
+                pkg_ns=default_pkg_ns,
             )
         else:
             self.config = config
@@ -115,7 +125,7 @@ class LocalLogger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         self.handler_stack.close()
         return None
 
@@ -142,7 +152,7 @@ class Logger(AbstractLogger):
         # Let the workers inherit the per-package logger and level configurations from the parent.
         # Each worker will add the RelayHandler by themselves.
         self.worker_logging_config = LoggingConfig(
-            # version=1,
+            version=1,
             disable_existing_loggers=False,
             handlers={
                 "null": LogHandlerConfig(class_="logging.NullHandler"),
@@ -155,6 +165,12 @@ class Logger(AbstractLogger):
                     for k, v in config.pkg_ns.items()
                 },
             },
+            drivers=[LogDriver.CONSOLE],
+            console=ConsoleConfig(colored=None, format=LogFormat.VERBOSE),
+            file=None,
+            logstash=None,
+            graylog=None,
+            pkg_ns=config.pkg_ns,
         )
 
     @override
@@ -174,7 +190,8 @@ class Logger(AbstractLogger):
         if self.is_master and self.log_endpoint:
             self.relay_handler = logging.getLogger("").handlers[0]
             self.ready_event = threading.Event()
-            assert isinstance(self.relay_handler, RelayHandler)
+            if not isinstance(self.relay_handler, RelayHandler):
+                raise RuntimeError("Expected RelayHandler as first handler")
             self.log_processor = threading.Thread(
                 target=log_processor,
                 name="Logger",
@@ -191,14 +208,15 @@ class Logger(AbstractLogger):
         return self
 
     @override
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         # Resetting generates "different context" errors.
         # Since practically we only need to check activeness in alembic scripts
         # and it should be active until the program terminates,
         # just leave it as-is.
         is_active.reset(self._is_active_token)
         if self.is_master and self.log_endpoint:
-            assert isinstance(self.relay_handler, RelayHandler)
+            if not isinstance(self.relay_handler, RelayHandler):
+                raise RuntimeError("Expected RelayHandler as relay_handler")
             self.relay_handler.emit(None)  # sentinel to stop log_processor
             self.log_processor.join()
             self.relay_handler.close()
@@ -326,7 +344,7 @@ def setup_graylog_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
 
 def log_processor(
     config: LoggingConfig,
-    parent_pid: int,
+    _parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
     msgpack_options: MsgpackOptions,
@@ -349,12 +367,12 @@ def log_processor(
         if "graylog" in config.drivers:
             external_handlers.append(handler_stack.enter_context(setup_graylog_handler(config)))
 
-        zctx = zmq.Context[zmq.Socket]()
+        zctx = zmq.Context[zmq.Socket[Any]]()
         agg_sock = zctx.socket(zmq.PULL)
         agg_sock.bind(log_endpoint)
         ep_url = yarl.URL(log_endpoint)
         if ep_url.scheme.lower() == "ipc":
-            os.chmod(ep_url.path, 0o777)
+            Path(ep_url.path).chmod(0o777)
         try:
             ready_event.set()
             while True:
@@ -365,8 +383,6 @@ def log_processor(
                 if not unpacked_data:
                     break
                 rec = logging.makeLogRecord(unpacked_data)
-                if rec is None:
-                    break
                 if console_handler:
                     console_handler.emit(rec)
                 try:

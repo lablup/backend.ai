@@ -1,5 +1,6 @@
 import functools
-from typing import Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import jwt
 from aiohttp import web
@@ -13,7 +14,7 @@ from ai.backend.appproxy.coordinator.types import RootContext
 def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Handler], Handler]:
     def wrap(handler: Handler) -> Handler:
         @functools.wraps(handler)
-        async def wrapped(request: web.Request, *args, **kwargs):
+        async def wrapped(request: web.Request, *args: Any, **kwargs: Any) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             permitted_token = root_ctx.local_config.secrets.api_secret
             permitted_header_values = (
@@ -34,8 +35,8 @@ def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Ha
                                 root_ctx.local_config.secrets.api_secret,
                                 algorithms=["HS256"],
                             )
-                        except jwt.PyJWTError:
-                            raise AuthorizationFailed("Unauthorized access")
+                        except jwt.PyJWTError as e:
+                            raise AuthorizationFailed("Unauthorized access") from e
                     case _:
                         raise AuthorizationFailed(f"Unsupported authorization method {method}")
             else:

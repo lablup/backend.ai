@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING, AsyncGenerator, Optional
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -47,8 +48,8 @@ class BackgroundTaskEventPayload:
     task_id: strawberry.ID
     event_type: BgtaskEventType
     message: str
-    current_progress: Optional[float] = None
-    total_progress: Optional[float] = None
+    current_progress: float | None = None
+    total_progress: float | None = None
 
     @classmethod
     def from_updated_event(cls, event: BgtaskUpdatedEvent) -> BackgroundTaskEventPayload:
@@ -109,7 +110,7 @@ class BackgroundTaskEventPayload:
         )
 
 
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description="Subscribe to real-time events for a specific background task. "
     "Streams progress updates and completion events (done/cancelled/failed) "
     "for the task lifecycle."
@@ -156,7 +157,7 @@ async def background_task_events(
         # Stream events from propagator
         async for event in propagator.receive(cache_id):
             # Convert event to payload
-            payload: Optional[BackgroundTaskEventPayload] = None
+            payload: BackgroundTaskEventPayload | None = None
             is_close_event = False
 
             if isinstance(event, BgtaskUpdatedEvent):

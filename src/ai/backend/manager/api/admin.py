@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import traceback
+from collections.abc import Callable, Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp_cors
 import attrs
@@ -19,21 +20,22 @@ from strawberry.aiohttp.views import GraphQLView
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
+from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.auth import AuthorizationFailed
 
-from ..api.gql.schema import schema as strawberry_schema
-from ..errors.api import GraphQLError as BackendGQLError
-from ..models.base import DataLoaderManager
-from ..models.gql import (
+from .auth import auth_required
+from .gql_legacy.base import DataLoaderManager
+from .gql_legacy.schema import (
     GQLExceptionMiddleware,
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
     graphene_schema,
 )
-from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, set_handler_attr
@@ -49,7 +51,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class CustomGraphQLView(GraphQLView):
     """Custom GraphQL view for Backend.AI with OpenAPI compatibility."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.__name__ = "handle_graphql_strawberry"
         self.__doc__ = """
@@ -75,13 +77,16 @@ class CustomGraphQLView(GraphQLView):
             config_provider=root_context.config_provider,
             event_hub=root_context.event_hub,
             event_fetcher=root_context.event_fetcher,
-            dataloader_registry=DataLoaderRegistry(),
+            dataloader_registry=DataLoaderRegistry(),  # TODO: Remove this.
             gql_adapter=root_context.gql_adapter,
+            data_loaders=DataLoaders(root_context.processors),
         )
 
 
 class GQLLoggingMiddleware:
-    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+    def resolve(
+        self, next: Callable[..., Any], root: Any, info: graphene.ResolveInfo, **args: Any
+    ) -> Any:
         if info.path.prev is None:  # indicates the root query
             graph_ctx = info.context
             log.info(
@@ -95,7 +100,7 @@ class GQLLoggingMiddleware:
 
 
 class CustomIntrospectionRule(ValidationRule):
-    def enter_field(self, node: FieldNode, *_args):
+    def enter_field(self, node: FieldNode, *_args: Any) -> None:
         field_name = node.name.value
         if field_name.startswith("__"):
             # Allow __typename field for GraphQL Federation, @connection directive
@@ -114,7 +119,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     rules = []
     if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         rules.append(CustomIntrospectionRule)
-    max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
+    max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:
@@ -151,28 +156,27 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         user_repository=root_ctx.repositories.user.repository,
         agent_repository=root_ctx.repositories.agent.repository,
     )
-    result = await app_ctx.gql_schema.execute_async(
-        params["query"],
-        None,  # root
-        variable_values=params["variables"],
-        operation_name=params["operation_name"],
-        context_value=gql_ctx,
-        middleware=[
-            GQLMutationPrivilegeCheckMiddleware(),
-            GQLMutationUnfrozenRequiredMiddleware(),
-            GQLMetricMiddleware(),
-            GQLExceptionMiddleware(),
-            GQLLoggingMiddleware(),
-        ],
+    result = cast(
+        ExecutionResult,
+        await app_ctx.gql_schema.execute_async(
+            params["query"],
+            None,  # root
+            variable_values=params["variables"],
+            operation_name=params["operation_name"],
+            context_value=gql_ctx,
+            middleware=[
+                GQLMutationPrivilegeCheckMiddleware(),
+                GQLMutationUnfrozenRequiredMiddleware(),
+                GQLMetricMiddleware(),
+                GQLExceptionMiddleware(),
+                GQLLoggingMiddleware(),
+            ],
+        ),
     )
 
     if result.errors:
         for e in result.errors:
-            if isinstance(e, GraphQLError):
-                errmsg = e.formatted
-            else:
-                errmsg = {"message": str(e)}
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.error("ADMIN.GQL Exception: {}", e.formatted)
             log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
@@ -204,13 +208,8 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     if result.errors:
         errors = []
         for e in result.errors:
-            if isinstance(e, GraphQLError):
-                errmsg = e.formatted
-                errors.append(errmsg)
-            else:
-                errmsg = {"message": str(e)}
-                errors.append(errmsg)
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            errors.append(e.formatted)
+            log.error("ADMIN.GQL Exception: {}", e.formatted)
         raise BackendGQLError(extra_data=errors)
     return web.json_response(result.data, status=HTTPStatus.OK)
 
@@ -239,7 +238,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ...types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 
 class WorkloadSequencer(ABC):
@@ -21,11 +21,16 @@ class WorkloadSequencer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def sequence(
-        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
+    async def sequence(
+        self,
+        resource_group: str,
+        system_snapshot: SystemSnapshot,
+        workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on the system snapshot.
+
+        :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by the sequencer's logic.
@@ -52,11 +57,16 @@ class SchedulingSequencer:
         """
         return self._workload_sequencer.success_message()
 
-    def sequence(
-        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
+    async def sequence(
+        self,
+        resource_group: str,
+        system_snapshot: SystemSnapshot,
+        workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on their priority using the configured workload sequencer.
+
+        :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by priority and the sequencer's logic.
@@ -65,4 +75,6 @@ class SchedulingSequencer:
         top_priority = max(priorities)
         filtered_workloads = [*filter(lambda s: s.priority == top_priority, workloads)]
 
-        return self._workload_sequencer.sequence(system_snapshot, filtered_workloads)
+        return await self._workload_sequencer.sequence(
+            resource_group, system_snapshot, filtered_workloads
+        )

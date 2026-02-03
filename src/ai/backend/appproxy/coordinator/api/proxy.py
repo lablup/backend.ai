@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Annotated, Iterable, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import jwt
@@ -25,16 +26,15 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import CircuitCreationError
+from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models import Circuit, Token, Worker, add_circuit
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AddRequestModel(BaseModel):
@@ -103,7 +103,7 @@ async def proxy(
     otherwise coordinator will try to automatically redirect callee via `Location: ` response header.
     """
 
-    existing_circuit: Optional[Circuit] = None
+    existing_circuit: Circuit | None = None
     reuse = False
 
     root_ctx: RootContext = request.app["_root.context"]
@@ -158,9 +158,13 @@ async def proxy(
         ]
 
         log.debug("protocol: {} ({})", params.protocol, type(params.protocol))
+        # Map application-level protocols to transport-level protocols for worker selection
         if params.protocol == ProxyProtocol.PREOPEN:
             log.debug("overriding PREOPEN to HTTP")
             params.protocol = ProxyProtocol.HTTP
+        elif params.protocol in (ProxyProtocol.VNC, ProxyProtocol.RDP):
+            log.debug("overriding {} to TCP", params.protocol)
+            params.protocol = ProxyProtocol.TCP
 
         async def _update(sess: SASession) -> tuple[Circuit, Worker]:
             circuit, worker = await add_circuit(
@@ -221,20 +225,19 @@ async def proxy(
             ),
             headers={"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "*"},
         )
-    else:
-        return web.HTTPPermanentRedirect(app_url)
+    return web.HTTPPermanentRedirect(app_url)
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 
 def create_app(
-    default_cors_options: CORSOptions,
+    _default_cors_options: CORSOptions,
 ) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "v2/proxy"

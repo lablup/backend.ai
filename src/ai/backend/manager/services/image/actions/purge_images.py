@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -16,7 +16,7 @@ class PurgeImageAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -29,10 +29,10 @@ class PurgeImageAction(ImageAction):
 class PurgeImageActionResult(BaseActionResult):
     reserved_bytes: int
     purged_image: ImageData
-    error: Optional[str]
+    error: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.purged_image.id)
 
 
@@ -56,7 +56,7 @@ class PurgeImagesAction(ImageAction):
     noprune: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -72,5 +72,28 @@ class PurgeImagesActionResult(BaseActionResult):
     errors: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
+
+
+@dataclass
+class PurgeImageByIdAction(ImageAction):
+    image_id: ImageID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.image_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "purge_by_id"
+
+
+@dataclass
+class PurgeImageByIdActionResult(BaseActionResult):
+    image: ImageData
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.image.id)

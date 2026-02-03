@@ -128,7 +128,11 @@ type Query {
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "aarch64"
+
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
   ): Image
   images(
     """
@@ -319,7 +323,7 @@ type Query {
   """Added in 25.5.0."""
   total_resource_slot(
     """
-    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
     Default value is null.
     """
     statuses: [String] = null
@@ -1541,6 +1545,9 @@ type VirtualFolderPermissionList implements PaginatedList {
   total_count: Int!
 }
 
+"""
+Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum).
+"""
 type VirtualFolderPermission implements Item {
   id: ID
   permission: String
@@ -2341,7 +2348,14 @@ type Mutation {
   ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
+  modify_image(
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    props: ModifyImageInput!
+    target: String!
+  ): ModifyImage
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
@@ -2350,7 +2364,13 @@ type Mutation {
   forget_image_by_id(image_id: String!): ForgetImageById
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    reference: String!
+  ): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -2362,7 +2382,15 @@ type Mutation {
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
-  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
+  alias_image(
+    alias: String!
+
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    target: String!
+  ): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
@@ -2937,7 +2965,11 @@ type ClearImageCustomResourceLimitPayload {
 """Added in 25.6.0."""
 input ClearImageCustomResourceLimitKey {
   image_canonical: String!
-  architecture: String! = "aarch64"
+
+  """
+  Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+  """
+  architecture: String = null
 }
 
 """Added in 24.03.0."""

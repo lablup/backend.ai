@@ -2,11 +2,10 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -24,7 +23,7 @@ class RunningRouteHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -34,9 +33,9 @@ class RunningRouteHandler(RouteHandler):
         return "check-running-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking running routes."""
-        return None
+    def lock_id(self) -> LockID | None:
+        """Lock for checking running routes."""
+        return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
@@ -49,26 +48,39 @@ class RunningRouteHandler(RouteHandler):
         ]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         return None
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Get the failure route status if applicable."""
         return RouteStatus.TERMINATING
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for running route handler (BEP-1030).
+
+        - success: None (stays in current status)
+        - failure: Route → TERMINATING (session died or failed)
+        - stale: None
+        """
+        return RouteStatusTransitions(
+            success=None,
+            failure=RouteStatus.TERMINATING,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for running routes."""
         log.debug("Checking health for {} running routes", len(routes))
 
         # Execute route health check logic via executor
-        result = await self._route_executor.check_running_routes(routes)
-        return result
+        return await self._route_executor.check_running_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after checking running routes."""

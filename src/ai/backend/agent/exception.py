@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Any
 
 from aiohttp import web
 
@@ -53,7 +56,7 @@ class InsufficientResource(ResourceError):
     requested_alloc: Decimal
     total_allocatable: Decimal | int
     allocation: dict[SlotName, dict[DeviceId, Decimal]]
-    context_tag: Optional[str] = None
+    context_tag: str | None = None
 
     def __str__(self) -> str:
         return (
@@ -62,7 +65,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[type[InsufficientResource], tuple[Any, ...]]:
         return (
             self.__class__,
             (
@@ -82,7 +85,7 @@ class FractionalResourceFragmented(ResourceError):
     slot_name: SlotName
     requested_alloc: Decimal
     dev_allocs: Sequence[tuple[DeviceId, Decimal]]
-    context_tag: Optional[str] = None
+    context_tag: str | None = None
 
     def __str__(self) -> str:
         return (
@@ -91,7 +94,7 @@ class FractionalResourceFragmented(ResourceError):
             + f"allocating {self.requested_alloc} from {self.dev_allocs})"
         )
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[type[FractionalResourceFragmented], tuple[Any, ...]]:
         return (
             self.__class__,
             (
@@ -111,14 +114,16 @@ class UnsupportedBaseDistroError(RuntimeError):
 class ContainerCreationError(Exception):
     container_id: str
 
-    def __init__(self, container_id: str, message: str | None = None, *args, **kwargs):
+    def __init__(
+        self, container_id: str, message: str | None = None, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.container_id = container_id
         self.message = message
 
 
 class K8sError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
 
@@ -132,7 +137,7 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: Optional[str] = None):
+    def __init__(self, *args: Any, exc_repr: str | None = None) -> None:
         super().__init__(*args)
         self.exc_repr = exc_repr
 

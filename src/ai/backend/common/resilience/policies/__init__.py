@@ -6,9 +6,9 @@ __all__ = [
     "BackoffStrategy",
     "MetricArgs",
     "MetricPolicy",
+    "ResilienceTimeoutError",
     "RetryArgs",
     "RetryPolicy",
-    "ResilienceTimeoutError",
     "TimeoutArgs",
     "TimeoutPolicy",
 ]

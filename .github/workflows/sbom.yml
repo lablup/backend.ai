@@ -3,17 +3,112 @@ name: SBOM report
 on: [workflow_dispatch, workflow_call]
 
 jobs:
-  sbom:
+  sbom-python:
+    name: Generate Python SBOM
     runs-on: ubuntu-latest
     steps:
     - name: Checkout the revision
       uses: actions/checkout@v6
       with:
         lfs: false
-    - name: Generate the SBOM report
-      uses: CycloneDX/gh-python-generate-sbom@v2
-    - name: Upload the SBOM report
+    - name: Install SBOM tool
+      run: pipx install cyclonedx-bom
+    - name: Create Python SBOM
+      # see for usage: https://pypi.org/project/cyclonedx-bom/
+      run: cyclonedx-py requirements -o bom-python.json
+    - name: Upload Python SBOM
       uses: actions/upload-artifact@v5
       with:
-        name: SBOM report
-        path: ./bom.xml
+        name: SBOM-Python
+        path: ./bom-python.json
+
+  prepare-matrix:
+    name: Discover Dockerfiles
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - name: Checkout the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+
+    - name: Find all Dockerfiles and create matrix
+      id: set-matrix
+      run: |
+        # Find all Dockerfiles in docker/ directory
+        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
+
+        # Build JSON array for matrix
+        MATRIX_JSON='{"include":['
+        FIRST=true
+
+        for dockerfile in $DOCKERFILES; do
+          # Get image name from filename (e.g., krunner-extractor.dockerfile -> krunner-extractor)
+          BASENAME=$(basename "$dockerfile" .dockerfile)
+
+          if [ "$FIRST" = true ]; then
+            FIRST=false
+          else
+            MATRIX_JSON="${MATRIX_JSON},"
+          fi
+
+          MATRIX_JSON="${MATRIX_JSON}{\"name\":\"${BASENAME}\",\"dockerfile\":\"${dockerfile}\",\"context\":\"docker\"}"
+        done
+
+        MATRIX_JSON="${MATRIX_JSON}]}"
+
+        echo "Found Dockerfiles matrix:"
+        echo "$MATRIX_JSON" | jq .
+
+        echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  sbom-containers:
+    name: Generate Container SBOMs
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    needs: prepare-matrix
+    if: needs.prepare-matrix.outputs.matrix != '{"include":[]}'
+    strategy:
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    steps:
+    - name: Checkout the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ matrix.context }}
+        file: ${{ matrix.dockerfile }}
+        platforms: linux/amd64
+        tags: backendai-${{ matrix.name }}:sbom
+        load: true
+
+    - name: Generate SBOM with Syft
+      uses: anchore/sbom-action@v0
+      with:
+        image: backendai-${{ matrix.name }}:sbom
+        format: cyclonedx-json
+        output-file: bom-${{ matrix.name }}.json
+
+    - name: Attest SBOM
+      uses: actions/attest-sbom@v2
+      with:
+        subject-name: backendai-${{ matrix.name }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        sbom-path: bom-${{ matrix.name }}.json
+        push-to-registry: false
+
+    - name: Upload Container SBOM
+      uses: actions/upload-artifact@v5
+      with:
+        name: SBOM-${{ matrix.name }}
+        path: ./bom-${{ matrix.name }}.json

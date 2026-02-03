@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any
 
 import aiohttp
 from yarl import URL
@@ -13,7 +14,7 @@ class PurityClient:
     endpoint: URL
     api_token: str
     api_version: str
-    _auth_token: Optional[str]
+    _auth_token: str | None
 
     _session: aiohttp.ClientSession
 
@@ -52,7 +53,7 @@ class PurityClient:
             self._lock.release()
             raise
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: object) -> None:
         self._auth_token = None
         self._lock.release()
 

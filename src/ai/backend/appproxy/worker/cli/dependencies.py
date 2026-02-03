@@ -5,9 +5,8 @@ import sys
 
 import click
 
+from ai.backend.appproxy.worker.dependencies import DependencyInput, WorkerDependencyComposer
 from ai.backend.common.dependencies.stacks.visualizing import VisualizingDependencyStack
-
-from ..dependencies import DependencyInput, WorkerDependencyComposer
 
 
 @click.group()

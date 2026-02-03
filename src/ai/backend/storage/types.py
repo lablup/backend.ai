@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePath
-from typing import Any, Final, Mapping, Optional, override
+from typing import Any, Final, override
 
 import attrs
 import trafaret as t
@@ -15,17 +15,17 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import QuotaConfig, StreamReader, VFolderID
 
 __all__ = (
-    "Sentinel",
     "SENTINEL",
-    "FSPerfMetric",
     "CapacityUsage",
-    "VolumeInfo",
-    "VFolderID",
-    "TreeUsage",
-    "QuotaConfig",
-    "Stat",
     "DirEntry",
     "DirEntryType",
+    "FSPerfMetric",
+    "QuotaConfig",
+    "Sentinel",
+    "Stat",
+    "TreeUsage",
+    "VFolderID",
+    "VolumeInfo",
 )
 
 
@@ -65,8 +65,8 @@ class QuotaUsage:
 class VolumeInfo:
     backend: str
     path: Path
-    fsprefix: Optional[PurePath]
-    options: Optional[Mapping[str, Any]]
+    fsprefix: PurePath | None
+    options: Mapping[str, Any] | None
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
@@ -122,7 +122,7 @@ _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 class MultipartFileUploadStreamReader(StreamReader):
     _file_reader: MultipartReader
 
-    def __init__(self, file_reader: MultipartReader, content_type: Optional[str]) -> None:
+    def __init__(self, file_reader: MultipartReader, content_type: str | None) -> None:
         self._file_reader = file_reader
         self._content_type = content_type
 
@@ -146,5 +146,5 @@ class MultipartFileUploadStreamReader(StreamReader):
             yield chunk
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type

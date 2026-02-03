@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
     CID_POSTGRES,
@@ -10,8 +11,6 @@ from ai.backend.common.health_checker.types import (
     ServiceGroup,
     ServiceHealth,
 )
-
-from ..models.utils import ExtendedAsyncSAEngine
 
 
 class DatabaseHealthChecker(StaticServiceHealthChecker):
@@ -47,7 +46,7 @@ class DatabaseHealthChecker(StaticServiceHealthChecker):
         Returns:
             ServiceHealth containing the database health status
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
 
         try:
             await self._db.ping()

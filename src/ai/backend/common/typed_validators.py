@@ -5,7 +5,7 @@ import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Final, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -30,12 +30,12 @@ from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
     API_VFOLDER_LENGTH_LIMIT,
-    MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
     RESERVED_VFOLDERS,
 )
+from .meta import BackendAIConfigMeta, ConfigExample
 
-TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
+type TVariousDelta = datetime.timedelta | relativedelta
 
 
 class _TimeDurationPydanticAnnotation:
@@ -46,30 +46,35 @@ class _TimeDurationPydanticAnnotation:
         cls,
         value: int | float | str,
     ) -> TVariousDelta:
-        assert isinstance(value, (int, float, str)), "value must be a number or string"
+        if not isinstance(value, (int, float, str)):
+            raise ValueError("value must be a number or string")
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert len(value) > 0, "value must not be empty"
+        if len(value) == 0:
+            raise ValueError("value must not be empty")
 
         try:
             unit = value[-1]
             if unit.isdigit():
                 t = float(value)
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 return datetime.timedelta(seconds=t)
-            elif value[-2:].isalpha():
+            if value[-2:].isalpha():
                 t = int(value[:-2])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-2:]:
                     case "yr":
                         return relativedelta(years=t)
                     case "mo":
                         return relativedelta(months=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
+                        raise ValueError("value is not a known time duration")
             else:
                 t = float(value[:-1])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-1]:
                     case "w":
                         return datetime.timedelta(weeks=t)
@@ -82,9 +87,9 @@ class _TimeDurationPydanticAnnotation:
                     case "s":
                         return datetime.timedelta(seconds=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
-        except ValueError:
-            raise AssertionError(f"invalid numeric literal: {value[:-1]}")
+                        raise ValueError("value is not a known time duration")
+        except ValueError as e:
+            raise ValueError(f"invalid numeric literal: {value[:-1]}") from e
 
     @classmethod
     def time_duration_serializer(cls, value: TVariousDelta) -> float | str:
@@ -94,20 +99,19 @@ class _TimeDurationPydanticAnnotation:
             case relativedelta():
                 # just like the deserializer, serializing relativedelta is only supported when year or month (not both) is supplied
                 # years or months being normalized is not considered as a valid case since relativedelta does not allow fraction of years or months as an input
-                assert not (value.years and value.months), (
-                    "Serializing relativedelta with both years and months contained is not supported"
-                )
-                assert value.years or value.months, (
-                    "Serialization is supported only for months or years field"
-                )
+                if value.years and value.months:
+                    raise ValueError(
+                        "Serializing relativedelta with both years and months contained is not supported"
+                    )
+                if not (value.years or value.months):
+                    raise ValueError("Serialization is supported only for months or years field")
                 if value.years:
                     return f"{value.years}yr"
-                elif value.months:
+                if value.months:
                     return f"{value.months}mo"
-                else:
-                    raise AssertionError("Should not reach here")
+                raise RuntimeError("Should not reach here")
             case _:
-                raise AssertionError("Not a valid type")
+                raise ValueError("Not a valid type")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -171,9 +175,11 @@ SESSION_NAME_MAX_LENGTH: Final[int] = 24
 
 
 def _vfolder_name_validator(name: str) -> str:
-    f"""
-    Although the length constraint of the `vfolders.name` column is {MODEL_VFOLDER_LENGTH_LIMIT},
-    we limit the length to {API_VFOLDER_LENGTH_LIMIT} in the create/rename API
+    """
+    Validate and return the VFolder name.
+
+    Although the length constraint of the ``vfolders.name`` column is 64 (MODEL_VFOLDER_LENGTH_LIMIT),
+    we limit the length to 48 (API_VFOLDER_LENGTH_LIMIT) in the create/rename API
     because we append a timestamp of deletion to the name when VFolders are deleted.
     """
     if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:
@@ -194,23 +200,32 @@ VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
 
 
 class HostPortPair(BaseModel):
-    host: str = Field(
-        description="""
-        Host address of the service.
-        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
-        """,
-        examples=["127.0.0.1"],
-    )
-    port: int = Field(
-        ge=1,
-        le=65535,
-        description="""
-        Port number of the service.
-        Must be between 1 and 65535.
-        Ports below 1024 require root/admin privileges.
-        """,
-        examples=[8080],
-    )
+    host: Annotated[
+        str,
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Host address of the service. "
+                "Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to "
+                "all interfaces."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="127.0.0.1", prod="server.example.com"),
+        ),
+    ]
+    port: Annotated[
+        int,
+        Field(ge=1, le=65535),
+        BackendAIConfigMeta(
+            description=(
+                "Port number of the service. "
+                "Must be between 1 and 65535. "
+                "Ports below 1024 require root/admin privileges."
+            ),
+            added_version="22.03.0",
+            example=ConfigExample(local="8080", prod="8080"),
+        ),
+    ]
 
     _allow_blank_host: ClassVar[bool] = True
 
@@ -242,8 +257,8 @@ class HostPortPair(BaseModel):
         elif isinstance(value, Mapping):
             try:
                 host, port = value["host"], value["port"]
-            except KeyError:
-                raise ValueError('value as map must contain "host" and "port" keys')
+            except KeyError as e:
+                raise ValueError('value as map must contain "host" and "port" keys') from e
 
         else:
             raise TypeError("unrecognized value type")
@@ -259,20 +274,19 @@ class HostPortPair(BaseModel):
 
         try:
             port = int(port)
-        except (TypeError, ValueError):
-            raise ValueError("port number must be an integer")
+        except (TypeError, ValueError) as e:
+            raise ValueError("port number must be an integer") from e
         if not (1 <= port <= 65535):
             raise ValueError("port number must be between 1 and 65535")
 
         return {"host": str(host), "port": port}
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
@@ -342,31 +356,29 @@ class AutoDirectoryPath(DirectoryPath):
 
 
 class UserID(int):
-    _default_uid: Optional[int] = None
+    _default_uid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
         if value is None:
             if cls._default_uid is not None:
                 return cls._default_uid
-            else:
-                return os.getuid()
-        elif isinstance(value, int):
+            return os.getuid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getuid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_uid is not None:
                     return cls._default_uid
-                else:
-                    return os.getuid()
+                return os.getuid()
             try:
                 value = int(value)
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_uid
-                except KeyError:
-                    raise ValueError(f"no such user {value} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such user {value} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -395,31 +407,29 @@ class UserID(int):
 
 
 class GroupID(int):
-    _default_gid: Optional[int] = None
+    _default_gid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
         if value is None:
             if cls._default_gid is not None:
                 return cls._default_gid
-            else:
-                return os.getgid()
-        elif isinstance(value, int):
+            return os.getgid()
+        if isinstance(value, int):
             if value == -1:
                 return os.getgid()
         elif isinstance(value, str):
             if not value:
                 if cls._default_gid is not None:
                     return cls._default_gid
-                else:
-                    return os.getgid()
+                return os.getgid()
             try:
                 value = int(value)
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_gid
-                except KeyError:
-                    raise ValueError(f"no such group {value!r} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such group {value!r} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -452,7 +462,7 @@ TItem = TypeVar("TItem")
 
 class DelimiterSeparatedList(list[TItem]):
     delimiter: str = ","
-    min_length: Optional[int] = None
+    min_length: int | None = None
     empty_str_as_empty_list: bool = False
 
     @classmethod
@@ -477,9 +487,9 @@ class DelimiterSeparatedList(list[TItem]):
             try:
                 return cls([item_adapter.validate_python(x) for x in items])
             except ValidationError as e:
-                raise ValueError(str(e))
+                raise ValueError(str(e)) from e
 
-        def _serialize(val: Sequence[Any]):
+        def _serialize(val: Sequence[Any]) -> str:
             return cls.delimiter.join(str(x) for x in val)
 
         return core_schema.with_info_plain_validator_function(

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
 from pydantic import Field
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.api_handlers import BaseFieldModel
@@ -22,18 +22,19 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
+    HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
 )
-from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
-
-from ..errors.common import (
-    GenericBadRequest,
-    InternalServerError,
-    ObjectNotFound,
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.updaters import (
+    ContainerRegistryUpdaterSpec,
 )
-from ..errors.image import HarborWebhookContainerRegistryRowNotFound
+from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
+    ModifyContainerRegistryAction,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -48,45 +49,61 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @server_status_required(READ_ALLOWED)
 @superadmin_required
-@pydantic_params_api_handler(PatchContainerRegistryRequestModel)
+@pydantic_params_api_handler(PatchContainerRegistryRequestModel)  # type: ignore[arg-type]
 async def patch_container_registry(
     request: web.Request, params: PatchContainerRegistryRequestModel
 ) -> PatchContainerRegistryResponseModel:
-    from ..models.container_registry import ContainerRegistryRow
-
     registry_id = uuid.UUID(request.match_info["registry_id"])
     log.info("PATCH_CONTAINER_REGISTRY (registry:{})", registry_id)
     root_ctx: RootContext = request.app["_root.context"]
-    registry_row_updates = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
 
-    try:
-        async with root_ctx.db.begin_session() as db_session:
-            if registry_row_updates:
-                update_stmt = (
-                    sa.update(ContainerRegistryRow)
-                    .where(ContainerRegistryRow.id == registry_id)
-                    .values(registry_row_updates)
-                )
-                await db_session.execute(update_stmt)
+    updater_spec = ContainerRegistryUpdaterSpec(
+        url=OptionalState.update(params.url) if params.url is not None else OptionalState.nop(),
+        registry_name=OptionalState.update(params.registry_name)
+        if params.registry_name is not None
+        else OptionalState.nop(),
+        type=OptionalState.update(params.type) if params.type is not None else OptionalState.nop(),
+        project=TriState.update(params.project) if params.project is not None else TriState.nop(),
+        username=TriState.update(params.username)
+        if params.username is not None
+        else TriState.nop(),
+        password=TriState.update(params.password)
+        if params.password is not None
+        else TriState.nop(),
+        ssl_verify=TriState.update(params.ssl_verify)
+        if params.ssl_verify is not None
+        else TriState.nop(),
+        is_global=TriState.update(params.is_global)
+        if params.is_global is not None
+        else TriState.nop(),
+        extra=TriState.update(params.extra) if params.extra is not None else TriState.nop(),
+        allowed_groups=TriState.update(params.allowed_groups)
+        if params.allowed_groups is not None
+        else TriState.nop(),
+    )
+    result = (
+        await root_ctx.processors.container_registry.modify_container_registry.wait_for_complete(
+            ModifyContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
+        )
+    )
 
-            query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
-            container_registry = (await db_session.execute(query)).fetchone()[0]
-
-        if params.allowed_groups:
-            await handle_allowed_groups_update(root_ctx.db, registry_id, params.allowed_groups)
-    except ObjectNotFound as e:
-        raise e
-    except IntegrityError as e:
-        raise GenericBadRequest(f"Failed to update allowed groups! Details: {str(e)}")
-    except Exception as e:
-        raise InternalServerError(f"Failed to update container registry! Details: {str(e)}")
-
-    return PatchContainerRegistryResponseModel.model_validate(container_registry)
+    return PatchContainerRegistryResponseModel(
+        id=result.data.id,
+        url=result.data.url,
+        registry_name=result.data.registry_name,
+        type=result.data.type,
+        project=result.data.project,
+        username=result.data.username,
+        password=result.data.password,
+        ssl_verify=result.data.ssl_verify,
+        is_global=result.data.is_global,
+        extra=result.data.extra,
+    )
 
 
 async def _get_registry_row_matching_url(
     db_sess: AsyncSession, registry_url: str, project: str
-) -> ContainerRegistryRow:
+) -> ContainerRegistryRow | None:
     query = sa.select(ContainerRegistryRow).where(
         (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
         & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
@@ -97,7 +114,7 @@ async def _get_registry_row_matching_url(
 
 
 def _is_authorized_harbor_webhook_request(
-    auth_header: Optional[str], registry_row: ContainerRegistryRow
+    auth_header: str | None, registry_row: ContainerRegistryRow
 ) -> bool:
     if auth_header:
         extra = registry_row.extra or {}
@@ -191,7 +208,7 @@ async def harbor_webhook_handler(
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"

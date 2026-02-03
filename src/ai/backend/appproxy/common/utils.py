@@ -8,16 +8,13 @@ import json
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Hashable, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Hashable,
-    Mapping,
-    TypeAlias,
     TypeVar,
+    cast,
 )
 from uuid import UUID
 
@@ -43,15 +40,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _danger_words = ["password", "passwd", "secret"]
 
 
-def set_handler_attr(func, key, value):
+def set_handler_attr(func: Callable[..., Any], key: str, value: Any) -> None:
     attrs = getattr(func, "_backend_attrs", None)
     if attrs is None:
         attrs = {}
     attrs[key] = value
-    setattr(func, "_backend_attrs", attrs)
+    func._backend_attrs = attrs  # type: ignore[attr-defined]
 
 
-def get_handler_attr(request, key, default=None):
+def get_handler_attr(request: web.Request, key: str, default: Any = None) -> Any:
     # When used in the aiohttp server-side codes, we should use
     # request.match_info.hanlder instead of handler passed to the middleware
     # functions because aiohttp wraps this original handler with functools.partial
@@ -99,7 +96,7 @@ async def call_non_bursty(
     *,
     max_bursts: int = 64,
     max_idle: int | float = 100.0,
-):
+) -> Any:
     """
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
@@ -139,8 +136,8 @@ async def call_non_bursty(
     if invoke:
         if inspect.iscoroutinefunction(coro):
             return await coro()
-        else:
-            return coro()
+        return coro()
+    return None
 
 
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)
@@ -149,16 +146,16 @@ TParamModel = TypeVar("TParamModel", bound=BaseModel)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
 TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
 
-THandlerFuncWithoutParam: TypeAlias = Callable[
-    [web.Request], Awaitable[PydanticResponse | TAnyResponse]
+type THandlerFuncWithoutParam[TAnyResponse: web.StreamResponse] = Callable[
+    [web.Request], Awaitable[PydanticResponse[Any] | TAnyResponse]
 ]
-THandlerFuncWithParam: TypeAlias = Callable[
-    [web.Request, TParamModel], Awaitable[PydanticResponse | TAnyResponse]
+type THandlerFuncWithParam[TParamModel: BaseModel, TAnyResponse: web.StreamResponse] = Callable[
+    [web.Request, TParamModel], Awaitable[PydanticResponse[Any] | TAnyResponse]
 ]
 
 
-def ensure_stream_response_type(
-    response: PydanticResponse | TAnyResponse,
+def ensure_stream_response_type[TAnyResponse: web.StreamResponse](
+    response: PydanticResponse[Any] | TAnyResponse,
 ) -> web.StreamResponse:
     json_body: Any
     match response:
@@ -178,8 +175,8 @@ def ensure_stream_response_type(
 
 
 def pydantic_api_response_handler(
-    handler: THandlerFuncWithoutParam,
-    is_deprecated=False,
+    handler: THandlerFuncWithoutParam,  # type: ignore[type-arg]
+    is_deprecated: bool = False,
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -190,8 +187,8 @@ def pydantic_api_response_handler(
     @functools.wraps(handler)
     async def wrapped(
         request: web.Request,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> web.StreamResponse:
         response = await handler(request, *args, **kwargs)
         return ensure_stream_response_type(response)
@@ -200,20 +197,20 @@ def pydantic_api_response_handler(
     return wrapped
 
 
-def pydantic_api_handler(
+def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-    is_deprecated=False,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+    is_deprecated: bool = False,
+) -> Callable[[THandlerFuncWithParam], Handler]:  # type: ignore[type-arg]
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam,  # type: ignore[type-arg]
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
             request: web.Request,
-            *args,
-            **kwargs,
+            *args: Any,
+            **kwargs: Any,
         ) -> web.StreamResponse:
             orig_params: Any
             body: str = ""
@@ -233,10 +230,10 @@ def pydantic_api_handler(
                 if body_exists and query_param_checker:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
-            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
-                raise InvalidAPIParameters("Malformed body")
+            except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
+                raise InvalidAPIParameters("Malformed body") from e
             except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
@@ -284,7 +281,7 @@ def config_key_to_kebab_case(o: Any) -> Any:
             return o
 
 
-def mime_match(base_array: str, compare: str, strict=False) -> bool:
+def mime_match(base_array: str, compare: str, strict: bool = False) -> bool:
     """
     Checks if `base_array` MIME string contains `compare` MIME type.
 
@@ -308,10 +305,10 @@ def mime_match(base_array: str, compare: str, strict=False) -> bool:
 
 
 class BackendAIAccessLogger(AccessLogger):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-    def log(self, request, response, time):
+    def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:
         if request.get("do_not_print_access_log"):
             return
 
@@ -346,7 +343,7 @@ class BackendAIAccessLogger(AccessLogger):
 
 async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
     try:
-        return await redis_helper.execute(connection, lambda r: r.ping())
+        return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
-        raise e
+        raise e from e

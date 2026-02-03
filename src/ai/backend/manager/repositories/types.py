@@ -1,11 +1,11 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
-from sqlalchemy.sql.elements import BooleanClauseList
+from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -13,9 +13,10 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidCursorTypeError
 from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql_legacy.base import validate_connection_args
+from ai.backend.manager.api.gql_legacy.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
-from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
+from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.types import PaginationOptions
@@ -33,7 +34,7 @@ class RepositoryArgs:
 
 
 # Generic types for pagination
-TModel = TypeVar("TModel")
+TModel = TypeVar("TModel", bound="PaginatableModel")
 TData = TypeVar("TData")
 TFilters = TypeVar("TFilters")
 TOrdering = TypeVar("TOrdering")
@@ -43,8 +44,8 @@ TOrdering = TypeVar("TOrdering")
 class PaginationQueryResult:
     """Result of a pagination query."""
 
-    data_query: Select
-    pagination_order: Optional[ConnectionPaginationOrder] = None
+    data_query: Select[Any]
+    pagination_order: ConnectionPaginationOrder | None = None
 
 
 class PaginatableModel(Protocol):
@@ -56,7 +57,7 @@ class PaginatableModel(Protocol):
 class FilterApplier(Protocol):
     """Protocol for applying filters to a query"""
 
-    def apply_filters(self, stmt: Select, filters: Any) -> Select:
+    def apply_filters(self, stmt: Select[Any], filters: Any) -> Select[Any]:
         """Apply filters to the query statement"""
         ...
 
@@ -65,8 +66,8 @@ class OrderingApplier(Protocol):
     """Protocol for applying ordering to a query"""
 
     def apply_ordering(
-        self, stmt: Select, ordering: Any
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
+        self, stmt: Select[Any], ordering: Any
+    ) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         ...
 
@@ -79,7 +80,7 @@ class ModelConverter(Protocol):
         ...
 
 
-class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
+class GenericQueryBuilder[TModel: "PaginatableModel", TData, TFilters, TOrdering]:
     """
     Generic query builder for constructing SQLAlchemy queries with pagination support.
     """
@@ -91,7 +92,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         ordering_applier: OrderingApplier,
         model_converter: ModelConverter,
         cursor_type_name: str,
-    ):
+    ) -> None:
         self.model_class = model_class
         self.filter_applier = filter_applier
         self.ordering_applier = ordering_applier
@@ -100,31 +101,30 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
 
     def build_lexicographic_cursor_conditions(
         self,
-        order_clauses: list[tuple[sa.Column, bool]],
+        order_clauses: list[tuple[sa.Column[Any], bool]],
         cursor_uuid: uuid.UUID,
-        pagination_order: Optional[ConnectionPaginationOrder],
-    ) -> list[BooleanClauseList]:
+        pagination_order: ConnectionPaginationOrder | None,
+    ) -> list[ColumnElement[bool]]:
         """
         Build lexicographic cursor conditions for multiple ordering fields.
         Generic implementation that works with any model.
         """
         if not order_clauses:
             # Handle empty order_clauses case - compare by ID only
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
             if pagination_order == ConnectionPaginationOrder.FORWARD:
                 return [id_column > cursor_uuid]
-            else:
-                return [id_column < cursor_uuid]
+            return [id_column < cursor_uuid]
 
         conditions = []
 
         # Cache subqueries to avoid duplication
         subquery_cache = {}
 
-        def get_cursor_value_subquery(column):
+        def get_cursor_value_subquery(column: sa.Column[Any]) -> sa.ScalarSelect[Any]:
             """Get or create cached subquery for cursor value"""
             if column not in subquery_cache:
-                id_column = getattr(self.model_class, "id")
+                id_column = self.model_class.id
                 subquery_cache[column] = (
                     sa.select(column).where(id_column == cursor_uuid).scalar_subquery()
                 )
@@ -161,7 +161,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
                 condition_parts.append(inequality_cond)
             else:
                 # Final condition: all fields equal, compare by ID
-                id_column = getattr(self.model_class, "id")
+                id_column = self.model_class.id
                 if pagination_order == ConnectionPaginationOrder.FORWARD:
                     id_inequality_cond = id_column > cursor_uuid
                 else:  # BACKWARD
@@ -181,9 +181,9 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
     def build_pagination_queries(
         self,
         pagination: PaginationOptions,
-        ordering: Optional[TOrdering] = None,
-        filters: Optional[TFilters] = None,
-        select_options: Optional[list] = None,
+        ordering: TOrdering | None = None,
+        filters: TFilters | None = None,
+        select_options: list[Any] | None = None,
     ) -> PaginationQueryResult:
         """
         Returns:
@@ -217,7 +217,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
                 stmt, _ = self.ordering_applier.apply_ordering(stmt, ordering)
 
             # Default order by id for consistent pagination
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
             stmt = stmt.order_by(id_column.asc())
 
             # Apply pagination
@@ -242,7 +242,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
             page_size = connection_args.requested_page_size
 
             # Apply ordering for cursor-based pagination
-            order_clauses: list[tuple[sa.Column, bool]] = []
+            order_clauses: list[tuple[sa.Column[Any], bool]] = []
             if ordering is not None:
                 stmt, order_clauses = self.ordering_applier.apply_ordering(stmt, ordering)
 
@@ -266,7 +266,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
 
             # Apply ordering based on pagination direction
             final_order_clauses = []
-            id_column = getattr(self.model_class, "id")
+            id_column = self.model_class.id
 
             if pagination_order == ConnectionPaginationOrder.BACKWARD:
                 # Reverse ordering for backward pagination
@@ -292,7 +292,7 @@ class GenericQueryBuilder(Generic[TModel, TData, TFilters, TOrdering]):
         return PaginationQueryResult(data_query=stmt, pagination_order=pagination_order)
 
     def convert_rows_to_data(
-        self, rows: list[TModel], pagination_order: Optional[ConnectionPaginationOrder] = None
+        self, rows: list[TModel], pagination_order: ConnectionPaginationOrder | None = None
     ) -> list[TData]:
         """
         Convert model instances to data objects.
@@ -309,22 +309,24 @@ T = TypeVar("T", bound="BaseFilterOptions")
 class BaseFilterOptions(Protocol):
     """Protocol for filter options that support logical operations"""
 
-    AND: Optional[list[Any]]
-    OR: Optional[list[Any]]
-    NOT: Optional[list[Any]]
+    AND: list[Any] | None
+    OR: list[Any] | None
+    NOT: list[Any] | None
 
 
-class BaseFilterApplier(ABC, Generic[T]):
+class BaseFilterApplier[T: "BaseFilterOptions"](ABC):
     """Base class for applying filters to queries with common logical operations"""
 
-    def apply_filters(self, stmt: Select, filters: T) -> Select:
+    def apply_filters(self, stmt: Select[Any], filters: T) -> Select[Any]:
         """Apply filters to the query statement"""
         condition, stmt = self._build_filter_condition(stmt, filters)
         if condition is not None:
             stmt = stmt.where(condition)
         return stmt
 
-    def _build_filter_condition(self, stmt: Select, filters: T) -> tuple[Optional[Any], Select]:
+    def _build_filter_condition(
+        self, stmt: Select[Any], filters: T
+    ) -> tuple[Any | None, Select[Any]]:
         """Build a filter condition from FilterOptions, handling logical operations"""
         conditions = []
 
@@ -397,7 +399,7 @@ class BaseFilterApplier(ABC, Generic[T]):
         return final_condition, stmt
 
     @abstractmethod
-    def apply_entity_filters(self, stmt: Select, filters: T) -> tuple[list[Any], Select]:
+    def apply_entity_filters(self, stmt: Select[Any], filters: T) -> tuple[list[Any], Select[Any]]:
         """Apply entity-specific filters and return list of conditions and updated statement
 
         Args:
@@ -419,12 +421,12 @@ class BaseOrderingOptions(Protocol):
     order_by: list[tuple[Any, bool]]
 
 
-class BaseOrderingApplier(ABC, Generic[TOrderingOptions]):
+class BaseOrderingApplier[TOrderingOptions: "BaseOrderingOptions"](ABC):
     """Base class for applying ordering to queries"""
 
     def apply_ordering(
-        self, stmt: Select, ordering: TOrderingOptions
-    ) -> tuple[Select, list[tuple[sa.Column, bool]]]:
+        self, stmt: Select[Any], ordering: TOrderingOptions
+    ) -> tuple[Select[Any], list[tuple[sa.Column[Any], bool]]]:
         """Apply ordering to the query statement and return order clauses for cursor pagination"""
         order_clauses = []
         sql_order_clauses = []
@@ -444,6 +446,6 @@ class BaseOrderingApplier(ABC, Generic[TOrderingOptions]):
         return stmt, order_clauses
 
     @abstractmethod
-    def get_order_column(self, field: Any) -> sa.Column:
+    def get_order_column(self, field: Any) -> sa.Column[Any]:
         """Get the SQLAlchemy column for the given field"""
         ...

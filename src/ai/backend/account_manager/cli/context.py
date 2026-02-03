@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import click
 
+from ai.backend.account_manager.config import ServerConfig
+from ai.backend.account_manager.config import load as load_config
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
-
-from ..config import ServerConfig
-from ..config import load as load_config
 
 
 class CLIContext:
@@ -35,7 +34,7 @@ class CLIContext:
             self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()

@@ -251,10 +251,10 @@ class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountRe
         )
         short_image_ref = spec.image_ref.short
         async with closing_async(Docker()) as docker:
-            avail_volumes = (await docker.volumes.list())["Volumes"]
+            avail_volumes = (await docker.volumes.list())["Volumes"]  # type: ignore[no-untyped-call]
             if not avail_volumes:
                 return []
-            avail_volume_names = set(v["Name"] for v in avail_volumes)
+            avail_volume_names = {v["Name"] for v in avail_volumes}
 
             # deeplearning specialization
             # TODO: extract as config

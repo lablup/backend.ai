@@ -1,8 +1,9 @@
 import asyncio
+from pathlib import Path
 from subprocess import CalledProcessError
 
 
-async def create_scratch_filesystem(scratch_dir, size):
+async def create_scratch_filesystem(scratch_dir: Path, size: int) -> None:
     """
     Create scratch folder size quota by using tmpfs filesystem.
 
@@ -12,7 +13,7 @@ async def create_scratch_filesystem(scratch_dir, size):
                  Size parameter is must be MiB(mebibyte).
     """
 
-    proc = await asyncio.create_subprocess_exec(*[
+    cmd = [
         "mount",
         "-t",
         "tmpfs",
@@ -20,24 +21,30 @@ async def create_scratch_filesystem(scratch_dir, size):
         f"size={size}M",
         "tmpfs",
         f"{scratch_dir}",
-    ])
+    ]
+    proc = await asyncio.create_subprocess_exec(*cmd)
     exit_code = await proc.wait()
 
     if exit_code < 0:
-        raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
+        if proc.returncode is None:
+            raise RuntimeError("Process returncode is None")
+        raise CalledProcessError(proc.returncode, cmd)
 
 
-async def destroy_scratch_filesystem(scratch_dir):
+async def destroy_scratch_filesystem(scratch_dir: Path) -> None:
     """
     Destroy scratch folder size quota by using tmpfs filesystem.
 
     :param scratch_dir: The path of scratch directory.
     """
-    proc = await asyncio.create_subprocess_exec(*[
+    cmd = [
         "umount",
         f"{scratch_dir}",
-    ])
+    ]
+    proc = await asyncio.create_subprocess_exec(*cmd)
     exit_code = await proc.wait()
 
     if exit_code < 0:
-        raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
+        if proc.returncode is None:
+            raise RuntimeError("Process returncode is None")
+        raise CalledProcessError(proc.returncode, cmd)

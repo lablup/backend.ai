@@ -12,11 +12,11 @@ from .sha import SHA3_256Hasher, SHA256Hasher
 from .types import HashInfo
 
 __all__ = [
-    "PasswordHasher",
     "BcryptHasher",
-    "SHA256Hasher",
-    "SHA3_256Hasher",
-    "PBKDF2_SHA256Hasher",
-    "PasswordHasherFactory",
     "HashInfo",
+    "PBKDF2_SHA256Hasher",
+    "PasswordHasher",
+    "PasswordHasherFactory",
+    "SHA3_256Hasher",
+    "SHA256Hasher",
 ]

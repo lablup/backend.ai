@@ -1,24 +1,26 @@
 from __future__ import annotations
 
+import builtins
 import sys
 import uuid
-from typing import Any, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_fail
+from ai.backend.client.cli.session.lifecycle import session as user_session
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import session_fields, session_fields_v5
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_fail
-from ..session.lifecycle import session as user_session
-from ..types import CLIContext
 from . import admin
 
-SessionItem = Dict[str, Any]
+SessionItem = dict[str, Any]
 
 
 @admin.group()
@@ -28,7 +30,7 @@ def session() -> None:
     """
 
 
-def _list_cmd(name: str = "list", docs: Optional[str] = None):
+def _list_cmd(name: str = "list", docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.option(
         "-s",
@@ -109,7 +111,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
         """
         List and manage compute sessions.
         """
-        fields: List[FieldSpec] = []
+        fields: builtins.list[FieldSpec] = []
         with Session() as api_sess:
             is_admin = api_sess.KeyPair(api_sess.config.access_key).info()["is_admin"]
             api_version = api_sess.api_version
@@ -233,7 +235,7 @@ user_session.command()(_list_cmd(docs='Alias of "admin session list"'))
 session.command()(_list_cmd())
 
 
-def _info_cmd(docs: Optional[str] = None):
+def _info_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.argument("session_id", metavar="SESSID")
     def info(ctx: CLIContext, session_id: str) -> None:

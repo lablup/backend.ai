@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.data.app_config.types import (
-    AppConfigCreator,
     AppConfigData,
-    AppConfigModifier,
     MergedAppConfig,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class AppConfigDBSource:
@@ -33,7 +34,7 @@ class AppConfigDBSource:
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-    ) -> Optional[AppConfigData]:
+    ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
         async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
@@ -105,27 +106,24 @@ class AppConfigDBSource:
                 merged_config=merged_config,
             )
 
-    async def create_config(self, creator: AppConfigCreator) -> AppConfigData:
+    async def create_config(self, creator: Creator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         async with self._db.begin_session() as db_sess:
-            config_row = AppConfigRow(**creator.fields_to_store())
-            db_sess.add(config_row)
-            await db_sess.flush()
-            await db_sess.refresh(config_row)
-            return config_row.to_data()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
 
     async def upsert_config(
         self,
         scope_type: AppConfigScopeType,
         scope_id: str,
-        modifier: AppConfigModifier,
+        spec: AppConfigUpdaterSpec,
     ) -> AppConfigData:
         """
         Create or update app configuration.
         If exists, update; otherwise, create new.
         """
         async with self._db.begin_session() as db_sess:
-            fields_to_update = modifier.fields_to_update()
+            fields_to_update = spec.build_values()
             if not fields_to_update:
                 # No fields to update, just fetch existing
                 result = await db_sess.execute(
@@ -163,7 +161,7 @@ class AppConfigDBSource:
                 .values(**fields_to_update)
             )
 
-            if result.rowcount > 0:
+            if cast(CursorResult[Any], result).rowcount > 0:
                 # Fetch updated row
                 fetch_result = await db_sess.execute(
                     sa.select(AppConfigRow).where(
@@ -176,7 +174,7 @@ class AppConfigDBSource:
                 row = fetch_result.scalar_one()
                 return row.to_data()
 
-            # If not exists, create new with the modifier's values
+            # If not exists, create new with the spec's values
             extra_config = fields_to_update.get("extra_config", {})
             config_row = AppConfigRow(
                 scope_type=scope_type,
@@ -203,4 +201,4 @@ class AppConfigDBSource:
                     )
                 )
             )
-            return result.rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0

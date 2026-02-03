@@ -5,11 +5,11 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -34,7 +34,9 @@ shutdown_enabled = False
 
 
 @web.middleware
-async def auth_middleware(request, handler):
+async def auth_middleware(
+    request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+) -> web.StreamResponse:
     token = request.headers.get("X-BackendAI-Watcher-Token", None)
     if token == request.app["token"]:
         try:
@@ -131,7 +133,7 @@ async def handle_fstab_detail(request: web.Request) -> web.Response:
     log.info("HANDLE_FSTAB_DETAIL")
     params = request.query
     fstab_path = params.get("fstab_path", "/etc/fstab")
-    async with aiofiles.open(fstab_path, mode="r") as fp:
+    async with aiofiles.open(fstab_path) as fp:
         content = await fp.read()
         return web.Response(text=content)
 
@@ -185,7 +187,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.add(
                 params["fs_location"], str(mountpoint), params["fs_type"], params["options"]
@@ -230,13 +232,13 @@ async def handle_umount(request: web.Request) -> web.Response:
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return web.Response(text=out)
 
 
-async def init_app(app):
+async def init_app(app: web.Application) -> None:
     r = app.router.add_route
     r("GET", "/", handle_status)
     if app["config"]["watcher"]["soft-reset-available"]:
@@ -252,18 +254,18 @@ async def init_app(app):
     r("DELETE", "/mounts", handle_umount)
 
 
-async def shutdown_app(app):
+async def shutdown_app(app: web.Application) -> None:
     pass
 
 
-async def prepare_hook(request, response):
+async def prepare_hook(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 
 @aiotools.server_context
 async def watcher_server(
-    loop: asyncio.AbstractEventLoop,
-    pidx: int,
+    _loop: asyncio.AbstractEventLoop,
+    _pidx: int,
     args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     global shutdown_enabled
@@ -291,52 +293,52 @@ async def watcher_server(
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }
-        etcd = AsyncEtcd(
+        async with AsyncEtcd(
             app["config"]["etcd"]["addr"],
             app["config"]["etcd"]["namespace"],
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,
-        )
-        app["config_server"] = etcd
+        ) as etcd:
+            app["config_server"] = etcd
 
-        token = await etcd.get("config/watcher/token")
-        if token is None:
-            token = "insecure"
-        log.debug("watcher authentication token: {}", token)
-        app["token"] = token
+            token = await etcd.get("config/watcher/token")
+            if token is None:
+                token = "insecure"
+            log.debug("watcher authentication token: {}", token)
+            app["token"] = token
 
-        app.middlewares.append(auth_middleware)
-        app.on_shutdown.append(shutdown_app)
-        app.on_startup.append(init_app)
-        app.on_response_prepare.append(prepare_hook)
-        ssl_ctx = None
-        if app["config"]["watcher"]["ssl-enabled"]:
-            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_ctx.load_cert_chain(
-                str(app["config"]["watcher"]["ssl-cert"]),
-                str(app["config"]["watcher"]["ssl-privkey"]),
+            app.middlewares.append(auth_middleware)
+            app.on_shutdown.append(shutdown_app)
+            app.on_startup.append(init_app)
+            app.on_response_prepare.append(prepare_hook)
+            ssl_ctx = None
+            if app["config"]["watcher"]["ssl-enabled"]:
+                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_ctx.load_cert_chain(
+                    str(app["config"]["watcher"]["ssl-cert"]),
+                    str(app["config"]["watcher"]["ssl-privkey"]),
+                )
+            runner = web.AppRunner(app)
+            await runner.setup()
+            watcher_addr = app["config"]["watcher"]["service-addr"]
+            site = web.TCPSite(
+                runner,
+                str(watcher_addr.host),
+                watcher_addr.port,
+                backlog=5,
+                reuse_port=True,
+                ssl_context=ssl_ctx,
             )
-        runner = web.AppRunner(app)
-        await runner.setup()
-        watcher_addr = app["config"]["watcher"]["service-addr"]
-        site = web.TCPSite(
-            runner,
-            str(watcher_addr.host),
-            watcher_addr.port,
-            backlog=5,
-            reuse_port=True,
-            ssl_context=ssl_ctx,
-        )
-        await site.start()
-        log.info("started at {}", watcher_addr)
-        try:
-            stop_sig = yield
-        finally:
-            log.info("shutting down...")
-            if stop_sig == signal.SIGALRM and shutdown_enabled:
-                log.warning("shutting down the agent node!")
-                subprocess.run(["shutdown", "-h", "now"])
-            await runner.cleanup()
+            await site.start()
+            log.info("started at {}", watcher_addr)
+            try:
+                stop_sig = yield
+            finally:
+                log.info("shutting down...")
+                if stop_sig == signal.SIGALRM and shutdown_enabled:
+                    log.warning("shutting down the agent node!")
+                    await asyncio.to_thread(subprocess.run, ["shutdown", "-h", "now"])
+                await runner.cleanup()
 
 
 @click.command()
@@ -361,7 +363,7 @@ async def watcher_server(
 )
 @click.pass_context
 def main(
-    ctx: click.Context,
+    _ctx: click.Context,
     config_path: str,
     log_level: LogLevel,
     debug: bool,
@@ -415,7 +417,7 @@ def main(
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
 
     # Change the filename from the logging config's file section.
     log_sockpath = Path(f"/tmp/backend.ai/ipc/watcher-logger-{os.getpid()}.sock")

@@ -1,9 +1,11 @@
-from typing import Sequence
+from collections.abc import Sequence
+from typing import cast
 
-from ..output.fields import permission_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import permission_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Permission",)
@@ -30,4 +32,4 @@ class Permission(BaseFunction):
         """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
-        return data["vfolder_host_permissions"]
+        return cast(Sequence[str], data["vfolder_host_permissions"])

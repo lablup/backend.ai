@@ -15,6 +15,10 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
     GetArtifactRegistryMetasAction,
     GetArtifactRegistryMetasActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.common.search import (
+    SearchArtifactRegistriesAction,
+    SearchArtifactRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -34,6 +38,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
+    SearchHuggingFaceRegistriesAction,
+    SearchHuggingFaceRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
@@ -59,12 +67,16 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
+    SearchReservoirRegistriesAction,
+    SearchReservoirRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
     UpdateReservoirRegistryAction,
     UpdateReservoirRegistryActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryService:
@@ -88,7 +100,7 @@ class ArtifactRegistryService:
         """
         Create a new huggingface registry.
         """
-        log.info("Creating huggingface registry with data: {}", action.creator.fields_to_store())
+        log.info("Creating huggingface registry with data: {}", action.creator)
         registry_data = await self._huggingface_registry_repository.create(
             action.creator, action.meta
         )
@@ -100,9 +112,9 @@ class ArtifactRegistryService:
         """
         Update an existing huggingface registry.
         """
-        log.info("Updating huggingface registry with data: {}", action.modifier.fields_to_update())
+        log.info("Updating huggingface registry with id: {}", action.updater.pk_value)
         registry_data = await self._huggingface_registry_repository.update(
-            action.id, action.modifier, action.meta
+            action.updater, action.meta
         )
         return UpdateHuggingFaceRegistryActionResult(result=registry_data)
 
@@ -141,7 +153,7 @@ class ArtifactRegistryService:
         return GetHuggingFaceRegistriesActionResult(result=registry_data_list)
 
     async def list_huggingface_registry(
-        self, action: ListHuggingFaceRegistryAction
+        self, _action: ListHuggingFaceRegistryAction
     ) -> ListHuggingFaceRegistryActionResult:
         """
         List all huggingface registries.
@@ -150,13 +162,28 @@ class ArtifactRegistryService:
         registry_data_list = await self._huggingface_registry_repository.list_registries()
         return ListHuggingFaceRegistryActionResult(data=registry_data_list)
 
+    async def search_huggingface_registries(
+        self, action: SearchHuggingFaceRegistriesAction
+    ) -> SearchHuggingFaceRegistriesActionResult:
+        """Searches HuggingFace registries."""
+        result = await self._huggingface_registry_repository.search_registries(
+            querier=action.querier,
+        )
+
+        return SearchHuggingFaceRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def create_reservoir_registry(
         self, action: CreateReservoirRegistryAction
     ) -> CreateReservoirActionResult:
         """
         Create a new reservoir.
         """
-        log.info("Creating reservoir with data: {}", action.creator.fields_to_store())
+        log.info("Creating reservoir with data: {}", action.creator)
         reservoir_data = await self._reservoir_repository.create(action.creator, action.meta)
         return CreateReservoirActionResult(result=reservoir_data)
 
@@ -166,10 +193,8 @@ class ArtifactRegistryService:
         """
         Update an existing reservoir.
         """
-        log.info("Updating reservoir with data: {}", action.modifier.fields_to_update())
-        reservoir_data = await self._reservoir_repository.update(
-            action.id, action.modifier, action.meta
-        )
+        log.info("Updating reservoir with id: {}", action.updater.pk_value)
+        reservoir_data = await self._reservoir_repository.update(action.updater, action.meta)
         return UpdateReservoirRegistryActionResult(result=reservoir_data)
 
     async def delete_reservoir_registry(
@@ -207,7 +232,7 @@ class ArtifactRegistryService:
         return GetReservoirRegistriesActionResult(result=reservoir_data_list)
 
     async def list_reservoir_registries(
-        self, action: ListReservoirRegistriesAction
+        self, _action: ListReservoirRegistriesAction
     ) -> ListReservoirRegistriesActionResult:
         """
         List all reservoirs.
@@ -215,6 +240,20 @@ class ArtifactRegistryService:
         log.info("Listing reservoirs")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
+
+    async def search_reservoir_registries(
+        self, action: SearchReservoirRegistriesAction
+    ) -> SearchReservoirRegistriesActionResult:
+        """Searches Reservoir registries."""
+        result = await self._reservoir_repository.search_registries(
+            querier=action.querier,
+        )
+        return SearchReservoirRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def get_registry_meta(
         self, action: GetArtifactRegistryMetaAction
@@ -242,3 +281,18 @@ class ArtifactRegistryService:
             action.registry_ids
         )
         return GetArtifactRegistryMetasActionResult(result=registry_metas)
+
+    async def search_artifact_registries(
+        self, action: SearchArtifactRegistriesAction
+    ) -> SearchArtifactRegistriesActionResult:
+        """Searches artifact registries."""
+        result = await self._artifact_registry_repository.search_artifact_registries(
+            querier=action.querier,
+        )
+
+        return SearchArtifactRegistriesActionResult(
+            registries=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

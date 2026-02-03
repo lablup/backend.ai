@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
 
 import aiohttp_cors
 from aiohttp import web
@@ -11,12 +11,11 @@ from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebM
 from ai.backend.appproxy.common.utils import pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import InvalidSessionParameterError
+from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Token
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TokenResponseModel(BaseModel):
@@ -60,11 +59,11 @@ async def conf_v2(
         return PydanticResponse(TokenResponseModel(token=str(token_id)))
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

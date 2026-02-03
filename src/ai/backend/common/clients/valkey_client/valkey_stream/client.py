@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Self, cast
+from typing import Any, Self, cast
 
 from glide import (
     Batch,
@@ -12,7 +12,7 @@ from glide import (
     StreamReadGroupOptions,
     TrimByMaxLen,
 )
-from glide.exceptions import TimeoutError as GlideTimeoutError
+from glide.exceptions import TimeoutError as GlideTimeoutError  # type: ignore[import-not-found]
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -91,7 +91,7 @@ class ValkeyStreamClient:
         *,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> Self:
         """
         Create a ValkeyStreamClient instance.
@@ -156,7 +156,7 @@ class ValkeyStreamClient:
         consumer_name: str,
         count: int = 1,
         block_ms: int = 0,
-    ) -> Optional[list[StreamMessage]]:
+    ) -> list[StreamMessage] | None:
         """
         Read messages from a consumer group.
 
@@ -181,8 +181,6 @@ class ValkeyStreamClient:
             return None
         messages: list[StreamMessage] = []
         for _, payload in result.items():
-            if payload is None:
-                continue
             for msg_id, msg_data in payload.items():
                 if msg_data is None:
                     continue
@@ -266,7 +264,7 @@ class ValkeyStreamClient:
         start_id: str,
         min_idle_timeout: int,
         count: int = _DEFAULT_AUTOCLAIM_COUNT,
-    ) -> Optional[AutoClaimMessage]:
+    ) -> AutoClaimMessage | None:
         """
         Auto claim messages from a stream for a consumer group.
 
@@ -321,7 +319,7 @@ class ValkeyStreamClient:
         channel: str,
         cache_id: str,
         payload: Mapping[str, str],
-        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+        expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Broadcast a message to a channel with caching.
@@ -329,12 +327,12 @@ class ValkeyStreamClient:
         :param channel: The channel to broadcast the message to.
         :param cache_id: The ID for caching the message.
         :param payload: The payload of the message.
-        :param timeout: The expiration time for the cached message in seconds.
+        :param expiry_seconds: The expiration time for the cached message in seconds.
         :raises: GlideClientError if the message cannot be broadcasted or cached.
         """
         message = dump_json(payload)
         tx = self._create_batch()
-        tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+        tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, expiry_seconds))
         tx.publish(
             message=message,
             channel=channel,
@@ -345,7 +343,7 @@ class ValkeyStreamClient:
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> Mapping[str, str] | None:
         """
         Fetch a cached broadcast message by its ID.
 
@@ -363,14 +361,14 @@ class ValkeyStreamClient:
         self,
         channel: str,
         events: list[BroadcastPayload],
-        timeout: int = _DEFAULT_CACHE_EXPIRATION,
+        expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Broadcast multiple messages to a channel in a batch with optional caching.
 
         :param channel: The channel to broadcast the messages to.
         :param events: List of BroadcastPayload objects containing payload and optional cache_id.
-        :param timeout: The expiration time for the cached messages in seconds.
+        :param expiry_seconds: The expiration time for the cached messages in seconds.
         :raises: GlideClientError if the messages cannot be broadcasted or cached.
         """
         if not events:
@@ -381,7 +379,11 @@ class ValkeyStreamClient:
             message = dump_json(event.payload)
             # Only set cache if cache_id is provided
             if event.cache_id:
-                tx.set(key=event.cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
+                tx.set(
+                    key=event.cache_id,
+                    value=message,
+                    expiry=ExpirySet(ExpiryType.SEC, expiry_seconds),
+                )
             tx.publish(
                 message=message,
                 channel=channel,
@@ -399,7 +401,7 @@ class ValkeyStreamClient:
         :return: The payload of the received message.
         """
         message = await self._client.client.get_pubsub_message()
-        return load_json(message.message)
+        return cast(Mapping[str, str], load_json(message.message))
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """

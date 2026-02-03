@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import enum
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple
+from uuid import UUID
 
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
 
@@ -14,6 +16,11 @@ if TYPE_CHECKING:
 class ImageStatus(enum.StrEnum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
+
+
+class ImageOrderField(enum.StrEnum):
+    NAME = "NAME"
+    CREATED_AT = "CREATED_AT"
 
 
 class ImageType(CIStrEnum):
@@ -38,32 +45,13 @@ class ImageLabelsData:
 
 @dataclass
 class ImageResourcesData:
-    resources_data: "Resources"
+    resources_data: Resources
 
 
 @dataclass
-class ImageData:
-    id: ImageID = field(compare=False)
-    name: ImageCanonical
-    project: Optional[str]
-    image: str
-    created_at: Optional[datetime] = field(compare=False)
-    tag: Optional[str]
-    registry: str
-    registry_id: uuid.UUID
-    architecture: str
-    config_digest: str
-    size_bytes: int
-    is_local: bool
-    type: ImageType
-    accelerators: Optional[str]
-    labels: ImageLabelsData
-    resources: ImageResourcesData
-    status: ImageStatus
+class ImageTagEntry:
+    """A single parsed tag component from the image reference."""
 
-
-@dataclass
-class KVPair:
     key: str
     value: str
 
@@ -76,6 +64,44 @@ class ResourceLimit:
 
 
 @dataclass
+class ImageData:
+    id: ImageID = field(compare=False)
+    name: ImageCanonical
+    project: str | None
+    image: str
+    created_at: datetime | None = field(compare=False)
+    tag: str | None
+    registry: str
+    registry_id: UUID
+    architecture: str
+    config_digest: str
+    size_bytes: int
+    is_local: bool
+    type: ImageType
+    accelerators: str | None
+    labels: ImageLabelsData
+    resources: ImageResourcesData
+    resource_limits: list[ResourceLimit]
+    tags: list[ImageTagEntry]
+    status: ImageStatus
+
+
+@dataclass
+class KVPair:
+    key: str
+    value: str
+
+
+@dataclass
+class ResourceLimitInput:
+    """Input for setting a resource limit with optional min/max values."""
+
+    slot_name: str
+    min_value: Decimal | None
+    max_value: Decimal | None
+
+
+@dataclass
 class ImageDataWithDetails:
     id: ImageID = field(compare=False)
     name: ImageCanonical
@@ -83,23 +109,24 @@ class ImageDataWithDetails:
     base_image_name: str
     project: str
     humanized_name: str
-    tag: Optional[str]
+    tag: str | None
     tags: list[KVPair]
-    version: Optional[str]
+    version: str | None
     registry: str
-    registry_id: uuid.UUID
+    registry_id: UUID
     type: ImageType
     architecture: str
     is_local: bool
     status: ImageStatus
     resource_limits: list[ResourceLimit]
     supported_accelerators: list[str] = field(default_factory=list)
-    digest: Optional[str] = field(default=None)
+    digest: str | None = field(default=None)
     labels: list[KVPair] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
+    created_at: datetime | None = field(default=None)
     # legacy
-    hash: Optional[str] = field(default=None)
+    hash: str | None = field(default=None)
 
 
 @dataclass
@@ -130,5 +157,15 @@ class RescanImagesResult:
 
 @dataclass
 class ImageAliasData:
-    id: uuid.UUID = field(compare=False)
+    id: UUID = field(compare=False)
     alias: str
+
+
+@dataclass
+class ImageListResult:
+    """Search result with total count and pagination info for images."""
+
+    items: list[ImageData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

@@ -1,8 +1,9 @@
 """Health monitoring API endpoints"""
 
 import logging
-from datetime import datetime
-from typing import Iterable, Literal
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 import aiohttp_cors
@@ -17,16 +18,16 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import pydantic_api_response_handler
+from ai.backend.appproxy.coordinator import __version__
+from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
-from .. import __version__
-from ..models import Circuit, Endpoint, Worker
-from ..types import RootContext
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RouteHealthStatusModel(BaseModel):
@@ -34,14 +35,14 @@ class RouteHealthStatusModel(BaseModel):
 
     route_id: UUID
     session_id: UUID
-    kernel_host: str
+    kernel_host: str | None
     kernel_port: int
     protocol: str
     health_status: ModelServiceStatus | None
     last_health_check: float | None
     consecutive_failures: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None
+    updated_at: datetime | None
 
 
 class EndpointHealthStatusModel(BaseModel):
@@ -242,16 +243,16 @@ async def get_circuit_health(
     circuit_id_str = request.match_info["circuit_id"]
     try:
         circuit_id = UUID(circuit_id_str)
-    except ValueError:
-        raise web.HTTPBadRequest(reason="Invalid circuit ID format")
+    except ValueError as e:
+        raise web.HTTPBadRequest(reason="Invalid circuit ID format") from e
 
     root_ctx: RootContext = request.app["ctx"]
 
     async with root_ctx.db.begin_readonly_session() as sess:
         try:
             circuit = await Circuit.get(sess, circuit_id)
-        except Exception:
-            raise web.HTTPNotFound(reason="Circuit not found")
+        except Exception as e:
+            raise web.HTTPNotFound(reason="Circuit not found") from e
 
         if not circuit.endpoint_id:
             # Circuit without endpoint health checking
@@ -335,17 +336,17 @@ async def status(request: web.Request) -> PydanticResponse[StatusResponseModel]:
                     ha_setup=w.nodes > 1,
                 )
                 for w in workers
-                if (w.updated_at.timestamp() - datetime.now().timestamp()) <= 30
+                if w.updated_at and (w.updated_at.timestamp() - datetime.now(UTC).timestamp()) <= 30
             ],
         )
     )
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

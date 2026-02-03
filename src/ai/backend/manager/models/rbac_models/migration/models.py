@@ -15,7 +15,7 @@ mapper_registry = registry(metadata=metadata)
 
 
 def get_user_roles_table() -> sa.Table:
-    user_roles_table = sa.Table(
+    return sa.Table(
         "user_roles",
         mapper_registry.metadata,
         IDColumn(),
@@ -23,11 +23,10 @@ def get_user_roles_table() -> sa.Table:
         sa.Column("role_id", GUID, nullable=False),
         extend_existing=True,
     )
-    return user_roles_table
 
 
 def get_roles_table() -> sa.Table:
-    roles_table = sa.Table(
+    return sa.Table(
         "roles",
         mapper_registry.metadata,
         IDColumn(),
@@ -41,11 +40,10 @@ def get_roles_table() -> sa.Table:
         sa.Column("description", sa.Text, nullable=True),
         extend_existing=True,
     )
-    return roles_table
 
 
 def get_permission_groups_table() -> sa.Table:
-    permission_groups_table = sa.Table(
+    return sa.Table(
         "permission_groups",
         mapper_registry.metadata,
         IDColumn(),
@@ -54,11 +52,10 @@ def get_permission_groups_table() -> sa.Table:
         sa.Column("scope_id", sa.String(length=64), nullable=False),
         extend_existing=True,
     )
-    return permission_groups_table
 
 
 def get_permissions_table() -> sa.Table:
-    permissions_table = sa.Table(
+    return sa.Table(
         "permissions",
         mapper_registry.metadata,
         IDColumn(),
@@ -67,11 +64,10 @@ def get_permissions_table() -> sa.Table:
         sa.Column("operation", sa.String(32), nullable=False),
         extend_existing=True,
     )
-    return permissions_table
 
 
 def get_object_permissions_table() -> sa.Table:
-    object_permissions_table = sa.Table(
+    return sa.Table(
         "object_permissions",
         mapper_registry.metadata,
         IDColumn(),
@@ -81,11 +77,10 @@ def get_object_permissions_table() -> sa.Table:
         sa.Column("operation", sa.String(32), nullable=False),
         extend_existing=True,
     )
-    return object_permissions_table
 
 
 def get_association_scopes_entities_table() -> sa.Table:
-    association_scopes_entities_table = sa.Table(
+    return sa.Table(
         "association_scopes_entities",
         mapper_registry.metadata,
         IDColumn(),
@@ -95,4 +90,3 @@ def get_association_scopes_entities_table() -> sa.Table:
         sa.Column("entity_id", sa.String(64), nullable=False),
         extend_existing=True,
     )
-    return association_scopes_entities_table

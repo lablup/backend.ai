@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import enum
 from collections import defaultdict
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING
 
 import attr
 import networkx as nx
@@ -28,12 +28,12 @@ class AffinityHint:
     as the allocation proceeds with the next resource slot.
     """
 
-    devices: Optional[Sequence[AbstractComputeDevice]]
+    devices: Sequence[AbstractComputeDevice] | None
     affinity_map: AffinityMap
     policy: AffinityPolicy
 
 
-class AffinityMap(nx.Graph):
+class AffinityMap(nx.Graph):  # type: ignore[misc]
     """
     Represents the NUMA distance matrix of all device pairs from all compute device plugins.
     """
@@ -86,7 +86,7 @@ class AffinityMap(nx.Graph):
             subgraph = nx.subgraph_view(
                 self,
                 filter_node=lambda u: u.device_name == device_name,
-                filter_edge=lambda u, v: self.edges[u, v]["weight"] == weight,
+                filter_edge=lambda u, v, w=weight: self.edges[u, v]["weight"] == w,
             )
             components: Iterable[set[AbstractComputeDevice]] = nx.connected_components(subgraph)
             for component in components:
@@ -129,7 +129,7 @@ class AffinityMap(nx.Graph):
             raise RuntimeError(
                 "This is a logic error trying to allocate the same resource slots twice in a single allocation run."
             )
-        src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
+        src_numa_nodes = {src_device.numa_node for src_device in src_devices}
         primary_sets = []
         secondary_set = set()
         for numa_node in src_numa_nodes:

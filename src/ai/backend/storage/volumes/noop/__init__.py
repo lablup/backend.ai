@@ -1,14 +1,13 @@
-from collections.abc import Sequence
-from datetime import datetime
+from collections.abc import AsyncIterator, Sequence
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, Optional, override
+from typing import Any, override
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-
-from ...types import (
+from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
     DirEntryType,
@@ -20,12 +19,17 @@ from ...types import (
     VFolderID,
     VolumeInfo,
 )
-from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.volumes.abc import (
+    _CURRENT_DIR,
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+    AbstractVolume,
+)
 
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
     yield DirEntry(
-        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(), datetime.now()), ""
+        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(UTC), datetime.now(UTC)), ""
     )
 
 
@@ -39,15 +43,15 @@ class NoopQuotaModel(AbstractQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         pass
 
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         pass
 
     async def update_quota_scope(
@@ -181,7 +185,7 @@ class NoopVolume(AbstractVolume):
     async def get_usage(
         self,
         vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
+        relpath: PurePosixPath = _CURRENT_DIR,
     ) -> TreeUsage:
         return TreeUsage(0, 0)
 

@@ -10,8 +10,7 @@ from .tasks.delete_files import FileDeleteTaskHandler
 
 if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventProducer
-
-    from ..volumes.pool import VolumePool
+    from ai.backend.storage.volumes.pool import VolumePool
 
 
 class BgtaskHandlerRegistryCreator:

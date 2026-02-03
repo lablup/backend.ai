@@ -75,6 +75,18 @@ class ScalingGroupNotFound(ObjectNotFound):
         )
 
 
+class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
+    error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
+    error_title = "Scaling group does not allow this session type."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."

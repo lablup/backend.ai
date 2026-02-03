@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import cast, override
+from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import (
@@ -18,6 +18,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.context_types import ArtifactVerifierContext
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactVerificationFailedError,
     ArtifactVerifyStorageTypeInvalid,
@@ -28,9 +29,9 @@ from ai.backend.storage.services.artifacts.storage_transfer import StorageTransf
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportStep,
-    ImportStepContext,
     VerifyStepResult,
 )
+from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -65,25 +66,31 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
     @override
     def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
-        verify_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        if not verify_storage_name:
+        verify_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.VERIFY
+        )
+        if not verify_storage_target:
             raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for VERIFY step cleanup"
             )
 
-        return context.storage_pool.get_storage(verify_storage_name)
+        return verify_storage_target.resolve_storage(context.storage_pool)
 
     @override
     async def execute(
         self, context: ImportStepContext, input_data: DownloadStepResult
     ) -> VerifyStepResult:
-        source_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
-        dst_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        if source_storage_name is None:
+        source_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.DOWNLOAD
+        )
+        dst_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.VERIFY
+        )
+        if source_storage_target is None:
             raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for DOWNLOAD step"
             )
-        if dst_storage_name is None:
+        if dst_storage_target is None:
             raise StorageStepRequiredStepNotProvided("No storage mapping provided for VERIFY step")
 
         revision = context.model.resolve_revision(self.registry_type)
@@ -100,16 +107,17 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         )
 
         await self._transfer_manager.transfer_directory(
-            source_storage_name=source_storage_name,
-            dest_storage_name=dst_storage_name,
+            source_storage=source_storage_target,
+            dest_storage=dst_storage_target,
             source_prefix=model_prefix,
             dest_prefix=model_prefix,
         )
 
-        dst_storage = context.storage_pool.get_storage(dst_storage_name)
-        if not isinstance(dst_storage, VFSStorage):
-            raise ArtifactVerifyStorageTypeInvalid("Verify step requires VFS storage type")
-        dst_storage = cast(VFSStorage, dst_storage)
+        dst_storage = dst_storage_target.resolve_storage(context.storage_pool)
+        if not isinstance(dst_storage, (VFSStorage, VFolderStorage)):
+            raise ArtifactVerifyStorageTypeInvalid(
+                "Verify step requires VFS or VFolderStorage storage type"
+            )
 
         # Collect verification results from all verifiers
         verifier_results: dict[str, VerifierResult] = {}
@@ -117,13 +125,13 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             dst_path = dst_storage.resolve_path(model_prefix)
-            verifier_start_time = datetime.now(timezone.utc)
+            verifier_start_time = datetime.now(UTC)
             log.info(
                 f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
             )
             try:
                 result = await verifier.verify(dst_path, context)
-                verifier_end_time = datetime.now(timezone.utc)
+                verifier_end_time = datetime.now(UTC)
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
 
                 # Create VerifierResult object
@@ -148,7 +156,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
             except Exception as e:
                 verification_success = False
-                verifier_end_time = datetime.now(timezone.utc)
+                verifier_end_time = datetime.now(UTC)
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
                 verifier_results[verifier_name] = VerifierResult(
                     success=False,
@@ -177,7 +185,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         return VerifyStepResult(
             verified_files=input_data.downloaded_files,
-            storage_name=dst_storage_name,
+            storage_name=dst_storage_target.name,
             total_bytes=input_data.total_bytes,
             verification_result=verification_result,
         )
@@ -201,13 +209,15 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
 
     @override
     def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
-        archive_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage_name:
+        archive_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.ARCHIVE
+        )
+        if not archive_storage_target:
             raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for ARCHIVE step cleanup"
             )
 
-        return context.storage_pool.get_storage(archive_storage_name)
+        return archive_storage_target.resolve_storage(context.storage_pool)
 
     @override
     async def execute(
@@ -215,33 +225,47 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
         context: ImportStepContext,
         input_data: VerifyStepResult,
     ) -> None:
-        download_storage = input_data.storage_name
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+        download_storage_name = input_data.storage_name
+        archive_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.ARCHIVE
+        )
 
-        if not archive_storage:
+        if not archive_storage_target:
             raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
+        archive_storage_name = archive_storage_target.name
+
         # No need to move if download and archive storage are the same
-        if download_storage == archive_storage:
+        if download_storage_name == archive_storage_name:
             log.info(
-                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
+                "Archive step skipped - download and archive storage are the same: {}",
+                archive_storage_name,
             )
             return
 
-        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
+        log.info("Starting archive transfer: {} -> {}", download_storage_name, archive_storage_name)
 
         # Transfer entire model directory at once
         revision = context.model.resolve_revision(self.registry_type)
         model_prefix = f"{context.model.model_id}/{revision}"
 
+        # Get source storage from VERIFY step mapping (where files are after verification)
+        verify_storage_target: StorageTarget | None = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.VERIFY
+        )
+        if not verify_storage_target:
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for VERIFY step")
+
         archived_file_cnt = await self._transfer_manager.transfer_directory(
-            source_storage_name=download_storage,
-            dest_storage_name=archive_storage,
+            source_storage=verify_storage_target,
+            dest_storage=archive_storage_target,
             source_prefix=model_prefix,
             dest_prefix=model_prefix,
         )
 
         log.info(
-            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={archived_file_cnt}"
+            "Archive transfer completed: {} -> {}, files={}",
+            download_storage_name,
+            archive_storage_name,
+            archived_file_cnt,
         )

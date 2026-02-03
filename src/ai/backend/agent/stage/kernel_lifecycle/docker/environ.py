@@ -1,8 +1,9 @@
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, Optional, Self, override
+from typing import Any, Final, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.agent.stage.kernel_lifecycle.defs import LIBBAIHOOK_MOUNT_PATH
 from ai.backend.common.docker import KernelFeatures, LabelName
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
@@ -16,8 +17,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     SlotName,
 )
-
-from ..defs import LIBBAIHOOK_MOUNT_PATH
 
 LD_PRELOAD: Final[str] = "LD_PRELOAD"
 LOCAL_USER_ID: Final[str] = "LOCAL_USER_ID"
@@ -39,8 +38,8 @@ class KernelInfo:
     kernel_creation_config: KernelCreationConfig
     kernel_features: frozenset[str]
     resource_spec: KernelResourceSpec
-    overriding_uid: Optional[int]
-    overriding_gid: Optional[int]
+    overriding_uid: int | None
+    overriding_gid: int | None
     supplementary_gids: set[int]
 
 
@@ -60,7 +59,7 @@ class EnvironResult:
 
 
 class Environ(dict[str, str]):
-    def set_value(self, key: str, value: Optional[Any]) -> Self:
+    def set_value(self, key: str, value: Any | None) -> Self:
         if value is None:
             return self
         self[key] = str(value)
@@ -126,14 +125,14 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         )
         return EnvironResult(environ=environ.to_dict())
 
-    def _get_local_uid(self, spec: EnvironSpec) -> Optional[int]:
+    def _get_local_uid(self, spec: EnvironSpec) -> int | None:
         if spec.kernel_info.overriding_uid is not None:
             return spec.kernel_info.overriding_uid
         if KernelFeatures.UID_MATCH in spec.kernel_info.kernel_features:
             return spec.agent_info.kernel_uid
         return None
 
-    def _get_local_gid(self, spec: EnvironSpec) -> Optional[int]:
+    def _get_local_gid(self, spec: EnvironSpec) -> int | None:
         if spec.kernel_info.overriding_gid is not None:
             return spec.kernel_info.overriding_gid
         if KernelFeatures.UID_MATCH in spec.kernel_info.kernel_features:

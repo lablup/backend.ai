@@ -1,6 +1,10 @@
-from typing import Any, Sequence
+from __future__ import annotations
 
-from ..request import Request
+from collections.abc import Sequence
+from typing import Any
+
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Resource",)
@@ -13,13 +17,15 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls):
+    async def list(cls) -> dict[str, Any]:
         """
         Lists all resource presets.
         """
         rqst = Request("GET", "/resource/presets")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
@@ -36,11 +42,13 @@ class Resource(BaseFunction):
             data["scaling_group"] = scaling_group
         rqst.set_json(data)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def get_docker_registries(cls):
+    async def get_docker_registries(cls) -> dict[str, Any]:
         """
         Lists all registered container registries.
 
@@ -51,17 +59,19 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_container_registries(cls):
+    async def get_container_registries(cls) -> dict[str, Any]:
         """
         Lists all registered container registries.
         """
         rqst = Request("GET", "/resource/container-registries")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def usage_per_month(cls, month: str, group_ids: Sequence[str]):
+    async def usage_per_month(cls, month: str, group_ids: Sequence[str]) -> dict[str, Any]:
         """
         Get usage statistics for groups specified by `group_ids` at specific `month`.
 
@@ -78,11 +88,15 @@ class Resource(BaseFunction):
         )
 
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def usage_per_period(cls, group_id: str | None, start_date: str, end_date: str):
+    async def usage_per_period(
+        cls, group_id: str | None, start_date: str, end_date: str
+    ) -> dict[str, Any]:
         """
         Get usage statistics for a group specified by `group_id` for time between
         `start_date` and `end_date`.
@@ -103,42 +117,54 @@ class Resource(BaseFunction):
             params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def get_resource_slots(cls):
+    async def get_resource_slots(cls) -> dict[str, Any]:
         """
         Get supported resource slots of Backend.AI server.
         """
         rqst = Request("GET", "/config/resource-slots")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def get_vfolder_types(cls):
+    async def get_vfolder_types(cls) -> dict[str, Any]:
         rqst = Request("GET", "/config/vfolder-types")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def recalculate_usage(cls):
+    async def recalculate_usage(cls) -> dict[str, Any]:
         rqst = Request("POST", "/resource/recalculate-usage")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def user_monthly_stats(cls):
+    async def user_monthly_stats(cls) -> dict[str, Any]:
         rqst = Request("GET", "/resource/stats/user/month")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def admin_monthly_stats(cls):
+    async def admin_monthly_stats(cls) -> dict[str, Any]:
         rqst = Request("GET", "/resource/stats/admin/month")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

@@ -3,7 +3,6 @@ Utility functions for agent selectors.
 """
 
 from decimal import Decimal
-from typing import Set
 
 from ai.backend.common.types import ResourceSlot
 
@@ -26,7 +25,7 @@ def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: Resour
         Number of unutilized capabilities (resource types with zero request but available on agent)
     """
     # Find slots that are requested as zero (not needed)
-    zero_requested_slots: Set[str] = set()
+    zero_requested_slots: set[str] = set()
     for slot_name, amount in requested_slots.items():
         if amount == Decimal(0):
             zero_requested_slots.add(slot_name)

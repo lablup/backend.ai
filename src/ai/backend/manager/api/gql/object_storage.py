@@ -2,32 +2,35 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Optional, Self
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.object_storage import ObjectStorageCreatorSpec
+from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdaterSpec
+from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
 )
+from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
+from ai.backend.manager.types import OptionalState
 
-from ...data.object_storage.creator import ObjectStorageCreator
-from ...data.object_storage.modifier import ObjectStorageModifier
-from ...data.object_storage.types import ObjectStorageData
-from ...services.object_storage.actions.create import CreateObjectStorageAction
-from ...services.object_storage.actions.delete import DeleteObjectStorageAction
-from ...services.object_storage.actions.get import GetObjectStorageAction
-from ...services.object_storage.actions.list import ListObjectStorageAction
-from ...services.object_storage.actions.update import UpdateObjectStorageAction
-from ...types import OptionalState
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
 
@@ -51,19 +54,19 @@ class ObjectStorage(Node):
             access_key=data.access_key,
             secret_key=data.secret_key,
             endpoint=data.endpoint,
-            region=data.region,
+            region=data.region or "",
         )
 
     @strawberry.field
     async def namespaces(
         self,
         info: Info[StrawberryGQLContext],
-        before: Optional[str],
-        after: Optional[str],
-        first: Optional[int],
-        last: Optional[int],
-        limit: Optional[int],
-        offset: Optional[int],
+        before: str | None,
+        after: str | None,
+        first: int | None,
+        last: int | None,
+        limit: int | None,
+        offset: int | None,
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
         action_result = (
@@ -73,10 +76,7 @@ class ObjectStorage(Node):
         )
 
         nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
-        edges = [
-            StorageNamespaceEdge(node=node, cursor=to_global_id(StorageNamespace, node.id))
-            for node in nodes
-        ]
+        edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
         return StorageNamespaceConnection(
             edges=edges,
@@ -99,8 +99,8 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")
-async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ObjectStorage]:
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
     processors = info.context.processors
     action_result = await processors.object_storage.get.wait_for_complete(
         GetObjectStorageAction(storage_id=uuid.UUID(id))
@@ -108,15 +108,15 @@ async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[O
     return ObjectStorage.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def object_storages(
     info: Info[StrawberryGQLContext],
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> ObjectStorageConnection:
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
@@ -126,9 +126,7 @@ async def object_storages(
     )
 
     nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
-    edges = [
-        ObjectStorageEdge(node=node, cursor=to_global_id(ObjectStorage, node.id)) for node in nodes
-    ]
+    edges = [ObjectStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ObjectStorageConnection(
         edges=edges,
@@ -150,29 +148,31 @@ class CreateObjectStorageInput:
     endpoint: str
     region: str
 
-    def to_creator(self) -> ObjectStorageCreator:
-        return ObjectStorageCreator(
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
+    def to_creator(self) -> Creator[ObjectStorageRow]:
+        return Creator(
+            spec=ObjectStorageCreatorSpec(
+                name=self.name,
+                host=self.host,
+                access_key=self.access_key,
+                secret_key=self.secret_key,
+                endpoint=self.endpoint,
+                region=self.region,
+            )
         )
 
 
 @strawberry.input(description="Added in 25.14.0")
 class UpdateObjectStorageInput:
     id: ID
-    name: Optional[str] = UNSET
-    host: Optional[str] = UNSET
-    access_key: Optional[str] = UNSET
-    secret_key: Optional[str] = UNSET
-    endpoint: Optional[str] = UNSET
-    region: Optional[str] = UNSET
+    name: str | None = UNSET
+    host: str | None = UNSET
+    access_key: str | None = UNSET
+    secret_key: str | None = UNSET
+    endpoint: str | None = UNSET
+    region: str | None = UNSET
 
-    def to_modifier(self) -> ObjectStorageModifier:
-        return ObjectStorageModifier(
+    def to_updater(self) -> Updater[ObjectStorageRow]:
+        spec = ObjectStorageUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
@@ -180,6 +180,7 @@ class UpdateObjectStorageInput:
             endpoint=OptionalState[str].from_graphql(self.endpoint),
             region=OptionalState[str].from_graphql(self.region),
         )
+        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -191,7 +192,7 @@ class DeleteObjectStorageInput:
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
     key: str
-    expiration: Optional[int] = None
+    expiration: int | None = None
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -226,7 +227,7 @@ class GetPresignedUploadURLPayload:
     fields: str  # JSON string containing the form fields
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
@@ -243,7 +244,7 @@ async def create_object_storage(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
@@ -251,8 +252,7 @@ async def update_object_storage(
 
     action_result = await processors.object_storage.update.wait_for_complete(
         UpdateObjectStorageAction(
-            id=uuid.UUID(input.id),
-            modifier=input.to_modifier(),
+            updater=input.to_updater(),
         )
     )
 
@@ -261,7 +261,7 @@ async def update_object_storage(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload:
@@ -276,7 +276,7 @@ async def delete_object_storage(
     return DeleteObjectStoragePayload(id=ID(str(action_result.deleted_storage_id)))
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
@@ -293,7 +293,7 @@ async def get_presigned_download_url(
     return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:

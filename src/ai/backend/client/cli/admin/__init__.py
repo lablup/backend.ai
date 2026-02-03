@@ -2,7 +2,7 @@ from ai.backend.cli.main import main
 
 
 @main.group()
-def admin():
+def admin() -> None:
     """
     Administrative command set
     """
@@ -13,10 +13,11 @@ from . import (  # noqa
     agent,
     domain,
     etcd,
+    export,
     group,
     image,
     keypair,
-    license,
+    license,  # noqa: A004
     manager,
     resource,
     resource_policy,

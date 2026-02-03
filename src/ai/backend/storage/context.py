@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping
+from collections.abc import AsyncIterator, Mapping, MutableMapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
-    AsyncIterator,
     Final,
-    Mapping,
 )
 
 import aiohttp_cors
@@ -41,10 +39,13 @@ from .volumes.cephfs import CephFSVolume
 from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
+from .volumes.hammerspace.volume.base import BaseHammerspaceVolume
+from .volumes.hammerspace.volume.extended import HammerspaceVolume
 from .volumes.netapp import NetAppVolume
 from .volumes.noop import NoopVolume
 from .volumes.pool import VolumePool
 from .volumes.purestorage import FlashBladeVolume
+from .volumes.stats import VolumeState, VolumeStatsObserver
 from .volumes.vast import VASTVolume
 from .volumes.vfs import BaseVolume
 from .volumes.weka import WekaVolume
@@ -70,6 +71,8 @@ DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
     NoopVolume.name: NoopVolume,
+    HammerspaceVolume.name: HammerspaceVolume,
+    BaseHammerspaceVolume.name: BaseHammerspaceVolume,
 }
 
 
@@ -104,6 +107,8 @@ class RootContext:
     manager_client_pool: ManagerHTTPClientPool
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     health_probe: HealthProbe
+    volume_stats_observer: VolumeStatsObserver
+    volume_stats_state: VolumeState
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
@@ -129,8 +134,8 @@ class RootContext:
         else:
             try:
                 volume_config = self.local_config.volume[name]
-            except KeyError:
-                raise InvalidVolumeError(name)
+            except KeyError as e:
+                raise InvalidVolumeError(name) from e
             volume_cls: type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),

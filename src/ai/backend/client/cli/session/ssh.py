@@ -4,12 +4,11 @@ import secrets
 import signal
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List
 
 from ai.backend.cli.types import ExitCode
-
-from ..pretty import print_fail, print_info
+from ai.backend.client.cli.pretty import print_fail, print_info
 
 CLI_EXECUTABLE: tuple[str, ...]
 if pex_path := os.environ.get("PEX", None):
@@ -38,7 +37,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
         print_fail(f"Failed to download the SSH key from the session (exit: {e.returncode}):")
         print(e.stdout.decode())
         sys.exit(ExitCode.FAILURE)
-    os.rename(key_filename, key_path)
+    Path(key_filename).rename(key_path)
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
@@ -46,9 +45,10 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    assert proxy_proc.stdout is not None
+    if proxy_proc.stdout is None:
+        raise RuntimeError("Failed to capture stdout from proxy process")
     try:
-        lines: List[bytes] = []
+        lines: list[bytes] = []
         while True:
             line = proxy_proc.stdout.readline(1024)
             if not line:
@@ -67,4 +67,4 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     finally:
         proxy_proc.send_signal(signal.SIGINT)
         proxy_proc.wait()
-        os.unlink(key_path)
+        Path(key_path).unlink()

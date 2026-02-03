@@ -4,14 +4,14 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
     DatabaseConfig,
     DebugConfig,
-    EtcdConfig,
     ManagerConfig,
-    PyroscopeConfig,
 )
 
 from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
@@ -24,7 +24,7 @@ from .loader.toml_loader import TomlConfigLoader
 # TODO: Remove useless config fields from this
 class BootstrapConfig(BaseModel):
     db: DatabaseConfig = Field(
-        default_factory=DatabaseConfig,
+        default_factory=DatabaseConfig,  # type: ignore[arg-type]
         description="""
         Database configuration settings.
         Defines how the manager connects to its PostgreSQL database.
@@ -32,7 +32,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     etcd: EtcdConfig = Field(
-        default_factory=EtcdConfig,
+        default_factory=EtcdConfig,  # type: ignore[arg-type]
         description="""
         Etcd configuration settings.
         Used for distributed coordination between manager instances.
@@ -40,7 +40,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     manager: ManagerConfig = Field(
-        default_factory=ManagerConfig,
+        default_factory=ManagerConfig,  # type: ignore[arg-type]
         description="""
         Core manager service configuration.
         Controls how the manager operates, communicates, and scales.
@@ -48,7 +48,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     logging: LoggingConfig = Field(
-        default_factory=LoggingConfig,
+        default_factory=LoggingConfig,  # type: ignore[arg-type]
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -56,7 +56,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     pyroscope: PyroscopeConfig = Field(
-        default_factory=PyroscopeConfig,
+        default_factory=PyroscopeConfig,  # type: ignore[arg-type]
         description="""
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
@@ -64,7 +64,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     debug: DebugConfig = Field(
-        default_factory=DebugConfig,
+        default_factory=DebugConfig,  # type: ignore[arg-type]
         description="""
         Debugging options configuration.
         Controls various debugging features and tools.
@@ -72,7 +72,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return pformat(self.model_dump())
 
     @classmethod
@@ -103,5 +103,4 @@ class BootstrapConfig(BaseModel):
         ])
         raw_cfg = await cfg_loader.load()
 
-        cfg = cls.model_validate(raw_cfg, by_name=True)
-        return cfg
+        return cls.model_validate(raw_cfg, by_name=True)

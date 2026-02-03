@@ -17,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("agents", sa.Column("architecture", sa.String, default="x86_64"))
     op.execute(text("UPDATE agents SET architecture='x86_64'"))
     op.alter_column("agents", "architecture", nullable=False)
@@ -26,6 +26,6 @@ def upgrade():
     op.alter_column("kernels", "architecture", nullable=False)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "architecture")
     op.drop_column("agents", "architecture")

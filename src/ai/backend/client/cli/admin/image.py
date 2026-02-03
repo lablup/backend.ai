@@ -1,19 +1,20 @@
 import json
 import sys
-from typing import Optional
 
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.image import _default_list_fields_admin
-from ai.backend.client.session import Session
-from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import (
+    ProgressBarWithSpinner,
+    print_done,
+    print_error,
+    print_fail,
+    print_warn,
+)
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.compat import asyncio_run
 
-from ...compat import asyncio_run
-from ...session import AsyncSession
-from ..extensions import pass_ctx_obj
-from ..pretty import ProgressBarWithSpinner, print_done, print_error, print_fail, print_warn
-from ..types import CLIContext
 from . import admin
 
 
@@ -31,6 +32,9 @@ def list(ctx: CLIContext, operation: bool) -> None:
     """
     Show the list of registered images in this cluster.
     """
+    from ai.backend.client.func.image import _default_list_fields_admin
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             items = session.Image.list(operation=operation)
@@ -55,12 +59,14 @@ def list(ctx: CLIContext, operation: bool) -> None:
     default=None,
     help="The name of the project to which the images belong. If not specified, scan all projects.",
 )
-def rescan(registry: str, project: Optional[str] = None) -> None:
+def rescan(registry: str, project: str | None = None) -> None:
     """
     Update the kernel image metadata from the configured registries.
     """
+    from ai.backend.client.session import AsyncSession
+    from ai.backend.common.bgtask.types import BgtaskStatus
 
-    async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
+    async def rescan_images_impl(registry: str, project: str | None) -> None:
         async with AsyncSession() as session:
             try:
                 result = await session.Image.rescan_images(registry, project)
@@ -105,7 +111,7 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                                         f"Finished registry scanning with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     asyncio_run(rescan_images_impl(registry, project))
 
@@ -114,8 +120,10 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
 @click.argument("alias", type=str)
 @click.argument("target", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
-def alias(alias, target, arch):
+def alias(alias: str, target: str, arch: str | None) -> None:
     """Add an image alias."""
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Image.alias_image(alias, target, arch)
@@ -125,13 +133,15 @@ def alias(alias, target, arch):
         if result["ok"]:
             print_done(f"An alias has created: {alias} -> {target}")
         else:
-            print_fail("Aliasing has failed: {0}".format(result["msg"]))
+            print_fail("Aliasing has failed: {}".format(result["msg"]))
 
 
 @image.command()
 @click.argument("alias", type=str)
-def dealias(alias):
+def dealias(alias: str) -> None:
     """Remove an image alias."""
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             result = session.Image.dealias_image(alias)
@@ -141,4 +151,4 @@ def dealias(alias):
         if result["ok"]:
             print_done(f"The alias has been removed: {alias}")
         else:
-            print_fail("Dealiasing has failed: {0}".format(result["msg"]))
+            print_fail("Dealiasing has failed: {}".format(result["msg"]))

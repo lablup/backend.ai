@@ -3,9 +3,9 @@ import sys
 from pathlib import Path
 
 
-def extract_dotfiles():
+def extract_dotfiles() -> None:
     try:
-        with open("/home/config/dotfiles.json") as fr:
+        with Path("/home/config/dotfiles.json").open() as fr:
             dotfiles = json.loads(fr.read())
     except FileNotFoundError:
         return
@@ -15,14 +15,14 @@ def extract_dotfiles():
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(dotfile["data"])
-        except IOError:
+        except OSError:
             print(f"failed to write dotfile: {file_path}", file=sys.stderr)
         try:
             tmp = Path(file_path)
             while tmp != work_dir:
                 tmp.chmod(int(dotfile["perm"], 8))
                 tmp = tmp.parent
-        except IOError:
+        except OSError:
             print(f"failed to chmod dotfile: {file_path}", file=sys.stderr)
 
 

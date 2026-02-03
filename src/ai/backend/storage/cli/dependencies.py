@@ -7,8 +7,8 @@ from pathlib import Path
 import click
 
 from ai.backend.common.dependencies.stacks.visualizing import VisualizingDependencyStack
+from ai.backend.storage.dependencies.composer import StorageDependencyComposer
 
-from ..dependencies.composer import StorageDependencyComposer
 from .context import CLIContext
 
 
@@ -86,7 +86,7 @@ def verify(
 
         try:
             async with stack:
-                from ..dependencies.composer import DependencyInput
+                from ai.backend.storage.dependencies.composer import DependencyInput
 
                 dependency_input = DependencyInput(
                     config_path=config_path or Path("storage-proxy.toml"),

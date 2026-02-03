@@ -3,21 +3,23 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import random
 import socket
-from collections.abc import Iterable
+import time
+from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional, Self, override
+from typing import Any, Self, override
 
 import glide
 from aiotools.server import process_index
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.message_queue.abc import AbstractConsumer
+from ai.backend.common.message_queue.types import MessageId, MQMessage
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..abc import AbstractConsumer
-from ..types import MessageId, MQMessage
 from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -29,13 +31,34 @@ _DEFAULT_READ_COUNT = 64
 
 
 @dataclass
+class _BackoffState:
+    """Tracks exponential backoff state for a stream."""
+
+    attempt: int = 0
+    last_error_time: float = 0.0
+
+    def increment(self) -> None:
+        """Increment attempt counter and record error time."""
+        self.attempt += 1
+        self.last_error_time = time.monotonic()
+
+    def reset(self) -> None:
+        """Reset backoff state after successful operation."""
+        self.attempt = 0
+        self.last_error_time = 0.0
+
+
+@dataclass
 class RedisConsumerArgs:
     stream_keys: Iterable[str]
     group_name: str
     node_id: str
     db: int = 0
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
-    autoclaim_start_id: Optional[str] = None
+    autoclaim_start_id: str | None = None
+    backoff_initial_delay: float = 0.1  # 100ms first retry
+    backoff_max_delay: float = 30.0  # cap at 30 seconds
+    backoff_max_attempts: int | None = None  # None = infinite retry
 
 
 class RedisConsumer(AbstractConsumer):
@@ -54,7 +77,11 @@ class RedisConsumer(AbstractConsumer):
     _redis_target: RedisTarget
     _autoclaim_idle_timeout: int
     _closed: bool
-    _loop_tasks: list[asyncio.Task]
+    _loop_tasks: list[asyncio.Task[Any]]
+    _backoff_initial_delay: float
+    _backoff_max_delay: float
+    _backoff_max_attempts: int | None
+    _backoff_state: dict[str, _BackoffState]
 
     def __init__(
         self,
@@ -82,6 +109,12 @@ class RedisConsumer(AbstractConsumer):
         self._redis_target = redis_target
         self._autoclaim_idle_timeout = args.autoclaim_idle_timeout
         self._closed = False
+
+        # Backoff configuration
+        self._backoff_initial_delay = args.backoff_initial_delay
+        self._backoff_max_delay = args.backoff_max_delay
+        self._backoff_max_attempts = args.backoff_max_attempts
+        self._backoff_state = {}
 
         start_id = args.autoclaim_start_id or "0-0"
         self._loop_tasks = []
@@ -221,6 +254,7 @@ class RedisConsumer(AbstractConsumer):
             while not self._closed:
                 try:
                     await self._read_messages(client, stream_key)
+                    self._reset_backoff(stream_key)
                 except glide.ClosingError:
                     log.info(
                         "Client connection closed, stopping read messages loop for stream {}",
@@ -229,8 +263,10 @@ class RedisConsumer(AbstractConsumer):
                     break
                 except glide.GlideError as e:
                     await self._failover_consumer(stream_key, e)
+                    await self._handle_backoff(stream_key)
                 except Exception as e:
                     log.error("Error while reading messages from stream {}: {}", stream_key, e)
+                    await self._handle_backoff(stream_key)
         finally:
             await client.close()
 
@@ -277,6 +313,7 @@ class RedisConsumer(AbstractConsumer):
                 )
                 if claimed:
                     autoclaim_start_id = next_start_id
+                    self._reset_backoff(stream_key)
                     continue
             except glide.TimeoutError:
                 # If the auto claim times out, we just continue to the next iteration
@@ -288,10 +325,14 @@ class RedisConsumer(AbstractConsumer):
                 break
             except glide.GlideError as e:
                 await self._failover_consumer(stream_key, e)
+                await self._handle_backoff(stream_key)
+                continue
             except Exception as e:
                 log.exception(
                     "Error while auto claiming messages from stream {}: {}", stream_key, e
                 )
+                await self._handle_backoff(stream_key)
+                continue
 
             await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
 
@@ -342,6 +383,42 @@ class RedisConsumer(AbstractConsumer):
             stream_key, self._group_name, message.msg_id, message.payload
         )
 
+    async def _handle_backoff(self, stream_key: str) -> None:
+        """
+        Handle exponential backoff for a stream.
+
+        Increments attempt counter, calculates delay with jitter, and sleeps.
+
+        Args:
+            stream_key: The Redis stream key experiencing connection issues
+        """
+        if stream_key not in self._backoff_state:
+            self._backoff_state[stream_key] = _BackoffState()
+
+        state = self._backoff_state[stream_key]
+        state.increment()
+
+        # Calculate delay with exponential backoff
+        delay = min(
+            self._backoff_initial_delay * (2 ** (state.attempt - 1)),
+            self._backoff_max_delay,
+        )
+
+        # Add jitter (50-100% of calculated delay)
+        actual_delay = delay * (0.5 + random.random() * 0.5)
+
+        await asyncio.sleep(actual_delay)
+
+    def _reset_backoff(self, stream_key: str) -> None:
+        """
+        Reset backoff state for a stream after successful operation.
+
+        Args:
+            stream_key: The Redis stream key that successfully completed operation
+        """
+        if stream_key in self._backoff_state:
+            self._backoff_state[stream_key].reset()
+
     async def _failover_consumer(self, stream_key: str, e: Exception) -> None:
         """
         Handle consumer failover scenarios.
@@ -370,7 +447,7 @@ class RedisConsumer(AbstractConsumer):
             log.exception("Error while reading messages from stream {}: {}", stream_key, e)
 
 
-def _generate_consumer_id(node_id: Optional[str]) -> str:
+def _generate_consumer_id(node_id: str | None) -> str:
     """
     Generate a unique consumer ID based on node ID, installation path, and process index.
 

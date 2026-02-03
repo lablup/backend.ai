@@ -1,21 +1,21 @@
 import datetime
 import json
 import uuid
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Protocol
 
 import orjson
 
 
 class ExtendedJSONEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o: Any) -> Any:
         if isinstance(o, uuid.UUID):
             return str(o)
-        elif isinstance(o, datetime.datetime):
+        if isinstance(o, datetime.datetime):
             return o.isoformat()
         return super().default(o)
 
 
-def load_json(s: Union[bytes, bytearray, memoryview, str]) -> Any:
+def load_json(s: bytes | bytearray | memoryview | str) -> Any:
     """
     Loads a JSON string into a Python object.
     """
@@ -35,14 +35,14 @@ async def read_json(reader: AsyncReader) -> Any:
     return load_json(data)
 
 
-def dump_json_str(obj: Any, option: Optional[int] = None) -> str:
+def dump_json_str(obj: Any, option: int | None = None) -> str:
     """
     Dumps the given object into a JSON string.
     """
     return orjson.dumps(obj, option=option).decode("utf-8")
 
 
-def dump_json(obj: Any, option: Optional[int] = None) -> bytes:
+def dump_json(obj: Any, option: int | None = None) -> bytes:
     """
     Dumps the given object into a JSON bytes.
     """

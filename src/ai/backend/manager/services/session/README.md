@@ -10,7 +10,7 @@ The Session Service provides comprehensive session management capabilities inclu
 
 - **SessionService**: Main service class that orchestrates all session operations
 - **SessionProcessors**: Handles action processing and monitoring with 25+ specialized processors
-- **SessionRepository & AdminSessionRepository**: Data access layer with repository pattern
+- **SessionRepository**: Data access layer with repository pattern
 - **Action Classes**: Structured actions for each session operation type
 - **Base Classes**: Common abstractions for session and batch actions
 
@@ -211,8 +211,7 @@ for entry in result.status_history["history"]:
 - **Resource Monitoring**: Collect resource usage statistics from agents
 
 ### Database Integration
-- **SessionRepository**: Standard session operations with validation
-- **AdminSessionRepository**: Administrative operations with elevated permissions
+- **SessionRepository**: Data access layer with repository pattern
 - **Database Schema**: PostgreSQL with SQLAlchemy ORM for session metadata
 - **Transaction Management**: Atomic operations with rollback support
 

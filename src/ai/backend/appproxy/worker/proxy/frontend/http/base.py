@@ -1,6 +1,5 @@
 import logging
 import time
-from typing import Generic
 
 import aiohttp_jinja2
 import jwt
@@ -11,22 +10,20 @@ from ai.backend.appproxy.common.errors import InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
+from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import (
     Circuit,
     InferenceAppInfo,
     InteractiveAppInfo,
     RootContext,
-    TCircuitKey,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
 
-from ..base import BaseFrontend
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitKey]):
+class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -97,8 +94,7 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
 
         if self._is_websocket_request(request):
             return await backend.proxy_ws(request)
-        else:
-            return await backend.proxy_http(request)
+        return await backend.proxy_http(request)
 
     async def exception_safe_handler_wrapper(
         self, request: web.Request, handler: WebRequestHandler
@@ -116,13 +112,12 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
                     status=ex.status_code,
                     headers={"Access-Control-Allow-Origin": "*"},
                 )
-            else:
-                return aiohttp_jinja2.render_template(
-                    "error.jinja2",
-                    request,
-                    ex.body_dict,
-                    status=ex.status_code,
-                )
+            return aiohttp_jinja2.render_template(
+                "error.jinja2",
+                request,
+                ex.body_dict,
+                status=ex.status_code,
+            )
         return resp
 
     @web.middleware
@@ -136,15 +131,12 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
         self, request: web.Request, handler: WebRequestHandler
     ) -> web.StreamResponse:
         metrics = self.root_context.metrics
-        response: web.StreamResponse | None = None
-
         remote = request.remote or ""
         start = time.monotonic()
         try:
             if not self._is_websocket_request(request):
                 metrics.proxy.observe_downstream_http_request(remote=remote)
-            response = await handler(request)
-            return response
+            return await handler(request)
         finally:
             end = time.monotonic()
             if not self._is_websocket_request(request):

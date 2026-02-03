@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Final
+from typing import Final
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.types import AbstractAnycastEvent

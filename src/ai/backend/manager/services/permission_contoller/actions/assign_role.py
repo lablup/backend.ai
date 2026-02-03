@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.role import (
@@ -14,7 +14,7 @@ class AssignRoleAction(RoleAction):
     input: UserRoleAssignmentInput
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.input.user_id)
 
     @override
@@ -25,9 +25,8 @@ class AssignRoleAction(RoleAction):
 
 @dataclass
 class AssignRoleActionResult(BaseActionResult):
-    success: bool
-    data: Optional[UserRoleAssignmentData]
+    data: UserRoleAssignmentData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

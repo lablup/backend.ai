@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import jwt
 
@@ -66,7 +66,7 @@ class JWTSigner:
         Raises:
             JWTError: If token generation fails
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         claims = JWTClaims(
             exp=now + self._config.token_expiration,

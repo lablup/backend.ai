@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.types import RuntimeVariant
@@ -32,8 +32,8 @@ class BaseRevisionGenerator(RevisionGenerator):
         self,
         draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
-        default_architecture: Optional[str] = None,
+        model_definition_path: str | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Generate revision with common override logic and variant-specific validation.
@@ -52,9 +52,9 @@ class BaseRevisionGenerator(RevisionGenerator):
     async def load_service_definition(
         self,
         vfolder_id: UUID,
-        model_definition_path: Optional[str],
+        model_definition_path: str | None,
         runtime_variant: str,
-    ) -> Optional[ModelServiceDefinition]:
+    ) -> ModelServiceDefinition | None:
         """
         Load service definition from vfolder with field-level override.
 
@@ -111,7 +111,9 @@ class BaseRevisionGenerator(RevisionGenerator):
 
         return ModelServiceDefinition.model_validate(merged_dict)
 
-    def _merge_service_definition_dicts(self, base: dict, override: dict) -> dict:
+    def _merge_service_definition_dicts(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Merge service definition dictionaries with field-level override.
         Override takes precedence over base for each nested field.
@@ -135,8 +137,8 @@ class BaseRevisionGenerator(RevisionGenerator):
     def merge_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: Optional[ModelServiceDefinition],
-        default_architecture: Optional[str] = None,
+        service_definition: ModelServiceDefinition | None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Merge requested revision with service definition.
@@ -147,20 +149,19 @@ class BaseRevisionGenerator(RevisionGenerator):
         3. Runtime variant section in service definition
         4. API request (highest priority)
 
-        If service definition is None, validates and converts request to revision spec.
-        Otherwise, starts with service definition and applies request overrides.
+        If service definition is None, creates an empty one to ensure
+        default_architecture and other common logic is applied consistently.
         """
-        if service_definition is None:
-            # No service definition, validate and convert request directly
-            return ModelRevisionSpec.model_validate(draft_revision.model_dump(mode="python"))
-
-        return self._override_revision(draft_revision, service_definition, default_architecture)
+        effective_service_definition = service_definition or ModelServiceDefinition()
+        return self._override_revision(
+            draft_revision, effective_service_definition, default_architecture
+        )
 
     def _override_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
         service_definition: ModelServiceDefinition,
-        default_architecture: Optional[str] = None,
+        default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
         Merge service definition and API request with field-level override.
@@ -171,7 +172,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         2. Service definition (already merged from root + variant)
         3. API request (field-level override, highest priority)
         """
-        service_dict: dict = {}
+        service_dict: dict[str, Any] = {}
         if service_definition.environment is not None:
             service_dict["environment"] = {
                 "image": service_definition.environment.image,

@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import IO, Optional
+from typing import IO
 from uuid import UUID
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
+)
+from ai.backend.common.data.notification.types import (
+    EmailMessage,
+    EmailSpec,
+    SMTPAuth,
+    SMTPConnection,
 )
 from ai.backend.common.dto.manager.notification import (
     CreateNotificationChannelRequest,
@@ -35,8 +40,8 @@ from .pretty import print_done, print_fail
 from .types import CLIContext
 
 
-@main.group()
-def notification():
+@click.group()
+def notification() -> None:
     """Set of notification operations (channels and rules)"""
 
 
@@ -44,7 +49,7 @@ def notification():
 
 
 @notification.group()
-def channel():
+def channel() -> None:
     """Manage notification channels"""
 
 
@@ -103,16 +108,26 @@ def info_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 @channel.command("create")
 @pass_ctx_obj
 @click.argument("name", type=str)
-@click.argument("url", type=str)
-@click.option("--channel-type", default="webhook", help="Channel type (default: WEBHOOK)")
+@click.option(
+    "--channel-type",
+    type=click.Choice(["webhook", "email"], case_sensitive=False),
+    default="webhook",
+    help="Channel type (default: webhook)",
+)
+@click.option(
+    "--spec",
+    type=str,
+    required=True,
+    help="Channel spec as JSON string",
+)
 @click.option("--description", type=str, default=None, help="Channel description")
 @click.option("--disabled", is_flag=True, help="Create channel as disabled")
 def create_channel_cmd(
     ctx: CLIContext,
     name: str,
-    url: str,
     channel_type: str,
-    description: Optional[str],
+    spec: str,
+    description: str | None,
     disabled: bool,
 ) -> None:
     """
@@ -120,14 +135,43 @@ def create_channel_cmd(
 
     \b
     NAME: Channel name
-    URL: Webhook URL
+
+    \b
+    Examples:
+      # Create webhook channel
+      backend.ai notification channel create "Slack Alert" \\
+        --channel-type webhook \\
+        --spec '{"url": "https://hooks.slack.com/services/xxx"}'
+
+      # Create email channel
+      backend.ai notification channel create "Admin Email" \\
+        --channel-type email \\
+        --spec '{"smtp": {"host": "smtp.gmail.com", "port": 587}, "message": {"from_email": "noreply@example.com", "to_emails": ["admin@example.com"]}}'
     """
     with Session() as session:
         try:
+            # Parse spec JSON
+            spec_data = json.loads(spec)
+
+            # Create appropriate spec based on channel type
+            channel_type_enum = NotificationChannelType(channel_type)
+            channel_spec: WebhookSpec | EmailSpec
+            match channel_type_enum:
+                case NotificationChannelType.WEBHOOK:
+                    channel_spec = WebhookSpec.model_validate(spec_data)
+                case NotificationChannelType.EMAIL:
+                    # Parse nested structures for EmailSpec
+                    smtp = SMTPConnection.model_validate(spec_data["smtp"])
+                    message = EmailMessage.model_validate(spec_data["message"])
+                    auth = None
+                    if spec_data.get("auth"):
+                        auth = SMTPAuth.model_validate(spec_data["auth"])
+                    channel_spec = EmailSpec(smtp=smtp, message=message, auth=auth)
+
             request = CreateNotificationChannelRequest(
                 name=name,
-                channel_type=NotificationChannelType(channel_type),
-                config=WebhookConfig(url=url),
+                channel_type=channel_type_enum,
+                spec=channel_spec,
                 description=description,
                 enabled=not disabled,
             )
@@ -135,6 +179,12 @@ def create_channel_cmd(
             channel = result.channel
             print_done(f"Channel created: {channel.id}")
             print(json.dumps(channel.model_dump(mode="json"), indent=2, default=str))
+        except json.JSONDecodeError as e:
+            print_fail(f"Invalid JSON configuration: {e}")
+            sys.exit(ExitCode.FAILURE)
+        except KeyError as e:
+            print_fail(f"Missing required configuration field: {e}")
+            sys.exit(ExitCode.FAILURE)
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -144,40 +194,94 @@ def create_channel_cmd(
 @pass_ctx_obj
 @click.argument("channel_id", type=str)
 @click.option("--name", type=str, default=None, help="Update channel name")
-@click.option("--url", type=str, default=None, help="Update webhook URL")
+@click.option(
+    "--channel-type",
+    type=click.Choice(["webhook", "email"], case_sensitive=False),
+    default=None,
+    help="Channel type (required when updating spec)",
+)
+@click.option(
+    "--spec",
+    type=str,
+    default=None,
+    help="Channel specification as JSON string",
+)
 @click.option("--description", type=str, default=None, help="Update channel description")
 @click.option("--enable", "enabled", flag_value=True, default=None, help="Enable the channel")
 @click.option("--disable", "enabled", flag_value=False, default=None, help="Disable the channel")
 def update_channel_cmd(
     ctx: CLIContext,
     channel_id: str,
-    name: Optional[str],
-    url: Optional[str],
-    description: Optional[str],
-    enabled: Optional[bool],
+    name: str | None,
+    channel_type: str | None,
+    spec: str | None,
+    description: str | None,
+    enabled: bool | None,
 ) -> None:
     """
     Update a notification channel.
 
     \b
     CHANNEL_ID: The channel ID to update
+
+    \b
+    Examples:
+      # Update channel name
+      backend.ai notification channel update <id> --name "New Name"
+
+      # Update webhook spec
+      backend.ai notification channel update <id> \\
+        --channel-type webhook \\
+        --spec '{"url": "https://new-webhook-url.com"}'
+
+      # Update email spec
+      backend.ai notification channel update <id> \\
+        --channel-type email \\
+        --spec '{"smtp": {"host": "smtp.example.com", "port": 587}, "message": {"from_email": "new@example.com", "to_emails": ["admin@example.com"]}}'
+
+      # Enable/disable channel
+      backend.ai notification channel update <id> --enable
+      backend.ai notification channel update <id> --disable
     """
     with Session() as session:
         try:
-            config = None
-            if url:
-                config = WebhookConfig(url=url)
+            # Parse spec if provided
+            channel_spec: WebhookSpec | EmailSpec | None = None
+            if spec:
+                if not channel_type:
+                    print_fail("--channel-type is required when updating spec")
+                    sys.exit(ExitCode.FAILURE)
+
+                spec_data = json.loads(spec)
+
+                channel_type_enum = NotificationChannelType(channel_type)
+                match channel_type_enum:
+                    case NotificationChannelType.WEBHOOK:
+                        channel_spec = WebhookSpec.model_validate(spec_data)
+                    case NotificationChannelType.EMAIL:
+                        smtp = SMTPConnection.model_validate(spec_data["smtp"])
+                        message = EmailMessage.model_validate(spec_data["message"])
+                        auth = None
+                        if spec_data.get("auth"):
+                            auth = SMTPAuth.model_validate(spec_data["auth"])
+                        channel_spec = EmailSpec(smtp=smtp, message=message, auth=auth)
 
             request = UpdateNotificationChannelRequest(
                 name=name,
                 description=description,
-                config=config,
+                spec=channel_spec,
                 enabled=enabled,
             )
             result = session.Notification.update_channel(UUID(channel_id), request)
             channel = result.channel
             print_done(f"Channel updated: {channel_id}")
             print(json.dumps(channel.model_dump(mode="json"), indent=2, default=str))
+        except json.JSONDecodeError as e:
+            print_fail(f"Invalid JSON specification: {e}")
+            sys.exit(ExitCode.FAILURE)
+        except KeyError as e:
+            print_fail(f"Missing required specification field: {e}")
+            sys.exit(ExitCode.FAILURE)
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -224,8 +328,8 @@ def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 def validate_channel_cmd(
     ctx: CLIContext,
     channel_id: str,
-    data: Optional[str],
-    data_file: Optional[IO],
+    data: str | None,
+    data_file: IO[str] | None,
 ) -> None:
     """
     Validate a notification channel by sending a test webhook.
@@ -245,7 +349,8 @@ def validate_channel_cmd(
 
             # Get test message content
             test_message = data_file.read() if data_file else data
-            assert test_message is not None  # Type narrowing
+            if test_message is None:
+                raise RuntimeError("Test message is not provided")
 
             request = ValidateNotificationChannelRequest(test_message=test_message)
             result = session.Notification.validate_channel(UUID(channel_id), request)
@@ -265,7 +370,7 @@ def validate_channel_cmd(
 
 
 @notification.group()
-def rule():
+def rule() -> None:
     """Manage notification rules"""
 
 
@@ -405,9 +510,9 @@ def create_rule_cmd(
     name: str,
     rule_type: str,
     channel_id: str,
-    template: Optional[str],
-    template_file: Optional[IO],
-    description: Optional[str],
+    template: str | None,
+    template_file: IO[str] | None,
+    description: str | None,
     disabled: bool,
 ) -> None:
     """
@@ -432,7 +537,8 @@ def create_rule_cmd(
 
             # Get template content
             message_template = template_file.read() if template_file else template
-            assert message_template is not None  # Already validated above
+            if message_template is None:
+                raise RuntimeError("Message template is not provided")
 
             request = CreateNotificationRuleRequest(
                 name=name,
@@ -468,11 +574,11 @@ def create_rule_cmd(
 def update_rule_cmd(
     ctx: CLIContext,
     rule_id: str,
-    name: Optional[str],
-    description: Optional[str],
-    message_template: Optional[str],
-    template_file: Optional[IO],
-    enabled: Optional[bool],
+    name: str | None,
+    description: str | None,
+    message_template: str | None,
+    template_file: IO[str] | None,
+    enabled: bool | None,
 ) -> None:
     """
     Update a notification rule.
@@ -550,7 +656,7 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     help="Path to JSON file with test data (use '-' for stdin)",
 )
 def validate_rule_cmd(
-    ctx: CLIContext, rule_id: str, data: Optional[str], data_file: Optional[IO]
+    ctx: CLIContext, rule_id: str, data: str | None, data_file: IO[str] | None
 ) -> None:
     """
     Validate a notification rule by rendering its template with test data.

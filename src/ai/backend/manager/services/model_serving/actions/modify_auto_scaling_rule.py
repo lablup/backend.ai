@@ -1,21 +1,21 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.modifier import EndpointAutoScalingRuleModifier
-from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData, RequesterCtx
+from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
+from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
     id: RuleId
-    modifier: EndpointAutoScalingRuleModifier
+    updater: Updater[EndpointAutoScalingRuleRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,8 +27,8 @@ class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
 @dataclass
 class ModifyEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
-    data: Optional[EndpointAutoScalingRuleData]
+    data: EndpointAutoScalingRuleData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id) if self.data is not None else None

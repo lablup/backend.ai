@@ -8,8 +8,10 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.storage_namespace import StorageNamespaceCreatorSpec
 from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
 )
@@ -73,10 +75,12 @@ class RegisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
 
-    def to_creator(self) -> StorageNamespaceCreator:
-        return StorageNamespaceCreator(
-            storage_id=self.storage_id,
-            bucket=self.namespace,
+    def to_creator(self) -> Creator[StorageNamespaceRow]:
+        return Creator(
+            spec=StorageNamespaceCreatorSpec(
+                storage_id=self.storage_id,
+                bucket=self.namespace,
+            )
         )
 
 
@@ -114,7 +118,7 @@ class UnregisterStorageNamespacePayload:
     id: uuid.UUID
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -135,7 +139,7 @@ async def register_storage_namespace(
     return RegisterStorageNamespacePayload(id=action_result.storage_id)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     description=dedent_strip("""
     Added in 25.15.0.
 

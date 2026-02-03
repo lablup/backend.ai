@@ -602,6 +602,93 @@ class NotificationChannelRepository:
 4. **Flexibility**: Easy to add new filters/orders without changing repository
 5. **Consistency**: Uniform query building across REST and GraphQL APIs
 
+### Scope Pattern for User APIs
+
+For user-facing APIs that require access control validation, use a `Scope` dataclass
+alongside `Querier`. The scope contains required parameters that must be validated
+before query execution.
+
+**Pattern distinction:**
+- **User API**: `scope` (required, validated first) + `querier` (optional filters, pagination)
+- **Admin API**: `querier` only (admin has full access, no scope validation needed)
+
+**Scope placement**: Always place `scope` parameter before `querier` in method signatures.
+
+```python
+@dataclass(frozen=True)
+class UserFairShareSearchScope:
+    """Required scope for user fair share search.
+
+    These parameters are validated before query execution.
+    If validation fails, an appropriate error is raised.
+    """
+    resource_group: str  # Required, always validated
+    project_id: uuid.UUID | None = None  # Optional, validated if provided
+    user_uuid: uuid.UUID | None = None   # Optional, validated if provided
+
+
+class FairShareRepository:
+    # User API - scope first, then querier
+    async def search_user_fair_shares(
+        self,
+        scope: UserFairShareSearchScope,  # Required, validated
+        querier: BatchQuerier,            # Optional filters, pagination
+    ) -> UserFairShareSearchResult:
+        """Search user fair shares within the specified scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # 1. Validate scope (raise error if entity doesn't exist)
+            await self._validate_user_search_scope(db_sess, scope)
+
+            # 2. Execute search with validated scope
+            return await self._execute_user_search(db_sess, scope, querier)
+
+    async def _validate_user_search_scope(
+        self,
+        db_sess: SASession,
+        scope: UserFairShareSearchScope,
+    ) -> None:
+        """Validate scope entities exist. Raise error if not found."""
+        # Validate resource_group exists
+        if not await self._scaling_group_exists(db_sess, scope.resource_group):
+            raise ScalingGroupNotFound(scope.resource_group)
+
+        # Validate project_id if provided
+        if scope.project_id and not await self._project_exists(db_sess, scope.project_id):
+            raise ProjectNotFound(scope.project_id)
+
+        # Validate user_uuid if provided
+        if scope.user_uuid and not await self._user_exists(db_sess, scope.user_uuid):
+            raise UserNotFound(scope.user_uuid)
+
+    # Admin API - querier only (no scope validation)
+    async def admin_search_user_fair_shares(
+        self,
+        querier: BatchQuerier,
+    ) -> UserFairShareSearchResult:
+        """Admin search for user fair shares (no access control)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            return await self._execute_admin_search(db_sess, querier)
+```
+
+**Key differences from Querier conditions:**
+
+| Aspect | Scope | Querier Conditions |
+|--------|-------|-------------------|
+| Purpose | Access control boundary | Filtering within allowed data |
+| Validation | Entities must exist (raise error) | No existence check (empty result OK) |
+| Required | Yes (for user APIs) | Optional |
+| Position | First parameter | After scope |
+
+**When to use Scope:**
+- User-facing APIs where access must be restricted
+- When invalid scope should result in an error, not empty results
+- When certain parameters define the "boundary" of allowed data
+
+**When to use Querier only:**
+- Admin APIs with unrestricted access
+- Internal system operations
+- Batch processing jobs
+
 ## Data Access Patterns
 
 ### 1. Basic Queries

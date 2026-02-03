@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
-from ...clients.valkey_client.valkey_bgtask.client import TaskSetKey, ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
+    TaskSetKey,
+    ValkeyBgtaskClient,
+)
+
 from .base import AbstractTaskHook, TaskContext
 
 
@@ -14,7 +18,7 @@ class ValkeyUnregisterHook(AbstractTaskHook):
         self,
         valkey_client: ValkeyBgtaskClient,
         task_set_key: TaskSetKey,
-    ):
+    ) -> None:
         self._valkey_client = valkey_client
         self._task_set_key = task_set_key
 

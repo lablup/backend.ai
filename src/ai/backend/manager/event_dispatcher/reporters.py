@@ -1,16 +1,15 @@
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.reporter import (
     AbstractEventReporter,
     CompleteEventReportArgs,
     PrepareEventReportArgs,
 )
-
-from ..models.event_log import EventLogRow
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.common.events.types import AbstractEvent
+from ai.backend.manager.models.event_log import EventLogRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
 class EventLogger(AbstractEventReporter):
-    def __init__(self, db: ExtendedAsyncSAEngine):
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
     async def prepare_event_report(

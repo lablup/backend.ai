@@ -4,7 +4,7 @@ Common and generic exceptions that don't belong to a specific domain.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp import web
 
@@ -36,11 +36,11 @@ class ObjectNotFound(BackendAIError, web.HTTPNotFound):
 
     def __init__(
         self,
-        extra_msg: Optional[str] = None,
-        extra_data: Optional[Any] = None,
+        extra_msg: str | None = None,
+        extra_data: Any | None = None,
         *,
-        object_name: Optional[str] = None,
-        **kwargs,
+        object_name: str | None = None,
+        **kwargs: Any,
     ) -> None:
         if object_name:
             self.object_name = object_name

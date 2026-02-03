@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 import uuid
-from typing import Optional, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
@@ -13,7 +20,9 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
-from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, RescanImagesResult
+from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.session.types import SessionListResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
@@ -30,6 +39,8 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.utils import query_userinfo
 
 session_repository_resilience = Resilience(
@@ -54,7 +65,7 @@ class SessionRepository:
         self._db = db
 
     @session_repository_resilience.apply()
-    async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
+    async def get_session_owner(self, session_id: str | SessionId) -> UserData | None:
         async with self._db.begin_readonly_session() as db_sess:
             query = (
                 sa.select(UserRow)
@@ -73,7 +84,7 @@ class SessionRepository:
         owner_access_key: AccessKey,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
-        eager_loading_op: Optional[list] = None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -82,7 +93,7 @@ class SessionRepository:
                 owner_access_key,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
             )
 
     @session_repository_resilience.apply()
@@ -110,10 +121,10 @@ class SessionRepository:
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> Optional[dict]:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates.c.template])
+                sa.select(session_templates.c.template)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -125,10 +136,10 @@ class SessionRepository:
     async def get_template_info_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> Optional[dict]:
+    ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([session_templates])
+                sa.select(session_templates)
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id) & session_templates.c.is_active,
@@ -181,7 +192,7 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         owner_access_key: AccessKey,
-        eager_loading_op: list,
+        eager_loading_op: Sequence[_AbstractLoad],
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -189,7 +200,7 @@ class SessionRepository:
                 session_name_or_id,
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=eager_loading_op,
+                eager_loading_op=list(eager_loading_op),
             )
 
     @session_repository_resilience.apply()
@@ -197,7 +208,7 @@ class SessionRepository:
         self,
         registry_hostname: str,
         registry_project: str,
-    ) -> Optional[ContainerRegistryRow]:
+    ) -> ContainerRegistryRow | None:
         async with self._db.begin_readonly_session() as db_session:
             query = (
                 sa.select(ContainerRegistryRow)
@@ -220,9 +231,26 @@ class SessionRepository:
     async def resolve_image(
         self,
         image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
+        alive_only: bool = True,
     ) -> ImageRow:
+        """Resolve an image from the given identifiers.
+
+        When ``alive_only`` is True (default), only images with the ALIVE status
+        are considered.  Set it to False to also include DELETED images, which is
+        useful when the caller needs to reference images that are no longer active
+        (e.g., committing a session whose base image has been deleted).
+        """
         async with self._db.begin_readonly_session() as db_sess:
-            return await ImageRow.resolve(db_sess, image_identifiers)
+            if alive_only:
+                return await ImageRow.resolve(db_sess, image_identifiers)
+            return await ImageRow.resolve(
+                db_sess,
+                image_identifiers,
+                filter_by_statuses=[
+                    ImageStatus.ALIVE,
+                    ImageStatus.DELETED,
+                ],
+            )
 
     @session_repository_resilience.apply()
     async def get_customized_image_count(
@@ -232,13 +260,11 @@ class SessionRepository:
     ) -> int:
         async with self._db.begin_readonly_session() as sess:
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(ImageRow)
                 .where(
-                    (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{image_visibility}:{image_owner_id}"
-                    )
+                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                    == f"{image_visibility}:{image_owner_id}"
                 )
                 .where(ImageRow.status == ImageStatus.ALIVE)
             )
@@ -252,7 +278,7 @@ class SessionRepository:
         image_visibility: str,
         image_owner_id: str,
         image_name: str,
-    ) -> Optional[ImageRow]:
+    ) -> ImageRow | None:
         async with self._db.begin_readonly_session() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
@@ -263,17 +289,17 @@ class SessionRepository:
                     ImageRow.status == ImageStatus.ALIVE,
                 )
             )
-            return await sess.scalar(query)
+            return cast(ImageRow | None, await sess.scalar(query))
 
     @session_repository_resilience.apply()
     async def get_group_name_by_domain_and_id(
         self,
         domain_name: str,
         group_id: uuid.UUID,
-    ) -> Optional[str]:
+    ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([groups.c.name])
+                sa.select(groups.c.name)
                 .select_from(groups)
                 .where(
                     (groups.c.domain_name == domain_name) & (groups.c.id == group_id),
@@ -285,22 +311,22 @@ class SessionRepository:
     async def get_scaling_group_wsproxy_addr(
         self,
         scaling_group_name: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select([scaling_groups.c.wsproxy_addr])
+                sa.select(scaling_groups.c.wsproxy_addr)
                 .select_from(scaling_groups)
-                .where((scaling_groups.c.name == scaling_group_name))
+                .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
-            return sgroup["wsproxy_addr"] if sgroup else None
+            return sgroup.wsproxy_addr if sgroup else None
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
         self,
         session_id: str | SessionId,
-    ) -> Optional[SessionRow]:
+    ) -> SessionRow | None:
         async with self._db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
@@ -309,23 +335,23 @@ class SessionRepository:
                     selectinload(SessionRow.kernels),
                 )
             )
-            return await db_session.scalar(stmt)
+            return cast(SessionRow | None, await db_session.scalar(stmt))
 
     @session_repository_resilience.apply()
     async def modify_session(
         self,
-        session_id: str | SessionId,
-        modifier_fields: dict,
-        session_name: Optional[str] = None,
-    ) -> Optional[SessionRow]:
+        updater: Updater[SessionRow],
+        session_name: str | None = None,
+    ) -> SessionRow | None:
+        session_id = updater.pk_value
+
         async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_session.scalar(query_stmt)
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
 
-            if session_name:
+            if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
@@ -340,16 +366,10 @@ class SessionRepository:
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-
-            session_row = await db_session.scalar(select_stmt)
-            for key, value in modifier_fields.items():
-                setattr(session_row, key, value)
+            # Use execute_updater to apply changes
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
                 await db_session.execute(
@@ -357,15 +377,23 @@ class SessionRepository:
                     .values(session_name=session_name)
                     .where(KernelRow.session_id == session_id)
                 )
-            return session_row
+
+            # Re-fetch with kernels loaded for the return value
+            select_stmt = (
+                sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
+                .execution_options(populate_existing=True)
+                .where(SessionRow.id == session_id)
+            )
+            return cast(SessionRow | None, await db_session.scalar(select_stmt))
 
     @session_repository_resilience.apply()
     async def rescan_images(
         self,
         image_canonical: str,
         registry_project: str,
-        reporter=None,
-    ):
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
         return await rescan_images(
             self._db,
             image_canonical,
@@ -380,11 +408,11 @@ class SessionRepository:
         requester_access_key: AccessKey,
         user_role: UserRole,
         domain_name: str,
-        keypair_resource_policy: Optional[dict],
+        keypair_resource_policy: dict[str, Any] | None,
         query_domain_name: str,
-        group_name: Optional[str],
-        query_on_behalf_of: Optional[AccessKey] = None,
-    ):
+        group_name: str | None,
+        query_on_behalf_of: AccessKey | None = None,
+    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
@@ -479,7 +507,7 @@ class SessionRepository:
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
-                    session_ids = [cast(SessionId, session.id)]
+                    session_ids = [session.id]
 
                 return session_ids
             except SessionNotFound:
@@ -491,7 +519,7 @@ class SessionRepository:
         root_session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         allow_stale: bool = False,
-    ):
+    ) -> list[uuid.UUID]:
         """
         Public method for finding dependent sessions.
         Maintained for backward compatibility.
@@ -510,7 +538,7 @@ class SessionRepository:
         self,
         session_name_or_id: uuid.UUID | str,
         access_key: AccessKey,
-    ):
+    ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,
@@ -553,4 +581,66 @@ class SessionRepository:
                 eager_loading_op=[
                     selectinload(SessionRow.routing).options(noload("*")),
                 ],
+            )
+
+    @session_repository_resilience.apply()
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> SessionListResult:
+        """Search sessions with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            SessionListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.SessionRow.to_dataclass() for row in result.rows]
+
+            return SessionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @session_repository_resilience.apply()
+    async def search_kernels(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelListResult:
+        """Search kernels with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            KernelListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.KernelRow.to_kernel_info() for row in result.rows]
+
+            return KernelListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

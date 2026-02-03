@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, Any, override
 
+from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     ORPHAN_KERNEL_THRESHOLD_SEC,
@@ -12,10 +13,8 @@ from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import LifecycleEvent
-
 if TYPE_CHECKING:
-    from ..agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -38,7 +37,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
 
     def __init__(
         self,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
         valkey_schedule_client: ValkeyScheduleClient,
     ) -> None:
         self._agent = agent
@@ -77,6 +76,14 @@ class OrphanKernelCleanupObserver(AbstractObserver):
                 # No Redis entry - skip (not enough info to decide)
                 continue
 
+            # Skip if last_check is None (not enough info to decide)
+            if status.last_check is None:
+                log.debug(
+                    "Kernel {} has no last_check timestamp, skipping orphan check",
+                    kernel_id,
+                )
+                continue
+
             # Strict condition: kernel.last_check < agent_last_check - THRESHOLD
             if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
                 orphan_kernels.append((kernel_id, kernel.session_id))
@@ -108,7 +115,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
 
     @classmethod
     @override
-    def timeout(cls) -> Optional[float]:
+    def timeout(cls) -> float | None:
         return 30.0  # 30 seconds
 
     @override

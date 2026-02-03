@@ -2,17 +2,14 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Callable, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
-    AsyncContextManager,
-    Callable,
-    Optional,
     Protocol,
     Self,
-    Sequence,
-    TypeAlias,
 )
 from uuid import UUID
 
@@ -50,11 +47,11 @@ from .defs import LockID
 from .models import Circuit
 from .models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CoordinatorMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     event: EventMetricObserver
@@ -66,7 +63,7 @@ class CoordinatorMetricRegistry:
         self.system = SystemMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -130,8 +127,8 @@ class CircuitManager:
         authority = circuit.worker_row.authority
 
         async def _event_handler(
-            context: CircuitManager,
-            agent_id: AgentId,
+            _context: CircuitManager,
+            _agent_id: AgentId,
             event: AppProxyWorkerCircuitAddedEvent,
         ) -> None:
             if circuit.id in [c.id for c in event.circuits]:
@@ -150,10 +147,10 @@ class CircuitManager:
         try:
             async with asyncio.timeout(15.0):
                 await worker_ready_evt.wait()
-        except asyncio.TimeoutError:
+        except TimeoutError as e:
             raise ServiceUnavailable(
                 "E10001: Proxy worker not responding", extra_data={"worker": authority}
-            )
+            ) from e
 
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
@@ -257,7 +254,7 @@ class CircuitManager:
         log.debug("unload_traefik_circuit(): end")
 
     async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(lambda: [])
+        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
         for circuit in circuits:
             circuits_by_worker[circuit.worker_row.authority].append(circuit)
 
@@ -295,7 +292,7 @@ class RootContext:
     leader_election: ValkeyLeaderElection
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):
@@ -309,7 +306,7 @@ class InferenceAppConfig(BaseModel):
         ),
     ]
     route_id: Annotated[
-        Optional[UUID],
+        UUID | None,
         Field(
             default=None,
             description="ID of the route. This is optional and may not be present for older routes.",
@@ -318,7 +315,7 @@ class InferenceAppConfig(BaseModel):
         ),
     ]
     kernel_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             ...,
             description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",

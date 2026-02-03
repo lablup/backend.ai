@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.vfs_storage.creator import VFSStorageCreator
-from ai.backend.manager.data.vfs_storage.modifier import VFSStorageModifier
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class VFSStorageDBSource:
@@ -27,7 +30,7 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.name == storage_name)
             result = await db_session.execute(query)
-            row: VFSStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with name {storage_name} not found.")
             return row.to_dataclass()
@@ -39,39 +42,28 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
             result = await db_session.execute(query)
-            row: VFSStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
             return row.to_dataclass()
 
-    async def create(self, creator: VFSStorageCreator) -> VFSStorageData:
+    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
         """
         Create a new VFS storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            vfs_storage_data = creator.fields_to_store()
-            vfs_storage_row = VFSStorageRow(**vfs_storage_data)
-            db_session.add(vfs_storage_row)
-            await db_session.flush()
-            await db_session.refresh(vfs_storage_row)
-            return vfs_storage_row.to_dataclass()
+            creator_result = await execute_creator(db_session, creator)
+            return creator_result.row.to_dataclass()
 
-    async def update(self, storage_id: uuid.UUID, modifier: VFSStorageModifier) -> VFSStorageData:
+    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
         """
         Update an existing VFS storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(VFSStorageRow)
-                .where(VFSStorageRow.id == storage_id)
-                .values(**data)
-                .returning(*sa.select(VFSStorageRow).selected_columns)
-            )
-            stmt = sa.select(VFSStorageRow).from_statement(update_stmt)
-            row: VFSStorageRow = (await db_session.execute(stmt)).scalars().one()
-
-            return row.to_dataclass()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
+            return result.row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
@@ -85,6 +77,8 @@ class VFSStorageDBSource:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+            if deleted_id is None:
+                raise VFSStorageNotFoundError(f"VFS storage with ID {storage_id} not found.")
             return deleted_id
 
     async def list_vfs_storages(self) -> list[VFSStorageData]:
@@ -94,5 +88,28 @@ class VFSStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(VFSStorageRow)
             result = await db_session.execute(query)
-            rows: list[VFSStorageRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> VFSStorageListResult:
+        """Searches VFS storages with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(VFSStorageRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.VFSStorageRow.to_dataclass() for row in result.rows]
+
+            return VFSStorageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

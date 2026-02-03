@@ -4,11 +4,8 @@ import traceback
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     Literal,
     NotRequired,
-    Optional,
-    Tuple,
     TypedDict,
 )
 
@@ -33,8 +30,8 @@ class RPCError(RuntimeError):
     """
 
     __slots__ = (
-        "agent_id",
         "agent_addr",
+        "agent_id",
         "extra_msg",
     )
 
@@ -71,8 +68,8 @@ class AgentError(RuntimeError):
         agent_id: AgentId,
         exc_name: str,
         exc_repr: str,
-        exc_args: Tuple[Any, ...],
-        exc_tb: Optional[str] = None,
+        exc_args: tuple[Any, ...],
+        exc_tb: str | None = None,
     ) -> None:
         super().__init__(agent_id, exc_name, exc_repr, exc_args, exc_tb)
         self.agent_id = agent_id
@@ -93,7 +90,7 @@ class ErrorDetail(TypedDict):
     name: str
     repr: str
     agent_id: NotRequired[str]
-    collection: NotRequired[List[ErrorDetail]]
+    collection: NotRequired[list[ErrorDetail]]
     traceback: NotRequired[str]
 
 
@@ -147,7 +144,7 @@ def convert_to_status_data(
 
 
 class ContainerRegistryProjectEmpty(RuntimeError):
-    def __init__(self, type: str, project: Literal[""] | None):
+    def __init__(self, type: str, project: Literal[""] | None) -> None:
         super().__init__(
             f"{type} container registry requires project value, but {project} is provided"
         )

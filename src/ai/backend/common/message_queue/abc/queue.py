@@ -4,9 +4,15 @@ Use `ai.backend.common.message_queue.abc.{anycaster,broadcaster,consumer,subscri
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any
 
-from ..types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
+from ai.backend.common.message_queue.types import (
+    BroadcastMessage,
+    BroadcastPayload,
+    MessageId,
+    MQMessage,
+)
 
 
 class AbstractMessageQueue(ABC):
@@ -53,7 +59,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
+from typing import Any
 
 import humps
 import tomli
@@ -22,18 +23,18 @@ from .types import RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
+    "check",
     "etcd_config_iv",
+    "merge",
+    "model_definition_iv",
+    "override_key",
+    "override_with_env",
+    "read_from_etcd",
+    "read_from_file",
     "redis_config_iv",
     "redis_helper_config_iv",
     "redis_helper_default_config",
     "vfolder_config_iv",
-    "model_definition_iv",
-    "read_from_file",
-    "read_from_etcd",
-    "override_key",
-    "override_with_env",
-    "check",
-    "merge",
 )
 
 
@@ -199,7 +200,7 @@ class PreStartAction(BaseConfigModel):
         description="The name of the pre-start action to execute.",
         examples=["action_name"],
     )
-    args: Dict[str, Any] = Field(
+    args: dict[str, Any] = Field(
         default_factory=dict,
         description="Arguments for the pre-start action.",
         examples=[{"arg1": "value1", "arg2": "value2"}],
@@ -259,55 +260,55 @@ class ModelServiceConfig(BaseConfigModel):
         examples=[8080],
         gt=1,
     )
-    health_check: Optional[ModelHealthCheck] = Field(
+    health_check: ModelHealthCheck | None = Field(
         default=None,
         description="Health check configuration for the model service.",
     )
 
 
 class ModelMetadata(BaseConfigModel):
-    author: Optional[str] = Field(
+    author: str | None = Field(
         default=None,
         examples=["John Doe"],
     )
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None,
     )
-    version: Optional[int | str] = Field(
+    version: int | str | None = Field(
         default=None,
     )
-    created: Optional[str] = Field(
+    created: str | None = Field(
         default=None,
         validation_alias=AliasChoices("created", "created_at"),
         serialization_alias="created",
     )
-    last_modified: Optional[str] = Field(
+    last_modified: str | None = Field(
         default=None,
         validation_alias=AliasChoices("last_modified", "modified_at"),
         serialization_alias="last_modified",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
     )
-    task: Optional[str] = Field(
+    task: str | None = Field(
         default=None,
     )
-    category: Optional[str] = Field(
+    category: str | None = Field(
         default=None,
     )
-    architecture: Optional[str] = Field(
+    architecture: str | None = Field(
         default=None,
     )
-    framework: Optional[list[str]] = Field(
+    framework: list[str] | None = Field(
         default=None,
     )
-    label: Optional[list[str]] = Field(
+    label: list[str] | None = Field(
         default=None,
     )
-    license: Optional[str] = Field(
+    license: str | None = Field(
         default=None,
     )
-    min_resource: Optional[Dict[str, Any]] = Field(
+    min_resource: dict[str, Any] | None = Field(
         default=None,
         description="Minimum resource requirements for the model.",
     )
@@ -322,11 +323,11 @@ class ModelConfig(BaseConfigModel):
         description="Path to the model file.",
         examples=["/models/my_model"],
     )
-    service: Optional[ModelServiceConfig] = Field(
+    service: ModelServiceConfig | None = Field(
         default=None,
         description="Configuration for the model service.",
     )
-    metadata: Optional[ModelMetadata] = Field(
+    metadata: ModelMetadata | None = Field(
         default=None,
         description="Metadata about the model.",
     )
@@ -338,7 +339,7 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
-    def health_check_config(self) -> Optional[ModelHealthCheck]:
+    def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
             if model.service and model.service.health_check:
                 if model.service.health_check is not None:
@@ -380,38 +381,36 @@ def find_config_file(daemon_name: str) -> Path:
         })
 
 
-def read_from_file(
-    toml_path: Optional[Union[Path, str]], daemon_name: str
-) -> Tuple[Dict[str, Any], Path]:
-    config: Dict[str, Any]
+def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
+    config: dict[str, Any]
     discovered_path: Path
     if toml_path is None:
         discovered_path = find_config_file(daemon_name)
     else:
         discovered_path = Path(toml_path)
     try:
-        config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
-    except IOError:
+        config = tomli.loads(discovered_path.read_text())
+    except OSError as e:
         raise ConfigurationError({
             "read_from_file()": f"Could not read config from: {discovered_path}",
-        })
+        }) from e
     else:
         return config, discovered_path
 
 
 async def read_from_etcd(
     etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> Optional[Dict[str, Any]]:
-    etcd = AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map)
-    raw_value = await etcd.get("daemon/config")
+) -> dict[str, Any] | None:
+    async with AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map) as etcd:
+        raw_value = await etcd.get("daemon/config")
     if raw_value is None:
         return None
-    config: Dict[str, Any]
-    config = cast(Dict[str, Any], tomli.loads(raw_value))
+    config: dict[str, Any]
+    config = tomli.loads(raw_value)
     return config
 
 
-def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any):
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             table[k] = {}
@@ -419,18 +418,23 @@ def override_key(table: MutableMapping[str, Any], key_path: Tuple[str, ...], val
     table[key_path[-1]] = value
 
 
-def override_with_env(table: MutableMapping[str, Any], key_path: Tuple[str, ...], env_key: str):
+def override_with_env(
+    table: MutableMapping[str, Any], key_path: tuple[str, ...], env_key: str
+) -> None:
     val = os.environ.get(env_key, None)
     if val is None:
         return
     override_key(table, key_path, val)
 
 
-def check(table: Any, iv: t.Trafaret):
+def check(table: Any, iv: t.Trafaret) -> Any:
     try:
         config = iv.check(table)
     except t.DataError as e:
-        raise ConfigurationError(e.as_dict())
+        err_data = e.as_dict()
+        if isinstance(err_data, str):
+            raise ConfigurationError({"error": err_data}) from e
+        raise ConfigurationError(err_data) from e
     else:
         return config
 
@@ -440,14 +444,15 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
     for k, v in updates.items():
         if isinstance(v, Mapping):
             orig = result.get(k, {})
-            assert isinstance(orig, Mapping)
+            if not isinstance(orig, Mapping):
+                raise TypeError(f"Cannot merge non-mapping value at key {k!r}")
             result[k] = merge(orig, v)
         else:
             result[k] = v
     return result
 
 
-def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], value: Any) -> None:
+def set_if_not_set(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:
     for k in key_path[:-1]:
         if k not in table:
             return

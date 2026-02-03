@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelListResult,
-    NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleModifier,
-    NotificationRuleType,
 )
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
@@ -27,7 +24,13 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.repositories.base import Querier, execute_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+    execute_creator,
+)
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -36,8 +39,8 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "NotificationDBSource",
     "NotificationChannelListResult",
+    "NotificationDBSource",
     "NotificationRuleListResult",
 )
 
@@ -90,99 +93,68 @@ class NotificationDBSource:
 
     async def create_channel(
         self,
-        creator: NotificationChannelCreator,
+        creator: Creator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         async with self._db.begin_session() as db_sess:
-            channel_row = NotificationChannelRow(**creator.fields_to_store())
-            db_sess.add(channel_row)
-            await db_sess.flush()
-            await db_sess.refresh(channel_row)
-            return channel_row.to_data()
+            result = await execute_creator(db_sess, creator)
+            return result.row.to_data()
 
     async def update_channel(
         self,
-        channel_id: UUID,
-        modifier: NotificationChannelModifier,
+        updater: Updater[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Updates an existing notification channel."""
         async with self._db.begin_session() as db_sess:
-            values = modifier.fields_to_update()
-            if not values:
-                raise NotificationChannelNotFound("No fields to update for notification channel")
-
-            stmt = (
-                sa.update(NotificationChannelRow)
-                .where(NotificationChannelRow.id == channel_id)
-                .values(values)
-            )
-            result = await db_sess.execute(stmt)
-            if result.rowcount == 0:
-                raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
-
-            # Fetch the updated row
-            select_stmt = sa.select(NotificationChannelRow).where(
-                NotificationChannelRow.id == channel_id
-            )
-            result = await db_sess.execute(select_stmt)
-            row = result.scalar_one()
-            return row.to_data()
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise NotificationChannelNotFound(
+                    f"Notification channel {updater.pk_value} not found"
+                )
+            return result.row.to_data()
 
     async def delete_channel(self, channel_id: UUID) -> bool:
         """Deletes a notification channel."""
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationChannelRow).where(NotificationChannelRow.id == channel_id)
             result = await db_sess.execute(stmt)
-            return result.rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def create_rule(
         self,
-        creator: NotificationRuleCreator,
+        creator: Creator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         async with self._db.begin_session() as db_sess:
-            rule_row = NotificationRuleRow(**creator.fields_to_store())
-            db_sess.add(rule_row)
-            await db_sess.flush()
-            # Explicitly load the channel relationship
-            await db_sess.refresh(rule_row)
+            result = await execute_creator(db_sess, creator)
+            # Explicitly load the channel relationship for to_data()
             stmt = (
                 sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_row.id)
+                .where(NotificationRuleRow.id == result.row.id)
                 .options(selectinload(NotificationRuleRow.channel))
             )
-            result = await db_sess.execute(stmt)
-            row = result.scalar_one()
+            query_result = await db_sess.execute(stmt)
+            row = query_result.scalar_one()
             return row.to_data()
 
     async def update_rule(
         self,
-        rule_id: UUID,
-        modifier: NotificationRuleModifier,
+        updater: Updater[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Updates an existing notification rule."""
         async with self._db.begin_session() as db_sess:
-            values = modifier.fields_to_update()
-            if not values:
-                raise NotificationRuleNotFound("No fields to update for notification rule")
-
-            stmt = (
-                sa.update(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_id)
-                .values(values)
-            )
-            result = await db_sess.execute(stmt)
-            if result.rowcount == 0:
-                raise NotificationRuleNotFound(f"Notification rule {rule_id} not found")
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise NotificationRuleNotFound(f"Notification rule {updater.pk_value} not found")
 
             # Fetch the updated row with channel relationship loaded
             select_stmt = (
                 sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_id)
+                .where(NotificationRuleRow.id == updater.pk_value)
                 .options(selectinload(NotificationRuleRow.channel))
             )
-            result = await db_sess.execute(select_stmt)
-            row = result.scalar_one()
+            fetch_result = await db_sess.execute(select_stmt)
+            row = fetch_result.scalar_one()
             return row.to_data()
 
     async def delete_rule(self, rule_id: UUID) -> bool:
@@ -190,7 +162,7 @@ class NotificationDBSource:
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationRuleRow).where(NotificationRuleRow.id == rule_id)
             result = await db_sess.execute(stmt)
-            return result.rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def get_channel_by_id(self, channel_id: UUID) -> NotificationChannelData:
         """Retrieves a notification channel by ID."""
@@ -216,13 +188,13 @@ class NotificationDBSource:
 
     async def search_channels(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationChannelListResult:
         """Searches notification channels with total count."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(NotificationChannelRow)
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
@@ -239,7 +211,7 @@ class NotificationDBSource:
 
     async def search_rules(
         self,
-        querier: Querier,
+        querier: BatchQuerier,
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -247,7 +219,7 @@ class NotificationDBSource:
                 selectinload(NotificationRuleRow.channel)
             )
 
-            result = await execute_querier(
+            result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,

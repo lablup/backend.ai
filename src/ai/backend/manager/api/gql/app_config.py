@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.app_config.types import AppConfigModifier
+from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 from ai.backend.manager.services.app_config.actions import (
     DeleteDomainConfigAction,
     DeleteUserConfigAction,
@@ -49,8 +47,8 @@ class UpsertDomainConfigInput:
     domain_name: str
     extra_config: strawberry.scalars.JSON
 
-    def to_modifier(self) -> AppConfigModifier:
-        return AppConfigModifier(extra_config=OptionalState.update(self.extra_config))
+    def to_updater_spec(self) -> AppConfigUpdaterSpec:
+        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
 @strawberry.input(
@@ -69,10 +67,10 @@ class UpsertUserConfigInput:
     """Input type for upserting user-level app configuration."""
 
     extra_config: strawberry.scalars.JSON
-    user_id: Optional[ID] = None
+    user_id: ID | None = None
 
-    def to_modifier(self) -> AppConfigModifier:
-        return AppConfigModifier(extra_config=OptionalState.update(self.extra_config))
+    def to_updater_spec(self) -> AppConfigUpdaterSpec:
+        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
 @strawberry.input(description="Added in 25.16.0. Input for deleting domain-level app configuration")
@@ -94,7 +92,7 @@ class DeleteDomainConfigInput:
 class DeleteUserConfigInput:
     """Input type for deleting user-level app configuration."""
 
-    user_id: Optional[ID] = None
+    user_id: ID | None = None
 
 
 @strawberry.type(
@@ -157,7 +155,37 @@ class DeleteUserConfigPayload:
     deleted: bool
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip(
+        """\
+        Added in 26.2.0.
+        Retrieve domain-level app configuration (admin only).
+        Returns only the configuration set specifically for the domain, without merging.
+        This query is useful for checking what values are configured at the domain level
+        when you want to modify domain or user configurations separately.
+        For actual configuration values to be applied, use mergedAppConfig instead.
+        """
+    )
+)
+async def admin_domain_app_config(
+    domain_name: str,
+    info: Info[StrawberryGQLContext],
+) -> AppConfig | None:
+    """Get domain-level app configuration (admin only)."""
+    check_admin_only()
+    processors = info.context.processors
+
+    action_result = await processors.app_config.get_domain_config.wait_for_complete(
+        GetDomainConfigAction(domain_name=domain_name)
+    )
+
+    if not action_result.result:
+        return None
+
+    return AppConfig(extra_config=action_result.result.extra_config)
+
+
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -168,12 +196,16 @@ class DeleteUserConfigPayload:
         For actual configuration values to be applied, use mergedAppConfig instead.
         Requires admin privileges.
         """
-    )
+    ),
+    deprecation_reason=(
+        "Use admin_domain_app_config instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+    ),
 )
 async def domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
-) -> Optional[AppConfig]:
+) -> AppConfig | None:
     """Get domain-level app configuration."""
     processors = info.context.processors
     me = current_user()
@@ -190,7 +222,7 @@ async def domain_app_config(
     return AppConfig(extra_config=action_result.result.extra_config)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -206,8 +238,8 @@ async def domain_app_config(
 )
 async def user_app_config(
     info: Info[StrawberryGQLContext],
-    user_id: Optional[ID] = None,
-) -> Optional[AppConfig]:
+    user_id: ID | None = None,
+) -> AppConfig | None:
     """Get user-level app configuration."""
     processors = info.context.processors
     me = current_user()
@@ -230,7 +262,7 @@ async def user_app_config(
     return AppConfig(extra_config=action_result.result.extra_config)
 
 
-@strawberry.field(
+@strawberry.field(  # type: ignore[misc]
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -258,7 +290,40 @@ async def merged_app_config(
     return AppConfig(extra_config=action_result.merged_config)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
+    name="adminUpsertDomainAppConfig",
+    description=dedent_strip(
+        """\
+        Added in 26.2.0.
+        Create or update domain-level app configuration (admin only).
+        The provided extra_config object will completely replace the existing configuration;
+        existing keys not present in the new extra_config will be removed.
+        All users in this domain will be affected by these settings when their configurations are merged,
+        unless they have user-level configurations that override specific keys.
+        """
+    ),
+)
+async def admin_upsert_domain_app_config(
+    input: UpsertDomainConfigInput,
+    info: Info[StrawberryGQLContext],
+) -> UpsertDomainConfigPayload:
+    """Create or update domain-level app configuration (admin only)."""
+    check_admin_only()
+    processors = info.context.processors
+
+    action_result = await processors.app_config.upsert_domain_config.wait_for_complete(
+        UpsertDomainConfigAction(
+            domain_name=input.domain_name,
+            updater_spec=input.to_updater_spec(),
+        )
+    )
+
+    return UpsertDomainConfigPayload(
+        app_config=AppConfig(extra_config=action_result.result.extra_config)
+    )
+
+
+@strawberry.mutation(  # type: ignore[misc]
     name="upsertDomainAppConfig",
     description=dedent_strip(
         """\
@@ -270,6 +335,10 @@ async def merged_app_config(
         unless they have user-level configurations that override specific keys.
         Requires admin privileges.
         """
+    ),
+    deprecation_reason=(
+        "Use admin_upsert_domain_app_config instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
     ),
 )
 async def upsert_domain_app_config(
@@ -285,7 +354,7 @@ async def upsert_domain_app_config(
     action_result = await processors.app_config.upsert_domain_config.wait_for_complete(
         UpsertDomainConfigAction(
             domain_name=input.domain_name,
-            modifier=input.to_modifier(),
+            updater_spec=input.to_updater_spec(),
         )
     )
 
@@ -294,7 +363,7 @@ async def upsert_domain_app_config(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="upsertUserAppConfig",
     description=dedent_strip(
         """\
@@ -327,7 +396,7 @@ async def upsert_user_app_config(
     action_result = await processors.app_config.upsert_user_config.wait_for_complete(
         UpsertUserConfigAction(
             user_id=target_user_id,
-            modifier=input.to_modifier(),
+            updater_spec=input.to_updater_spec(),
         )
     )
 
@@ -336,7 +405,34 @@ async def upsert_user_app_config(
     )
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
+    name="adminDeleteDomainAppConfig",
+    description=dedent_strip(
+        """\
+        Added in 26.2.0.
+        Delete domain-level app configuration (admin only).
+        All users in this domain may be affected by this deletion.
+        After deletion, users will only receive their user-level configurations
+        when configurations are merged, with no domain-level defaults.
+        """
+    ),
+)
+async def admin_delete_domain_app_config(
+    input: DeleteDomainConfigInput,
+    info: Info[StrawberryGQLContext],
+) -> DeleteDomainConfigPayload:
+    """Delete domain-level app configuration (admin only)."""
+    check_admin_only()
+    processors = info.context.processors
+
+    action_result = await processors.app_config.delete_domain_config.wait_for_complete(
+        DeleteDomainConfigAction(domain_name=input.domain_name)
+    )
+
+    return DeleteDomainConfigPayload(deleted=action_result.deleted)
+
+
+@strawberry.mutation(  # type: ignore[misc]
     name="deleteDomainAppConfig",
     description=dedent_strip(
         """\
@@ -347,6 +443,10 @@ async def upsert_user_app_config(
         when configurations are merged, with no domain-level defaults.
         Requires admin privileges.
         """
+    ),
+    deprecation_reason=(
+        "Use admin_delete_domain_app_config instead. "
+        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
     ),
 )
 async def delete_domain_app_config(
@@ -366,7 +466,7 @@ async def delete_domain_app_config(
     return DeleteDomainConfigPayload(deleted=action_result.deleted)
 
 
-@strawberry.mutation(
+@strawberry.mutation(  # type: ignore[misc]
     name="deleteUserAppConfig",
     description=dedent_strip(
         """\

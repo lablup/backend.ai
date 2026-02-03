@@ -16,11 +16,11 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "scaling_groups", sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True)
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("scaling_groups", "wsproxy_addr")

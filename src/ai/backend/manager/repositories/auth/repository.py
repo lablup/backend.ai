@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any
 from uuid import UUID
+
+import sqlalchemy as sa
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -35,8 +37,8 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_data: dict[str, Any],
+        keypair_data: dict[str, Any],
         group_name: str,
         domain_name: str,
     ) -> UserData:
@@ -45,8 +47,8 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> bool:
-        return await self._db_source.modify_user_full_name(email, domain_name, full_name)
+    async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
+        await self._db_source.modify_user_full_name(email, domain_name, full_name)
 
     @auth_repository_resilience.apply()
     async def update_user_password(self, email: str, password_info: PasswordInfo) -> None:
@@ -63,7 +65,7 @@ class AuthRepository:
         await self._db_source.mark_user_and_keypairs_inactive(email)
 
     @auth_repository_resilience.apply()
-    async def get_ssh_public_key(self, access_key: str) -> Optional[str]:
+    async def get_ssh_public_key(self, access_key: str) -> str | None:
         return await self._db_source.fetch_ssh_public_key(access_key)
 
     @auth_repository_resilience.apply()
@@ -76,7 +78,7 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> Optional[dict]:
+    ) -> sa.RowMapping:
         return await self._db_source.verify_credential_with_migration(
             domain_name, email, target_password_info
         )
@@ -87,14 +89,14 @@ class AuthRepository:
         domain_name: str,
         email: str,
         password: str,
-    ) -> Optional[dict]:
+    ) -> sa.RowMapping:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
             domain_name, email, password
         )
 
     @auth_repository_resilience.apply()
-    async def get_user_row_by_uuid(self, user_uuid: UUID) -> Optional[UserRow]:
+    async def get_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         return await self._db_source.fetch_user_row_by_uuid(user_uuid)
 
     @auth_repository_resilience.apply()

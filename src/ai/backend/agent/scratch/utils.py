@@ -5,23 +5,22 @@ import subprocess
 from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import Optional
 
 import aiofiles
 
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.json import load_json
 from ai.backend.common.types import KernelId
 
-from ..resources import KernelResourceSpec
 from .types import KernelRecoveryScratchData
 
 
 def create_sparse_file(name: str, size: int) -> None:
-    fd = os.open(name, os.O_CREAT, 0o644)
-    os.close(fd)
+    filepath = Path(name)
+    filepath.touch(mode=0o644, exist_ok=True)
     os.truncate(name, size)
     # Check that no space was allocated
-    stat = os.stat(name)
+    stat = filepath.stat()
     if stat.st_blocks != 0:
         raise RuntimeError("could not create sparse file")
 
@@ -54,7 +53,7 @@ async def destroy_loop_filesystem(scratch_root: Path, kernel_id: KernelId) -> No
     exit_code = await umount.wait()
     if exit_code != 0:
         raise RuntimeError("umount failed")
-    await loop.run_in_executor(None, os.remove, str(scratch_file))
+    await loop.run_in_executor(None, scratch_file.unlink)
     await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
 
@@ -80,11 +79,11 @@ class ScratchConfig:
     def recovery_file_exists(self) -> bool:
         return self._json_recovery_file_path().is_file()
 
-    async def get_json_recovery_data(self) -> Optional[KernelRecoveryScratchData]:
+    async def get_json_recovery_data(self) -> KernelRecoveryScratchData | None:
         filepath = self._json_recovery_file_path()
         if not filepath.is_file():
             return None
-        async with aiofiles.open(filepath, "r") as file:
+        async with aiofiles.open(filepath) as file:
             text = await file.read()
         raw_data = load_json(text)
         return KernelRecoveryScratchData.model_validate(raw_data)

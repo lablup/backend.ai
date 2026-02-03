@@ -35,7 +35,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "storage": "ai.backend.storage.cli.__main__:main",
-            "storage.start-server": "ai.backend.storage.server:main",
+            "storage.start-server": "ai.backend.storage.cli.start_server:main",
         },
     },
     generate_setup=True,

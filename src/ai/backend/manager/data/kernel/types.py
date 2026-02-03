@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from functools import lru_cache
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from ai.backend.common.types import (
     CIStrEnum,
+    KernelId,
     ResourceSlot,
+    SessionId,
     SessionResult,
     SessionTypes,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import SchedulingResult
 
 
 class KernelStatus(CIStrEnum):
@@ -37,7 +45,7 @@ class KernelStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def having_containers(cls) -> set["KernelStatus"]:
+    def having_containers(cls) -> set[KernelStatus]:
         return {
             cls.PULLING,
             cls.CREATING,
@@ -52,7 +60,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_occupied_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_occupied_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -63,7 +71,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def resource_requested_statuses(cls) -> frozenset["KernelStatus"]:
+    def resource_requested_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
@@ -77,7 +85,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminatable_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminatable_statuses(cls) -> frozenset[KernelStatus]:
         """Return statuses that can transition to TERMINATING."""
         return frozenset(
             status
@@ -94,7 +102,7 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def terminal_statuses(cls) -> frozenset["KernelStatus"]:
+    def terminal_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered terminal.
         """
@@ -106,21 +114,51 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def retriable_statuses(cls) -> frozenset["KernelStatus"]:
+    def pre_prepared_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns statuses before image pulling is complete.
+        Used for NOT_ANY kernel matching to promote sessions to PREPARED.
+        """
+        return frozenset((
+            cls.PENDING,
+            cls.SCHEDULED,
+            cls.PREPARING,
+            cls.BUILDING,
+            cls.PULLING,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def pre_running_statuses(cls) -> frozenset[KernelStatus]:
+        """
+        Returns statuses before kernel is actually running.
+        Used for NOT_ANY kernel matching to promote sessions to RUNNING.
+        """
+        return frozenset((
+            cls.PENDING,
+            cls.SCHEDULED,
+            cls.PREPARING,
+            cls.BUILDING,
+            cls.PULLING,
+            cls.PREPARED,
+            cls.CREATING,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def retriable_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered retriable.
         """
         return frozenset(
-            (
-                status
-                for status in cls
-                if status
-                not in (
-                    cls.RUNNING,
-                    cls.TERMINATING,
-                    cls.TERMINATED,
-                    cls.CANCELLED,
-                )
+            status
+            for status in cls
+            if status
+            not in (
+                cls.RUNNING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
             )
         )
 
@@ -128,8 +166,8 @@ class KernelStatus(CIStrEnum):
 @dataclass
 class RelatedSessionInfo:
     session_id: str  # Session UUID
-    creation_id: Optional[str]
-    name: Optional[str]
+    creation_id: str | None
+    name: str | None
     session_type: SessionTypes
 
 
@@ -149,17 +187,17 @@ class UserPermission:
     access_key: str
     domain_name: str
     group_id: UUID
-    uid: Optional[int]
-    main_gid: Optional[int]
-    gids: Optional[list[int]]
+    uid: int | None
+    main_gid: int | None
+    gids: list[int] | None
 
 
 @dataclass
 class ResourceInfo:
-    scaling_group: Optional[str]
-    agent: Optional[str]
-    agent_addr: Optional[str]
-    container_id: Optional[str]
+    scaling_group: str | None
+    agent: str | None
+    agent_addr: str | None
+    container_id: str | None
     occupied_slots: ResourceSlot
     requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
@@ -169,31 +207,31 @@ class ResourceInfo:
 
 @dataclass
 class ImageInfo:
-    identifier: Optional[ImageIdentifier]
-    registry: Optional[str]
-    tag: Optional[str]
-    architecture: Optional[str]
+    identifier: ImageIdentifier | None
+    registry: str | None
+    tag: str | None
+    architecture: str | None
 
 
 @dataclass
 class RuntimeConfig:
-    environ: Optional[list[str]]
-    mounts: Optional[list[str]]  # legacy
-    mount_map: Optional[dict[str, Any]]  # legacy
-    vfolder_mounts: Optional[list[dict[str, Any]]]
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
+    environ: list[str] | None
+    mounts: list[str] | None  # legacy
+    mount_map: dict[str, Any] | None  # legacy
+    vfolder_mounts: list[dict[str, Any]] | None
+    bootstrap_script: str | None
+    startup_command: str | None
 
 
 @dataclass
 class NetworkConfig:
-    kernel_host: Optional[str]
+    kernel_host: str | None
     repl_in_port: int
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
-    service_ports: Optional[dict[str, Any]]
-    preopen_ports: Optional[list[int]]
+    service_ports: dict[str, Any] | None
+    preopen_ports: list[int] | None
     use_host_network: bool
 
 
@@ -201,32 +239,33 @@ class NetworkConfig:
 class LifecycleStatus:
     status: KernelStatus
     result: SessionResult
-    created_at: Optional[datetime]
-    terminated_at: Optional[datetime]
-    starts_at: Optional[datetime]
-    status_changed: Optional[datetime]
-    status_info: Optional[str]
-    status_data: Optional[Mapping[str, Any]]
-    status_history: Optional[dict[str, Any]]
-    last_seen: Optional[datetime]
+    created_at: datetime | None
+    terminated_at: datetime | None
+    starts_at: datetime | None
+    status_changed: datetime | None
+    status_info: str | None
+    status_data: Mapping[str, Any] | None
+    status_history: dict[str, Any] | None
+    last_seen: datetime | None
+    last_observed_at: datetime | None
 
 
 @dataclass
 class Metrics:
     num_queries: int
-    last_stat: Optional[dict[str, Any]]
-    container_log: Optional[bytes]
+    last_stat: dict[str, Any] | None
+    container_log: bytes | None
 
 
 @dataclass
 class Metadata:
-    callback_url: Optional[str]
-    internal_data: Optional[dict[str, Any]]
+    callback_url: str | None
+    internal_data: dict[str, Any] | None
 
 
 @dataclass
 class KernelInfo:
-    id: UUID  # Kernel UUID
+    id: KernelId
     session: RelatedSessionInfo
     user_permission: UserPermission
     image: ImageInfo
@@ -237,3 +276,57 @@ class KernelInfo:
     lifecycle: LifecycleStatus
     metrics: Metrics
     metadata: Metadata
+
+
+@dataclass
+class KernelListResult:
+    """Search result with total count and pagination info for kernels."""
+
+    items: list[KernelInfo]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+# ========== Scheduling History Types ==========
+
+
+class KernelSchedulingPhase(StrEnum):
+    PREPARING = "PREPARING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
+    RUNNING = "RUNNING"
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+
+
+@dataclass
+class KernelSchedulingHistoryData:
+    """Domain model for kernel scheduling history."""
+
+    id: UUID
+    kernel_id: KernelId
+    session_id: SessionId
+
+    phase: str  # ScheduleType value
+    from_status: KernelSchedulingPhase | None
+    to_status: KernelSchedulingPhase | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class KernelSchedulingHistoryListResult:
+    """Search result with pagination for kernel scheduling history."""
+
+    items: list[KernelSchedulingHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

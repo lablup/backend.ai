@@ -15,11 +15,11 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.alter_column("kernels", column_name="max_mem_bytes", new_column_name="mem_max_bytes")
     op.alter_column("kernels", column_name="cur_mem_bytes", new_column_name="mem_cur_bytes")
 
 
-def downgrade():
+def downgrade() -> None:
     op.alter_column("kernels", column_name="mem_max_bytes", new_column_name="max_mem_bytes")
     op.alter_column("kernels", column_name="mem_cur_bytes", new_column_name="cur_mem_bytes")

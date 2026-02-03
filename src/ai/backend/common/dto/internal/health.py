@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -28,7 +27,7 @@ class ComponentConnectivityStatus(BaseModel):
     component_id: str = Field(description="Unique identifier for the component")
     is_healthy: bool = Field(description="Whether the component is currently healthy")
     last_checked_at: datetime = Field(description="Timestamp when the health check was performed")
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None, description="Error message if the health check failed"
     )
 

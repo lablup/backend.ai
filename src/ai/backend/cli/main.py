@@ -1,3 +1,5 @@
+from typing import Any
+
 import click
 
 from .completion import get_completion_command
@@ -23,7 +25,7 @@ from .types import CliContextInfo
     help="(client option) Set the output style of the command results.",
 )
 @click.pass_context
-def main(ctx: click.Context, **kwargs) -> None:
+def main(ctx: click.Context, /, **kwargs: Any) -> None:
     """Unified Command Line Interface for Backend.ai"""
     ctx.obj = CliContextInfo(info=kwargs)
 

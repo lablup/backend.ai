@@ -1,6 +1,6 @@
 from abc import ABC
 
-from ..action import BaseAction, BaseActionTriggerMeta, ProcessResult
+from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 
 
 class ActionMonitor(ABC):

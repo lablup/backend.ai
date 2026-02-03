@@ -7,10 +7,10 @@ from ai.backend.common.dependencies import (
 from .composer import DependencyInput, DependencyResources, ManagerDependencyComposer
 
 __all__ = [
-    "DependencyProvider",
     "DependencyComposer",
-    "DependencyStack",
     "DependencyInput",
+    "DependencyProvider",
     "DependencyResources",
+    "DependencyStack",
     "ManagerDependencyComposer",
 ]

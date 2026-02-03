@@ -7,10 +7,10 @@ import enum
 import os
 import pickle
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import PosixPath, PurePosixPath
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Protocol, cast
 
 import msgpack as _msgpack
 import temporenc
@@ -87,7 +87,7 @@ _DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
 
 
 class _Deserializer:
-    def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None):
+    def __init__(self, mapping: Mapping[int, ExtFunc] | None = None) -> None:
         self._ext_hook: dict[int, ExtFunc] = {}
         mapping = mapping or {}
         self._ext_hook = {**mapping}
@@ -121,16 +121,16 @@ DEFAULT_UNPACK_OPTS = {
 }
 
 
-def packb(data: Any, **kwargs) -> bytes:
+def packb(data: Any, **kwargs: Any) -> bytes:
     opts = {**DEFAULT_PACK_OPTS, **kwargs}
     ret = _msgpack.packb(data, **opts)
     if ret is None:
         return b""
-    return ret
+    return cast(bytes, ret)
 
 
 def unpackb(
-    packed: bytes, ext_hook_mapping: Optional[Mapping[int, ExtFunc]] = None, **kwargs
+    packed: bytes, ext_hook_mapping: Mapping[int, ExtFunc] | None = None, **kwargs: Any
 ) -> Any:
     opts = {**DEFAULT_UNPACK_OPTS, **kwargs}
     if ext_hook_mapping is not None:

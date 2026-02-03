@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -32,11 +32,11 @@ class UserResourcePolicyDep(BaseDependencyModel):
 
 
 class EndpointDep(BaseDependencyModel):
-    api_endpoint: Optional[str] = Field(
+    api_endpoint: str | None = Field(
         default=None,
         description="The API endpoint configuration for the test context.",
     )
-    login_endpoint: Optional[str] = Field(
+    login_endpoint: str | None = Field(
         default=None,
         description="The login endpoint configuration for the test context.",
     )
@@ -45,7 +45,7 @@ class EndpointDep(BaseDependencyModel):
 class LoginCredentialDep(BaseDependencyModel):
     user_id: str = Field(description="The user ID for login.", examples=["user@example.com"])
     password: str = Field(description="The password for login.", examples=["password123"])
-    otp: Optional[str] = Field(
+    otp: str | None = Field(
         default=None,
         description="The one-time password for login, if required.",
         examples=["123456"],
@@ -89,7 +89,7 @@ class BatchSessionDep(BaseDependencyModel):
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
     )
-    batch_timeout: Optional[float] = Field(
+    batch_timeout: float | None = Field(
         default=None,
         description="The timeout for the batch session in seconds.",
         examples=[10.0],
@@ -125,7 +125,7 @@ class BootstrapScriptDep(BaseDependencyModel):
 
 
 class SessionDep(BaseDependencyModel):
-    resources: Optional[dict[str, Any]] = Field(
+    resources: dict[str, Any] | None = Field(
         default=None,
         description="The resources to allocate for the session.",
         examples=[{"cpu": 2, "mem": "4gb"}],
@@ -171,11 +171,11 @@ class ModelServiceDep(BaseDependencyModel):
 
 
 class VFolderDep(BaseDependencyModel):
-    group: Optional[str] = Field(
+    group: str | None = Field(
         default=None,
         description="The group name for the vfolder.",
     )
-    unmanaged_path: Optional[str] = Field(
+    unmanaged_path: str | None = Field(
         default=None, description="The unmanaged path for the vfolder."
     )
     permission: str = Field(
@@ -191,7 +191,7 @@ class VFolderDep(BaseDependencyModel):
     )
 
     @model_validator(mode="after")
-    def validate(self):
+    def validate_permissions(self) -> Self:
         if self.permission == self.share_permission:
             raise ValueError("permission and share_permission must be different")
         return self
@@ -209,63 +209,63 @@ class UploadFileDep(BaseDependencyModel):
 
 
 class TestContextInjectionModel(BaseDependencyModel):
-    endpoint: Optional[EndpointDep] = Field(
+    endpoint: EndpointDep | None = Field(
         default=None,
         description="The endpoint configurations for the test context.",
     )
-    keypair: Optional[KeyPairDep] = Field(
+    keypair: KeyPairDep | None = Field(
         default=None,
         description="The key pair for the test context.",
     )
-    login_credential: Optional[LoginCredentialDep] = Field(
+    login_credential: LoginCredentialDep | None = Field(
         default=None,
         description="The login credentials for the test context.",
     )
-    domain: Optional[DomainDep] = Field(
+    domain: DomainDep | None = Field(
         default=None,
         description="The domain configuration for the test context.",
     )
-    group: Optional[GroupDep] = Field(
+    group: GroupDep | None = Field(
         default=None,
         description="The group configuration for the test context.",
     )
-    scaling_group: Optional[ScalingGroupDep] = Field(
+    scaling_group: ScalingGroupDep | None = Field(
         default=None,
         description="The scaling group configuration for the test context.",
     )
-    image: Optional[ImageDep] = Field(
+    image: ImageDep | None = Field(
         default=None,
         description="The Docker image context for the test.",
     )
-    sse: Optional[SSEDep] = Field(
+    sse: SSEDep | None = Field(
         default=None,
         description="The Server-Sent Events configuration for the test context.",
     )
-    cluster_config: Optional[ClusterDep] = Field(
+    cluster_config: ClusterDep | None = Field(
         default=None,
         description="The cluster configuration for the test context.",
     )
-    batch_session: Optional[BatchSessionDep] = Field(
+    batch_session: BatchSessionDep | None = Field(
         default=None,
         description="The batch session configuration for the test context.",
     )
-    session: Optional[SessionDep] = Field(
+    session: SessionDep | None = Field(
         default=None,
         description="The session configuration for the test context.",
     )
-    session_imagify: Optional[SessionImagifyDep] = Field(
+    session_imagify: SessionImagifyDep | None = Field(
         default=None,
         description="The session imagify configuration for the test context.",
     )
-    model_service: Optional[ModelServiceDep] = Field(
+    model_service: ModelServiceDep | None = Field(
         default=None,
         description="The model service configuration for the test context.",
     )
-    vfolder: Optional[VFolderDep] = Field(
+    vfolder: VFolderDep | None = Field(
         default=None,
         description="The vfolder configuration for the test context.",
     )
-    user_resource_policy: Optional[UserResourcePolicyDep] = Field(
+    user_resource_policy: UserResourcePolicyDep | None = Field(
         default=None,
         description="The user resource policy configuration for the test context.",
     )

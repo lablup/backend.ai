@@ -3,7 +3,7 @@ import ctypes.util
 import logging
 import os
 import sys
-from typing import Iterator
+from collections.abc import Iterator
 
 import aiohttp
 import aiotools
@@ -47,18 +47,16 @@ def parse_cpuset(value: str) -> Iterator[int]:
 
 class libnuma:
     @staticmethod
-    def node_of_cpu(core) -> int:
+    def node_of_cpu(core: int) -> int:
         if _numa_supported:
-            return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
-        else:
-            return 0
+            return int(_libnuma.numa_node_of_cpu(core))  # type: ignore[name-defined,unused-ignore]
+        return 0
 
     @staticmethod
     def num_nodes() -> int:
         if _numa_supported:
-            return int(_libnuma.numa_num_configured_nodes())  # type: ignore
-        else:
-            return 1
+            return int(_libnuma.numa_num_configured_nodes())  # type: ignore[name-defined,unused-ignore]
+        return 1
 
     @staticmethod
     @aiotools.lru_cache(maxsize=1)
@@ -106,12 +104,12 @@ class libnuma:
                     return None
             docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
             log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
-            cpuset_source = "the docker cgroup (v{})".format(version)
+            cpuset_source = f"the docker cgroup (v{version})"
             try:
                 docker_cpuset = docker_cpuset_path.read_text()
                 cpuset = {*parse_cpuset(docker_cpuset)}
                 return cpuset, cpuset_source
-            except (IOError, ValueError):
+            except (OSError, ValueError):
                 log.warning(
                     "failed to parse cgroup cpuset from {}, falling back to the next cpuset source",
                     docker_cpuset_path,
@@ -120,7 +118,7 @@ class libnuma:
 
         async def read_affinity_cpuset() -> tuple[set[int], str] | None:
             try:
-                cpuset = os.sched_getaffinity(0)  # type: ignore
+                cpuset = os.sched_getaffinity(0)  # type: ignore[attr-defined,unused-ignore]
                 cpuset_source = "the scheduler affinity mask of the agent process"
             except AttributeError:
                 return None
@@ -165,7 +163,7 @@ class libnuma:
             log.debug("read the available cpuset from {}", cpuset_source)
 
     @staticmethod
-    async def get_core_topology(limit_cpus=None) -> tuple[list[int], ...]:
+    async def get_core_topology(limit_cpus: set[int] | None = None) -> tuple[list[int], ...]:
         topo: tuple[list[int], ...] = tuple([] for _ in range(libnuma.num_nodes()))
         for c in await libnuma.get_available_cores():
             if limit_cpus is not None and c not in limit_cpus:

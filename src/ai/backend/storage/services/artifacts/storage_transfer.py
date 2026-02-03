@@ -4,12 +4,13 @@ import asyncio
 import logging
 import shutil
 from pathlib import Path
+from typing import cast
 
-from ai.backend.common.artifact_storage import AbstractStorage
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.storage.data.storage.types import StorageTarget
 from ai.backend.storage.errors import StorageTransferError
 from ai.backend.storage.storages.object_storage import ObjectStorage
-from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -20,13 +21,13 @@ class StorageTransferManager:
     Manages transferring files between different artifact storage backends.
     """
 
-    def __init__(self, storage_pool: StoragePool):
+    def __init__(self, storage_pool: AbstractStoragePool) -> None:
         self._storage_pool = storage_pool
 
     async def transfer_file(
         self,
-        source_storage_name: str,
-        dest_storage_name: str,
+        source_storage: StorageTarget,
+        dest_storage: StorageTarget,
         source_path: str,
         dest_path: str,
     ) -> None:
@@ -34,45 +35,54 @@ class StorageTransferManager:
         Transfer a file from source storage to destination storage.
 
         Args:
-            source_storage_name: Name of source storage
-            dest_storage_name: Name of destination storage
+            source_storage: Source storage (name or instance)
+            dest_storage: Destination storage (name or instance)
             source_path: Path of file in source storage
             dest_path: Path of file in destination storage
         """
+        source_storage_name = source_storage.name
+        dest_storage_name = dest_storage.name
+
         if source_storage_name == dest_storage_name:
-            log.debug(f"Skipping transfer - same storage: {source_storage_name}")
+            log.debug("Skipping transfer - same storage: {}", source_storage_name)
             return
 
-        source_storage = self._storage_pool.get_storage(source_storage_name)
-        dest_storage = self._storage_pool.get_storage(dest_storage_name)
+        resolved_source = source_storage.resolve_storage(self._storage_pool)
+        resolved_dest = dest_storage.resolve_storage(self._storage_pool)
 
         log.info(
-            f"Transferring file from {source_storage_name} to {dest_storage_name}: "
-            f"{source_path} -> {dest_path}"
+            "Transferring file from {} to {}: {} -> {}",
+            source_storage_name,
+            dest_storage_name,
+            source_path,
+            dest_path,
         )
 
         try:
             # Optimize VFS-to-VFS transfer using direct file move
-            if isinstance(source_storage, VFSStorage) and isinstance(dest_storage, VFSStorage):
-                await self._move_vfs_to_vfs(source_storage, dest_storage, source_path, dest_path)
+            if isinstance(resolved_source, VFSStorage) and isinstance(resolved_dest, VFSStorage):
+                await self._move_vfs_to_vfs(resolved_source, resolved_dest, source_path, dest_path)
             else:
                 # Generic storage-to-storage transfer via streaming
-                await self._copy_via_stream(source_storage, dest_storage, source_path, dest_path)
+                await self._copy_via_stream(resolved_source, resolved_dest, source_path, dest_path)
 
             log.info(
-                f"Successfully transferred file from {source_storage_name} to {dest_storage_name}: "
-                f"{source_path} -> {dest_path}"
+                "Successfully transferred file from {} to {}: {} -> {}",
+                source_storage_name,
+                dest_storage_name,
+                source_path,
+                dest_path,
             )
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer file from {source_storage_name} to {dest_storage_name}: "
-                f"{source_path} -> {dest_path}: {str(e)}"
+                f"{source_path} -> {dest_path}: {e!s}"
             ) from e
 
     async def transfer_directory(
         self,
-        source_storage_name: str,
-        dest_storage_name: str,
+        source_storage: StorageTarget,
+        dest_storage: StorageTarget,
         source_prefix: str,
         dest_prefix: str,
         concurrency: int = 10,
@@ -81,45 +91,55 @@ class StorageTransferManager:
         Transfer all files with given prefix from source to destination storage.
 
         Args:
-            source_storage_name: Name of source storage
-            dest_storage_name: Name of destination storage
+            source_storage: Source storage (name or instance)
+            dest_storage: Destination storage (name or instance)
             source_prefix: Prefix path in source storage
             dest_prefix: Prefix path in destination storage
             concurrency: Number of concurrent transfers
         """
+        source_storage_name = source_storage.name
+        dest_storage_name = dest_storage.name
+
         if source_storage_name == dest_storage_name:
-            log.debug(f"Skipping transfer - same storage: {source_storage_name}")
+            log.debug("Skipping transfer - same storage: {}", source_storage_name)
             return 0
 
-        source_storage = self._storage_pool.get_storage(source_storage_name)
-        dest_storage = self._storage_pool.get_storage(dest_storage_name)
+        resolved_source = source_storage.resolve_storage(self._storage_pool)
+        resolved_dest = dest_storage.resolve_storage(self._storage_pool)
 
         try:
             # VFS-to-VFS: move entire directory at once (no empty directory cleanup needed)
-            if isinstance(source_storage, VFSStorage) and isinstance(dest_storage, VFSStorage):
-                file_count = len(await self._list_files_with_prefix(source_storage, source_prefix))
+            if isinstance(resolved_source, VFSStorage) and isinstance(resolved_dest, VFSStorage):
+                file_count = len(await self._list_files_with_prefix(resolved_source, source_prefix))
                 if file_count == 0:
-                    log.warning(f"No files found with prefix: {source_prefix}")
+                    log.warning("No files found with prefix: {}", source_prefix)
                     return 0
 
                 await self._move_vfs_directory(
-                    source_storage, dest_storage, source_prefix, dest_prefix
+                    resolved_source, resolved_dest, source_prefix, dest_prefix
                 )
                 log.info(
-                    f"Successfully moved directory from {source_storage_name} to {dest_storage_name}: "
-                    f"{source_prefix} -> {dest_prefix} ({file_count} files)"
+                    "Successfully moved directory from {} to {}: {} -> {} ({} files)",
+                    source_storage_name,
+                    dest_storage_name,
+                    source_prefix,
+                    dest_prefix,
+                    file_count,
                 )
                 return file_count
 
             # Other storage types: transfer files individually
-            file_list = await self._list_files_with_prefix(source_storage, source_prefix)
+            file_list = await self._list_files_with_prefix(resolved_source, source_prefix)
 
             if not file_list:
-                log.warning(f"No files found with prefix: {source_prefix}")
+                log.warning("No files found with prefix: {}", source_prefix)
                 return 0
 
             log.info(
-                f"Transferring {len(file_list)} files from {source_storage_name} to {dest_storage_name}"
+                "Transferring {} files from {} to {}",
+                len(file_list),
+                source_storage_name,
+                dest_storage_name,
             )
 
             # Transfer files with concurrency control
@@ -135,22 +155,23 @@ class StorageTransferManager:
                         else dest_prefix
                     )
 
-                    await self.transfer_file(
-                        source_storage_name, dest_storage_name, source_path, dest_path
-                    )
+                    await self.transfer_file(source_storage, dest_storage, source_path, dest_path)
 
             # Execute transfers concurrently
             await asyncio.gather(*[_transfer_single_file(path) for path in file_list])
 
             log.info(
-                f"Successfully transferred {len(file_list)} files from {source_storage_name} to {dest_storage_name}"
+                "Successfully transferred {} files from {} to {}",
+                len(file_list),
+                source_storage_name,
+                dest_storage_name,
             )
             return len(file_list)
 
         except Exception as e:
             raise StorageTransferError(
                 f"Failed to transfer directory from {source_storage_name} to {dest_storage_name}: "
-                f"{source_prefix} -> {dest_prefix}: {str(e)}"
+                f"{source_prefix} -> {dest_prefix}: {e!s}"
             ) from e
 
     async def _move_vfs_directory(
@@ -246,10 +267,9 @@ class StorageTransferManager:
         """List all files in storage with given prefix."""
         if isinstance(storage, VFSStorage):
             return await self._list_vfs_files_with_prefix(storage, prefix)
-        elif isinstance(storage, ObjectStorage):
+        if isinstance(storage, ObjectStorage):
             return await self._list_object_storage_files_with_prefix(storage, prefix)
-        else:
-            raise StorageTransferError(f"Unsupported storage type: {type(storage)}")
+        raise StorageTransferError(f"Unsupported storage type: {type(storage)}")
 
     async def _list_vfs_files_with_prefix(self, storage: VFSStorage, prefix: str) -> list[str]:
         """List files in VFS storage with given prefix."""
@@ -257,15 +277,14 @@ class StorageTransferManager:
             full_path = storage.resolve_path(prefix)
             if full_path.is_file():
                 return [prefix]
-            elif full_path.is_dir():
+            if full_path.is_dir():
                 files = []
                 for item in full_path.rglob("*"):
                     if item.is_file():
                         rel_path = item.relative_to(storage.base_path)
                         files.append(str(rel_path))
                 return files
-            else:
-                return []
+            return []
         except Exception:
             return []
 
@@ -276,13 +295,13 @@ class StorageTransferManager:
         try:
             return await storage.list_objects_with_prefix(prefix)
         except Exception as e:
-            log.warning(f"Failed to list objects with prefix '{prefix}': {str(e)}")
+            log.warning(f"Failed to list objects with prefix '{prefix}': {e!s}")
             return []
 
     async def verify_transfer(
         self,
-        source_storage_name: str,
-        dest_storage_name: str,
+        source_storage: StorageTarget,
+        dest_storage: StorageTarget,
         source_path: str,
         dest_path: str,
     ) -> bool:
@@ -290,8 +309,8 @@ class StorageTransferManager:
         Verify that a file was transferred correctly by comparing metadata.
 
         Args:
-            source_storage_name: Name of source storage
-            dest_storage_name: Name of destination storage
+            source_storage: Source storage (name or instance)
+            dest_storage: Destination storage (name or instance)
             source_path: Path in source storage
             dest_path: Path in destination storage
 
@@ -299,20 +318,20 @@ class StorageTransferManager:
             True if transfer was successful, False otherwise
         """
         try:
-            source_storage = self._storage_pool.get_storage(source_storage_name)
-            dest_storage = self._storage_pool.get_storage(dest_storage_name)
+            resolved_source = source_storage.resolve_storage(self._storage_pool)
+            resolved_dest = dest_storage.resolve_storage(self._storage_pool)
 
             # Get metadata from both storages
-            source_meta = await source_storage.get_file_info(source_path)
-            dest_meta = await dest_storage.get_file_info(dest_path)
+            source_meta = await resolved_source.get_file_info(source_path)
+            dest_meta = await resolved_dest.get_file_info(dest_path)
 
             # Compare file sizes
             if hasattr(source_meta, "size") and hasattr(dest_meta, "size"):
-                return source_meta.size == dest_meta.size
+                return cast(bool, source_meta.size == dest_meta.size)
 
             # If size comparison is not available, assume success
             return True
 
         except Exception as e:
-            log.error(f"Failed to verify transfer: {source_path} -> {dest_path}: {str(e)}")
+            log.error("Failed to verify transfer: {} -> {}: {}", source_path, dest_path, e)
             return False

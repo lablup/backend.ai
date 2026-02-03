@@ -1,4 +1,4 @@
-from typing import Optional
+from __future__ import annotations
 
 import sqlalchemy as sa
 
@@ -10,10 +10,8 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    KeyPairResourcePolicyModifier,
-)
-from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 keypair_resource_policy_db_source_resilience = Resilience(
     policies=[
@@ -43,46 +41,21 @@ class KeypairResourcePolicyDBSource:
         self._db = db
 
     @keypair_resource_policy_db_source_resilience.apply()
-    async def insert(self, creator: KeyPairResourcePolicyCreator) -> KeyPairResourcePolicyData:
+    async def insert(self, creator: Creator[KeyPairResourcePolicyRow]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            db_row = KeyPairResourcePolicyRow.from_creator(creator)
-            db_sess.add(db_row)
-            await db_sess.flush()
-            # Refresh the object to ensure all attributes are loaded
-            await db_sess.refresh(db_row)
+            creator_result = await execute_creator(db_sess, creator)
+            db_row = creator_result.row
             return db_row.to_dataclass()
 
     @keypair_resource_policy_db_source_resilience.apply()
-    async def update(
-        self, name: str, modifier: KeyPairResourcePolicyModifier
-    ) -> KeyPairResourcePolicyData:
+    async def update(self, updater: Updater[KeyPairResourcePolicyRow]) -> KeyPairResourcePolicyData:
         async with self._db.begin_session() as db_sess:
-            check_query = sa.select(KeyPairResourcePolicyRow).where(
-                KeyPairResourcePolicyRow.name == name
-            )
-            existing_row = await db_sess.scalar(check_query)
-            if existing_row is None:
+            result = await execute_updater(db_sess, updater)
+            if result is None:
                 raise KeypairResourcePolicyNotFound(
-                    f"Keypair resource policy with name {name} not found."
+                    f"Keypair resource policy with name {updater.pk_value} not found."
                 )
-            fields = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(KeyPairResourcePolicyRow)
-                .where(KeyPairResourcePolicyRow.name == name)
-                .values(**fields)
-                .returning(KeyPairResourcePolicyRow)
-            )
-            query_stmt = (
-                sa.select(KeyPairResourcePolicyRow)
-                .from_statement(update_stmt)
-                .execution_options(populate_existing=True)
-            )
-            updated_row: Optional[KeyPairResourcePolicyRow] = await db_sess.scalar(query_stmt)
-            if updated_row is None:
-                raise KeypairResourcePolicyNotFound(
-                    f"Keypair resource policy with name {name} not found after update."
-                )
-            return updated_row.to_dataclass()
+            return result.row.to_dataclass()
 
     @keypair_resource_policy_db_source_resilience.apply()
     async def delete(self, name: str) -> KeyPairResourcePolicyData:
@@ -98,7 +71,7 @@ class KeypairResourcePolicyDBSource:
                 .from_statement(delete_stmt)
                 .execution_options(populate_existing=True)
             )
-            row: Optional[KeyPairResourcePolicyRow] = await db_sess.scalar(query_stms)
+            row: KeyPairResourcePolicyRow | None = await db_sess.scalar(query_stms)
             if row is None:
                 raise KeypairResourcePolicyNotFound(
                     f"Keypair resource policy with name {name} not found."

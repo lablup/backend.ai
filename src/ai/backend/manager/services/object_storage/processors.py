@@ -27,6 +27,10 @@ from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
     ListObjectStorageActionResult,
 )
+from ai.backend.manager.services.object_storage.actions.search import (
+    SearchObjectStoragesAction,
+    SearchObjectStoragesActionResult,
+)
 from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageAction,
     UpdateObjectStorageActionResult,
@@ -46,6 +50,9 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
     get_presigned_upload_url: ActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
     ]
+    search_object_storages: ActionProcessor[
+        SearchObjectStoragesAction, SearchObjectStoragesActionResult
+    ]
 
     def __init__(self, service: ObjectStorageService, action_monitors: list[ActionMonitor]) -> None:
         self.create = ActionProcessor(service.create, action_monitors)
@@ -59,6 +66,7 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
         self.get_presigned_upload_url = ActionProcessor(
             service.get_presigned_upload_url, action_monitors
         )
+        self.search_object_storages = ActionProcessor(service.search, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -70,4 +78,5 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
             ListObjectStorageAction.spec(),
             GetDownloadPresignedURLAction.spec(),
             GetUploadPresignedURLAction.spec(),
+            SearchObjectStoragesAction.spec(),
         ]

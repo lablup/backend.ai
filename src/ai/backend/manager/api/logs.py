@@ -3,9 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import uuid
-from datetime import datetime
+from collections.abc import Iterable, MutableMapping
+from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any
 
 import aiohttp_cors
 import attrs
@@ -20,14 +21,20 @@ from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.data.error_log.types import ErrorLogSeverity
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.errors.resource import DBOperationFailed
+from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
+from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 
-from ..defs import LockID
-from ..errors.resource import DBOperationFailed
-from ..models import UserRole, error_logs, groups
-from ..models import association_groups_users as agus
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
-from .types import CORSOptions, Iterable, WebMiddleware
+from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:
@@ -63,25 +70,24 @@ async def append(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
 
-    async with root_ctx.db.begin() as conn:
-        resp = {
-            "success": True,
-        }
-        query = error_logs.insert().values({
-            "severity": params["severity"].lower(),
-            "source": params["source"],
-            "user": requester_uuid,
-            "message": params["message"],
-            "context_lang": params["context_lang"],
-            "context_env": params["context_env"],
-            "request_url": params["request_url"],
-            "request_status": params["request_status"],
-            "traceback": params["traceback"],
-        })
-        result = await conn.execute(query)
-        if result.rowcount != 1:
-            raise DBOperationFailed("Failed to create error log")
-    return web.json_response(resp)
+    severity = ErrorLogSeverity(params["severity"].value.lower())
+    creator = Creator(
+        spec=ErrorLogCreatorSpec(
+            severity=severity,
+            source=params["source"],
+            user=requester_uuid,
+            message=params["message"],
+            context_lang=params["context_lang"],
+            context_env=params["context_env"],
+            request_url=params["request_url"],
+            request_status=params["request_status"],
+            traceback=params["traceback"],
+        )
+    )
+    action = CreateErrorLogAction(creator=creator)
+    await root_ctx.processors.error_log.create.wait_for_complete(action)
+
+    return web.json_response({"success": True})
 
 
 @auth_required
@@ -109,12 +115,12 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin() as conn:
         is_admin = True
         select_query = (
-            sa.select([error_logs])
+            sa.select(error_logs)
             .select_from(error_logs)
             .order_by(sa.desc(error_logs.c.created_at))
             .limit(params["page_size"])
         )
-        count_query = sa.select([sa.func.count()]).select_from(error_logs)
+        count_query = sa.select(sa.func.count()).select_from(error_logs)
         if params["page_no"] > 1:
             select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
         if request["is_superadmin"]:
@@ -122,9 +128,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
@@ -141,23 +145,23 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(select_query)
         for row in result:
             result_item = {
-                "log_id": str(row["id"]),
-                "created_at": datetime.timestamp(row["created_at"]),
-                "severity": row["severity"],
-                "source": row["source"],
-                "user": row["user"],
-                "is_read": row["is_read"],
-                "message": row["message"],
-                "context_lang": row["context_lang"],
-                "context_env": row["context_env"],
-                "request_url": row["request_url"],
-                "request_status": row["request_status"],
-                "traceback": row["traceback"],
+                "log_id": str(row.id),
+                "created_at": datetime.timestamp(row.created_at),
+                "severity": row.severity,
+                "source": row.source,
+                "user": row.user,
+                "is_read": row.is_read,
+                "message": row.message,
+                "context_lang": row.context_lang,
+                "context_env": row.context_env,
+                "request_url": row.request_url,
+                "request_status": row.request_status,
+                "traceback": row.traceback,
             }
             if result_item["user"] is not None:
                 result_item["user"] = str(result_item["user"])
             if is_admin:
-                result_item["is_cleared"] = row["is_cleared"]
+                result_item["is_cleared"] = row.is_cleared
             resp["logs"].append(result_item)
         resp["count"] = await conn.scalar(count_query)
         if params["mark_read"]:
@@ -187,9 +191,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         elif user_role == UserRole.ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                sa.select(agus.c.user_id).select_from(j).where(groups.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
@@ -209,7 +211,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         return web.json_response({"success": True}, status=HTTPStatus.OK)
 
 
-async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
+async def log_cleanup_task(app: web.Application, _src: AgentId, _event: DoLogCleanupEvent) -> None:
     root_ctx: RootContext = app["_root.context"]
     raw_lifetime = await root_ctx.etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
@@ -224,7 +226,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             "falling back to 90 days",
             raw_lifetime,
         )
-    boundary = datetime.now() - lifetime
+    boundary = datetime.now(UTC) - lifetime
     async with root_ctx.db.begin() as conn:
         query = sa.delete(error_logs).where(error_logs.c.created_at < boundary)
         result = await conn.execute(query)
@@ -266,7 +268,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

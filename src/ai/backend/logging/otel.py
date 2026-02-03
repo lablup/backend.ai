@@ -1,7 +1,7 @@
 import logging
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -64,13 +64,13 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
     logging.info("OpenTelemetry tracing initialized successfully.")
 
 
-def instrument_aiohttp_server():
+def instrument_aiohttp_server() -> None:
     # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpServerInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
 
 
-def instrument_aiohttp_client():
+def instrument_aiohttp_client() -> None:
     # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpClientInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp client initialized successfully.")

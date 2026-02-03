@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
@@ -8,15 +10,19 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
-from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryData,
+    HuggingFaceRegistryListResult,
+)
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class HuggingFaceDBSource:
@@ -34,7 +40,7 @@ class HuggingFaceDBSource:
                 .where(HuggingFaceRegistryRow.id == registry_id)
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
@@ -50,9 +56,13 @@ class HuggingFaceDBSource:
                     )
                 )
             )
-            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
+            if row.huggingface_registries is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry not found for registry {name}"
+                )
             return row.huggingface_registries.to_dataclass()
 
     async def get_registry_data_by_artifact_id(
@@ -68,69 +78,63 @@ class HuggingFaceDBSource:
                     ),
                 )
             )
-            row: ArtifactRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
+            if row.huggingface_registry is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry not found for artifact {artifact_id}"
+                )
             return row.huggingface_registry.to_dataclass()
 
     async def create(
-        self, creator: HuggingFaceRegistryCreator, meta: ArtifactRegistryCreatorMeta
+        self, creator: Creator[HuggingFaceRegistryRow], meta: ArtifactRegistryCreatorMeta
     ) -> HuggingFaceRegistryData:
         """
         Create a new Hugging Face registry entry.
         """
         async with self._db.begin_session() as db:
-            hf_insert = (
-                sa.insert(HuggingFaceRegistryRow)
-                .values(**creator.fields_to_store())
-                .returning(HuggingFaceRegistryRow.id)
-            )
-            hf_id = (await db.execute(hf_insert)).scalar_one()
+            creator_result = await execute_creator(db, creator)
+            new_row = creator_result.row
 
             reg_insert = sa.insert(ArtifactRegistryRow).values(
                 name=meta.name,
-                registry_id=hf_id,
+                registry_id=new_row.id,
                 type=ArtifactRegistryType.HUGGINGFACE,
             )
             await db.execute(reg_insert)
 
             stmt = (
                 sa.select(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == hf_id)
+                .where(HuggingFaceRegistryRow.id == new_row.id)
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
             row: HuggingFaceRegistryRow | None = (await db.execute(stmt)).scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError(f"Registry with ID {hf_id} not found")
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {new_row.id} not found")
 
             return row.to_dataclass()
 
     async def update(
         self,
-        registry_id: uuid.UUID,
-        modifier: HuggingFaceRegistryModifier,
+        updater: Updater[HuggingFaceRegistryRow],
         meta: ArtifactRegistryModifierMeta,
     ) -> HuggingFaceRegistryData:
         """
         Update an existing Hugging Face registry entry in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-
-            update_stmt = (
-                sa.update(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.id == registry_id)
-                .values(**data)
-                .returning(HuggingFaceRegistryRow.id)
-            )
-
-            result = await db_session.execute(update_stmt)
-            inserted_row_id = result.scalar()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry with ID {updater.pk_value} not found"
+                )
+            updated_row_id = result.row.id
 
             if (name := meta.name.optional_value()) is not None:
                 await db_session.execute(
                     sa.update(ArtifactRegistryRow)
-                    .where(ArtifactRegistryRow.registry_id == inserted_row_id)
+                    .where(ArtifactRegistryRow.registry_id == updated_row_id)
                     .values(name=name)
                 )
 
@@ -138,7 +142,7 @@ class HuggingFaceDBSource:
             row = (
                 await db_session.execute(
                     sa.select(HuggingFaceRegistryRow)
-                    .where(HuggingFaceRegistryRow.id == inserted_row_id)
+                    .where(HuggingFaceRegistryRow.id == updated_row_id)
                     .options(selectinload(HuggingFaceRegistryRow.meta))
                 )
             ).scalar_one()
@@ -157,6 +161,10 @@ class HuggingFaceDBSource:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+            if deleted_id is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"HuggingFace registry with ID {registry_id} not found"
+                )
 
             delete_meta_query = sa.delete(ArtifactRegistryRow).where(
                 ArtifactRegistryRow.id == registry_id
@@ -176,7 +184,7 @@ class HuggingFaceDBSource:
                 .where(HuggingFaceRegistryRow.id.in_(registry_ids))
                 .options(selectinload(HuggingFaceRegistryRow.meta))
             )
-            rows: list[HuggingFaceRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
@@ -188,5 +196,30 @@ class HuggingFaceDBSource:
                 selectinload(HuggingFaceRegistryRow.meta)
             )
             result = await db_session.execute(query)
-            rows: list[HuggingFaceRegistryRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search_registries(
+        self,
+        querier: BatchQuerier,
+    ) -> HuggingFaceRegistryListResult:
+        """Searches HuggingFace registries with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(HuggingFaceRegistryRow).options(
+                selectinload(HuggingFaceRegistryRow.meta)
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.HuggingFaceRegistryRow.to_dataclass() for row in result.rows]
+
+            return HuggingFaceRegistryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

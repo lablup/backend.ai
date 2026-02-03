@@ -1,12 +1,13 @@
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping, Type, override
+from typing import Any, override
 
+from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.resources import AbstractComputePlugin
+from ai.backend.agent.types import AbstractAgentDiscovery
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
-from ..agent import AbstractAgent
-from ..resources import AbstractComputePlugin
-from ..types import AbstractAgentDiscovery
 from .agent import DummyAgent
 from .kernel import prepare_krunner_env
 from .resources import load_resources, scan_available_resources
@@ -14,7 +15,7 @@ from .resources import load_resources, scan_available_resources
 
 class DummyAgentDiscovery(AbstractAgentDiscovery):
     @override
-    def get_agent_cls(self) -> Type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         return DummyAgent
 
     @override

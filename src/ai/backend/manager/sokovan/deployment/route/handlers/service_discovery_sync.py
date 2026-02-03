@@ -2,11 +2,10 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -24,7 +23,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -34,7 +33,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         return "service-discovery-sync"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for service discovery sync."""
         return None
 
@@ -44,27 +43,39 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         return [RouteStatus.HEALTHY]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """No status transition for service discovery sync."""
         return None
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """No failure status for service discovery sync."""
         return None
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Get the stale route status if applicable."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for service discovery sync handler (BEP-1030).
+
+        All transitions are None because this handler only syncs to service discovery,
+        it doesn't change route status.
+        """
+        return RouteStatusTransitions(
+            success=None,
+            failure=None,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute service discovery synchronization for healthy routes."""
         log.debug("Syncing {} healthy routes to service discovery", len(routes))
 
         # Execute service discovery sync logic via executor
-        result = await self._route_executor.sync_service_discovery(routes)
-        return result
+        return await self._route_executor.sync_service_discovery(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after service discovery sync."""

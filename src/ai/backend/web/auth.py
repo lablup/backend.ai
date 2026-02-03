@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import json
-from typing import Optional, cast
+from typing import cast
 
 from aiohttp import web
 
@@ -17,7 +19,7 @@ from . import user_agent
 
 async def get_api_session(
     request: web.Request,
-    override_api_endpoint: Optional[str] = None,
+    override_api_endpoint: str | None = None,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     api_endpoint = str(config.api.endpoint[0])
@@ -72,7 +74,7 @@ async def get_api_session(
 
 async def get_anonymous_session(
     request: web.Request,
-    override_api_endpoint: Optional[str] = None,
+    override_api_endpoint: str | None = None,
 ) -> APISession:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     api_endpoint = str(config.api.endpoint[0])
@@ -98,7 +100,7 @@ async def get_anonymous_session(
     return APISession(config=api_config, proxy_mode=True, aiohttp_session=client_session)
 
 
-def get_client_ip(request: web.Request) -> Optional[str]:
+def get_client_ip(request: web.Request) -> str | None:
     client_ip = request.headers.get("X-Forwarded-For")
     if not client_ip and request.transport:
         client_ip = request.transport.get_extra_info("peername")[0]

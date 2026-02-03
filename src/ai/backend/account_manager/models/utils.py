@@ -1,13 +1,11 @@
-import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
+    Any,
     Concatenate,
     ParamSpec,
     TypeVar,
@@ -20,7 +18,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -31,12 +29,11 @@ from tenacity import (
 )
 from yarl import URL
 
+from ai.backend.account_manager.config import ServerConfig
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
-from ..config import ServerConfig
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def is_db_retry_error(e: Exception) -> bool:
@@ -52,13 +49,13 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -135,9 +132,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -156,9 +152,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
-                    yield sess
+            async with self.connect() as _conn, _begin_session(_conn) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
@@ -178,12 +173,12 @@ class ExtendedAsyncSAEngine(SAEngine):
         Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
         """
 
-        # result: TQueryResult | Sentinel = Sentinel.token
         _begin_trx = cast(
             Callable[..., AbstractAsyncCtxMgr[SASession]],
             self.begin_session if begin_trx is None else begin_trx,
         )
 
+        result: TQueryResult | None = None
         max_attempts = 10
         try:
             async for attempt in AsyncRetrying(
@@ -197,19 +192,21 @@ class ExtendedAsyncSAEngine(SAEngine):
                             result = await txn_func(session_or_conn, *args, **kwargs)
                     except DBAPIError as e:
                         if is_db_retry_error(e):
-                            raise TryAgain
+                            raise TryAgain from e
                         raise
-        except RetryError:
-            raise asyncio.TimeoutError(
+        except RetryError as e:
+            raise TimeoutError(
                 f"DB serialization failed after {max_attempts} retry transactions"
-            )
+            ) from e
+        if result is None:
+            raise RuntimeError("AsyncRetrying loop completed without setting result")
         return result
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
@@ -237,6 +234,8 @@ async def connect_database(
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
+        if version_str is None:
+            raise RuntimeError("Failed to get PostgreSQL version")
         major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")

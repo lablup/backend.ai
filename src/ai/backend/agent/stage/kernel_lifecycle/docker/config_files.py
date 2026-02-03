@@ -6,10 +6,11 @@ This stage handles creation of environment and resource configuration files.
 
 import asyncio
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Mapping, override
+from typing import override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage

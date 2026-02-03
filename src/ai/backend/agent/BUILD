@@ -54,7 +54,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "ag": "ai.backend.agent.cli.__main__:main",
-            "ag.start-server": "ai.backend.agent.server:main",
+            "ag.start-server": "ai.backend.agent.cli.start_server:main",
         },
         "backendai_network_agent_v1": {
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",

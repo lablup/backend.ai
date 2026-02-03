@@ -1,5 +1,6 @@
 import uuid
-from typing import Any, Mapping, Self, override
+from collections.abc import Mapping
+from typing import Any, Self, override
 
 from aiohttp import web
 from pydantic import ConfigDict
@@ -9,7 +10,9 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.config.unified import ExportConfig
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.repositories.export import ExportRepository
 from ai.backend.manager.services.processors import Processors
 
 
@@ -60,6 +63,31 @@ class ValkeyArtifactCtx(MiddlewareParam):
         return cls(valkey_artifact=root_ctx.valkey_artifact)
 
 
+class UserContext(MiddlewareParam):
+    """
+    Middleware parameter providing authenticated user information.
+
+    This context is populated by @auth_required decorator.
+    """
+
+    user_uuid: uuid.UUID
+    user_email: str
+    user_domain: str
+    access_key: str
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(
+            user_uuid=request["user"]["uuid"],
+            user_email=request["user"]["email"],
+            user_domain=request["user"]["domain_name"],
+            access_key=request["keypair"]["access_key"],
+        )
+
+
 class VFolderAuthContext(MiddlewareParam):
     """
     Middleware parameter providing authenticated user and vfolder information.
@@ -98,4 +126,27 @@ class VFolderAuthContext(MiddlewareParam):
             access_key=access_key,
             vfolder_row=row,
             processors=root_ctx.processors,
+        )
+
+
+class ExportCtx(MiddlewareParam):
+    """
+    Middleware parameter providing export-specific context.
+
+    Provides access to export repository (for report definitions) and export config
+    (for max_rows, statement_timeout_sec).
+    """
+
+    repository: ExportRepository
+    config: ExportConfig
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+        return cls(
+            repository=root_ctx.repositories.export.repository,
+            config=root_ctx.config_provider.config.export,
         )

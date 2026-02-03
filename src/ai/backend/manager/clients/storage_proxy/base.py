@@ -1,10 +1,9 @@
-import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, AsyncIterator, Final, Optional
+from typing import Any, Final, cast
 
 import aiohttp
 import yarl
@@ -48,7 +47,7 @@ class StorageProxyHTTPClient:
     _endpoint: yarl.URL
     _secret: str
 
-    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs):
+    def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
         self._client_session = client_session
         self._endpoint = args.endpoint
         self._secret = args.secret
@@ -111,7 +110,7 @@ class StorageProxyHTTPClient:
                     error_detail=ErrorDetail.CONTENT_TYPE_MISMATCH,
                 ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
-            )
+            ) from e
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
@@ -135,7 +134,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        request_timeout: ClientTimeout,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         """
         Make an HTTP request using the session client.
@@ -143,7 +142,7 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         headers = {
@@ -156,13 +155,13 @@ class StorageProxyHTTPClient:
                 headers=headers,
                 json=body,
                 params=params,
-                timeout=timeout,
+                timeout=request_timeout,
             ) as client_resp:
                 if client_resp.status // 100 == 2:
                     yield client_resp
                     return
                 await self._handle_exceptional_response(client_resp)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
             ) from e
@@ -178,26 +177,26 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
-    ) -> Optional[Mapping[str, Any]]:
+        request_timeout: ClientTimeout,
+    ) -> Mapping[str, Any] | None:
         """
         Make an HTTP request using the session client.
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response data as a dictionary, or None if no content
         """
         async with self.request_stream_response(
-            method, url, body=body, params=params, timeout=timeout
+            method, url, body=body, params=params, request_timeout=request_timeout
         ) as response_stream:
             if response_stream.status == HTTPStatus.NO_CONTENT:
                 return None
             resp_bytes = await response_stream.read()
             if not resp_bytes:
                 return None
-            return load_json(resp_bytes)
+            return cast(Mapping[str, Any] | None, load_json(resp_bytes))
 
     async def request_with_response(
         self,
@@ -206,7 +205,7 @@ class StorageProxyHTTPClient:
         *,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
-        timeout: ClientTimeout,
+        request_timeout: ClientTimeout,
     ) -> Mapping[str, Any]:
         """
         Make an HTTP request and return the response as a dictionary.
@@ -214,10 +213,12 @@ class StorageProxyHTTPClient:
         :param method: HTTP method (GET, POST, etc.)
         :param url: URL to send the request to
         :param body: JSON body data to send with the request
-        :param timeout: Timeout configuration for the request
+        :param request_timeout: Timeout configuration for the request
         :return: Response object from the request
         """
-        response = await self.request(method, url, body=body, params=params, timeout=timeout)
+        response = await self.request(
+            method, url, body=body, params=params, request_timeout=request_timeout
+        )
         if response is None:
             raise UnexpectedStorageProxyResponseError(
                 "Unexpected response from storage proxy: None",

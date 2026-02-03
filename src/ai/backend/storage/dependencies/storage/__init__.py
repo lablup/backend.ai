@@ -6,6 +6,6 @@ from .storage_pool import StoragePoolProvider
 __all__ = [
     "StorageComposer",
     "StorageComposerInput",
-    "StorageResources",
     "StoragePoolProvider",
+    "StorageResources",
 ]

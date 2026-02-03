@@ -8,6 +8,16 @@ from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStat
 
 
 @dataclass
+class ReservoirRegistryListResult:
+    """Search result with total count for Reservoir registries."""
+
+    items: list[ReservoirRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
 class ReservoirRegistryData:
     id: uuid.UUID
     name: str

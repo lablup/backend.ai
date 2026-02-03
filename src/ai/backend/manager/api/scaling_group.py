@@ -1,8 +1,9 @@
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 import aiohttp_cors
@@ -17,9 +18,9 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     ServerMisconfiguredError,
 )
+from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from ..models import query_allowed_sgroups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
@@ -40,17 +41,21 @@ class WSProxyVersionQueryParams:
 async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(
             wsproxy_addr + "/status",
             headers={"Accept": "application/json"},
-        ) as resp:
-            try:
-                result = await resp.json()
-            except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-                log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
-                raise InternalServerError("Got invalid response from wsproxy when querying status")
-            return result
+        ) as resp,
+    ):
+        try:
+            result = await resp.json()
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
+            raise InternalServerError(
+                "Got invalid response from wsproxy when querying status"
+            ) from e
+        return cast(dict[str, Any], result)
 
 
 @auth_required
@@ -70,10 +75,10 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
     async with root_ctx.db.begin() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name, access_key)
         if not is_admin:
-            sgroups = [sgroup for sgroup in sgroups if sgroup["is_public"]]
+            sgroups = [sgroup for sgroup in sgroups if sgroup.is_public]
         return web.json_response(
             {
-                "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
+                "scaling_groups": [{"name": sgroup.name} for sgroup in sgroups],
             },
             status=HTTPStatus.OK,
         )
@@ -98,8 +103,8 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
     async with root_ctx.db.begin_readonly() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
         for sgroup in sgroups:
-            if sgroup["name"] == scaling_group_name:
-                wsproxy_addr = sgroup["wsproxy_addr"]
+            if sgroup.name == scaling_group_name:
+                wsproxy_addr = sgroup.wsproxy_addr
                 if not wsproxy_addr:
                     wsproxy_version = "v1"
                 else:
@@ -130,7 +135,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "scaling-groups"
     app["api_versions"] = (2, 3, 4)

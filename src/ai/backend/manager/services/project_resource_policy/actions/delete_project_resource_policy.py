@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
@@ -13,7 +13,7 @@ class DeleteProjectResourcePolicyAction(ProjectResourcePolicyAction):
     name: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -28,5 +28,5 @@ class DeleteProjectResourcePolicyActionResult(BaseActionResult):
     project_resource_policy: ProjectResourcePolicyData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.project_resource_policy.name

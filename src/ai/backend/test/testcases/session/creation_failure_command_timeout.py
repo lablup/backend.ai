@@ -1,5 +1,6 @@
 import asyncio
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
@@ -16,7 +17,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
         client_session = ClientSessionContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         image_dep = ImageContext.current()
         session_dep = SessionContext.current()
@@ -28,7 +29,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
                     session_name,
                     "session_failure",
                     {"session_success", "session_cancelled"},
-                    expected_failure_reason="task-timeout",
+                    expected_failure_reason=KernelLifecycleEventReason.TASK_TIMEOUT,
                 ),
                 _TASK_TIMEOUT,
             )

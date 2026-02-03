@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+
 import sqlalchemy as sa
 
+from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
     ScalingGroupRow,
@@ -13,42 +16,106 @@ class ScalingGroupConditions:
     """Query conditions for scaling groups."""
 
     @staticmethod
-    def by_name_contains(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ScalingGroupRow.name.ilike(f"%{name}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"%{spec.value}%")
             else:
-                return ScalingGroupRow.name.like(f"%{name}%")
+                condition = ScalingGroupRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_name_equals(name: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ScalingGroupRow.name) == name.lower()
+            if spec.case_insensitive:
+                condition = sa.func.lower(ScalingGroupRow.name) == spec.value.lower()
             else:
-                return ScalingGroupRow.name == name
+                condition = ScalingGroupRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_description_contains(description: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return ScalingGroupRow.description.ilike(f"%{description}%")
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"{spec.value}%")
             else:
-                return ScalingGroupRow.description.like(f"%{description}%")
+                condition = ScalingGroupRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_description_equals(description: str, case_insensitive: bool = False) -> QueryCondition:
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if case_insensitive:
-                return sa.func.lower(ScalingGroupRow.description) == description.lower()
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.name.ilike(f"%{spec.value}")
             else:
-                return ScalingGroupRow.description == description
+                condition = ScalingGroupRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.description.ilike(f"%{spec.value}%")
+            else:
+                condition = ScalingGroupRow.description.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ScalingGroupRow.description) == spec.value.lower()
+            else:
+                condition = ScalingGroupRow.description == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.description.ilike(f"{spec.value}%")
+            else:
+                condition = ScalingGroupRow.description.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ScalingGroupRow.description.ilike(f"%{spec.value}")
+            else:
+                condition = ScalingGroupRow.description.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -67,13 +134,6 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
-    def by_driver(driver: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupRow.driver == driver
-
-        return inner
-
-    @staticmethod
     def by_scheduler(scheduler: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.scheduler == scheduler
@@ -84,6 +144,13 @@ class ScalingGroupConditions:
     def by_use_host_network(use_host_network: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.use_host_network == use_host_network
+
+        return inner
+
+    @staticmethod
+    def by_names(names: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.name.in_(names)
 
         return inner
 
@@ -142,26 +209,22 @@ class ScalingGroupOrders:
     def name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.name.asc()
-        else:
-            return ScalingGroupRow.name.desc()
+        return ScalingGroupRow.name.desc()
 
     @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.created_at.asc()
-        else:
-            return ScalingGroupRow.created_at.desc()
+        return ScalingGroupRow.created_at.desc()
 
     @staticmethod
     def is_active(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.is_active.asc()
-        else:
-            return ScalingGroupRow.is_active.desc()
+        return ScalingGroupRow.is_active.desc()
 
     @staticmethod
     def is_public(ascending: bool = True) -> QueryOrder:
         if ascending:
             return ScalingGroupRow.is_public.asc()
-        else:
-            return ScalingGroupRow.is_public.desc()
+        return ScalingGroupRow.is_public.desc()

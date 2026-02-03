@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -13,11 +15,11 @@ class BaseVolumeEvent(AbstractBroadcastEvent):
         return EventDomain.VOLUME
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -31,15 +33,15 @@ class DoVolumeMountEvent(BaseVolumeEvent):
 
     fs_location: str
     fs_type: str = "nfs"
-    cmd_options: Optional[str] = None
-    scaling_group: Optional[str] = None
+    cmd_options: str | None = None
+    scaling_group: str | None = None
 
     # if `edit_fstab` is False, `fstab_path` is ignored
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = False
     fstab_path: str = "/etc/fstab"
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
             self.volume_backend_name,
@@ -53,7 +55,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -78,14 +80,14 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
     dir_name: str
     volume_backend_name: str
     quota_scope_id: QuotaScopeID
-    scaling_group: Optional[str] = None
+    scaling_group: str | None = None
 
     # if `edit_fstab` is False, `fstab_path` is ignored
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = False
-    fstab_path: Optional[str] = None
+    fstab_path: str | None = None
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
             self.volume_backend_name,
@@ -96,7 +98,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
             volume_backend_name=value[1],
@@ -117,9 +119,9 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
     node_type: VolumeMountableNodeType
     mount_path: str
     quota_scope_id: QuotaScopeID
-    err_msg: Optional[str] = None
+    err_msg: str | None = None
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.node_id,
             str(self.node_type),
@@ -129,7 +131,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             value[0],
             VolumeMountableNodeType(value[1]),

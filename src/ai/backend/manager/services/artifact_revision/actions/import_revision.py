@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
@@ -10,9 +10,12 @@ from ai.backend.manager.services.artifact_revision.actions.base import ArtifactR
 @dataclass
 class ImportArtifactRevisionAction(ArtifactRevisionAction):
     artifact_revision_id: uuid.UUID
+    vfolder_id: uuid.UUID | None = None
+    storage_prefix: str | None = None
+    force: bool = False
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.artifact_revision_id)
 
     @override
@@ -24,8 +27,8 @@ class ImportArtifactRevisionAction(ArtifactRevisionAction):
 @dataclass
 class ImportArtifactRevisionActionResult(BaseActionResult):
     result: ArtifactRevisionData
-    task_id: Optional[uuid.UUID]
+    task_id: uuid.UUID | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

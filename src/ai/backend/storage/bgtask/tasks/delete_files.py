@@ -15,7 +15,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 if TYPE_CHECKING:
-    from ...volumes.pool import VolumePool
+    from ai.backend.storage.volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

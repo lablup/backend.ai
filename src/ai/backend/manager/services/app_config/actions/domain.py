@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigModifier
+from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 
 from .base import AppConfigAction
 
@@ -23,7 +24,7 @@ class GetDomainConfigAction(AppConfigAction):
         return "app_config_domain"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.domain_name
 
     @override
@@ -36,10 +37,10 @@ class GetDomainConfigAction(AppConfigAction):
 class GetDomainConfigActionResult(BaseActionResult):
     """Result of get domain config action."""
 
-    result: Optional[AppConfigData]
+    result: AppConfigData | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.result.scope_id if self.result else None
 
 
@@ -48,7 +49,7 @@ class UpsertDomainConfigAction(AppConfigAction):
     """Action to create or update domain-level app configuration."""
 
     domain_name: str
-    modifier: AppConfigModifier
+    updater_spec: AppConfigUpdaterSpec
 
     @override
     @classmethod
@@ -56,7 +57,7 @@ class UpsertDomainConfigAction(AppConfigAction):
         return "app_config_domain"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.domain_name
 
     @override
@@ -72,7 +73,7 @@ class UpsertDomainConfigActionResult(BaseActionResult):
     result: AppConfigData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.result.scope_id
 
 
@@ -88,7 +89,7 @@ class DeleteDomainConfigAction(AppConfigAction):
         return "app_config_domain"
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.domain_name
 
     @override
@@ -105,5 +106,5 @@ class DeleteDomainConfigActionResult(BaseActionResult):
     domain_name: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return self.domain_name if self.deleted else None

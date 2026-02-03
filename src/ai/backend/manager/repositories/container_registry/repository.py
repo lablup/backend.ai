@@ -1,18 +1,36 @@
-from typing import Optional
+import logging
+import uuid
+from typing import cast
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.errors.image import (
+    ContainerRegistryNotFound,
+)
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.purger import Purger, execute_purger
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.container_registry.updaters import (
+    ContainerRegistryUpdaterSpec,
+    handle_allowed_groups_update,
+)
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 container_registry_repository_resilience = Resilience(
     policies=[
@@ -37,11 +55,67 @@ class ContainerRegistryRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    async def modify_registry(
+        self,
+        updater: Updater[ContainerRegistryRow],
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as session:
+            updater.spec = cast(ContainerRegistryUpdaterSpec, updater.spec)
+            registry_id = cast(uuid.UUID, updater.pk_value)
+
+            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            result = await session.execute(stmt)
+            reg_row = result.scalar_one_or_none()
+
+            if reg_row is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            if updater.spec.has_allowed_groups_update is True:
+                await handle_allowed_groups_update(
+                    session, registry_id, updater.spec.allowed_groups.value()
+                )
+
+            to_update = updater.spec.build_values()
+            if to_update == {}:  # means no fields to update or only allowed_groups updated
+                return reg_row.to_dataclass()
+
+            session.expire(reg_row)  # Expire to get updated values after update
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            reg_row = update_result.row
+            validator = ContainerRegistryValidator(
+                ContainerRegistryValidatorArgs(
+                    type=reg_row.type,
+                    project=reg_row.project,
+                    url=reg_row.url,
+                )
+            )
+            validator.validate()
+            return reg_row.to_dataclass()
+
+    async def delete_registry(self, purger: Purger[ContainerRegistryRow]) -> ContainerRegistryData:
+        """
+        Delete a container registry using a purger.
+        Returns the deleted registry data.
+        Raises ContainerRegistryNotFound if registry doesn't exist.
+        """
+        async with self._db.begin_session() as session:
+            result = await execute_purger(session, purger)
+
+            if result is None:
+                raise ContainerRegistryNotFound(
+                    f"Container registry not found (id:{purger.pk_value})"
+                )
+
+            return result.row.to_dataclass()
+
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryData:
         async with self._db.begin_readonly_session() as session:
             result = await self._get_by_registry_and_project(session, registry_name, project)
@@ -52,18 +126,26 @@ class ContainerRegistryRepository:
     @container_registry_repository_resilience.apply()
     async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
-            return await self._get_by_registry_name(session, registry_name)
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == registry_name
+            )
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
-            return await self._get_all(session)
+            stmt = sa.select(ContainerRegistryRow)
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
 
     @container_registry_repository_resilience.apply()
     async def clear_images(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryData:
         async with self._db.begin_session() as session:
             # Clear images
@@ -103,11 +185,12 @@ class ContainerRegistryRepository:
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str | None = None,
     ) -> ContainerRegistryRow:
         """
         Get the raw ContainerRegistryRow object needed for container registry scanner.
         Raises ContainerRegistryNotFound if registry is not found.
+        TODO: Refactor to return ContainerRegistryData when Registry Scanner is updated
         """
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(
@@ -116,7 +199,7 @@ class ContainerRegistryRepository:
             if project:
                 stmt = stmt.where(ContainerRegistryRow.project == project)
 
-            row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
+            row: ContainerRegistryRow | None = await session.scalar(stmt)
             if not row:
                 raise ContainerRegistryNotFound()
             return row
@@ -125,31 +208,13 @@ class ContainerRegistryRepository:
         self,
         session: SASession,
         registry_name: str,
-        project: Optional[str] = None,
-    ) -> Optional[ContainerRegistryData]:
+        project: str | None = None,
+    ) -> ContainerRegistryData | None:
         stmt = sa.select(ContainerRegistryRow).where(
             ContainerRegistryRow.registry_name == registry_name,
         )
         if project:
             stmt = stmt.where(ContainerRegistryRow.project == project)
 
-        row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
+        row: ContainerRegistryRow | None = await session.scalar(stmt)
         return row.to_dataclass() if row else None
-
-    async def _get_by_registry_name(
-        self,
-        session: SASession,
-        registry_name: str,
-    ) -> list[ContainerRegistryData]:
-        stmt = sa.select(ContainerRegistryRow).where(
-            ContainerRegistryRow.registry_name == registry_name
-        )
-        result = await session.execute(stmt)
-        rows: list[ContainerRegistryRow] = result.scalars().all()
-        return [row.to_dataclass() for row in rows]
-
-    async def _get_all(self, session: SASession) -> list[ContainerRegistryData]:
-        stmt = sa.select(ContainerRegistryRow)
-        result = await session.execute(stmt)
-        rows: list[ContainerRegistryRow] = result.scalars().all()
-        return [row.to_dataclass() for row in rows]

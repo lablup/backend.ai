@@ -7,7 +7,7 @@ This stage handles processing and installation of dotfiles in containers.
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
@@ -25,8 +25,8 @@ class DotfileInput:
 class DirOwnPermission:
     path: str
     perm: str
-    uid: Optional[int]
-    gid: Optional[int]
+    uid: int | None
+    gid: int | None
 
 
 @dataclass
@@ -50,8 +50,8 @@ class DotfilesSpec:
     work_dir: Path
 
     # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
+    uid_override: int | None
+    gid_override: int | None
 
     agent_config: AgentConfig
 
@@ -93,8 +93,8 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
             spec.agent_config.kernel_gid,
             spec.agent_config.kernel_features,
         )
-        determined_uid: Optional[int] = None
-        determined_gid: Optional[int] = None
+        determined_uid: int | None = None
+        determined_gid: int | None = None
         processed_dotfiles: list[DotfileProcResult] = []
         for dotfile in spec.dotfiles:
             file_path = self._resolve_dotfile_path(spec, dotfile.path)

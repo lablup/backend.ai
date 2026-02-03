@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
@@ -13,7 +13,7 @@ class ImportArtifactBatchAction(ArtifactRevisionAction):
     artifact_revision_ids: list[uuid.UUID]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,5 +27,5 @@ class ImportArtifactBatchActionResult(BaseActionResult):
     result: list[ArtifactRevisionData]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

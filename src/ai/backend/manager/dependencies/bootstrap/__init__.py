@@ -4,9 +4,9 @@ from .etcd import EtcdDependency
 
 __all__ = [
     "BootstrapComposer",
-    "BootstrapInput",
-    "BootstrapResources",
     "BootstrapConfigDependency",
     "BootstrapConfigInput",
+    "BootstrapInput",
+    "BootstrapResources",
     "EtcdDependency",
 ]

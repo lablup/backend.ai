@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -16,7 +16,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
-def cli(args) -> None:
+def cli(args: Any) -> None:
     pass
 
 
@@ -29,15 +29,15 @@ def cli(args) -> None:
     help="The path to Alembic config file. [default: alembic-appproxy.ini]",
 )
 @click.pass_obj
-def show(cli_ctx: CLIContext, alembic_config) -> None:
+def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """Show the current schema information."""
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.utils import create_async_engine
+    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -72,7 +72,7 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     help="The path to Alembic config file. [default: alembic-appproxy.ini]",
 )
 @click.pass_obj
-def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
+def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.
@@ -87,9 +87,9 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ..models.alembic import invoked_programmatically
-    from ..models.base import metadata_obj as metadata
-    from ..models.utils import create_async_engine
+    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
+    from ai.backend.appproxy.coordinator.models.base import metadata_obj as metadata
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)

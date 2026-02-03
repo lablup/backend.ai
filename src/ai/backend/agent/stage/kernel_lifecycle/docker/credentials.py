@@ -5,9 +5,10 @@ This stage handles Docker credentials setup for containers.
 """
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional, override
+from typing import Any, override
 
 from ai.backend.common.json import dump_json
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
@@ -16,7 +17,7 @@ from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, Provis
 @dataclass
 class CredentialsSpec:
     config_dir: Path
-    docker_credentials: Optional[Mapping[str, Any]]
+    docker_credentials: Mapping[str, Any] | None
 
 
 class CredentialsSpecGenerator(ArgsSpecGenerator[CredentialsSpec]):
@@ -25,7 +26,7 @@ class CredentialsSpecGenerator(ArgsSpecGenerator[CredentialsSpec]):
 
 @dataclass
 class CredentialsResult:
-    credentials_path: Optional[Path]
+    credentials_path: Path | None
 
 
 class CredentialsProvisioner(Provisioner[CredentialsSpec, CredentialsResult]):

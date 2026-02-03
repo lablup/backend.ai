@@ -1,19 +1,17 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
 @dataclass
 class ClearErrorAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
     service_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -27,5 +25,5 @@ class ClearErrorActionResult(BaseActionResult):
     success: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

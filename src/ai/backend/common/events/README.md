@@ -99,7 +99,6 @@ event_types/
 - `KernelPullingBroadcastEvent`: Image download progress
 
 #### Session Events
-- `SessionStartedBroadcastEvent`: Session start
 - `SessionTerminatedBroadcastEvent`: Session termination
 
 #### Background Task Events

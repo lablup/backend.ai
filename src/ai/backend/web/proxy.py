@@ -5,7 +5,8 @@ import base64
 import json
 import logging
 import random
-from typing import Final, Iterable, Optional, Tuple, Union, cast
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, Final, cast
 
 import aiohttp
 from aiohttp import web
@@ -52,16 +53,16 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
 
 class WebSocketProxy:
     __slots__ = (
-        "up_conn",
         "down_conn",
+        "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
     )
 
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
-    upstream_buffer: asyncio.Queue[Tuple[Union[str, bytes], aiohttp.WSMsgType]]
-    upstream_buffer_task: Optional[asyncio.Task]
+    upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
+    upstream_buffer_task: asyncio.Task[Any] | None
 
     def __init__(
         self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
@@ -103,9 +104,7 @@ class WebSocketProxy:
                     await self.down_conn.send_str(msg.data)
                 elif msg.type == aiohttp.WSMsgType.BINARY:
                     await self.down_conn.send_bytes(msg.data)
-                elif msg.type == aiohttp.WSMsgType.CLOSED:
-                    break
-                elif msg.type == aiohttp.WSMsgType.ERROR:
+                elif msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.ERROR:
                     break
             # here, server gracefully disconnected
         except asyncio.CancelledError:
@@ -151,7 +150,10 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 
 @web.middleware
-async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+async def decrypt_payload(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
     config: WebServerUnifiedConfig = request.app["config"]
     try:
         request_headers = extra_config_headers.check(request.headers)
@@ -183,7 +185,7 @@ async def web_handler(
     frontend_rqst: web.Request,
     *,
     is_anonymous: bool = False,
-    api_endpoint: Optional[str] = None,
+    api_endpoint: str | None = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
@@ -328,7 +330,7 @@ async def web_handler_with_jwt(
         Streamed response from the backend API
     """
     # Select random endpoint if multiple endpoints are provided
-    api_endpoint: Optional[str] = None
+    api_endpoint: str | None = None
     if api_endpoints:
         api_endpoint = random.choice(api_endpoints)
 
@@ -567,9 +569,9 @@ async def web_plugin_handler(
 async def websocket_handler(
     request: web.Request,
     *,
-    is_anonymous=False,
-    api_endpoint: Optional[str] = None,
-    jwt_token: Optional[str] = None,
+    is_anonymous: bool = False,
+    api_endpoint: str | None = None,
+    jwt_token: str | None = None,
 ) -> web.StreamResponse:
     if api_endpoint:
         if api_endpoint.startswith("http://"):

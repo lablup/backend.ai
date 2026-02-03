@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 from ai.backend.manager.data.notification import (
-    NotificationChannelCreator,
     NotificationChannelData,
     NotificationChannelModifier,
-    NotificationRuleCreator,
     NotificationRuleData,
     NotificationRuleModifier,
 )
 
+from .creators import NotificationChannelCreatorSpec, NotificationRuleCreatorSpec
 from .repositories import NotificationRepositories
 from .repository import NotificationRepository
 
 __all__ = (
-    "NotificationChannelCreator",
+    "NotificationChannelCreatorSpec",
     "NotificationChannelData",
     "NotificationChannelModifier",
     "NotificationRepositories",
     "NotificationRepository",
-    "NotificationRuleCreator",
+    "NotificationRuleCreatorSpec",
     "NotificationRuleData",
     "NotificationRuleModifier",
 )

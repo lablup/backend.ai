@@ -6,12 +6,11 @@ All database operations go through the repository pattern.
 """
 
 import logging
-from typing import Optional
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.types import KernelCreationInfo
+from ai.backend.manager.sokovan.data import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,7 +29,7 @@ class KernelStateEngine:
 
     _repository: SchedulerRepository
 
-    def __init__(self, repository: SchedulerRepository):
+    def __init__(self, repository: SchedulerRepository) -> None:
         """
         Initialize the KernelStateEngine with a repository.
 
@@ -136,7 +135,7 @@ class KernelStateEngine:
         self,
         kernel_id: KernelId,
         reason: str,
-        exit_code: Optional[int] = None,
+        exit_code: int | None = None,
     ) -> bool:
         """
         Mark a kernel as TERMINATED when it's terminated.
@@ -150,25 +149,11 @@ class KernelStateEngine:
 
         return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
-    async def update_kernel_heartbeat(
-        self,
-        kernel_id: KernelId,
-    ) -> bool:
-        """
-        Update the heartbeat timestamp for a running kernel.
-
-        :param kernel_id: The kernel ID
-        :return: True if the update was successful
-        """
-        log.trace("Updating heartbeat for kernel {}", kernel_id)
-
-        return await self._repository.update_kernel_heartbeat(kernel_id)
-
     async def update_kernels_to_pulling_for_image(
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -189,7 +174,7 @@ class KernelStateEngine:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -209,7 +194,7 @@ class KernelStateEngine:
         agent_id: AgentId,
         image: str,
         error_msg: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Cancel kernels for an image that failed to be available on an agent.
@@ -229,3 +214,47 @@ class KernelStateEngine:
         await self._repository.cancel_kernels_for_failed_image(
             agent_id, image, error_msg, image_ref
         )
+
+    async def reset_kernels_to_pending_for_sessions(
+        self,
+        session_ids: list[SessionId],
+        reason: str,
+    ) -> int:
+        """
+        Reset kernels to PENDING status for the given sessions.
+
+        This is used when sessions exceed max retries and need to be rescheduled.
+        Clears agent assignments and resets status_data for all kernels in the sessions.
+
+        :param session_ids: List of session IDs whose kernels should be reset
+        :param reason: The reason for the reset
+        :return: The number of kernels reset
+        """
+        if not session_ids:
+            return 0
+
+        log.debug("Resetting kernels to PENDING for {} sessions: {}", len(session_ids), reason)
+
+        return await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
+
+    async def update_kernels_to_creating_for_sessions(
+        self,
+        session_ids: list[SessionId],
+        reason: str,
+    ) -> int:
+        """
+        Update kernels to CREATING status for the given sessions.
+
+        This is used when sessions transition from PREPARED to CREATING.
+        Only updates kernels that are currently in PREPARED status.
+
+        :param session_ids: List of session IDs whose kernels should be updated
+        :param reason: The reason for the update
+        :return: The number of kernels updated
+        """
+        if not session_ids:
+            return 0
+
+        log.debug("Updating kernels to CREATING for {} sessions: {}", len(session_ids), reason)
+
+        return await self._repository.update_kernels_to_creating_for_sessions(session_ids, reason)

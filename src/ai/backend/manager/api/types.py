@@ -1,34 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextlib import AbstractAsyncContextManager
 from typing import (
     TYPE_CHECKING,
-    AsyncContextManager,
-    Awaitable,
-    Callable,
-    Iterable,
-    Mapping,
-    Tuple,
 )
 
 import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
-from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from .context import RootContext
 
 
-WebRequestHandler: TypeAlias = Callable[
+type WebRequestHandler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware
 
-CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
-AppCreator: TypeAlias = Callable[
+type CORSOptions = Mapping[str, aiohttp_cors.ResourceOptions]
+type AppCreator = Callable[
     [CORSOptions],
-    Tuple[web.Application, Iterable[WebMiddleware]],
+    tuple[web.Application, Iterable[WebMiddleware]],
 ]
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]

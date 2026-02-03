@@ -2,11 +2,10 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -29,7 +28,7 @@ class RouteEvictionHandler(RouteHandler):
         self,
         route_executor: RouteExecutor,
         event_producer: EventProducer,
-    ):
+    ) -> None:
         self._route_executor = route_executor
         self._event_producer = event_producer
 
@@ -39,7 +38,7 @@ class RouteEvictionHandler(RouteHandler):
         return "evict-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """No lock needed for eviction."""
         return None
 
@@ -49,19 +48,33 @@ class RouteEvictionHandler(RouteHandler):
         return [RouteStatus.UNHEALTHY]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Routes that should be evicted become TERMINATING."""
         return RouteStatus.TERMINATING
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """No failure status for eviction - routes are either evicted or left as is."""
         return None
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """No stale status for eviction handler."""
         return None
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for route eviction handler (BEP-1030).
+
+        - success: Route → TERMINATING (evicted)
+        - failure: None (routes are either evicted or left as is)
+        - stale: None
+        """
+        return RouteStatusTransitions(
+            success=RouteStatus.TERMINATING,
+            failure=None,
+            stale=None,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """

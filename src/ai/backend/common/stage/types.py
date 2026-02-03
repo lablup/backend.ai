@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar, override
+from typing import TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -11,7 +11,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 TSpec = TypeVar("TSpec")
 
 
-class SpecGenerator(ABC, Generic[TSpec]):
+class SpecGenerator[TSpec](ABC):
     """
     Base class for all specs in the stage.
 
@@ -30,7 +30,7 @@ class SpecGenerator(ABC, Generic[TSpec]):
 TResource = TypeVar("TResource")
 
 
-class Provisioner(ABC, Generic[TSpec, TResource]):
+class Provisioner[TSpec, TResource](ABC):
     """
     Base class for all provisioners in the stage.
     """
@@ -58,7 +58,7 @@ class Provisioner(ABC, Generic[TSpec, TResource]):
         raise NotImplementedError
 
 
-class Stage(ABC, Generic[TSpec, TResource]):
+class Stage[TSpec, TResource](ABC):
     @abstractmethod
     async def setup(self, spec_generator: SpecGenerator[TSpec]) -> None:
         """
@@ -89,11 +89,11 @@ class ProvisionStage(Stage[TSpec, TResource]):
     It waits for the spec to be ready and then uses the provisioner to set up the resource.
     """
 
-    _provisioner: Provisioner
-    _resource: Optional[TResource]
+    _provisioner: Provisioner  # type: ignore[type-arg]
+    _resource: TResource | None
     _setup_completed: asyncio.Event
 
-    def __init__(self, provisioner: Provisioner):
+    def __init__(self, provisioner: Provisioner) -> None:  # type: ignore[type-arg]
         self._provisioner = provisioner
         self._resource = None
         self._setup_completed = asyncio.Event()
@@ -134,7 +134,7 @@ class ArgsSpecGenerator(SpecGenerator[TSpec]):
 
     _args: TSpec
 
-    def __init__(self, args: TSpec):
+    def __init__(self, args: TSpec) -> None:
         self._args = args
 
     @override

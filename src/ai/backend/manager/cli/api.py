@@ -10,10 +10,9 @@ import aiofiles
 import click
 
 from ai.backend.common.json import pretty_json_str
+from ai.backend.manager.api.gql.schema import schema as strawberry_schema
+from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.openapi import generate
-
-from ..api.gql.schema import schema as strawberry_schema
-from ..models.gql import graphene_schema
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -22,12 +21,12 @@ log = logging.getLogger(__spec__.name)
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 
-async def generate_graphene_gql_schema(output_path: Path) -> None:
-    if output_path == "-":
+async def generate_graphene_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
         log.info("======== Graphene GraphQL API Schema ========")
         print(str(graphene_schema))
     else:
@@ -35,8 +34,8 @@ async def generate_graphene_gql_schema(output_path: Path) -> None:
             await fw.write(str(graphene_schema))
 
 
-async def generate_strawberry_gql_schema(output_path: Path) -> None:
-    if output_path == "-":
+async def generate_strawberry_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
         log.info("======== Strawberry GraphQL API Schema ========")
         print(strawberry_schema.as_str())
     else:
@@ -97,7 +96,7 @@ def generate_supergraph_schema(
     type=click.Path(file_okay=False, writable=True),
     help="Output directory for supergraph.graphql (default: same as schema file directory)",
 )
-def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> None:
+def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) -> None:
     """Post-process GraphQL schema and generate supergraph."""
     try:
         generate_supergraph_schema(
@@ -107,15 +106,15 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
         click.echo("✅ Supergraph generation completed successfully!")
     except FileNotFoundError as e:
         click.echo(f"❌ Error: {e}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
     except subprocess.CalledProcessError as e:
         click.echo(f"❌ Rover command failed: {e}", err=True)
         if hasattr(e, "stderr") and e.stderr:
             click.echo(f"Error details: {e.stderr}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
     except Exception as e:
         click.echo(f"❌ Unexpected error: {e}", err=True)
-        raise click.Abort()
+        raise click.Abort() from e
 
 
 @cli.command()
@@ -124,7 +123,7 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
     "--output",
     "-o",
     default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 @click.option(
@@ -133,7 +132,10 @@ def generate_supergraph(cli_ctx: CLIContext, config: Path, output_dir: Path) -> 
     default=False,  # TODO: Set default to True after v2 migration is complete
     help="Generate strawberry based v2 GraphQL schema (default: False)",
 )
-def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+    """
+    Generates GraphQL schema of Backend.AI API.
+    """
     if v2:
         asyncio.run(generate_strawberry_gql_schema(output))
     else:
@@ -145,17 +147,17 @@ def dump_gql_schema(cli_ctx: CLIContext, output: Path, v2: bool) -> None:
 @click.option(
     "--output",
     "-o",
-    default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
-def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
+def dump_openapi(_cli_ctx: CLIContext, output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
     openapi = asyncio.run(generate())
-    if output == "-" or output is None:
+    if output is None:
         print(pretty_json_str(openapi))
     else:
-        with open(output, mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(pretty_json_str(openapi))

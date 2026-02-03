@@ -1,13 +1,10 @@
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     Any,
     Final,
-    Optional,
     Self,
-    Sequence,
-    Union,
     cast,
 )
 from uuid import UUID
@@ -93,7 +90,7 @@ class ValkeyStatClient:
         *,
         db_id: int,
         human_readable_name: str,
-        pubsub_channels: Optional[set[str]] = None,
+        pubsub_channels: set[str] | None = None,
     ) -> Self:
         """
         Create a ValkeyStatClient instance.
@@ -149,7 +146,7 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def get_keypair_concurrency_used(
         self, access_key: str, is_private: bool = False
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Get current concurrency usage for a keypair.
 
@@ -167,7 +164,7 @@ class ValkeyStatClient:
             return None
 
     @valkey_stat_resilience.apply()
-    async def get_keypair_last_used_time(self, access_key: str) -> Optional[float]:
+    async def get_keypair_last_used_time(self, access_key: str) -> float | None:
         """
         Get last API call timestamp for a keypair.
 
@@ -183,7 +180,7 @@ class ValkeyStatClient:
             return None
 
     @valkey_stat_resilience.apply()
-    async def get_gpu_allocation_map(self, agent_id: str) -> Optional[dict[str, float]]:
+    async def get_gpu_allocation_map(self, agent_id: str) -> dict[str, float] | None:
         """
         Get GPU allocation mapping for an agent.
 
@@ -194,7 +191,7 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return json.loads(result)
+            return cast(dict[str, float], json.loads(result))
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
                 "Failed to decode GPU allocation map for agent {}: {}",
@@ -217,7 +214,7 @@ class ValkeyStatClient:
         await self._client.client.set(key, value, expiry=ExpirySet(ExpiryType.SEC, ttl))
 
     @valkey_stat_resilience.apply()
-    async def get_kernel_statistics(self, kernel_id: str) -> Optional[dict[str, Any]]:
+    async def get_kernel_statistics(self, kernel_id: str) -> dict[str, Any] | None:
         """
         Get kernel utilization statistics.
 
@@ -228,7 +225,7 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return msgpack.unpackb(result, raw=False)
+            return cast(dict[str, Any], msgpack.unpackb(result, raw=False))
         except (ExtraData, UnpackException, ValueError):
             log.warning(
                 "Failed to unpack kernel statistics for ID {}: {}",
@@ -256,7 +253,7 @@ class ValkeyStatClient:
         return f"{_CONTAINER_COUNT_PREFIX}.{agent_id}"
 
     @valkey_stat_resilience.apply()
-    async def get_kernel_commit_statuses(self, kernel_ids: list[str]) -> list[Optional[bytes]]:
+    async def get_kernel_commit_statuses(self, kernel_ids: list[str]) -> list[bytes | None]:
         """
         Get commit statuses for multiple kernels efficiently.
 
@@ -270,7 +267,7 @@ class ValkeyStatClient:
         return await self._get_multiple_keys(keys)
 
     @valkey_stat_resilience.apply()
-    async def get_abuse_report(self, kernel_id: str) -> Optional[str]:
+    async def get_abuse_report(self, kernel_id: str) -> str | None:
         """
         Get abuse report for a specific kernel.
 
@@ -300,7 +297,9 @@ class ValkeyStatClient:
         )
 
     @valkey_stat_resilience.apply()
-    async def get_session_statistics_batch(self, session_ids: list[str]) -> list[Optional[dict]]:
+    async def get_session_statistics_batch(
+        self, session_ids: list[str]
+    ) -> list[dict[str, Any] | None]:
         """
         Get statistics for multiple sessions efficiently.
 
@@ -311,7 +310,7 @@ class ValkeyStatClient:
             return []
 
         results = await self._get_multiple_keys(session_ids)
-        stats: list[Optional[dict]] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -332,9 +331,7 @@ class ValkeyStatClient:
         return stats
 
     @valkey_stat_resilience.apply()
-    async def get_user_kernel_statistics_batch(
-        self, kernel_ids: list[str]
-    ) -> list[Optional[bytes]]:
+    async def get_user_kernel_statistics_batch(self, kernel_ids: list[str]) -> list[bytes | None]:
         """
         Get raw kernel statistics for multiple kernels for user service operations.
 
@@ -344,7 +341,7 @@ class ValkeyStatClient:
         return await self._get_multiple_keys(kernel_ids)
 
     @valkey_stat_resilience.apply()
-    async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[Optional[dict]]:
+    async def get_agent_statistics_batch(self, agent_ids: list[str]) -> list[dict[str, Any] | None]:
         """
         Get agent statistics for multiple agents.
 
@@ -352,7 +349,7 @@ class ValkeyStatClient:
         :return: List of agent statistics, with None for non-existent agents.
         """
         results = await self._get_multiple_keys(agent_ids)
-        stats: list[Optional[dict]] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -443,7 +440,7 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def get_inference_app_statistics_batch(
         self, endpoint_ids: list[str]
-    ) -> list[Optional[dict]]:
+    ) -> list[dict[str, Any] | None]:
         """
         Get inference app statistics for multiple endpoints.
 
@@ -456,7 +453,7 @@ class ValkeyStatClient:
         keys = [self._get_inference_app_key(endpoint_id) for endpoint_id in endpoint_ids]
         results = await self._get_multiple_keys(keys)
 
-        stats: list[Optional[dict]] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -489,7 +486,7 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def get_inference_replica_statistics_batch(
         self, endpoint_replica_pairs: list[tuple[str, str]]
-    ) -> list[Optional[dict]]:
+    ) -> list[dict[str, Any] | None]:
         """
         Get inference replica statistics for multiple endpoint-replica pairs.
 
@@ -505,7 +502,7 @@ class ValkeyStatClient:
         ]
         results = await self._get_multiple_keys(keys)
 
-        stats: list[Optional[dict]] = []
+        stats: list[dict[str, Any] | None] = []
         for i, result in enumerate(results):
             if result is None:
                 stats.append(None)
@@ -526,7 +523,7 @@ class ValkeyStatClient:
         return stats
 
     @valkey_stat_resilience.apply()
-    async def get_image_distro(self, image_id: str) -> Optional[str]:
+    async def get_image_distro(self, image_id: str) -> str | None:
         """
         Get cached Linux distribution for a Docker image.
 
@@ -541,7 +538,7 @@ class ValkeyStatClient:
         if not results:
             return None
         try:
-            result = cast(Optional[bytes], results[0])
+            result = cast(bytes | None, results[0])
             if not result:
                 return None
             return result.decode("utf-8")
@@ -563,7 +560,7 @@ class ValkeyStatClient:
         )
 
     @valkey_stat_resilience.apply()
-    async def get_volume_usage(self, proxy_name: str, volume_name: str) -> Optional[bytes]:
+    async def get_volume_usage(self, proxy_name: str, volume_name: str) -> bytes | None:
         """
         Get volume usage information.
 
@@ -617,9 +614,6 @@ class ValkeyStatClient:
         :return: Dictionary of slot name to metadata JSON string.
         """
         result = await self._client.client.hgetall(_COMPUTER_METADATA_KEY)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         metadata: dict[str, bytes] = {}
         for key, value in result.items():
@@ -628,7 +622,7 @@ class ValkeyStatClient:
         return metadata
 
     @valkey_stat_resilience.apply()
-    async def _get_raw(self, key: str) -> Optional[bytes]:
+    async def _get_raw(self, key: str) -> bytes | None:
         """
         Get raw value by key (internal use only for testing).
 
@@ -646,18 +640,18 @@ class ValkeyStatClient:
         """Generate resource preset key by name."""
         return f"resource_preset:name:{name}"
 
-    def _get_resource_preset_list_key(self, scaling_group: Optional[str] = None) -> str:
+    def _get_resource_preset_list_key(self, scaling_group: str | None = None) -> str:
         """Generate resource preset list key."""
         return f"resource_preset:list:{scaling_group or '_global_'}"
 
     def _get_resource_preset_check_key(
-        self, access_key: str, group: str, domain: str, scaling_group: Optional[str] = None
+        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
     ) -> str:
         """Generate resource preset check key."""
         return f"resource_preset:check:{access_key}:{group}:{domain}:{scaling_group or '_any_'}"
 
     @valkey_stat_resilience.apply()
-    async def get_resource_preset_by_id(self, preset_id: str) -> Optional[bytes]:
+    async def get_resource_preset_by_id(self, preset_id: str) -> bytes | None:
         """
         Get cached resource preset data by ID.
 
@@ -668,7 +662,7 @@ class ValkeyStatClient:
         return await self._client.client.get(key)
 
     @valkey_stat_resilience.apply()
-    async def get_resource_preset_by_name(self, name: str) -> Optional[bytes]:
+    async def get_resource_preset_by_name(self, name: str) -> bytes | None:
         """
         Get cached resource preset data by name.
 
@@ -679,9 +673,7 @@ class ValkeyStatClient:
         return await self._client.client.get(key)
 
     @valkey_stat_resilience.apply()
-    async def get_resource_preset_list(
-        self, scaling_group: Optional[str] = None
-    ) -> Optional[bytes]:
+    async def get_resource_preset_list(self, scaling_group: str | None = None) -> bytes | None:
         """
         Get cached resource preset list.
 
@@ -693,8 +685,8 @@ class ValkeyStatClient:
 
     @valkey_stat_resilience.apply()
     async def get_resource_preset_check_data(
-        self, access_key: str, group: str, domain: str, scaling_group: Optional[str] = None
-    ) -> Optional[bytes]:
+        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
+    ) -> bytes | None:
         """
         Get cached resource preset check data.
 
@@ -733,7 +725,7 @@ class ValkeyStatClient:
 
     @valkey_stat_resilience.apply()
     async def set_resource_preset_list(
-        self, scaling_group: Optional[str], value: bytes, expire_sec: int = 60
+        self, scaling_group: str | None, value: bytes, expire_sec: int = 60
     ) -> None:
         """
         Cache resource preset list.
@@ -755,7 +747,7 @@ class ValkeyStatClient:
         access_key: str,
         group: str,
         domain: str,
-        scaling_group: Optional[str],
+        scaling_group: str | None,
         value: bytes,
         expire_sec: int = 60,
     ) -> None:
@@ -778,7 +770,7 @@ class ValkeyStatClient:
 
     @valkey_stat_resilience.apply()
     async def delete_resource_preset(
-        self, preset_id: Optional[str] = None, name: Optional[str] = None
+        self, preset_id: str | None = None, name: str | None = None
     ) -> int:
         """
         Delete resource preset cache by ID and/or name.
@@ -828,7 +820,7 @@ class ValkeyStatClient:
         self,
         key: str,
         value: bytes,
-        expire_sec: Optional[int] = None,
+        expire_sec: int | None = None,
     ) -> None:
         """
         Set the value of a key with optional expiration.
@@ -872,7 +864,7 @@ class ValkeyStatClient:
         return seconds + (microseconds / 10**6)
 
     @valkey_stat_resilience.apply()
-    async def setex(self, name: str, value: Union[str, bytes], time: int) -> None:
+    async def setex(self, name: str, value: str | bytes, time: int) -> None:
         """
         Set a key with an expiration time.
 
@@ -1048,7 +1040,7 @@ class ValkeyStatClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
-    async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def _get_multiple_keys(self, keys: list[str]) -> list[bytes | None]:
         """
         Get multiple keys efficiently using batch operations.
 
@@ -1063,7 +1055,7 @@ class ValkeyStatClient:
     async def set_multiple_keys(
         self,
         key_value_map: Mapping[str, bytes],
-        expire_sec: Optional[int] = None,
+        expire_sec: int | None = None,
     ) -> None:
         """
         Set multiple keys efficiently using batch operations.
@@ -1269,7 +1261,7 @@ class ValkeyStatClient:
     async def scan_and_get_manager_status(
         self,
         pattern: str,
-    ) -> list[Optional[bytes]]:
+    ) -> list[bytes | None]:
         """
         Scan for manager status keys and get their values.
 
@@ -1419,7 +1411,7 @@ class ValkeyStatClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    async def get_total_resource_slots(self) -> Optional[TotalResourceData]:
+    async def get_total_resource_slots(self) -> TotalResourceData | None:
         """
         Get total resource slots data from cache.
 
@@ -1509,3 +1501,23 @@ class ValkeyStatClient:
         batch = self._invalidate_keypair_concurrencies(batch, access_keys)
 
         await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_stat_resilience.apply()
+    async def config_get(self, parameters: Sequence[str]) -> dict[bytes, bytes]:
+        """
+        Get the values of configuration parameters.
+
+        :param parameters: List of configuration parameter names to retrieve.
+        :return: Dictionary mapping parameter names to their values.
+        """
+        return await self._client.client.config_get(cast(list[str | bytes], list(parameters)))
+
+    @valkey_stat_resilience.apply()
+    async def execute_command(self, args: Sequence[str]) -> Any:
+        """
+        Execute a custom Redis/Valkey command.
+
+        :param args: Command arguments (first element is the command name).
+        :return: Command result.
+        """
+        return await self._client.client.custom_command(cast(list[str | bytes], list(args)))

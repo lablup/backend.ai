@@ -1,17 +1,17 @@
 import sys
 import uuid
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.output.fields import network_fields
 from ai.backend.client.session import Session
 
-from ..output.fields import network_fields
 from .pretty import print_done
 
 _default_list_fields = (
@@ -22,8 +22,8 @@ _default_list_fields = (
 )
 
 
-@main.group()
-def network():
+@click.group()
+def network() -> None:
     """Set of inter-container network operations"""
 
 
@@ -32,7 +32,7 @@ def network():
 @click.argument("project", type=str, metavar="PROJECT_ID_OR_NAME")
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--driver", default=None, help="Set the network driver.")
-def create(ctx: CLIContext, project, name, driver):
+def create(ctx: CLIContext, project: str, name: str, driver: str | None) -> None:
     """Create a new network interface."""
 
     with Session() as session:
@@ -73,14 +73,21 @@ def create(ctx: CLIContext, project, name, driver):
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, format, filter_, order, offset, limit):
+def list(
+    ctx: CLIContext,
+    format: str | None,
+    filter_: str | None,
+    order: str | None,
+    offset: int,
+    limit: int | None,
+) -> None:
     """List all available network interfaces."""
 
     if format:
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = None
@@ -112,13 +119,13 @@ def list(ctx: CLIContext, format, filter_, order, offset, limit):
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, network, format):
+def get(ctx: CLIContext, network: str, format: str | None) -> None:
     fields: Iterable[Any]
     if format:
         try:
             fields = [network_fields[f.strip()] for f in format.split(",")]
         except KeyError as e:
-            ctx.output.print_fail(f"Field {str(e)} not found")
+            ctx.output.print_fail(f"Field {e!s} not found")
             sys.exit(ExitCode.FAILURE)
     else:
         fields = _default_list_fields
@@ -144,7 +151,7 @@ def get(ctx: CLIContext, network, format):
 @network.command()
 @pass_ctx_obj
 @click.argument("network", type=str, metavar="NETWORK_ID_OR_NAME")
-def delete(ctx: CLIContext, network):
+def delete(ctx: CLIContext, network: str) -> None:
     with Session() as session:
         try:
             network_info = session.Network(uuid.UUID(network)).get(fields=[network_fields["id"]])
@@ -163,7 +170,7 @@ def delete(ctx: CLIContext, network):
             network_info = networks.items[0]
 
         try:
-            session.Network(uuid.UUID(network_info["row_id"])).delete()
+            _ = session.Network(uuid.UUID(network_info["row_id"])).delete()
             print_done(f"Network {network} has been deleted.")
         except BackendAPIError as e:
             ctx.output.print_fail(f"Failed to delete network {network}:")

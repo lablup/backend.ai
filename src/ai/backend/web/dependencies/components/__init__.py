@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .composer import ComponentComposer, ComponentResources
 from .hive_router_client import HiveRouterClientInfo, HiveRouterClientProvider
 from .manager_client import ManagerClientInfo, ManagerClientProvider

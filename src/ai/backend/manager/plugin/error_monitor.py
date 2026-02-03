@@ -3,25 +3,30 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping, Optional, override
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, override
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-
-from ..models import error_logs
+from ai.backend.manager.data.error_log.types import ErrorLogSeverity
+from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
+    from ai.backend.manager.repositories.error_log import ErrorLogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
-    async def init(self, context: Optional[Any] = None) -> None:
+    _error_log_repository: ErrorLogRepository
+
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_monitor is initialized without the root context. "
@@ -29,10 +34,9 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
-        root_ctx: RootContext = context["_root.context"]  # type: ignore
-        self.db = root_ctx.db
+        self.enabled = True
+        root_ctx: RootContext = context["_root.context"]
+        self._error_log_repository = root_ctx.repositories.error_log.repository
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -42,8 +46,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
     async def capture_exception(
         self,
-        exc_instance: Optional[Exception] = None,
-        context: Optional[Mapping[str, Any]] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         if not self.enabled:
             return
@@ -70,17 +74,19 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             user = context["user"]
         message = "".join(traceback.format_exception_only(exc_type, exc_instance)).strip()
 
-        async with self.db.begin() as conn:
-            query = error_logs.insert().values({
-                "severity": severity.value.lower(),
-                "source": "manager",
-                "user": user,
-                "message": message,
-                "context_lang": "python",
-                "context_env": context,
-                "traceback": "".join(traceback.format_tb(tb)).strip(),
-            })
-            await conn.execute(query)
+        error_log_severity = ErrorLogSeverity(severity.value.lower())
+        creator = Creator(
+            spec=ErrorLogCreatorSpec(
+                severity=error_log_severity,
+                source="manager",
+                user=user,
+                message=message,
+                context_lang="python",
+                context_env=dict(context) if context else {},
+                traceback="".join(traceback.format_tb(tb)).strip(),
+            )
+        )
+        await self._error_log_repository.create(creator)
         log.debug(
             'collected an error log [{}] "{}" from manager',
             severity.name,
@@ -89,7 +95,9 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
 
 class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
-    async def init(self, context: Optional[Any] = None) -> None:
+    _error_log_repository: ErrorLogRepository
+
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_event_dispatcher is initialized without the root context. "
@@ -97,10 +105,9 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
             )
             self.enabled = False
             return
-        else:
-            self.enabled = True
+        self.enabled = True
         root_ctx: RootContext = context
-        self._db = root_ctx.db
+        self._error_log_repository = root_ctx.repositories.error_log.repository
 
     @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
@@ -116,17 +123,19 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
             return
         if not self.enabled:
             return
-        async with self._db.begin() as conn:
-            query = error_logs.insert().values({
-                "severity": event.severity.value.lower(),
-                "source": source,
-                "user": event.user,
-                "message": event.message,
-                "context_lang": "python",
-                "context_env": event.context_env,
-                "traceback": event.traceback,
-            })
-            await conn.execute(query)
+        error_log_severity = ErrorLogSeverity(event.severity.value.lower())
+        creator = Creator(
+            spec=ErrorLogCreatorSpec(
+                severity=error_log_severity,
+                source=source,
+                user=event.user,
+                message=event.message,
+                context_lang="python",
+                context_env=dict(event.context_env) if event.context_env else {},
+                traceback=event.traceback,
+            )
+        )
+        await self._error_log_repository.create(creator)
         log.debug(
             'collected an error log [{}] "{}" from agent:{}',
             event.severity.name,

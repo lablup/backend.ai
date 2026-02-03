@@ -14,7 +14,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
 if TYPE_CHECKING:
-    from ai.backend.manager.clients.agent.pool import AgentPool
+    from ai.backend.manager.clients.agent.pool import AgentClientPool
     from ai.backend.manager.repositories.agent.repository import AgentRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -34,20 +34,20 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
     """
 
     _agent_repository: AgentRepository
-    _agent_pool: AgentPool
+    _agent_client_pool: AgentClientPool
 
     def __init__(
         self,
         agent_repository: AgentRepository,
-        agent_pool: AgentPool,
+        agent_client_pool: AgentClientPool,
     ) -> None:
         self._agent_repository = agent_repository
-        self._agent_pool = agent_pool
+        self._agent_client_pool = agent_client_pool
 
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.RESCAN_GPU_ALLOC_MAPS  # type: ignore[return-value]
+        return ManagerBgtaskName.RESCAN_GPU_ALLOC_MAPS
 
     @classmethod
     @override
@@ -61,8 +61,8 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
             agent_data = await self._agent_repository.get_by_id(manifest.agent_id)
 
             # Get agent client from pool and scan GPU allocation map
-            agent_client = self._agent_pool.get_agent_client(agent_data.id)
-            alloc_map = await agent_client.scan_gpu_alloc_map()
+            async with self._agent_client_pool.acquire(AgentId(agent_data.id)) as client:
+                alloc_map = await client.scan_gpu_alloc_map()
 
             # Store result in cache via repository
             await self._agent_repository.update_gpu_alloc_map(manifest.agent_id, alloc_map)

@@ -1,6 +1,7 @@
 """Validator rules for session creation."""
 
-from typing import Mapping, override
+from collections.abc import Mapping
+from typing import override
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_ports import parse_service_ports
@@ -112,7 +113,7 @@ class ResourceLimitRule(SessionValidatorRule):
     def name(self) -> str:
         return "resource_limit"
 
-    def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None):
+    def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None) -> None:
         self._known_slot_types = known_slot_types
 
     @override

@@ -4,24 +4,19 @@ A module to collect various performance metrics of Docker containers.
 Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
 
+from __future__ import annotations
+
 import asyncio
 import enum
 import logging
 import sys
 import time
 import uuid
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    FrozenSet,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
+    Any,
     cast,
 )
 
@@ -52,6 +47,7 @@ from .metrics.types import (
     PCT_METRIC_KEY,
     FlattenedDeviceMetric,
     FlattenedKernelMetric,
+    FlattenedProcessMetric,
 )
 from .utils import remove_exponent
 
@@ -62,18 +58,18 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "StatContext",
-    "StatModes",
-    "MetricTypes",
-    "NodeMeasurement",
     "ContainerMeasurement",
     "Measurement",
+    "MetricTypes",
+    "NodeMeasurement",
+    "StatContext",
+    "StatModes",
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def check_cgroup_available():
+def check_cgroup_available() -> bool:
     """
     Check if the host OS provides cgroups.
     """
@@ -85,7 +81,7 @@ class StatModes(enum.StrEnum):
     DOCKER = "docker"
 
     @staticmethod
-    def get_preferred_mode():
+    def get_preferred_mode() -> StatModes:
         """
         Returns the most preferred statistics collector type for the host OS.
         """
@@ -133,9 +129,9 @@ class MetricTypes(enum.Enum):
 @attrs.define(auto_attribs=True, slots=True)
 class Measurement:
     value: Decimal
-    capacity: Optional[Decimal] = None
+    capacity: Decimal | None = None
 
-    def apply_scale_factor(self, scale_factor: Decimal) -> "Measurement":
+    def apply_scale_factor(self, scale_factor: Decimal) -> Measurement:
         return Measurement(
             value=self.value * scale_factor,
             capacity=self.capacity * scale_factor if self.capacity is not None else None,
@@ -154,8 +150,8 @@ class NodeMeasurement:
     type: MetricTypes
     per_node: Measurement
     per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -168,8 +164,8 @@ class ContainerMeasurement:
     key: MetricKey
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -182,8 +178,8 @@ class ProcessMeasurement:
     key: MetricKey
     type: MetricTypes
     per_process: Mapping[int, Measurement] = attrs.Factory(dict)
-    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    stats_filter: frozenset[str] = attrs.Factory(frozenset)
+    current_hook: Callable[[Metric], Decimal] | None = None
     unit_hint: str = "count"
 
 
@@ -203,19 +199,19 @@ def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000
 
 class MovingStatistics:
     __slots__ = (
-        "_sum",
         "_count",
-        "_min",
-        "_max",
         "_last",
+        "_max",
+        "_min",
+        "_sum",
     )
     _sum: Decimal
     _count: int
     _min: Decimal
     _max: Decimal
-    _last: List[Tuple[Decimal, float]]
+    _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None):
+    def __init__(self, initial_value: Decimal | None = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -230,7 +226,7 @@ class MovingStatistics:
             point = (initial_value, time.perf_counter())
             self._last.append(point)
 
-    def update(self, value: Decimal):
+    def update(self, value: Decimal) -> None:
         self._sum += value
         self._min = min(self._min, value)
         self._max = max(self._max, value)
@@ -260,15 +256,19 @@ class MovingStatistics:
     @property
     def diff(self) -> Decimal:
         if len(self._last) == 2:
-            return self._last[-1][0] - self._last[-2][0]
+            delta = self._last[-1][0] - self._last[-2][0]
+            if delta < 0:  # Counter reset (e.g., container restart)
+                return Decimal(0)
+            return delta
         return Decimal(0)
 
     @property
     def rate(self) -> Decimal:
         if len(self._last) == 2:
-            return (self._last[-1][0] - self._last[-2][0]) / Decimal(
-                self._last[-1][1] - self._last[-2][1]
-            )
+            delta = self._last[-1][0] - self._last[-2][0]
+            if delta < 0:  # Counter reset (e.g., container restart)
+                return Decimal(0)
+            return delta / Decimal(self._last[-1][1] - self._last[-2][1])
         return Decimal(0)
 
     def to_serializable_dict(self) -> MovingStatValue:
@@ -299,12 +299,12 @@ class Metric:
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
-    stats_filter: FrozenSet[str]
+    stats_filter: frozenset[str]
     current: Decimal
-    capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[["Metric"], Decimal]] = None
+    capacity: Decimal | None = None
+    current_hook: Callable[[Metric], Decimal] | None = None
 
-    def update(self, value: Measurement):
+    def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
         self.stats.update(value.value)
@@ -336,7 +336,7 @@ class Metric:
 
 
 class StatContext:
-    agent: "AbstractAgent"
+    agent: AbstractAgent[Any, Any]
     mode: StatModes
     node_metrics: dict[MetricKey, Metric]
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
@@ -346,7 +346,11 @@ class StatContext:
     _stage_observer: StageObserver
 
     def __init__(
-        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
+        self,
+        agent: AbstractAgent[Any, Any],
+        mode: StatModes | None = None,
+        *,
+        cache_lifespan: int = 120,
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
@@ -362,7 +366,7 @@ class StatContext:
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
 
-    def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
+    def update_timestamp(self, timestamp_key: str) -> tuple[float, float]:
         """
         Update the timestamp for the given key and return a pair of the current timestamp and
         the interval from the last update of the same key.
@@ -381,7 +385,7 @@ class StatContext:
     def _get_ownership_info_from_kernel(
         self,
         kernel_id: KernelId,
-    ) -> tuple[Optional[SessionId], Optional[uuid.UUID], Optional[uuid.UUID]]:
+    ) -> tuple[SessionId | None, uuid.UUID | None, uuid.UUID | None]:
         kernel_obj = self.agent.kernel_registry.get(kernel_id)
         if kernel_obj is not None:
             ownership_data = kernel_obj.ownership_data
@@ -415,16 +419,24 @@ class StatContext:
             )
         )
 
-    async def remove_kernel_metric(self, kernel_id: KernelId) -> None:
-        log.info("Removing metrics for kernel {}", kernel_id)
+    async def remove_kernel_metric(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId | None,
+    ) -> None:
+        log.info("Removing metrics for kernel {} (container: {})", kernel_id, container_id)
         known_metrics = self.kernel_metrics.get(kernel_id)
         log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
         if known_metrics is None:
+            log.warning("No known metrics for kernel {}", kernel_id)
             return
         metric_keys = list(known_metrics.keys())
         agent_id = self.agent.id
         session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        # TODO: Remove passing kernel_metrics dict to UtilizationMetricObserver
+        # Removing container metrics
         await self._utilization_metric_observer.lazy_remove_container_metric(
+            self.kernel_metrics,
             agent_id=agent_id,
             kernel_id=kernel_id,
             session_id=session_id,
@@ -432,6 +444,45 @@ class StatContext:
             project_id=project_id,
             keys=metric_keys,
         )
+
+        # Removing process metrics associated with the container
+        # Skip if running on macOS
+        if sys.platform == "darwin":
+            return
+
+        # mypy evaluates sys.platform at type-check time, so:
+        # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
+        # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
+        if container_id is None:  # type: ignore[unreachable,unused-ignore]
+            log.warning(
+                "Skipping process metric removal for kernel {}: container_id is None", kernel_id
+            )
+            return
+
+        process_metrics_for_container = self.process_metrics.get(container_id, {})
+        if not process_metrics_for_container:
+            log.warning("No process metrics to remove for container {}", container_id)
+            return
+
+        log.info(
+            "Removing process metrics for container {}: {} PIDs",
+            container_id,
+            len(process_metrics_for_container),
+        )
+        for pid, metrics in process_metrics_for_container.items():
+            metric_keys = list(metrics.keys())
+            # TODO: Remove passing process_metrics dict to UtilizationMetricObserver
+            await self._utilization_metric_observer.lazy_remove_process_metric(
+                self.process_metrics,
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                container_id=container_id,
+                pid=pid,
+                keys=metric_keys,
+            )
 
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         """
@@ -447,7 +498,9 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            async def gather_node_measures_with_slots(instance: "AbstractComputePlugin"):
+            async def gather_node_measures_with_slots(
+                instance: AbstractComputePlugin,
+            ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
                 result = await instance.gather_node_measures(self)
                 return [slot_name for slot_name, _ in instance.slot_types], result
 
@@ -600,11 +653,10 @@ class StatContext:
                     slot_name = slot_names_with_same_prefix_as_metric_key[0]
                     log.info(f"Found slot name {slot_name} with same prefix as {metric_key}")
                     return resource_scaling_factors[slot_name]
-                else:
-                    raise ValueError(
-                        f"Plugin defines more than 1 device slots {slot_names}, "
-                        f"and matching with metric key {metric_key} yielded no results."
-                    )
+                raise ValueError(
+                    f"Plugin defines more than 1 device slots {slot_names}, "
+                    f"and matching with metric key {metric_key} yielded no results."
+                )
 
     def observe_container_metric(
         self,
@@ -626,6 +678,35 @@ class StatContext:
                 session_id=session_id,
                 owner_user_id=owner_user_id,
                 project_id=project_id,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
+
+    def observe_process_metric(
+        self,
+        kernel_id: KernelId,
+        container_id: ContainerId,
+        pid: PID,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = self.agent.id
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_process_metric(
+            metric=FlattenedProcessMetric(
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                container_id=container_id,
+                pid=pid,
                 key=metric_key,
                 value_pairs=value_pairs,
             )
@@ -655,10 +736,6 @@ class StatContext:
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
                     kernel_obj_map[kid] = info
-            unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
-            for unused_kernel_id in unused_kernel_ids:
-                log.debug("removing kernel_metric for {}", unused_kernel_id)
-                self.kernel_metrics.pop(unused_kernel_id, None)
 
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
@@ -676,7 +753,7 @@ class StatContext:
                 upper_layer="collect_container_stat",
             )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
-            updated_kernel_ids: Set[KernelId] = set()
+            updated_kernel_ids: set[KernelId] = set()
             self._stage_observer.observe_stage(
                 stage="before_observe",
                 upper_layer="collect_container_stat",
@@ -810,28 +887,29 @@ class StatContext:
         if sys.platform == "darwin":
             return
 
-        self._stage_observer.observe_stage(
+        # mypy evaluates sys.platform at type-check time, so:
+        # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
+        # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
+        self._stage_observer.observe_stage(  # type: ignore[unreachable,unused-ignore]
             stage="before_lock",
             upper_layer="collect_per_container_process_stat",
         )
         async with self._lock:
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            for kid, info in self.agent.kernel_registry.items():
+                try:
+                    cid = info["container_id"]
+                except KeyError:
+                    log.warning(
+                        "collect_per_container_process_stat(): no container for kernel {}", kid
+                    )
+                else:
+                    kernel_id_map[ContainerId(cid)] = kid
+
             pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
                     active_pids = await self._get_processes(cid, docker)
-                    if cid in self.process_metrics:
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
-                        if unused_pids:
-                            log.debug(
-                                "removing pid_metric for {}: {}",
-                                cid,
-                                ", ".join([str(p) for p in unused_pids]),
-                            )
-                            self.process_metrics[cid] = {
-                                pid_: metric
-                                for pid_, metric in self.process_metrics[cid].items()
-                                if pid_ in active_pids
-                            }
                     for pid_ in active_pids:
                         pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
@@ -855,7 +933,7 @@ class StatContext:
                 stage="before_observe",
                 upper_layer="collect_per_container_process_stat",
             )
-            updated_cids: Set[ContainerId] = set()
+            updated_cids: set[ContainerId] = set()
             for result in results:
                 if isinstance(result, BaseException):
                     log.error(
@@ -866,10 +944,21 @@ class StatContext:
                 for proc_measure in result:
                     metric_key = proc_measure.key
                     # update per-process metric
-                    for pid, measure in proc_measure.per_process.items():
-                        pid = PID(pid)
+                    for raw_pid, measure in proc_measure.per_process.items():
+                        pid = PID(raw_pid)
                         cid = pid_map[pid]
+                        try:
+                            kernel_id = kernel_id_map[cid]
+                        except KeyError:
+                            continue
                         updated_cids.add(cid)
+                        self.observe_process_metric(
+                            kernel_id,
+                            cid,
+                            pid,
+                            metric_key,
+                            measure,
+                        )
                         if cid not in self.process_metrics:
                             self.process_metrics[cid] = {}
                         if pid not in self.process_metrics[cid]:

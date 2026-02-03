@@ -1,6 +1,7 @@
 import importlib.resources
 import logging
 import ssl
+from typing import Any
 
 import aiohttp_jinja2
 import jinja2
@@ -8,19 +9,19 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
 from ai.backend.logging import BraceStyleAdapter
 
-from ....errors import InvalidFrontendTypeError
-from ....types import Circuit, PortFrontendInfo
 from .base import BaseHTTPFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PortFrontend(BaseHTTPFrontend[int]):
     sites: list[web.TCPSite]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.sites = []

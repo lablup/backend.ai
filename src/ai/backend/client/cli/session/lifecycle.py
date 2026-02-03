@@ -6,10 +6,11 @@ import secrets
 import subprocess
 import sys
 from collections import OrderedDict, defaultdict
-from datetime import datetime, timedelta
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, Literal, Optional, Sequence
+from typing import IO, Any, Literal, cast
 from uuid import UUID
 
 import click
@@ -25,17 +26,8 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.types import ClusterMode
-
-from ...exceptions import BackendAPIError
-from ...func.session import ComputeSession
-from ...output.fields import network_fields, session_fields
-from ...output.types import FieldSpec
-from ...session import AsyncSession, Session
-from ..events import SubscribableEvents
-from ..pretty import (
+from ai.backend.client.cli.events import SubscribableEvents
+from ai.backend.client.cli.pretty import (
     ProgressBarWithSpinner,
     print_done,
     print_error,
@@ -44,6 +36,15 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.func.session import ComputeSession
+from ai.backend.client.output.fields import network_fields, session_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import AsyncSession, Session
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode
+
 from .args import click_start_option
 from .execute import (
     format_stats,
@@ -57,11 +58,11 @@ list_expr: click.ParamType = CommaSeparatedListType()
 
 
 @main.group()
-def session():
+def session() -> None:
     """Set of compute session operations"""
 
 
-def _create_cmd(docs: Optional[str] = None):
+def _create_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("image")
     @click.option(
         "-o",
@@ -141,38 +142,38 @@ def _create_cmd(docs: Optional[str] = None):
     def create(
         # base args
         image: str,
-        name: Optional[str],  # click_start_option
-        owner: Optional[str],
+        name: str | None,  # click_start_option
+        owner: str | None,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        starts_at: Optional[str],  # click_start_option
-        startup_command: Optional[str],
-        timeout: Optional[str],
+        starts_at: str | None,  # click_start_option
+        startup_command: str | None,
+        timeout: str | None,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[UUID],
-        priority: Optional[int],  # click_start_option
+        priority: int | None,  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        bootstrap_script: Optional[IO],
-        tag: Optional[str],  # click_start_option
+        bootstrap_script: IO[str] | None,
+        tag: str | None,  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: Optional[str],  # click_start_option
+        scaling_group: str | None,  # click_start_option
         resources: Sequence[str],  # click_start_option
         cluster_size: int,  # click_start_option
         cluster_mode: ClusterMode,
         resource_opts: Sequence[str],  # click_start_option
-        preopen: Optional[str],
-        assign_agent: Optional[str],
+        preopen: str | None,
+        assign_agent: str | None,
         # resource grouping
-        domain: Optional[str],  # click_start_option
-        group: Optional[str],  # click_start_option
-        network: Optional[str],  # click_start_option
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -261,48 +262,32 @@ def _create_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info(
-                        "Session ID {0} is enqueued for scheduling.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
                     print_info(
-                        "Session ID {0} is scheduled and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is scheduled and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARED":
                     print_info(
-                        "Session ID {0} is prepared and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is prepared and about to be started."
                     )
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
                     print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} creation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info(
-                            "Session ID {0} is created and ready.".format(compute_session.id)
-                        )
+                        print_info(f"Session ID {compute_session.id} is created and ready.")
                     else:
-                        print_info(
-                            "Session ID {0} is already running and ready.".format(
-                                compute_session.id
-                            )
-                        )
+                        print_info(f"Session ID {compute_session.id} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -310,32 +295,26 @@ def _create_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info(
-                        "Session ID {0} is still on the job queue.".format(compute_session.id)
-                    )
+                    print_info(f"Session ID {compute_session.id} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            compute_session.id
-                        )
+                        f"Session ID {compute_session.id} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
         create.__doc__ = docs
-    return create
+    return create  # type: ignore[no-any-return]
 
 
 main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
-def _create_from_template_cmd(docs: Optional[str] = None):
+def _create_from_template_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("template_id")
     @click_start_option()
     @click.option(
@@ -455,12 +434,12 @@ def _create_from_template_cmd(docs: Optional[str] = None):
     def create_from_template(
         # base args
         template_id: str,
-        name: Optional[str],  # click_start_option
+        name: str | None,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        priority: Optional[int],  # click_start_option
-        starts_at: Optional[str],  # click_start_option
+        priority: int | None,  # click_start_option
+        starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         timeout: str | Undefined,
@@ -468,11 +447,11 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[UUID],
-        callback_url: Optional[str],  # click_start_option
+        callback_url: str | None,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: Optional[str],  # click_start_option
+        tag: str | None,  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,
@@ -486,7 +465,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
-        network: Optional[str],  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -574,30 +553,26 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                 sys.exit(ExitCode.FAILURE)
             else:
                 if compute_session.status == "PENDING":
-                    print_info("Session ID {0} is enqueued for scheduling.".format(name))
+                    print_info(f"Session ID {name} is enqueued for scheduling.")
                 elif compute_session.status == "SCHEDULED":
-                    print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    print_info(f"Session ID {name} is scheduled and about to be started.")
                     return
                 elif compute_session.status == "PREPARED":
-                    print_info("Session ID {0} is prepared and about to be started.".format(name))
+                    print_info(f"Session ID {name} is prepared and about to be started.")
                     return
                 elif compute_session.status == "PREPARING":
                     print_info(
-                        "Session ID {0} preparation in progress and about to be started.".format(
-                            name
-                        )
+                        f"Session ID {name} preparation in progress and about to be started."
                     )
                     return
                 elif compute_session.status == "CREATING":
-                    print_info(
-                        "Session ID {0} creation in progress and about to be started.".format(name)
-                    )
+                    print_info(f"Session ID {name} creation in progress and about to be started.")
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info("Session ID {0} is created and ready.".format(name))
+                        print_info(f"Session ID {name} is created and ready.")
                     else:
-                        print_info("Session ID {0} is already running and ready.".format(name))
+                        print_info(f"Session ID {name} is already running and ready.")
                     if compute_session.service_ports:
                         print_info(
                             "This session provides the following app services: "
@@ -605,21 +580,19 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                         )
                 elif compute_session.status == "TERMINATED":
                     print_warn(
-                        "Session ID {0} is already terminated.\n"
-                        "This may be an error in the compute_session image.".format(name)
+                        f"Session ID {name} is already terminated.\n"
+                        "This may be an error in the compute_session image."
                     )
                 elif compute_session.status == "TIMEOUT":
-                    print_info("Session ID {0} is still on the job queue.".format(name))
+                    print_info(f"Session ID {name} is still on the job queue.")
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            name
-                        )
+                        f"Session ID {name} has an error during scheduling/startup or cancelled."
                     )
 
     if docs is not None:
         create_from_template.__doc__ = docs
-    return create_from_template
+    return create_from_template  # type: ignore[no-any-return]
 
 
 main.command(aliases=["start-from-template"])(
@@ -628,7 +601,7 @@ main.command(aliases=["start-from-template"])(
 session.command()(_create_from_template_cmd())
 
 
-def _destroy_cmd(docs: Optional[str] = None):
+def _destroy_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_names", metavar="SESSID", nargs=-1)
     @click.option(
         "-f",
@@ -649,7 +622,13 @@ def _destroy_cmd(docs: Optional[str] = None):
     @click.option(
         "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
     )
-    def destroy(session_names, forced, owner, stats, recursive):
+    def destroy(
+        session_names: tuple[str, ...],
+        forced: bool,
+        owner: str | None,
+        stats: bool,
+        recursive: bool,
+    ) -> None:
         """
         Terminate and destroy the given session.
 
@@ -661,6 +640,7 @@ def _destroy_cmd(docs: Optional[str] = None):
         print_wait("Terminating the session(s)...")
         with Session() as session:
             has_failure = False
+            ret: dict[str, Any] | None = None
             for session_name in session_names:
                 try:
                     compute_session = session.ComputeSession(session_name, owner)
@@ -687,9 +667,9 @@ def _destroy_cmd(docs: Optional[str] = None):
                             "Manual cleanup of actual containers may be required."
                         )
                 if stats:
-                    stats = ret.get("stats", None) if ret else None
-                    if stats:
-                        print(format_stats(stats))
+                    stats_data = ret.get("stats", None) if ret else None
+                    if stats_data:
+                        print(format_stats(stats_data))
                     else:
                         print("Statistics is not available.")
             if has_failure:
@@ -704,7 +684,7 @@ main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destro
 session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
-def _restart_cmd(docs: Optional[str] = None):
+def _restart_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     @click.option(
         "-o",
@@ -713,7 +693,7 @@ def _restart_cmd(docs: Optional[str] = None):
         metavar="ACCESS_KEY",
         help="Specify the owner of the target session explicitly.",
     )
-    def restart(session_refs, owner):
+    def restart(session_refs: tuple[str, ...], owner: str | None) -> None:
         """
         Restart the compute session.
 
@@ -729,7 +709,7 @@ def _restart_cmd(docs: Optional[str] = None):
             for session_ref in session_refs:
                 try:
                     compute_session = session.ComputeSession(session_ref, owner)
-                    compute_session.restart()
+                    _ = compute_session.restart()
                 except BackendAPIError as e:
                     print_error(e)
                     if e.status == 404:
@@ -759,7 +739,7 @@ session.command()(_restart_cmd())
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", type=click.Path(exists=True), nargs=-1)
-def upload(session_id, files):
+def upload(session_id: str, files: tuple[str, ...]) -> None:
     """
     Upload the files to a compute session's home directory.
     If the target directory is in a storage folder mount, the operation is
@@ -780,7 +760,7 @@ def upload(session_id, files):
         try:
             print_wait("Uploading files...")
             kernel = session.ComputeSession(session_id)
-            kernel.upload(files, show_progress=True)
+            _ = kernel.upload(files, show_progress=True)
             print_done("Uploaded.")
         except Exception as e:
             print_error(e)
@@ -791,7 +771,7 @@ def upload(session_id, files):
 @click.argument("session_id", metavar="SESSID")
 @click.argument("files", nargs=-1)
 @click.option("--dest", type=Path, default=".", help="Destination path to store downloaded file(s)")
-def download(session_id, files, dest):
+def download(session_id: str, files: tuple[str, ...], dest: Path) -> None:
     """
     Download files from a compute session's home directory.
     If the source path is in a storage folder mount, the operation is
@@ -810,10 +790,10 @@ def download(session_id, files, dest):
         return
     with Session() as session:
         try:
-            print_wait("Downloading file(s) from {}...".format(session_id))
+            print_wait(f"Downloading file(s) from {session_id}...")
             kernel = session.ComputeSession(session_id)
-            kernel.download(files, dest, show_progress=True)
-            print_done("Downloaded to {}.".format(dest.resolve()))
+            _ = kernel.download(files, dest, show_progress=True)
+            print_done(f"Downloaded to {dest.resolve()}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -822,7 +802,7 @@ def download(session_id, files, dest):
 @session.command()
 @click.argument("session_id", metavar="SESSID")
 @click.argument("path", metavar="PATH", nargs=1, default="/home/work")
-def ls(session_id, path):
+def ls(session_id: str, path: str) -> None:
     """
     List files in a path of a running compute session.
 
@@ -834,11 +814,11 @@ def ls(session_id, path):
     """
     with Session() as session:
         try:
-            print_wait('Retrieving list of files in "{}"...'.format(path))
+            print_wait(f'Retrieving list of files in "{path}"...')
             kernel = session.ComputeSession(session_id)
             result = kernel.list_files(path)
 
-            if "errors" in result and result["errors"]:
+            if result.get("errors"):
                 print_fail(result["errors"])
                 sys.exit(ExitCode.FAILURE)
 
@@ -846,7 +826,7 @@ def ls(session_id, path):
             table = []
             headers = ["File name", "Size", "Modified", "Mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromtimestamp(file["mtime"], tz=UTC)
                 fsize = naturalsize(file["size"], binary=True)
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], fsize, mtime, file["mode"]]
@@ -868,7 +848,7 @@ def ls(session_id, path):
     default=None,
     help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
 )
-def logs(session_id: str, kernel: Optional[str]) -> None:
+def logs(session_id: str, kernel: str | None) -> None:
     """
     Shows the full console log of a compute session.
 
@@ -1031,7 +1011,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
-    async def export_tracker(bgtask_id):
+    async def export_tracker(bgtask_id: str) -> None:
         async with AsyncSession() as session:
             completion_msg_func = lambda: print_done("Session export process completed.")
             try:
@@ -1066,7 +1046,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
                 sys.exit()
 
     asyncio.run(export_tracker(result["task_id"]))
@@ -1092,7 +1072,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: Optional[str] = None):
+def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -1153,7 +1133,7 @@ session.command(
 )(_ssh_cmd())
 
 
-def _scp_cmd(docs: Optional[str] = None):
+def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
     @click.argument("dst", type=str, metavar="DST")
@@ -1245,7 +1225,7 @@ session.command(
 )(_scp_cmd())
 
 
-def _events_cmd(docs: Optional[str] = None):
+def _events_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
@@ -1273,10 +1253,10 @@ def _events_cmd(docs: Optional[str] = None):
     )
     def events(
         session_id_or_name: str,
-        owner_access_key: str,
+        owner_access_key: str | None,
         scope: str,
         quiet: bool,
-        wait: Optional[str] = None,
+        wait: str | None = None,
     ) -> None:
         """
         Monitor the lifecycle events of a compute session.
@@ -1290,14 +1270,14 @@ def _events_cmd(docs: Optional[str] = None):
         - Any other event name waits for that specific event (exit code 0)
         """
 
-        def print_event(ev):
+        def print_event(ev: Any) -> None:
             click.echo(
                 click.style(ev.event, fg="cyan", bold=True)
                 + " "
                 + json.dumps(json.loads(ev.data), indent=None)  # as single-line
             )
 
-        async def _run_events():
+        async def _run_events() -> None:
             async with AsyncSession() as session:
                 compute_session = session.ComputeSession(session_id_or_name, owner_access_key)
 
@@ -1333,7 +1313,7 @@ main.command()(_events_cmd(docs='Alias of "session events"'))
 session.command()(_events_cmd())
 
 
-def _fetch_session_names() -> tuple[str]:
+def _fetch_session_names() -> tuple[str, ...]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",
@@ -1371,7 +1351,7 @@ def _fetch_session_names() -> tuple[str]:
     return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
-def _watch_cmd(docs: Optional[str] = None):
+def _watch_cmd(docs: str | None = None) -> Callable[..., None]:
     @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME", nargs=-1)
     @click.option(
         "-o",
@@ -1400,8 +1380,12 @@ def _watch_cmd(docs: Optional[str] = None):
         help="Set the output style of the command results.",
     )
     def watch(
-        session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str
-    ):
+        session_name_or_id: tuple[str, ...],
+        owner_access_key: str | None,
+        scope: str,
+        max_wait: int,
+        output: str,
+    ) -> None:
         """
         Monitor the lifecycle events of a compute session
         and display in human-friendly interface.
@@ -1439,7 +1423,7 @@ def _watch_cmd(docs: Optional[str] = None):
 
         async def handle_console_output(
             session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
-        ):
+        ) -> None:
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     match ev.event:
@@ -1460,7 +1444,7 @@ def _watch_cmd(docs: Optional[str] = None):
 
         async def handle_json_output(
             session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
-        ):
+        ) -> None:
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     event = json.loads(ev.data)
@@ -1478,7 +1462,7 @@ def _watch_cmd(docs: Optional[str] = None):
                         ):
                             break
 
-        async def _run_events():
+        async def _run_events() -> None:
             async with AsyncSession() as session:
                 try:
                     session_id = UUID(session_name_or_id)
@@ -1487,15 +1471,21 @@ def _watch_cmd(docs: Optional[str] = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
 
                 if output == "console":
-                    await handle_console_output(session=compute_session, scope=scope)
+                    await handle_console_output(
+                        session=compute_session,
+                        scope=cast(Literal["*", "session", "kernel"], scope),
+                    )
                 elif output == "json":
-                    await handle_json_output(session=compute_session, scope=scope)
+                    await handle_json_output(
+                        session=compute_session,
+                        scope=cast(Literal["*", "session", "kernel"], scope),
+                    )
 
-        async def _run_events_with_timeout(max_wait: int):
+        async def _run_events_with_timeout(max_wait: int) -> None:
             try:
                 async with timeout(max_wait):
                     await _run_events()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
@@ -1512,12 +1502,12 @@ def _watch_cmd(docs: Optional[str] = None):
     return watch
 
 
-def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
-    ts: TopologicalSorter = TopologicalSorter()
+def get_dependency_session_table(root_node: OrderedDict[str, Any]) -> list[OrderedDict[str, Any]]:
+    ts: TopologicalSorter[str] = TopologicalSorter()
     session_info_dict = {}
     visited = {}
 
-    def construct_topological_sorter(session: OrderedDict):
+    def construct_topological_sorter(session: OrderedDict[str, Any]) -> None:
         visited[session["session_id"]] = True
         session_info_dict[session["session_id"]] = session
         ts.add(
@@ -1533,7 +1523,7 @@ def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
     return [*map(lambda session_id: session_info_dict[session_id], [*ts.static_order()])]
 
 
-def show_dependency_session_table(root_node: OrderedDict) -> None:
+def show_dependency_session_table(root_node: OrderedDict[str, Any]) -> None:
     table = get_dependency_session_table(root_node)
     header_keys = ["session_name", "session_id", "status", "status_changed"]
 
@@ -1553,17 +1543,17 @@ def show_dependency_session_table(root_node: OrderedDict) -> None:
     )
 
 
-def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
+def get_dependency_session_tree(root_node: OrderedDict[str, Any]) -> treelib.Tree:  # type: ignore[name-defined]
     dependency_tree = treelib.Tree()
 
     root_session_name = root_node["session_name"]
-    session_name_counter: defaultdict = defaultdict(lambda: 1)
+    session_name_counter: defaultdict[str, int] = defaultdict(lambda: 1)
     session_name_counter[root_session_name] += 1
 
     def discard_below_dot(time_str: str) -> str:
         return time_str.split(".")[0]
 
-    def get_node_name(session: OrderedDict) -> str:
+    def get_node_name(session: OrderedDict[str, Any]) -> str:
         task_name = session["session_name"].split("-")[-2]
         status = session["status"].split("KernelStatus.")[1]
         delta = ""
@@ -1571,8 +1561,8 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
         if session["status_changed"] != "None":
             status_changed = datetime.strptime(
                 discard_below_dot(session["status_changed"]), "%Y-%m-%d %H:%M:%S"
-            )
-            delta = f" {discard_below_dot(str(datetime.now() - status_changed))} ago"
+            ).replace(tzinfo=UTC)
+            delta = f" {discard_below_dot(str(datetime.now(UTC) - status_changed))} ago"
 
         return f'{task_name} ("{status}"{delta})'
 
@@ -1581,7 +1571,9 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
 
     dependency_tree.create_node(get_node_name(root_node), get_node_id(root_session_name))
 
-    def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
+    def construct_dependency_tree(
+        session_name: str, dependency_sessions: OrderedDict[str, Any]
+    ) -> None:
         for dependency_session in dependency_sessions:
             dependency_session_name = dependency_session["session_name"]
             session_name_counter[dependency_session_name] += 1
@@ -1601,7 +1593,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
 @click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
-def show_dependency_graph(session_id: UUID | str, table: bool):
+def show_dependency_graph(session_id: UUID | str, table: bool) -> None:
     """
     Shows the dependency graph of a compute session.
     \b

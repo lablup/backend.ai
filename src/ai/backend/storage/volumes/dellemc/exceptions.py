@@ -1,6 +1,3 @@
-from typing import Optional
-
-
 class DellError(Exception):
     pass
 
@@ -12,7 +9,7 @@ class DellInitError(DellError):
 class DellAPIError(DellError):
     message: str
 
-    def __init__(self, message: Optional[str] = None, *args):
+    def __init__(self, message: str | None = None, *args: object) -> None:
         super().__init__(message, *args)
 
         self.message = message or ""

@@ -14,7 +14,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
-from .common import ObjectNotFound
+from .common import GenericForbidden, ObjectNotFound
 
 
 class NoUpdatesToApply(BackendAIError):
@@ -68,6 +68,28 @@ class ScalingImpossible(BackendAIError, web.HTTPBadRequest):
 
 class AutoScalingRuleNotFound(ObjectNotFound):
     object_name = "auto_scaling_rule"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class AutoScalingPolicyNotFound(ObjectNotFound):
+    object_name = "auto_scaling_policy"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DeploymentPolicyNotFound(ObjectNotFound):
+    object_name = "deployment_policy"
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -141,4 +163,17 @@ class AppServiceStartFailed(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.START,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class EndpointAccessForbiddenError(GenericForbidden):
+    """Raised when user does not have permission to access an endpoint."""
+
+    error_title = "Access to this endpoint is forbidden."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
         )

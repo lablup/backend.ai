@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import ContainerStatus
 from ai.backend.logging.utils import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..agent import AbstractAgent
+    from ai.backend.agent.agent import AbstractAgent
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -17,12 +19,12 @@ PORT_USAGE_THRESHOLD = 4
 
 
 class HostPortObserver(AbstractObserver):
-    _agent: "AbstractAgent"
+    _agent: AbstractAgent[Any, Any]
     _port_unused_counts: defaultdict[int, int]
 
     def __init__(
         self,
-        agent: "AbstractAgent",
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         self._agent = agent
         self._port_unused_counts: defaultdict[int, int] = defaultdict(int)
@@ -59,7 +61,7 @@ class HostPortObserver(AbstractObserver):
 
     @classmethod
     @override
-    def timeout(cls) -> Optional[float]:
+    def timeout(cls) -> float | None:
         return 10.0
 
     @override

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import Any, override
 
 import aiohttp
 import sqlalchemy as sa
@@ -11,9 +12,9 @@ import yarl
 from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.common.json import pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageRow
 
-from ..data.image.types import ImageStatus
-from ..models.image import ImageRow
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,
@@ -59,13 +60,13 @@ class LocalRegistry(BaseContainerRegistry):
     async def _scan_tag_local(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, str],
+        _rqst_args: dict[str, str],
         image: str,
         tag: str,
     ) -> None:
         async def _read_image_info(
             _tag: str,
-        ) -> tuple[dict[str, dict], str | None]:
+        ) -> tuple[dict[str, dict[str, Any]], str | None]:
             async with sess.get(
                 self.registry_url / "images" / f"{image}:{tag}" / "json"
             ) as response:
@@ -79,11 +80,10 @@ class LocalRegistry(BaseContainerRegistry):
                 "Architecture": architecture,
             }
             log.debug("scanned image info: {}:{}\n{}", image, tag, pretty_json_str(summary))
-            already_exists = 0
             config_digest = data["Id"]
             async with self.db.begin_readonly_session() as db_session:
                 already_exists = await db_session.scalar(
-                    sa.select([sa.func.count(ImageRow.id)]).where(
+                    sa.select(sa.func.count(ImageRow.id)).where(
                         sa.and_(
                             ImageRow.config_digest == config_digest,
                             ImageRow.is_local == sa.false(),
@@ -91,7 +91,7 @@ class LocalRegistry(BaseContainerRegistry):
                         )
                     ),
                 )
-            if already_exists > 0:
+            if already_exists is not None and already_exists > 0:
                 return {}, "already synchronized from a remote registry"
             labels = data["Config"]["Labels"]
             if labels is None:

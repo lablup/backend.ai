@@ -7,22 +7,13 @@ import random
 import re
 import statistics
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Collection, Mapping, MutableMapping, Sequence
+from datetime import UTC, datetime
 from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     cast,
 )
 
@@ -133,8 +124,8 @@ class MockPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
     key: DeviceName
-    slot_types: List[Tuple[SlotName, SlotTypes]] = []
-    exclusive_slot_types: Set[str] = set()
+    slot_types: list[tuple[SlotName, SlotTypes]] = []
+    exclusive_slot_types: set[str] = set()
 
     device_formats: Mapping[str, Mapping[str, Any]]
 
@@ -143,15 +134,15 @@ class MockPlugin(AbstractComputePlugin):
     reserved_memory: int = 64 * (2**20)  # 64 MiB (only for fractional)
     quantum_size: Decimal = Decimal("0.1")
 
-    _all_devices: Optional[Sequence[MockDevice]] = None
+    _all_devices: Sequence[MockDevice] | None = None
     _mode: AllocationModes = AllocationModes.DISCRETE
     _unit_mem: int = 2 * (2**30)  # 2 GiB
     _unit_proc: int = 8  # number of SMPs
 
-    nvdocker_version: Tuple[int, ...] = (0, 0, 0)
-    docker_version: Tuple[int, ...] = (0, 0, 0)
+    nvdocker_version: tuple[int, ...] = (0, 0, 0)
+    docker_version: tuple[int, ...] = (0, 0, 0)
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         # Read the mockup device config.
         raw_cfg, cfg_src_path = config.read_from_file(None, "mock-accelerator")
         self.mock_config = _mock_config_iv.check(raw_cfg)
@@ -279,7 +270,7 @@ class MockPlugin(AbstractComputePlugin):
         if self._all_devices is not None:
             return self._all_devices
 
-        device_cls: Type[MockDevice]
+        device_cls: type[MockDevice]
         all_devices = []
 
         for idx, dev_info in enumerate(self.mock_config["devices"]):
@@ -292,6 +283,7 @@ class MockPlugin(AbstractComputePlugin):
                 "memory_size": dev_info["memory_size"],
                 "processing_units": dev_info["subproc_count"],
                 "model_name": dev_info["model_name"],
+                "device_name": self.key,
             }
             match self.key:
                 case "cuda":
@@ -308,7 +300,7 @@ class MockPlugin(AbstractComputePlugin):
         self._all_devices = all_devices
         return all_devices
 
-    def _cuda_available_slots(self, devices: List[CUDADevice]) -> MutableMapping[SlotName, Decimal]:
+    def _cuda_available_slots(self, devices: list[CUDADevice]) -> MutableMapping[SlotName, Decimal]:
         slots: MutableMapping[SlotName, Decimal] = defaultdict(Decimal)
         if self._mode == AllocationModes.DISCRETE:
             slots[SlotName("cuda.device")] = Decimal(
@@ -334,7 +326,7 @@ class MockPlugin(AbstractComputePlugin):
         slots: MutableMapping[SlotName, Decimal] = defaultdict(Decimal)
         match self.key:
             case "cuda":
-                slots = self._cuda_available_slots(cast(List[CUDADevice], devices))
+                slots = self._cuda_available_slots(cast(list[CUDADevice], devices))
             case _:
                 if self._mode == AllocationModes.DISCRETE:
                     slots[SlotName(f"{self.key}.device")] = Decimal(len(devices))
@@ -461,11 +453,11 @@ class MockPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        mem_stats: Dict[str, int] = {}
-        mem_sizes: Dict[str, int] = {}
-        util_stats: Dict[str, float] = {}
-        device_occurrences_per_container: Dict[str, int] = defaultdict(int)
-        assignment_per_container: Dict[str, Mapping[DeviceId, Decimal]] = {}
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, float] = {}
+        device_occurrences_per_container: dict[str, int] = defaultdict(int)
+        assignment_per_container: dict[str, Mapping[DeviceId, Decimal]] = {}
         if self.enabled:
             for cid in container_ids:
                 mem_stats[cid] = 0
@@ -556,9 +548,9 @@ class MockPlugin(AbstractComputePlugin):
                 },
                 exclusive_slot_types=self.exclusive_slot_types,
             )
-        elif self._mode == AllocationModes.FRACTIONAL:
+        if self._mode == AllocationModes.FRACTIONAL:
             # for legacy agents
-            kwargs: Dict[str, Any] = {
+            kwargs: dict[str, Any] = {
                 "quantum_size": self.quantum_size,
             }
             for kw in [*kwargs.keys()]:
@@ -580,8 +572,7 @@ class MockPlugin(AbstractComputePlugin):
                 exclusive_slot_types=self.exclusive_slot_types,
                 **kwargs,
             )
-        else:
-            raise RuntimeError("Unsupported MockDevicePlugin allocation mode!")
+        raise RuntimeError("Unsupported MockDevicePlugin allocation mode!")
 
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []
@@ -591,7 +582,7 @@ class MockPlugin(AbstractComputePlugin):
         docker: aiodocker.Docker,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Mapping[str, Any]:
-        docker_config: Dict[str, Any] = {}
+        docker_config: dict[str, Any] = {}
         if not self.enabled:
             return docker_config
         assigned_device_ids = []
@@ -621,8 +612,8 @@ class MockPlugin(AbstractComputePlugin):
         return docker_config
 
     def _get_share(self, device: MockDevice) -> Decimal:
-        if isinstance(device, CUDADevice):
-            assert not device.is_mig_device
+        if isinstance(device, CUDADevice) and device.is_mig_device:
+            raise ValueError("Cannot calculate share for MIG devices")
         return self._get_share_raw(device.memory_size, device.processing_units)
 
     def _get_share_raw(self, memory_size: int, subproc_count: int) -> Decimal:
@@ -632,7 +623,7 @@ class MockPlugin(AbstractComputePlugin):
         quantum = Decimal(".01")
         return Decimal(common_shares).quantize(quantum, ROUND_DOWN)
 
-    def _share_to_spec(self, share: Decimal) -> Tuple[BinarySize, int]:
+    def _share_to_spec(self, share: Decimal) -> tuple[BinarySize, int]:
         return (
             BinarySize(self._unit_mem * share),
             max(int(self._unit_proc * share), MIN_SMP_COUNT),
@@ -647,19 +638,20 @@ class MockPlugin(AbstractComputePlugin):
             return data
 
         is_unique = False
-        active_device_id_list: List[DeviceId] = []
+        active_device_id_list: list[DeviceId] = []
         for slot_type, per_device_alloc in device_alloc.items():
             if slot_type == SlotTypes.UNIQUE:
-                assert len(device_alloc) == 1
-                assert len(per_device_alloc) == 1
+                if len(device_alloc) != 1:
+                    raise ValueError("UNIQUE slot type requires exactly one slot allocation")
+                if len(per_device_alloc) != 1:
+                    raise ValueError("UNIQUE slot type requires exactly one device allocation")
                 device_id = list(per_device_alloc.keys())[0]
                 active_device_id_list.append(device_id)
                 is_unique = True
                 break
-            else:
-                for dev_id, alloc in per_device_alloc.items():
-                    if alloc > 0:
-                        active_device_id_list.append(dev_id)
+            for dev_id, alloc in per_device_alloc.items():
+                if alloc > 0:
+                    active_device_id_list.append(dev_id)
 
         match self.key:
             case "cuda":
@@ -741,7 +733,7 @@ class MockPlugin(AbstractComputePlugin):
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids: List[DeviceId] = []
+        device_ids: list[DeviceId] = []
         for slot_name, per_device_alloc in device_alloc.items():
             # cuda.device:* slot name dedicated for mocked MIG devices
             if slot_name.startswith("cuda.device:") or slot_name in (
@@ -750,7 +742,7 @@ class MockPlugin(AbstractComputePlugin):
             ):
                 device_ids.extend(per_device_alloc.keys())
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 if self._mode == AllocationModes.FRACTIONAL:
@@ -781,22 +773,23 @@ class MockPlugin(AbstractComputePlugin):
                 "platform": "Backend.AI",
                 "serial_number": "N/A",
                 "version": __version__,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             },
         }
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
-        assert self._all_devices is not None
+        if self._all_devices is None:
+            raise RuntimeError("Devices not initialized. Call list_devices() first.")
         format_key = ""
         if self._mode == AllocationModes.DISCRETE:
             format_key = "device"
@@ -804,7 +797,8 @@ class MockPlugin(AbstractComputePlugin):
             format_key = "shares"
         if self.key == DeviceName("cuda"):
             for device in self._all_devices:
-                assert isinstance(device, CUDADevice)
+                if not isinstance(device, CUDADevice):
+                    raise RuntimeError(f"Expected CUDADevice but got {type(device).__name__}")
                 if device.is_mig_device:
                     format_key = "*-mig"
                     break

@@ -1,16 +1,17 @@
 import sys
+from typing import Any
 
 import click
 
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_done
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_done
-from ..types import CLIContext
 from . import admin
 
 
@@ -124,7 +125,7 @@ def add(
     use_host_network: bool,
     wsproxy_addr: str,
     wsproxy_api_token: str,
-):
+) -> None:
     """
     Add a new scaling group.
 
@@ -241,13 +242,13 @@ def update(
     active: bool | Undefined,
     private: bool | Undefined,
     driver: str | Undefined,
-    driver_opts: dict | Undefined,
+    driver_opts: dict[str, Any] | Undefined,
     scheduler: str | Undefined,
-    scheduler_opts: dict | Undefined,
+    scheduler_opts: dict[str, Any] | Undefined,
     use_host_network: bool | Undefined,
     wsproxy_addr: str | Undefined,
     wsproxy_api_token: str | Undefined,
-):
+) -> None:
     """
     Update existing scaling group.
 
@@ -293,7 +294,7 @@ def update(
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def delete(ctx: CLIContext, name):
+def delete(ctx: CLIContext, name: str) -> None:
     """
     Delete an existing scaling group.
 
@@ -328,7 +329,7 @@ def delete(ctx: CLIContext, name):
 @pass_ctx_obj
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
-def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
+def associate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:
     """
     Associate a domain with a scaling_group.
 
@@ -356,9 +357,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                "detail_msg": "Scaling group {} is associated with domain {}.".format(
-                    scaling_group, domain
-                ),
+                "detail_msg": f"Scaling group {scaling_group} is associated with domain {domain}.",
             },
         )
 
@@ -367,7 +366,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
 @pass_ctx_obj
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
-def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
+def dissociate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:
     """
     Dissociate a domain from a scaling_group.
 
@@ -392,4 +391,4 @@ def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
                 action_name="scaling_group_dissociation",
             )
             sys.exit(ExitCode.FAILURE)
-        print_done("Scaling group {} is dissociated from domain {}.".format(scaling_group, domain))
+        print_done(f"Scaling group {scaling_group} is dissociated from domain {domain}.")

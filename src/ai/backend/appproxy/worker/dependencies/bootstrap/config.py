@@ -5,9 +5,8 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai.backend.appproxy.worker.config import ServerConfig, load
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
-
-from ...config import ServerConfig, load
 
 
 @dataclass

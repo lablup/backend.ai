@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Optional, cast, override
+from typing import TYPE_CHECKING, cast, override
 
 from pydantic import Field
 
@@ -11,17 +11,22 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, KernelFeatures, LabelName
+from ai.backend.common.docker import (
+    DEFAULT_KERNEL_FEATURE,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
-    BgtaskStatus,
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
-from ai.backend.common.types import ImageRegistry, SessionId
+from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -42,10 +47,10 @@ class CommitSessionResult(BaseBackgroundTaskResult):
     Contains the rescanned image ID or error message.
     """
 
-    image_id: Optional[uuid.UUID] = Field(
+    image_id: uuid.UUID | None = Field(
         default=None, description="ID of the rescanned image after commit"
     )
-    error_message: Optional[str] = Field(default=None, description="Error message if task failed")
+    error_message: str | None = Field(default=None, description="Error message if task failed")
 
 
 class CommitSessionManifest(BaseBackgroundTaskManifest):
@@ -89,7 +94,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.COMMIT_SESSION  # type: ignore[return-value]
+        return ManagerBgtaskName.COMMIT_SESSION
 
     @classmethod
     @override
@@ -116,6 +121,12 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 return CommitSessionResult(error_message=error_msg)
 
             # Resolve base image
+            if not session.main_kernel.image or not session.main_kernel.architecture:
+                error_msg = (
+                    f"Session {manifest.session_id} main kernel has no image or architecture"
+                )
+                log.error(error_msg)
+                return CommitSessionResult(error_message=error_msg)
             image_row = await self._session_repository.resolve_image([
                 ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
             ])
@@ -162,8 +173,6 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
 
-            from ai.backend.common.docker import ImageRef
-
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
                 None,
@@ -204,8 +213,12 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                     username=registry_conf.username,
                     password=registry_conf.password,
                 )
+                if not session.main_kernel.agent:
+                    error_msg = f"Session {manifest.session_id} main kernel has no agent assigned"
+                    log.error(error_msg)
+                    return CommitSessionResult(error_message=error_msg)
                 resp = await self._agent_registry.push_image(
-                    session.main_kernel.agent,
+                    AgentId(session.main_kernel.agent),
                     new_image_ref,
                     image_registry,
                 )
@@ -227,7 +240,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 )
                 log.error(error_msg)
                 return CommitSessionResult(error_message=error_msg)
-            elif len(rescan_result.images) > 1:
+            if len(rescan_result.images) > 1:
                 log.warning(
                     "More than two images were rescanned unexpectedly. Rescanned Images: {}",
                     rescan_result.images,

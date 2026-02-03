@@ -16,14 +16,14 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "keypair_resource_policies",
         sa.Column("max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default="1"),
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column(
         "keypair_resource_policies",
         "max_concurrent_sftp_sessions",

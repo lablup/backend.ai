@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
 
-from ..task_result import TaskResult
-from ..types import BgtaskNameBase, TaskID
+from ai.backend.common.bgtask.task_result import TaskResult
+from ai.backend.common.bgtask.types import BgtaskNameBase, TaskID
 
 
 @dataclass
@@ -15,7 +15,7 @@ class TaskContext:
 
     task_name: BgtaskNameBase
     task_id: TaskID
-    result: Optional[TaskResult] = None
+    result: TaskResult | None = None
 
 
 class AbstractTaskHook(ABC):
@@ -32,4 +32,4 @@ class AbstractTaskHook(ABC):
         Yields the context object that can be modified during execution.
         """
         raise NotImplementedError("Subclasses must implement this method")
-        yield context  # type: ignore
+        yield context  # type: ignore[unreachable]

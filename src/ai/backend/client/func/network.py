@@ -1,11 +1,13 @@
-from typing import Self, Sequence
+from collections.abc import Sequence
+from typing import Any, Self, cast
 from uuid import UUID
 
-from ..output.fields import network_fields
-from ..output.types import FieldSpec, RelayPaginatedResult
-from ..pagination import execute_paginated_relay_query
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import network_fields
+from ai.backend.client.output.types import FieldSpec, RelayPaginatedResult
+from ai.backend.client.pagination import execute_paginated_relay_query
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Network",)
@@ -29,7 +31,7 @@ class Network(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> RelayPaginatedResult[dict]:
+    ) -> RelayPaginatedResult[dict[str, Any]]:
         """
         Fetches the list of created networks in this cluster.
         """
@@ -97,7 +99,7 @@ class Network(BaseFunction):
     async def get(
         self,
         fields: Sequence[FieldSpec] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Fetches the information of the network.
         """
@@ -107,10 +109,11 @@ class Network(BaseFunction):
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in (fields or _default_list_fields)))
-        return await api_session.get().Admin._query(q, {"id": str(self.network_id)})
+        data = await api_session.get().Admin._query(q, {"id": str(self.network_id)})
+        return cast(dict[str, Any], data)
 
     @api_function
-    async def update(self, name: str) -> None:
+    async def update(self, name: str) -> dict[str, Any]:
         """
         Updates network name.
         """
@@ -126,10 +129,10 @@ class Network(BaseFunction):
             "props": {"name": name},
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_network"]
+        return cast(dict[str, Any], data["modify_network"])
 
     @api_function
-    async def delete(self) -> None:
+    async def delete(self) -> dict[str, Any]:
         """
         Deletes network.
         Delete only works for networks that are not attached to active session.
@@ -146,4 +149,4 @@ class Network(BaseFunction):
             "network": str(self.network_id),
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_network"]
+        return cast(dict[str, Any], data["delete_network"])

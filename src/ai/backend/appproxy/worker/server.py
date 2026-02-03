@@ -14,11 +14,13 @@ import ssl
 import sys
 import traceback
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import Any, Final, cast
 
+import aiohttp
 import aiohttp_cors
 import aiohttp_jinja2
 import aiomonitor
@@ -27,6 +29,7 @@ import click
 import jinja2
 import memray
 import pyroscope
+import uvloop
 from aiohttp import web
 from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
@@ -65,6 +68,10 @@ from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
     ensure_json_serializable,
     mime_match,
+)
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientPool,
+    tcp_client_session_factory,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -129,7 +136,7 @@ from .proxy.frontend import (
 )
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 REDIS_APPPROXY_DB: Final[int] = 10  # FIXME: move to ai.backend.common.defs
 EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appproxy-worker"
@@ -148,8 +155,7 @@ async def request_context_aware_middleware(
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await handler(request)
-    return resp
+    return await handler(request)
 
 
 @web.middleware
@@ -162,7 +168,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
         if new_match_info is None:
             raise InternalServerError("No matching method handler found")
         _handler = new_match_info.handler
-        request._match_info = new_match_info  # type: ignore  # this is a hack
+        request._match_info = new_match_info
     ex = request.match_info.http_exception
     if ex is not None:
         # handled by exception_middleware
@@ -171,8 +177,7 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     request["request_id"] = request_id
     if _current_task := asyncio.current_task():
         setattr(_current_task, "request_id", request_id)
-    resp = await _handler(request)
-    return resp
+    return await _handler(request)
 
 
 @web.middleware
@@ -192,23 +197,22 @@ async def exception_middleware(
                 status=ex.status_code,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-        else:
-            return aiohttp_jinja2.render_template(
-                "error.jinja2",
-                request,
-                ex.body_dict,
-                status=ex.status_code,
-            )
+        return aiohttp_jinja2.render_template(
+            "error.jinja2",
+            request,
+            ex.body_dict,
+            status=ex.status_code,
+        )
     except web.HTTPException as ex:
         if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path)
+            raise URLNotFound(extra_data=request.path) from ex
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            ) from ex
         log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest
+        raise GenericBadRequest from ex
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
@@ -217,9 +221,8 @@ async def exception_middleware(
     except Exception as e:
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
-        else:
-            raise InternalServerError()
+            raise InternalServerError(traceback.format_exc()) from e
+        raise InternalServerError() from e
     else:
         return resp
 
@@ -281,15 +284,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from functools import partial
-
-    import aiohttp
-
-    from ai.backend.common.clients.http_client.client_pool import (
-        ClientPool,
-        tcp_client_session_factory,
-    )
-
     client_timeout = aiohttp.ClientTimeout(
         total=None,
         connect=10.0,
@@ -339,11 +333,10 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    else:
-        return await RedisQueue.create(
-            stream_redis_target,
-            args,
-        )
+    return await RedisQueue.create(
+        stream_redis_target,
+        args,
+    )
 
 
 @asynccontextmanager
@@ -370,7 +363,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    handlers: list[EventHandler] = [
+    handlers: list[EventHandler[Any, Any]] = [
         root_ctx.event_dispatcher.subscribe(
             evt, root_ctx, handle_proxy_route_event, name="proxy-worker"
         )
@@ -433,10 +426,10 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
-            if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
-                raise asyncio.CancelledError()
+            if all(isinstance(e, asyncio.CancelledError) for e in ee.exceptions):
+                raise asyncio.CancelledError() from ee
             else:
-                raise ee
+                raise
 
 
 @asynccontextmanager
@@ -448,18 +441,18 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         with attempt:
             try:
                 await register_worker(root_ctx, str(uuid.uuid4()))
-            except CoordinatorConnectionError:
+            except CoordinatorConnectionError as e:
                 log.warning(
                     "Failed to connect to coordinator {}, retrying...",
                     root_ctx.local_config.proxy_worker.coordinator_endpoint,
                 )
-                raise TryAgain
+                raise TryAgain from e
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
 
-    async def _heartbeat(interval: float):
+    async def _heartbeat(_interval: float) -> None:
         try:
             async for attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -586,14 +579,13 @@ async def metrics(request: web.Request) -> web.Response:
         remote_ip = ipaddress.IPv4Network(request.remote)
         if not remote_ip.subnet_of(allowed_network):
             raise GenericForbidden
-    except ValueError:
-        raise GenericForbidden
+    except ValueError as e:
+        raise GenericForbidden from e
 
-    response = web.Response(
+    return web.Response(
         text=root_ctx.metrics.to_prometheus(),
         content_type="text/plain",
     )
-    return response
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -617,7 +609,7 @@ async def status(request: web.Request) -> web.Response:
 
 async def handle_proxy_route_event(
     context: RootContext,
-    agent_id: AgentId,
+    _agent_id: AgentId,
     event: AppProxyCircuitCreatedEvent
     | AppProxyCircuitRouteUpdatedEvent
     | AppProxyCircuitRemovedEvent,
@@ -658,13 +650,13 @@ async def handle_proxy_route_event(
                 await context.proxy_frontend.break_circuit(Circuit.from_serialized_circuit(circuit))
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
 def handle_loop_error(
-    root_ctx: RootContext,
-    loop: asyncio.AbstractEventLoop,
+    _root_ctx: RootContext,
+    _loop: asyncio.AbstractEventLoop,
     context: Mapping[str, Any],
 ) -> None:
     exception = context.get("exception")
@@ -685,7 +677,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["_root.context"] = root_app["_root.context"]
@@ -710,7 +702,7 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] = [],
+    subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
     root_ctx.metrics = WorkerMetricRegistry.instance()
@@ -730,7 +722,7 @@ def build_root_app(
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -766,19 +758,24 @@ def build_root_app(
             ]
     shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(_app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
         if cleanup_contexts is None:
             raise CleanupContextNotInitializedError("Cleanup contexts are not initialized")
         async with AsyncExitStack() as stack:
             for cctx in cleanup_contexts:
-                cctx_instance = cctx(root_ctx)
-                if hasattr(cctx_instance, "shutdown"):
-                    shutdown_context_instances.append(cctx_instance)
-                await stack.enter_async_context(cctx_instance)
+                cctx_name = cctx.__name__
+                try:
+                    cctx_instance = cctx(root_ctx)
+                    if hasattr(cctx_instance, "shutdown"):
+                        shutdown_context_instances.append(cctx_instance)
+                    await stack.enter_async_context(cctx_instance)
+                except Exception:
+                    log.exception("Failed to initialize cleanup context: {}", cctx_name)
+                    raise
             yield
 
-    async def _trigger_shutdown(app: web.Application) -> None:
+    async def _trigger_shutdown(_app: web.Application) -> None:
         # shutdown is triggered before cleanup, giving chances to close client connections first.
         for cctx_instance in shutdown_context_instances:
             try:
@@ -794,13 +791,11 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"/", hello))
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
-    if subapp_pkgs is None:
-        subapp_pkgs = []
     for pkg_name in subapp_pkgs:
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.worker.api")
-        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+        init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
 
 
@@ -815,7 +810,7 @@ async def server_main(
     root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
 
     @asynccontextmanager
-    async def aiomonitor_ctx() -> AsyncGenerator[None]:
+    async def aiomonitor_ctx() -> AsyncGenerator[None, None]:
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
@@ -833,9 +828,9 @@ async def server_main(
         try:
             m.start()
             aiomon_started = True
-        except Exception as e:
+        except Exception:
             log.warning(
-                "aiomonitor could not start but skipping this error to continue", exc_info=e
+                "aiomonitor could not start but skipping this error to continue", exc_info=True
             )
         try:
             yield
@@ -844,7 +839,7 @@ async def server_main(
                 m.close()
 
     @asynccontextmanager
-    async def webapp_ctx() -> AsyncGenerator[None]:
+    async def webapp_ctx() -> AsyncGenerator[None, None]:
         ssl_ctx = None
         if local_config.proxy_worker.tls_listen:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -995,10 +990,9 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.worker.config")
                 log_config.debug("debug mode enabled.")
+                runner: Callable[..., Any]
                 match server_config.proxy_worker.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:

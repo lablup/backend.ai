@@ -5,17 +5,19 @@ from .types.scheduling import SchedulingData
 from .types.session import (
     KernelTerminationResult,
     MarkTerminatingResult,
-    SessionTerminationResult,
+    SweptSessionInfo,
     TerminatingKernelData,
     TerminatingKernelWithAgentData,
+    TerminatingSessionData,
 )
 
 __all__ = [
-    "SchedulerRepository",
-    "SchedulingData",
     "KernelTerminationResult",
     "MarkTerminatingResult",
-    "SessionTerminationResult",
+    "SchedulerRepository",
+    "SchedulingData",
+    "SweptSessionInfo",
     "TerminatingKernelData",
     "TerminatingKernelWithAgentData",
+    "TerminatingSessionData",
 ]

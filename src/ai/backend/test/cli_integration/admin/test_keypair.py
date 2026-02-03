@@ -1,14 +1,14 @@
 import json
 from contextlib import closing
-from typing import Tuple
+from typing import Any
 
-from ...utils.cli import EOF, ClientRunnerFunc, decode
-from ..conftest import KeypairOption, User
+from ai.backend.test.cli_integration.conftest import KeypairOption, User
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
 def test_add_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], keypair_options: Tuple[KeypairOption]
-):
+    run_admin: ClientRunnerFunc, users: tuple[User], keypair_options: tuple[KeypairOption]
+) -> None:
     """
     Test add keypair.
     This test should be execued first in test_keypair.py.
@@ -69,7 +69,7 @@ def test_add_keypair(
         assert response.get("ok") is True, "cannot add users to group"
 
     # Create keypair
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair_add_arguments = [
             "--output=json",
             "admin",
@@ -96,7 +96,7 @@ def test_add_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
+    for i, (user, keypair_option) in enumerate(zip(users, keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} doesn't exist"
         assert keypair.get("is_active") is keypair_option.is_active, (
@@ -113,8 +113,8 @@ def test_add_keypair(
 
 
 def test_update_keypair(
-    run_admin: ClientRunnerFunc, users: Tuple[User], new_keypair_options: Tuple[KeypairOption]
-):
+    run_admin: ClientRunnerFunc, users: tuple[User], new_keypair_options: tuple[KeypairOption]
+) -> None:
     """
     Test update keypair.
     This test must be executed after test_add_keypair.
@@ -129,7 +129,7 @@ def test_update_keypair(
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
 
@@ -160,7 +160,7 @@ def test_update_keypair(
         updated_keypair_list = loaded.get("items")
         assert isinstance(updated_keypair_list, list), "List not printed properly!"
 
-    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
+    for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options, strict=True)):
         updated_keypair = get_keypair_from_list(updated_keypair_list, user.email)
         assert "access_key" in updated_keypair, f"Keypair#{i + 1} doesn't exist"
         assert updated_keypair.get("is_active") is new_keypair_option.is_active, (
@@ -177,39 +177,7 @@ def test_update_keypair(
         )
 
 
-def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
-    """
-    Test delete keypair.
-    This test must be executed after test_add_keypair.
-    """
-    print("[ Delete keypair ]")
-    return
-    # Get access key
-    with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
-        p.expect(EOF)
-        decoded = decode(p.before)
-        loaded = json.loads(decoded)
-        keypair_list = loaded.get("items")
-        assert isinstance(keypair_list, list), "List not printed properly!"
-
-    for i, user in enumerate(users):
-        keypair = get_keypair_from_list(keypair_list, user.email)
-        assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
-
-        # Delete keypair
-        with closing(run_admin(["admin", "keypair", "delete", keypair["access_key"]])) as p:
-            p.expect(EOF)
-
-        # Delete test user
-        with closing(run_admin(["--output=json", "admin", "user", "purge", user.email])) as p:
-            p.sendline("y")
-            p.expect(EOF)
-            before = decode(p.before)
-            response = json.loads(before[before.index("{") :])
-            assert response.get("ok") is True, f"Account deletion failed: {user.username}"
-
-
-def test_list_keypair(run_admin: ClientRunnerFunc):
+def test_list_keypair(run_admin: ClientRunnerFunc) -> None:
     """
     Test list keypair.
     """
@@ -221,7 +189,7 @@ def test_list_keypair(run_admin: ClientRunnerFunc):
         assert isinstance(keypair_list, list), "List not printed properly!"
 
 
-def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
+def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc) -> None:
     admin_find_command = [
         "--output=json",
         "admin",
@@ -330,7 +298,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
         assert loaded.get("ok") is True, "Keypair deletion failed"
 
 
-def get_keypair_from_list(keypairs: list, userid: str) -> dict:
+def get_keypair_from_list(keypairs: list[dict[str, Any]], userid: str) -> dict[str, Any]:
     for keypair in keypairs:
         if keypair.get("user_id", "") == userid:
             return keypair

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal, cast
 
 import aiohttp
 import yarl
@@ -24,13 +24,13 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -43,6 +43,10 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
 from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
+)
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+    LoadContainerCountsActionResult,
 )
 from ai.backend.manager.services.agent.actions.mark_agent_exit import (
     MarkAgentExitAction,
@@ -63,6 +67,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
 from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -115,7 +123,7 @@ class AgentService:
         self._event_producer = event_producer
         self._agent_cache = agent_cache
 
-    async def _get_watcher_info(self, agent_id: AgentId) -> dict:
+    async def _get_watcher_info(self, agent_id: AgentId) -> dict[str, Any]:
         """
         Get watcher information.
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
@@ -150,7 +158,7 @@ class AgentService:
         agent_id: AgentId,
         method: Literal["GET", "POST"],
         endpoint: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         watcher_info = await self._get_watcher_info(agent_id)
         connector = aiohttp.TCPConnector()
 
@@ -161,7 +169,7 @@ class AgentService:
 
                 async with sess.request(method, watcher_url, headers=headers) as resp:
                     if resp.status // 100 == 2:
-                        return await resp.json()
+                        return cast(dict[str, Any], await resp.json())
 
                     error_msg = await resp.text()
                     raise AgentWatcherResponseError(
@@ -219,16 +227,29 @@ class AgentService:
         )
 
     async def recalculate_usage(
-        self, action: RecalculateUsageAction
+        self, _action: RecalculateUsageAction
     ) -> RecalculateUsageActionResult:
         await self._agent_registry.recalc_resource_usage()
         return RecalculateUsageActionResult()
 
     async def get_total_resources(
-        self, action: GetTotalResourcesAction
+        self, _action: GetTotalResourcesAction
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
+        """Searches agents. It is used by superadmin only."""
+        result = await self._agent_repository.search_agents(
+            querier=action.querier,
+        )
+
+        return SearchAgentsActionResult(
+            agents=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         reported_agent_info = action.agent_info
@@ -267,7 +288,7 @@ class AgentService:
         now = datetime.now(tzutc())
         await self._agent_repository.cleanup_agent_on_exit(
             agent_id=action.agent_id,
-            modifier=AgentStatusModifier(
+            spec=AgentStatusUpdaterSpec(
                 status=action.agent_status, status_changed=now, lost_at=OptionalState.update(now)
             ),
         )
@@ -280,7 +301,7 @@ class AgentService:
         now = datetime.now(tzutc())
         await self._agent_repository.update_agent_status(
             agent_id=action.agent_id,
-            modifier=AgentStatusModifier(
+            spec=AgentStatusUpdaterSpec(
                 status=action.agent_status,
                 status_changed=now,
             ),
@@ -306,3 +327,11 @@ class AgentService:
         )
 
         return RemoveAgentFromImagesByCanonicalsActionResult(agent_id=action.agent_id)
+
+    async def load_container_counts(
+        self, action: LoadContainerCountsAction
+    ) -> LoadContainerCountsActionResult:
+        container_counts = await self._agent_repository.load_agent_container_counts(
+            agent_ids=action.agent_ids
+        )
+        return LoadContainerCountsActionResult(container_counts=container_counts)

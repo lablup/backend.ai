@@ -18,7 +18,7 @@ class SessionCreationFailureTooManyContainer(TestCode):
         session_dep = SessionContext.current()
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        session_name = f"test_failure_{str(test_id)}"
+        session_name = f"test_failure_{test_id!s}"
 
         access_key = keypair.access_key
         result = await client_session.KeyPair(access_key).info([keypair_fields["resource_policy"]])

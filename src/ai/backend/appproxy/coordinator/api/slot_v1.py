@@ -1,7 +1,8 @@
 import json
 import logging
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Annotated, Iterable
+from typing import Annotated
 from uuid import UUID
 
 import aiohttp_cors
@@ -16,13 +17,13 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.models import Circuit
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Circuit
-from ..types import RootContext
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SlotResponseModel(BaseModel):
@@ -31,7 +32,7 @@ class SlotResponseModel(BaseModel):
     subdomain: Annotated[str | None, Field(default=None, description="Subdomain for the circuit.")]
     wsproxy_version: Annotated[str, Field(description="AppProxy version.")]
     worker__authority: Annotated[str, Field(description="Authority name of the worker.")]
-    circuit__app: Annotated[str, Field(description="App name.")]
+    circuit__app: Annotated[str | None, Field(default=None, description="App name.")]
     circuit__session_id: Annotated[
         UUID | None, Field(default=None, description="Session ID of the circuit.")
     ]
@@ -47,9 +48,11 @@ class SlotResponseModel(BaseModel):
     circuit__arguments: Annotated[
         str | None, Field(default=None, description="Arguments for the circuit.")
     ]
-    circuit__created: Annotated[datetime, Field(description="Creation time of the circuit.")]
+    circuit__created: Annotated[
+        datetime | None, Field(default=None, description="Creation time of the circuit.")
+    ]
     circuit__modified: Annotated[
-        datetime, Field(description="Last modification time of the circuit.")
+        datetime | None, Field(default=None, description="Last modification time of the circuit.")
     ]
 
 
@@ -83,11 +86,11 @@ async def list_slots(request: web.Request) -> PydanticResponse[list[SlotResponse
         ])
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

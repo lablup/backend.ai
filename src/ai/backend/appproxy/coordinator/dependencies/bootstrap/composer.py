@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
-from ...config import ServerConfig
 from .config import ConfigInput, ConfigProvider
 
 

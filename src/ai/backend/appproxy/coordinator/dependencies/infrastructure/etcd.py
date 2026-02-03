@@ -4,14 +4,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from ai.backend.appproxy.common.etcd import TraefikEtcd
-from ai.backend.common.config import ConfigScopes
+from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.errors import MissingTraefikConfigError
 from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.types import HostPortPair
-
-from ...config import ServerConfig
-from ...errors import MissingTraefikConfigError
 
 
 class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
@@ -35,8 +34,16 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
             if traefik_config.etcd.password:
                 creds = {"password": traefik_config.etcd.password}
 
+            # Handle addr as either single HostPortPair or list
+            addr = traefik_config.etcd.addr
+            if isinstance(addr, list):
+                # Use first address from the list
+                host_port = addr[0]
+            else:
+                host_port = addr
+
             traefik_etcd = TraefikEtcd(
-                HostPortPair(traefik_config.etcd.addr.host, traefik_config.etcd.addr.port),
+                HostPortPair(host_port.host, host_port.port),
                 traefik_config.etcd.namespace,
                 {ConfigScopes.GLOBAL: ""},
                 credentials=creds,

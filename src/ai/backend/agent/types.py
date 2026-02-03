@@ -5,10 +5,11 @@ import enum
 import importlib
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypeAlias
+from typing import TYPE_CHECKING, Any, cast
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -41,11 +42,11 @@ class AgentBackend(enum.StrEnum):
 
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
-    def get_agent_cls(self) -> Type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         """
         Return the concrete implementation class of AbstactAgent for the backend.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def load_resources(
@@ -58,7 +59,7 @@ class AbstractAgentDiscovery(ABC):
 
         limit_cpus, limit_gpus are deprecated.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def scan_available_resources(
@@ -68,7 +69,7 @@ class AbstractAgentDiscovery(ABC):
         """
         Detect available computing resource of the system.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
@@ -77,12 +78,12 @@ class AbstractAgentDiscovery(ABC):
         If not, automatically create it and update its content from the packaged pre-built krunner
         tar archives.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
     agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-    return agent_mod.get_agent_discovery()
+    return cast(AbstractAgentDiscovery, agent_mod.get_agent_discovery())
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -169,14 +170,14 @@ class LifecycleEvent(enum.IntEnum):
 class ContainerLifecycleEvent:
     kernel_id: KernelId
     session_id: SessionId
-    container_id: Optional[ContainerId]
+    container_id: ContainerId | None
     event: LifecycleEvent
     reason: KernelLifecycleEventReason
-    done_future: Optional[asyncio.Future] = None
-    exit_code: Optional[int] = None
+    done_future: asyncio.Future[Any] | None = None
+    exit_code: int | None = None
     suppress_events: bool = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.container_id:
             cid = self.container_id[:13]
         else:
@@ -189,7 +190,7 @@ class ContainerLifecycleEvent:
             f"reason:{self.reason!r})"
         )
 
-    def set_done_future_result(self, result: Any):
+    def set_done_future_result(self, result: Any) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_result(result)
@@ -197,7 +198,7 @@ class ContainerLifecycleEvent:
                 # The future is already done, ignore the error
                 pass
 
-    def set_done_future_exception(self, exception: Exception):
+    def set_done_future_exception(self, exception: Exception) -> None:
         if self.done_future is not None:
             try:
                 self.done_future.set_exception(exception)
@@ -211,14 +212,14 @@ class KernelOwnershipData:
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
-    owner_user_id: Optional[uuid.UUID] = None
-    owner_project_id: Optional[uuid.UUID] = None
+    owner_user_id: uuid.UUID | None = None
+    owner_project_id: uuid.UUID | None = None
 
-    def __post_init__(self):
-        def to_uuid(value: Optional[str | uuid.UUID]) -> Optional[uuid.UUID]:
+    def __post_init__(self) -> None:
+        def to_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
             if value is None:
                 return None
-            elif isinstance(value, uuid.UUID):
+            if isinstance(value, uuid.UUID):
                 return value
             return uuid.UUID(value)
 
@@ -226,12 +227,12 @@ class KernelOwnershipData:
         self.owner_project_id = to_uuid(self.owner_project_id)
 
     @property
-    def owner_user_id_to_str(self) -> Optional[str]:
+    def owner_user_id_to_str(self) -> str | None:
         return str(self.owner_user_id) if self.owner_user_id is not None else None
 
     @property
-    def owner_project_id_to_str(self) -> Optional[str]:
+    def owner_project_id_to_str(self) -> str | None:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
-WebMiddleware: TypeAlias = Middleware
+type WebMiddleware = Middleware

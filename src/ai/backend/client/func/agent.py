@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Any, cast
 
-from ..output.fields import agent_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import agent_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = (
@@ -55,14 +57,14 @@ class Agent(BaseFunction):
     async def paginated_list(
         cls,
         status: str = "ALIVE",
-        scaling_group: Optional[str] = None,
+        scaling_group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[Any]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -86,7 +88,7 @@ class Agent(BaseFunction):
         cls,
         agent_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = _d("""
             query($agent_id: String!) {
                 agent(agent_id: $agent_id) {$fields}
@@ -95,7 +97,7 @@ class Agent(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"agent_id": agent_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["agent"]
+        return cast(Sequence[dict[str, Any]], data["agent"])
 
 
 class AgentWatcher(BaseFunction):
@@ -111,7 +113,7 @@ class AgentWatcher(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_status(cls, agent_id: str) -> dict:
+    async def get_status(cls, agent_id: str) -> dict[str, Any]:
         """
         Get agent and watcher status.
         """
@@ -119,13 +121,12 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            else:
-                return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
-    async def agent_start(cls, agent_id: str) -> dict:
+    async def agent_start(cls, agent_id: str) -> dict[str, Any]:
         """
         Start agent.
         """
@@ -134,13 +135,12 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            else:
-                return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
-    async def agent_stop(cls, agent_id: str) -> dict:
+    async def agent_stop(cls, agent_id: str) -> dict[str, Any]:
         """
         Stop agent.
         """
@@ -149,13 +149,12 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            else:
-                return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)
 
     @api_function
     @classmethod
-    async def agent_restart(cls, agent_id: str) -> dict:
+    async def agent_restart(cls, agent_id: str) -> dict[str, Any]:
         """
         Restart agent.
         """
@@ -164,6 +163,5 @@ class AgentWatcher(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:
-                return data["message"]
-            else:
-                return data
+                return cast(dict[str, Any], data["message"])
+            return cast(dict[str, Any], data)

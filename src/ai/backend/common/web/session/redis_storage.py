@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any, Callable, Optional, override
+from collections.abc import Callable
+from typing import Any, override
 
 from aiohttp import web
 
@@ -23,12 +24,12 @@ class RedisStorage(AbstractStorage):
         valkey_session_client: ValkeySessionClient,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
-        domain: Optional[str] = None,
-        max_age: Optional[int] = None,
+        domain: str | None = None,
+        max_age: int | None = None,
         path: str = "/",
-        secure: Optional[bool] = None,
+        secure: bool | None = None,
         httponly: bool = True,
-        samesite: Optional[str] = None,
+        samesite: str | None = None,
         key_factory: Callable[[], str] = lambda: uuid.uuid4().hex,
         encoder: Callable[[object], str] = json.dumps,
         decoder: Callable[[str], Any] = json.loads,
@@ -63,8 +64,7 @@ class RedisStorage(AbstractStorage):
             cookie = self.load_cookie(request)
             if cookie is None:
                 return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
-            else:
-                key = str(cookie)
+            key = str(cookie)
         data_bytes = await self._valkey_client.get_session_data(self.cookie_name + "_" + key)
         if data_bytes is None:
             return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)

@@ -1,413 +1,820 @@
-# Backend.AI Web Server Configuration Sample
+# Backend.AI Web Server Configuration (PROD Environment)
 #
 # This is a sample configuration file for the Backend.AI Web Server.
 # All configuration options are documented with their descriptions,
-# default values, and examples.
+# default values, and environment-specific examples.
 #
-# Generated automatically from the WebServerUnifiedConfig schema.
+# Generated using BackendAIConfigMeta annotations.
 
-# Service configuration.
+
+# Core service configuration including bind address, SSL settings, and
+# authentication options.
+# Added in 25.12.0
 [service]
-  # IP address to bind the webserver service.
-  # Use '0.0.0.0' to bind to all interfaces.
+  # IP address to bind the webserver service. Use '0.0.0.0' to listen on all
+  # network interfaces (recommended for production), or '127.0.0.1' to restrict
+  # to localhost only (useful for development or when behind a reverse proxy).
+  # Added in 25.12.0
   ip = "0.0.0.0"
-  # Port number to bind the webserver service.
-  # Must be between 1 and 65535.
+  # Port number to bind the webserver service. Standard HTTP is 80, HTTPS is
+  # 443. Use high ports (>1024) to run without root privileges. Common
+  # alternatives include 8080, 8443, or 3000.
+  # Added in 25.12.0
   port = 8080
-  # Whether to enable SSL/TLS for the webserver.
-  # When enabled, requires ssl_cert and ssl_privkey to be set.
-  ssl_enabled = false
-  # Path to SSL certificate file.
-  # Required when ssl_enabled is True.
-  ## ssl_cert = "/path/to/cert.pem"
-  # Path to SSL private key file.
-  # Required when ssl_enabled is True.
-  ## ssl_privkey = "/path/to/privkey.pem"
-  # Path to static files directory.
-  # Contains web UI assets and other static resources.
-  static_path = "/path/to/static"
-  # Force a specific protocol for API endpoints.
-  # Useful when running behind a reverse proxy.
-  ## force_endpoint_protocol = "{ ForceEndpointProtocol }"
-  # Service mode.
-  # 'webui' serves the full web UI, 'static' serves only static files.
+  # Enable SSL/TLS encryption for the webserver. When enabled, all HTTP
+  # connections are served over HTTPS. Requires ssl_cert and ssl_privkey to be
+  # configured. Strongly recommended for production deployments.
+  # Added in 25.12.0
+  ssl-enabled = true
+  # File path to the SSL/TLS certificate in PEM format. Required when
+  # ssl_enabled is true. Should contain the full certificate chain including
+  # intermediate certificates for proper validation by browsers.
+  # Added in 25.12.0
+  ## ssl-cert = "/etc/ssl/certs/webserver.crt"
+  # File path to the SSL/TLS private key in PEM format. Required when
+  # ssl_enabled is true. Keep this file secure with restricted permissions
+  # (e.g., 0600) and never share or commit to version control.
+  # Added in 25.12.0
+  ## ssl-privkey = "/path/to/file"
+  # Directory path containing static web assets (HTML, CSS, JavaScript, images).
+  # The webserver serves these files directly to browsers. Defaults to the
+  # bundled static directory within the package.
+  # Added in 25.12.0
+  static-path = "/var/www/backend.ai/static"
+  # Force a specific protocol (http or https) for generated API endpoint URLs.
+  # Useful when running behind a reverse proxy that terminates SSL. Set to
+  # 'https' if the proxy handles SSL but the webserver runs on HTTP.
+  # Added in 25.12.0
+  ## force-endpoint-protocol = "https"
+  # Service operation mode. 'webui' serves the full Backend.AI web interface
+  # with all features. 'static' serves only static files, useful for CDN or
+  # custom frontend deployments that don't need the built-in UI.
+  # Added in 25.12.0
   mode = "webui"
-  # Whether to enable user signup functionality.
-  enable_signup = false
-  # Whether to allow anonymous users to change passwords.
-  allow_anonymous_change_password = false
-  # Whether to allow project resource monitoring.
-  allow_project_resource_monitor = false
-  # Whether to allow users to change signin mode.
-  allow_change_signin_mode = false
-  # Whether to allow manual image name specification for sessions.
-  allow_manual_image_name_for_session = false
-  # Whether to allow signup without email confirmation.
-  allow_signup_without_confirmation = false
-  # Whether to always enqueue compute sessions.
-  always_enqueue_compute_session = false
-  # Whether to enable debug mode for the web UI.
-  webui_debug = false
-  # Whether to mask user information in the UI.
-  mask_user_info = false
-  # List of single sign-on vendors to enable.
-  ## single_sign_on_vendors = "..."
-  # SSO realm name for single sign-on.
-  sso_realm_name = ""
-  # Whether to enable container commit functionality.
-  enable_container_commit = false
-  # Whether to hide agent information in the UI.
-  hide_agents = true
-  # URL for app download.
-  app_download_url = ""
-  # Whether to allow app download panel in the UI.
-  allow_app_download_panel = true
-  # Whether to enable two-factor authentication.
-  enable_2FA = false
-  # Whether to force two-factor authentication for all users.
-  force_2FA = false
-  # System SSH image name.
-  system_SSH_image = ""
-  # Whether to use directory-based usage tracking.
-  directory_based_usage = false
-  # Whether to allow custom resource allocation.
-  allow_custom_resource_allocation = true
-  # Education app name prefix.
-  edu_appname_prefix = ""
-  # Whether to enable extended login sessions.
-  enable_extend_login_session = false
-  # Whether directory size is visible in the UI.
-  is_directory_size_visible = true
-  # Whether to enable interactive login account switching.
-  enable_interactive_login_account_switch = true
-  # Default file browser image name.
-  default_file_browser_image = ""
-  # Whether to enable reservoir feature.
-  enable_reservoir = false
+  # Enable user self-registration through the web interface. When disabled, only
+  # administrators can create new user accounts. Enable for public-facing
+  # deployments that allow self-service signup.
+  # Added in 25.12.0
+  enable-signup = true
+  # Allow password changes without requiring current authentication. Useful for
+  # password reset flows where users have forgotten their password. Enable with
+  # caution as it may reduce security.
+  # Added in 25.12.0
+  allow-anonymous-change-password = false
+  # Enable project-level resource monitoring in the web UI. Shows aggregated
+  # resource usage statistics per project (group). Useful for project managers
+  # to track their team's resource consumption.
+  # Added in 25.12.0
+  allow-project-resource-monitor = true
+  # Allow users to switch between different sign-in methods (e.g., password,
+  # SSO). When disabled, users must use the sign-in method configured by the
+  # administrator.
+  # Added in 25.12.0
+  allow-change-signin-mode = false
+  # Allow users to manually specify container image names when creating
+  # sessions. Useful for advanced users who need to use custom or unlisted
+  # images. Disable for controlled environments.
+  # Added in 25.12.0
+  allow-manual-image-name-for-session = false
+  # Allow user accounts to be activated immediately upon registration without
+  # email confirmation. Enable for internal deployments where email verification
+  # is not required. Disable for public-facing services.
+  # Added in 25.12.0
+  allow-signup-without-confirmation = false
+  # Force all compute session requests to go through the scheduling queue. When
+  # disabled, sessions may start immediately if resources are available. Enable
+  # for fair resource allocation in multi-user environments.
+  # Added in 25.12.0
+  always-enqueue-compute-session = true
+  # Enable debug mode for the web UI frontend. Shows additional debugging
+  # information in the browser console and may expose internal state. Should be
+  # disabled in production for security.
+  # Added in 25.12.0
+  webui-debug = false
+  # Mask sensitive user information (email, full name) in the UI for privacy.
+  # Shows partial or redacted information instead of full details. Useful for
+  # compliance with privacy regulations.
+  # Added in 25.12.0
+  mask-user-info = true
+  # Comma-separated list of enabled SSO providers (e.g.,
+  # 'google,github,keycloak'). Each provider must be separately configured in
+  # the Manager. Set to None to disable SSO and use only local authentication.
+  # Added in 25.12.0
+  ## single-sign-on-vendors = "google,keycloak"
+  # SSO realm name for identity providers that use realms (e.g., Keycloak).
+  # Identifies the authentication realm within the SSO provider. Leave empty if
+  # not using realm-based SSO.
+  # Added in 25.12.0
+  sso-realm-name = "backend-ai"
+  # Enable container commit functionality that allows users to save their
+  # session environments as new container images. Useful for preserving custom
+  # environments but requires additional storage and image management.
+  # Added in 25.12.0
+  enable-container-commit = true
+  # Hide compute agent information from regular users in the UI. When enabled,
+  # users cannot see which physical machines their sessions run on. Enable for
+  # security and simplified user experience.
+  # Added in 25.12.0
+  hide-agents = true
+  # URL for downloading Backend.AI desktop applications or CLI tools. Shown in
+  # the app download panel if enabled. Leave empty to hide the download link.
+  # Added in 25.12.0
+  app-download-url = "https://releases.example.com/backend-ai"
+  # Show the application download panel in the web UI. The panel provides links
+  # to download Backend.AI desktop apps and CLI tools. Disable if you don't want
+  # users to see download options.
+  # Added in 25.12.0
+  allow-app-download-panel = true
+  # Enable two-factor authentication (2FA) support. When enabled, users can
+  # optionally set up TOTP-based 2FA for enhanced account security. Requires
+  # proper 2FA configuration in the Manager.
+  # Added in 25.12.0
+  enable-2FA = true
+  # Require all users to set up two-factor authentication. Users who haven't
+  # configured 2FA will be prompted to do so before accessing the system.
+  # Requires enable_2fa to be true.
+  # Added in 25.12.0
+  force-2FA = false
+  # Default container image for system SSH access sessions. Specifies which
+  # image to use when users request SSH access to the system. Leave empty to use
+  # the default system image.
+  # Added in 25.12.0
+  system-SSH-image = "cr.backend.ai/system/ssh:latest"
+  # Track resource usage based on directory structure. When enabled, usage
+  # statistics are calculated per directory/project hierarchy rather than flat
+  # aggregation. Useful for organizational billing.
+  # Added in 25.12.0
+  directory-based-usage = true
+  # Allow users to customize resource allocation (CPU, memory, GPU) when
+  # creating sessions. When disabled, users must choose from predefined resource
+  # templates. Disable for simplified user experience.
+  # Added in 25.12.0
+  allow-custom-resource-allocation = true
+  # Prefix for educational application names. Used to identify and filter
+  # applications meant for educational environments. Leave empty to disable
+  # educational app filtering.
+  # Added in 25.12.0
+  edu-appname-prefix = "edu-"
+  # Allow users to extend their login session beyond the default timeout. When
+  # enabled, users can request session extension before automatic logout. Useful
+  # for long-running work without frequent re-authentication.
+  # Added in 25.12.0
+  enable-extend-login-session = true
+  # Show directory sizes in the file browser. When disabled, directory sizes are
+  # not calculated, which can improve performance for large directory trees but
+  # provides less information to users.
+  # Added in 25.12.0
+  is-directory-size-visible = true
+  # Allow users to switch between multiple accounts during an interactive
+  # session. Useful for users who manage multiple projects or have admin/user
+  # dual roles. Disable for simpler single-account workflows.
+  # Added in 25.12.0
+  enable-interactive-login-account-switch = true
+  # Default container image for the file browser application. Specifies which
+  # image to use when users open the built-in file browser. Leave empty to use
+  # the system default.
+  # Added in 25.12.0
+  default-file-browser-image = "cr.backend.ai/filebrowser:latest"
+  # Enable the Reservoir feature for managing ML model artifacts. Reservoir
+  # provides model versioning, sharing, and deployment capabilities. Requires
+  # storage-proxy Reservoir configuration.
+  # Added in 25.12.0
+  enable-reservoir = true
 
-  # WebSocket proxy configuration.
+  # WebSocket proxy configuration for routing WebSocket connections. Configure
+  # this when you need to proxy WebSocket traffic through a separate service,
+  # typically for terminal and interactive app connections.
+  # Added in 25.12.0
   [service.wsproxy]
-    # WebSocket proxy URL.
-    # Used to proxy WebSocket connections through a separate service.
-    # Leave empty to disable WebSocket proxy.
-    url = ""
+    # WebSocket proxy URL for routing WebSocket connections through a separate
+    # proxy service. Used when the webserver needs to forward WebSocket traffic
+    # to another service. Leave empty to disable WebSocket proxying.
+    # Added in 25.12.0
+    url = "ws://wsproxy.example.com:8080"
 
-# Security configuration.
+# Security settings including request/response policies and Content Security
+# Policy (CSP) configuration.
+# Added in 25.12.0
 [security]
-  # List of request security policies.
-  request_policies = []
-  # List of response security policies.
-  response_policies = []
+  # List of request security policy names to apply. These policies are processed
+  # as middleware on incoming requests. Common policies include CORS handling,
+  # request size limits, and rate limiting. Empty list means no additional
+  # policies.
+  # Added in 25.12.0
+  request-policies = []
+  # List of response security policy names to apply. These policies are
+  # processed as middleware on outgoing responses. Can include security headers
+  # like X-Content-Type-Options, X-Frame-Options, etc. Empty list means no
+  # additional policies.
+  # Added in 25.12.0
+  response-policies = []
 
-  # Content Security Policy configuration.
+  # Content Security Policy configuration. When set, adds CSP headers to
+  # responses to protect against XSS and other injection attacks. Leave unset
+  # (None) to skip CSP headers entirely.
+  # Added in 25.12.0
   [security.csp]
-    # Content Security Policy default-src directive.
-    ## default_src = [ "..." ]
-    # Content Security Policy connect-src directive.
-    ## connect_src = [ "..." ]
-    # Content Security Policy img-src directive.
-    ## img_src = [ "..." ]
-    # Content Security Policy media-src directive.
-    ## media_src = [ "..." ]
-    # Content Security Policy font-src directive.
-    ## font_src = [ "..." ]
-    # Content Security Policy script-src directive.
-    ## script_src = [ "..." ]
-    # Content Security Policy style-src directive.
-    ## style_src = [ "..." ]
-    # Content Security Policy frame-src directive.
-    ## frame_src = [ "..." ]
-    # Content Security Policy object-src directive.
-    ## object_src = [ "..." ]
-    # Content Security Policy frame-ancestors directive.
-    ## frame_ancestors = [ "..." ]
-    # Content Security Policy form-action directive.
-    ## form_action = [ "..." ]
+    # CSP default-src directive. Serves as the fallback for other resource types
+    # when their specific directive is not set. Common values include "'self'"
+    # (same origin only), "'none'" (block all), or specific domains.
+    # Added in 25.12.0
+    ## default-src = []
+    # CSP connect-src directive. Controls which URLs can be loaded using script
+    # interfaces like fetch, XMLHttpRequest, and WebSocket. Essential for API
+    # calls and WebSocket connections. Include "wss:" for WebSocket support.
+    # Added in 25.12.0
+    ## connect-src = []
+    # CSP img-src directive. Specifies valid sources for images and favicons.
+    # Include "data:" to allow inline data URIs for images, which is common for
+    # dynamically generated or embedded images.
+    # Added in 25.12.0
+    ## img-src = []
+    # CSP media-src directive. Specifies valid sources for loading audio and
+    # video elements. Set to "'self'" to only allow media from the same origin,
+    # or include specific CDN domains.
+    # Added in 25.12.0
+    ## media-src = []
+    # CSP font-src directive. Defines valid sources for fonts loaded using
+    # @font-face. Include font CDN domains like Google Fonts or self-hosted font
+    # locations.
+    # Added in 25.12.0
+    ## font-src = []
+    # CSP script-src directive. Specifies valid sources for JavaScript.
+    # "'unsafe-inline'" allows inline scripts (less secure but often required).
+    # "'strict-dynamic'" can be used with nonces for better security.
+    # Added in 25.12.0
+    ## script-src = []
+    # CSP style-src directive. Specifies valid sources for stylesheets.
+    # "'unsafe-inline'" is often needed for frameworks that inject styles
+    # dynamically. Consider using hashes or nonces for stricter security.
+    # Added in 25.12.0
+    ## style-src = []
+    # CSP frame-src directive. Specifies valid sources for nested browsing
+    # contexts using <frame> and <iframe>. Important for embedded content like
+    # Jupyter notebooks or app proxies.
+    # Added in 25.12.0
+    ## frame-src = []
+    # CSP object-src directive. Specifies valid sources for <object>, <embed>,
+    # and <applet> elements. Typically set to "'none'" as these elements are
+    # rarely needed and can be security risks.
+    # Added in 25.12.0
+    ## object-src = []
+    # CSP frame-ancestors directive. Specifies valid parents that may embed a
+    # page using <frame>, <iframe>, or <object>. Replaces the X-Frame-Options
+    # header. Set to "'none'" to prevent any embedding (clickjacking
+    # protection).
+    # Added in 25.12.0
+    ## frame-ancestors = []
+    # CSP form-action directive. Restricts URLs which can be used as form
+    # submission targets. Set to "'self'" to only allow form submissions to the
+    # same origin, preventing form hijacking attacks.
+    # Added in 25.12.0
+    ## form-action = []
 
-# Resources configuration.
+# Resource limits for the UI including maximum CPU, memory, and accelerator
+# allocations per container.
+# Added in 25.12.0
 [resources]
-  # Whether to open ports to public.
-  open_port_to_public = false
-  # Whether to allow non-authenticated TCP connections.
-  allow_non_auth_tcp = false
-  # Whether to allow preferred port selection.
-  allow_preferred_port = false
-  # Maximum CPU cores per container.
-  max_cpu_cores_per_container = 64
-  # Maximum memory per container in GB.
-  max_memory_per_container = 64
-  # Maximum CUDA devices per container.
-  max_cuda_devices_per_container = 16
-  # Maximum CUDA shares per container.
-  max_cuda_shares_per_container = 16
-  # Maximum ROCm devices per container.
-  max_rocm_devices_per_container = 10
-  # Maximum TPU devices per container.
-  max_tpu_devices_per_container = 8
-  # Maximum IPU devices per container.
-  max_ipu_devices_per_container = 8
-  # Maximum Atom devices per container.
-  max_atom_devices_per_container = 8
-  # Maximum Gaudi2 devices per container.
-  max_gaudi2_devices_per_container = 8
-  # Maximum Atom Plus devices per container.
-  max_atom_plus_devices_per_container = 8
-  # Maximum Warboy devices per container.
-  max_warboy_devices_per_container = 8
-  # Maximum shared memory per container in GB.
-  max_shm_per_container = 2.0
-  # Maximum file upload size in bytes.
-  max_file_upload_size = 4294967296
+  # Allow users to open container ports to the public internet. When enabled,
+  # users can expose their container services to external access. Disable for
+  # security-restricted environments.
+  # Added in 25.12.0
+  open-port-to-public = false
+  # Allow non-authenticated TCP connections to container services. When
+  # disabled, all TCP connections require authentication through the app proxy.
+  # Enable only for trusted network environments.
+  # Added in 25.12.0
+  allow-non-auth-tcp = false
+  # Allow users to specify preferred port numbers for their services. When
+  # disabled, ports are automatically assigned. Enable to give users more
+  # control over service accessibility.
+  # Added in 25.12.0
+  allow-preferred-port = false
+  # Maximum number of CPU cores a single container can request. This is a UI-
+  # level limit shown to users. Actual allocation depends on resource policies
+  # and agent availability.
+  # Added in 25.12.0
+  max-cpu-cores-per-container = 64
+  # Maximum memory in gigabytes (GB) a single container can request. This is a
+  # UI-level limit. Actual allocation depends on resource policies and agent
+  # availability.
+  # Added in 25.12.0
+  max-memory-per-container = 64
+  # Maximum number of NVIDIA CUDA GPU devices a single container can request.
+  # Applies to both full GPU allocation and MIG (Multi-Instance GPU) partitions.
+  # Set based on your largest GPU node configuration.
+  # Added in 25.12.0
+  max-cuda-devices-per-container = 16
+  # Maximum number of CUDA shares (fractional GPU) a single container can
+  # request. Used with GPU sharing/virtualization solutions like CUDA MPS or
+  # vGPU. Each share represents a fraction of GPU resources.
+  # Added in 25.12.0
+  max-cuda-shares-per-container = 16
+  # Maximum number of AMD ROCm GPU devices a single container can request.
+  # Applies to AMD Instinct and Radeon Pro GPUs. Set based on your largest AMD
+  # GPU node configuration.
+  # Added in 25.12.0
+  max-rocm-devices-per-container = 10
+  # Maximum number of Google TPU (Tensor Processing Unit) devices a single
+  # container can request. TPUs are specialized for machine learning workloads.
+  # Set based on your TPU pod configuration.
+  # Added in 25.12.0
+  max-tpu-devices-per-container = 8
+  # Maximum number of Graphcore IPU (Intelligence Processing Unit) devices a
+  # single container can request. IPUs are optimized for machine intelligence
+  # workloads. Set based on your IPU-POD configuration.
+  # Added in 25.12.0
+  max-ipu-devices-per-container = 8
+  # Maximum number of Rebellions ATOM accelerator devices a single container can
+  # request. ATOM is an AI accelerator for inference workloads. Set based on
+  # your node configuration.
+  # Added in 25.12.0
+  max-atom-devices-per-container = 8
+  # Maximum number of Intel Gaudi2 accelerator devices a single container can
+  # request. Gaudi2 is optimized for deep learning training and inference. Set
+  # based on your HLS-Gaudi2 server configuration.
+  # Added in 25.12.0
+  max-gaudi2-devices-per-container = 8
+  # Maximum number of Rebellions ATOM+ accelerator devices a single container
+  # can request. ATOM+ is an enhanced AI accelerator with improved performance.
+  # Set based on your node configuration.
+  # Added in 25.12.0
+  max-atom-plus-devices-per-container = 8
+  # Maximum number of FuriosaAI Warboy accelerator devices a single container
+  # can request. Warboy is an NPU optimized for vision and language AI
+  # workloads. Set based on your node configuration.
+  # Added in 25.12.0
+  max-warboy-devices-per-container = 8
+  # Maximum shared memory (/dev/shm) size in gigabytes (GB) a container can
+  # request. Shared memory is used for inter-process communication and some ML
+  # frameworks like PyTorch DataLoader.
+  # Added in 25.12.0
+  max-shm-per-container = 4.0
+  # Maximum file upload size in bytes. Default is 4GB (4294967296 bytes). This
+  # limit applies to file uploads through the web interface. Large file uploads
+  # may require increased server timeouts.
+  # Added in 25.12.0
+  max-file-upload-size = 4294967296
 
-# Environments configuration.
+# Container image environment settings including allowlist and display
+# preferences.
+# Added in 25.12.0
 [environments]
-  # List of allowed environments.
-  ## allowlist = "..."
-  # Whether to show non-installed images.
-  show_non_installed_images = false
+  # Comma-separated list of allowed environment image name patterns to display.
+  # When set, only images matching these patterns are shown to users. Leave
+  # empty (None) to show all available images.
+  # Added in 25.12.0
+  ## allowlist = []
+  # Show container images that are available but not yet installed on agents.
+  # When enabled, users can see and request images that will be pulled on
+  # demand. Disable to only show pre-installed images.
+  # Added in 25.12.0
+  show-non-installed-images = false
 
-# Plugin configuration.
+# Web UI plugin configuration for extending the interface.
+# Added in 25.12.0
 [plugin]
-  # List of page plugins.
-  ## page = "..."
+  # Comma-separated list of plugin page names to load in the UI. Plugin pages
+  # extend the web interface with custom functionality. Leave empty (None) to
+  # disable all page plugins.
+  # Added in 25.12.0
+  ## page = []
 
-# Pipeline configuration.
+# Backend.AI Pipeline service integration settings for ML workflow automation.
+# Added in 25.12.0
 [pipeline]
-  # Pipeline service endpoint URL.
-  endpoint = "http://127.0.0.1:9500"
-  # Frontend endpoint URL for pipeline service.
-  ## frontend_endpoint = "..."
+  # Backend URL of the Pipeline service API. The web server proxies pipeline
+  # requests to this endpoint. Use internal cluster DNS or IP in Kubernetes.
+  # Added in 25.12.0
+  endpoint = "http://pipeline-api:9500"
+  # External URL for the Pipeline frontend. If different from the main endpoint,
+  # set this for users to access the Pipeline UI directly. Leave empty if
+  # Pipeline UI is accessed through the main web interface.
+  # Added in 25.12.0
+  ## frontend-endpoint = "https://pipeline.example.com"
 
-# UI configuration.
+# UI customization settings including default environments and menu visibility.
+# Added in 25.12.0
 [ui]
-  # Default environment for new sessions.
-  ## default_environment = "..."
-  # Default environment for import operations.
-  ## default_import_environment = "..."
-  # List of blocked menu items.
-  ## menu_blocklist = "..."
-  # List of inactive menu items.
-  ## menu_inactivelist = "..."
-  # Whether to enable model folders functionality.
-  enable_model_folders = true
+  # Default container image pre-selected when users create new compute sessions.
+  # Specify a full image name like 'python:3.9-ubuntu20.04'. Leave empty to let
+  # users choose from available images.
+  # Added in 25.12.0
+  ## default-environment = "cr.backend.ai/python:3.10-ubuntu22.04"
+  # Default container image for import operations like folder uploads or Git
+  # repository cloning. Typically set to a lightweight Python image with common
+  # data tools.
+  # Added in 25.12.0
+  ## default-import-environment = "cr.backend.ai/python:3.10-ubuntu22.04"
+  # Comma-separated list of menu items to completely hide from all users.
+  # Blocked menus are removed from the UI and cannot be accessed. Use for
+  # features not available in your deployment.
+  # Added in 25.12.0
+  ## menu-blocklist = []
+  # Comma-separated list of menu items to show as inactive (grayed out).
+  # Inactive menus are visible but not clickable. Use for features coming soon
+  # or temporarily disabled.
+  # Added in 25.12.0
+  ## menu-inactivelist = []
+  # Enable the model folders functionality in the UI. Model folders provide a
+  # dedicated space for storing and managing ML model artifacts. Disable if not
+  # using model management features.
+  # Added in 25.12.0
+  enable-model-folders = true
 
-# API configuration.
+# Backend.AI Manager API connection settings including endpoints and connection
+# limits.
+# Added in 25.12.0
 [api]
-  # API domain name.
+  # Backend.AI domain name for API requests. Domains provide logical separation
+  # of users and resources. Use 'default' for single-domain deployments or
+  # specify the domain name for multi-tenant setups.
+  # Added in 25.12.0
   domain = "default"
-  # API endpoint URL.
-  endpoint = "http://127.0.0.1:8080,http://api.example.com:8080"
-  # API text description.
-  text = "Backend.AI API"
-  # Whether to verify SSL certificates for API calls.
-  ssl_verify = true
-  # Authentication token name.
-  auth_token_name = "sToken"
-  # Maximum number of simultaneous API connections.
-  # This limits the number of concurrent API requests that can be processed.
-  connection_limit = 100
+  # Backend.AI Manager API endpoint URL(s). Multiple endpoints can be specified
+  # as comma-separated values for load balancing and high availability. The web
+  # server will distribute requests across all endpoints.
+  # Added in 25.12.0
+  endpoint = "http://manager-api:8080,http://manager-api-2:8080"
+  # Display text for the API endpoint shown in the web UI. This label appears in
+  # settings and debugging panels. Customize for branded deployments.
+  # Added in 25.12.0
+  text = "Production API"
+  # Verify SSL certificates when connecting to the Manager API. Disable only for
+  # development with self-signed certificates. Always enable in production for
+  # security.
+  # Added in 25.12.0
+  ssl-verify = true
+  # Name of the authentication token cookie/header used for API requests.
+  # Default is 'sToken'. Change only if customizing the authentication flow or
+  # integrating with external identity providers.
+  # Added in 25.12.0
+  auth-token-name = "sToken"
+  # Maximum number of simultaneous connections to the Manager API. This limits
+  # concurrent API requests to prevent overloading the manager. Increase for
+  # high-traffic deployments.
+  # Added in 25.12.0
+  connection-limit = 200
 
-# JWT authentication configuration (shared between manager and webserver via
-# etcd).
-#
-# Note: JWT tokens are signed using per-user secret keys (from keypair table),
-# not a shared system secret key. This maintains the same security model as HMAC
-# authentication.
+# JWT authentication configuration shared between Manager and Web Server for
+# stateless token-based authentication.
+# Added in 25.12.0
 [jwt]
-  # Algorithm for JWT token signing.
-  # HS256 (HMAC-SHA256) is the default symmetric algorithm.
+  # Algorithm for JWT token signing. HS256 (HMAC-SHA256) is the default
+  # symmetric algorithm.
+  # Added in 25.16.0
   algorithm = "HS256"
-  # JWT token expiration time in seconds.
-  # Default is 900 seconds (15 minutes).
-  # Range: 60 seconds (1 minute) to 86400 seconds (24 hours).
-  # Shorter expiration times are more secure but may impact user experience.
-  token_expiration_seconds = 900
+  # JWT token expiration time in seconds. Default is 900 seconds (15 minutes).
+  # Range: 60 seconds (1 minute) to 86400 seconds (24 hours). Shorter expiration
+  # times are more secure but may impact user experience.
+  # Added in 25.16.0
+  token-expiration-seconds = 3600
 
-# Session configuration.
+# User session management settings including Redis storage, timeouts, and login
+# security.
+# Added in 25.12.0
 [session]
-  # Session maximum age in seconds.
-  max_age = 604800
-  # Login session extension in seconds.
-  ## login_session_extension_sec =   
-  # Whether to flush sessions on startup.
-  flush_on_startup = false
-  # Login block time in seconds.
-  login_block_time = 1200
-  # Allowed login failure count.
-  login_allowed_fail_count = 10
-  # Whether to enable auto logout.
-  auto_logout = false
-  # Maximum count for preopen ports.
-  max_count_for_preopen_ports = 10
+  # Maximum session age in seconds. Default is 604800 (7 days). After this time,
+  # users must re-authenticate. Shorter values improve security but require more
+  # frequent logins.
+  # Added in 25.12.0
+  max-age = 86400
+  # Seconds to extend the session on each user activity. When set, active users
+  # get their session extended automatically. Leave empty (None) to use fixed
+  # session duration without extension.
+  # Added in 25.12.0
+  ## login-session-extension-sec = 3600
+  # Clear all existing sessions when the web server starts. Enable during
+  # development or after security incidents. In production, enable only if you
+  # want to force all users to re-login on restart.
+  # Added in 25.12.0
+  flush-on-startup = false
+  # Duration in seconds to block login attempts after exceeding the failure
+  # limit. Default is 1200 (20 minutes). This helps prevent brute-force password
+  # attacks.
+  # Added in 25.12.0
+  login-block-time = 1200
+  # Maximum number of failed login attempts before blocking. After this many
+  # failures, the IP or account is blocked for login_block_time seconds. Lower
+  # values are more secure but may frustrate legitimate users.
+  # Added in 25.12.0
+  login-allowed-fail-count = 5
+  # Automatically log out users after a period of inactivity. When enabled,
+  # inactive sessions are terminated. Works with session extension settings to
+  # control idle timeout behavior.
+  # Added in 25.12.0
+  auto-logout = true
+  # Maximum number of ports that can be pre-opened for a session. Pre-opened
+  # ports are reserved before the session starts for services like Jupyter or
+  # SSH. Higher values allow more services but consume more resources.
+  # Added in 25.12.0
+  max-count-for-preopen-ports = 5
 
-  # Redis configuration for sessions.
+  # Redis configuration for session storage. Sessions are stored in Redis for
+  # fast access and horizontal scalability. Use a dedicated Redis instance or
+  # database for production.
+  # Added in 25.12.0
   [session.redis]
-    # Network address and port of the Redis server.
-    # Redis is used for distributed caching and messaging between managers.
-    # Set to None when using Sentinel for high availability.
-    ## addr = "{ HostPortPair }"
-    # Service name for Redis Sentinel.
-    # Required when using Redis Sentinel for high availability.
-    # Identifies which service to monitor for failover.
-    ## service_name = "..."
-    # Password for authenticating with Redis.
-    # Set to None if Redis doesn't require authentication.
-    # Should be kept secret in production environments.
-    ## password = "..."
-    # Timeout in milliseconds for Redis requests.
-    # Controls how long operations wait before timing out.
-    # If None, uses the default timeout configured in the Redis client.
-    ## request_timeout =   
+    # Network address and port of the Redis server. Redis is used for
+    # distributed caching and messaging between managers. Set to None when using
+    # Sentinel for high availability.
+    # Added in 25.13.0
+    ## addr = { host = "redis-server", port = 6379 }
+    # Service name for Redis Sentinel. Required when using Redis Sentinel for
+    # high availability. Identifies which service to monitor for failover.
+    # Added in 25.13.0
+    ## service-name = "backend-ai"
+    # Password for authenticating with Redis. Set to None if Redis doesn't
+    # require authentication. Should be kept secret in production environments.
+    # Added in 25.13.0
+    ## password = "REDIS_PASSWORD"
+    # Timeout in milliseconds for Redis requests. Controls how long operations
+    # wait before timing out. If None, uses the default timeout configured in
+    # the Redis client.
+    # Added in 25.13.0
+    ## request-timeout = 5000
     # Whether to use TLS for Redis connections.
-    use_tls = false
-    # Whether to skip TLS certificate verification.
-    # Set to True for self-signed certificates or development environments.
+    # Added in 25.13.0
+    use_tls = true
+    # Whether to skip TLS certificate verification. Set to True for self-signed
+    # certificates or development environments.
+    # Added in 25.13.0
     tls_skip_verify = false
 
-    # Configuration for the Redis helper library.
-    # Controls timeouts and reconnection behavior.
-    # Adjust based on network conditions and reliability requirements.
-    [session.redis.redis_helper_config]
-      # Timeout in seconds for Redis socket operations.
-      # Controls how long operations wait before timing out.
-      # Increase for slow or congested networks.
-      socket_timeout = 5.0
-      # Timeout in seconds for establishing Redis connections.
-      # Controls how long connection attempts wait before failing.
-      # Shorter values fail faster but may be too aggressive for some networks.
-      socket_connect_timeout = 2.0
-      # Time in seconds to wait between reconnection attempts.
-      # Controls the polling frequency when trying to reconnect to Redis.
-      # Lower values reconnect faster but may increase network load.
-      reconnect_poll_timeout = 0.3
+    # Configuration for the Redis helper library. Controls timeouts and
+    # reconnection behavior. Adjust based on network conditions and reliability
+    # requirements.
+    # Added in 25.13.0
+    [session.redis.redis-helper-config]
+      # Timeout in seconds for Redis socket operations. Controls how long
+      # operations wait before timing out. Increase for slow or congested
+      # networks.
+      # Added in 25.13.0
+      socket_timeout = 10.0
+      # Timeout in seconds for establishing Redis connections. Controls how long
+      # connection attempts wait before failing. Shorter values fail faster but
+      # may be too aggressive for some networks.
+      # Added in 25.13.0
+      socket_connect_timeout = 5.0
+      # Time in seconds to wait between reconnection attempts. Controls the
+      # polling frequency when trying to reconnect to Redis. Lower values
+      # reconnect faster but may increase network load.
+      # Added in 25.13.0
+      reconnect_poll_timeout = 1.0
+      # Timeout in seconds to wait for a connection from the blocking connection
+      # pool. Used by BlockingConnectionPool for distributed locking scenarios.
+      # If no connection is available within this time, a timeout error is
+      # raised.
+      # Added in 25.13.0
+      connection_ready_timeout = 30.0
 
-    # Optional override configurations for specific Redis contexts.
-    # Allows different Redis settings for different services within Backend.AI.
-    # Each key represents a context name, and the value is a complete Redis
+    # Optional override configurations for specific Redis contexts. Allows
+    # different Redis settings for different services within Backend.AI. Each
+    # key represents a context name, and the value is a complete Redis
     # configuration.
-    [session.redis.override_configs]
+    # Added in 25.13.0
+    [session.redis.override-configs]
 
-    # List of Redis Sentinel addresses for high availability.
-    # If provided, the manager will use Redis Sentinel for automatic failover.
-    # When using Sentinel, the addr field is ignored and service_name is required.
+    # List of Redis Sentinel addresses for high availability. If provided, the
+    # manager will use Redis Sentinel for automatic failover. When using
+    # Sentinel, the addr field is ignored and service_name is required.
+    # Added in 25.13.0
     [[session.redis.sentinel]]
     # Add multiple [[session.redis.sentinel]] sections as needed
-      # Host address of the service.
-      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-      # all interfaces.
-      host = "127.0.0.1"
-      # Port number of the service.
-      # Must be between 1 and 65535.
-      # Ports below 1024 require root/admin privileges.
-      port = 8080
+      # Host address of the service. Can be a hostname, IP address, or special
+      # addresses like 0.0.0.0 to bind to all interfaces.
+      # Added in 22.03.0
+      host = "redis-sentinel"
+      # Port number of the service. Must be between 1 and 65535. Ports below
+      # 1024 require root/admin privileges.
+      # Added in 22.03.0
+      port = 26379
 
-# License configuration.
+# License information displayed in the web interface.
+# Added in 25.12.0
 [license]
-  # License edition.
-  edition = "Open Source"
-  # License valid since date.
-  valid_since = ""
-  # License valid until date.
-  valid_until = ""
+  # Backend.AI edition name. 'Open Source' for community edition, 'Enterprise'
+  # for commercial deployments. This is displayed in the UI footer and about
+  # page.
+  # Added in 25.12.0
+  edition = "Enterprise"
+  # Start date of the license validity period in YYYY-MM-DD format. Empty for
+  # Open Source edition. Used to display license information to administrators.
+  # Added in 25.12.0
+  valid-since = "2024-01-01"
+  # End date of the license validity period in YYYY-MM-DD format. Empty for Open
+  # Source edition. Administrators are notified when the license is approaching
+  # expiration.
+  # Added in 25.12.0
+  valid-until = "2025-12-31"
 
-# Web server configuration.
+# Core web server runtime settings including event loop and process management.
+# Added in 25.12.0
 [webserver]
-  # Event loop implementation to use.
-  # 'asyncio' is the Python standard library implementation.
-  # 'uvloop' is a faster alternative but may have compatibility issues with some
-  # libraries.
-  event_loop = "uvloop"
-  # IPC base path.
-  ipc_base_path = "/tmp/backend.ai/ipc"
-  # Process ID file path.
-  pid_file = "/dev/null"
+  # Async event loop implementation. 'uvloop' (default) provides better
+  # performance using libuv. 'asyncio' uses Python's standard library
+  # implementation, which may be more compatible in some environments.
+  # Added in 25.12.0
+  event-loop = "asyncio"
+  # Base directory for Unix domain sockets used for inter-process communication.
+  # The directory is created automatically if it doesn't exist. Must be writable
+  # by the web server process.
+  # Added in 25.12.0
+  ipc-base-path = "/var/run/backend.ai/ipc"
+  # Path to write the web server process ID. Used by process managers and
+  # monitoring tools. Set to /dev/null (default) to disable PID file creation.
+  # Added in 25.12.0
+  pid-file = "/var/run/backend.ai/webserver.pid"
 
-# OpenTelemetry configuration.
+# OpenTelemetry integration for distributed tracing and metrics collection.
+# Added in 25.12.0
 [otel]
-  # Whether to enable OpenTelemetry.
-  enabled = false
-  # OpenTelemetry log level.
-  log_level = "INFO"
-  # OpenTelemetry endpoint.
-  endpoint = "http://127.0.0.1:4317"
+  # Whether to enable OpenTelemetry for tracing or logging. When enabled, traces
+  # or logs will be collected and sent to the configured OTLP endpoint.
+  # Added in 25.7.0
+  enabled = true
+  # Log level for OpenTelemetry. Controls the verbosity of logs generated by
+  # OpenTelemetry. Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'.
+  # Added in 25.7.0
+  log-level = "INFO"
+  # OTLP endpoint for sending traces. Should include the host and port of the
+  # OTLP receiver.
+  # Added in 25.7.0
+  endpoint = "http://otel-collector:4317"
 
-# Apollo Router configuration.
-[apollo_router]
-  # Whether to enable Apollo Router.
-  enabled = false
-  # Apollo Router endpoint(s).
-  # Supports multiple endpoints separated by commas for load balancing.
-  endpoint = "http://127.0.0.1:4000"
+# etcd connection settings for distributed configuration and coordination with
+# other Backend.AI components.
+# Added in 25.12.0
+[etcd]
+  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
+  # keys will be stored under this namespace.
+  # Added in 22.03.0
+  namespace = "backend"
+  # Network address of the etcd server. Default is the standard etcd port on
+  # localhost. In production, should point to one or more etcd instance
+  # endpoint(s).
+  # Added in 22.03.0
+  addr = { host = "etcd-cluster", port = 2379 }
+  # Username for authenticating with etcd. Optional if etcd doesn't require
+  # authentication. Should be set along with password for secure deployments.
+  # Added in 22.03.0
+  ## user = "backend"
+  # Password for authenticating with etcd. Should be kept secret in production
+  # environments. Set together with the user field for authentication.
+  # Added in 22.03.0
+  ## password = "ETCD_PASSWORD"
 
-# Logging configuration.
+# Pyroscope continuous profiling integration for performance analysis.
+# Added in 25.12.0
+[pyroscope]
+  # Whether to enable Pyroscope profiling. When enabled, performance profiling
+  # data will be sent to a Pyroscope server. Useful for debugging performance
+  # issues, but adds some overhead.
+  # Added in 24.12.1
+  enabled = true
+  # Application name to use in Pyroscope. This name will identify this component
+  # instance in Pyroscope UI. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## app-name = "backendai-manager-prod"
+  # Address of the Pyroscope server. Must include the protocol (http or https)
+  # and port if non-standard. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## server-addr = "http://pyroscope:4040"
+  # Sampling rate for Pyroscope profiling. Higher values collect more data but
+  # increase overhead. Balance based on your performance monitoring needs.
+  # Added in 24.12.1
+  ## sample-rate = 100
+
+# Service discovery configuration for automatic detection and connection to
+# Backend.AI services.
+# Added in 25.12.0
+[service-discovery]
+  # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
+  # Added in 25.9.0
+  type = "redis"
+
+# Apollo Router GraphQL gateway configuration for federated schemas.
+# Added in 25.12.0
+[apollo-router]
+  # Enable Apollo Router integration for GraphQL federation. When enabled,
+  # GraphQL requests are routed through Apollo Router instead of directly to the
+  # Manager API. Useful for advanced GraphQL architectures.
+  # Added in 25.12.0
+  enabled = false
+  # Apollo Router endpoint URL(s). Multiple endpoints can be specified as comma-
+  # separated values for load balancing. Only used when Apollo Router is
+  # enabled.
+  # Added in 25.12.0
+  endpoints = "http://apollo-router:4000"
+
+# Logging configuration for log levels, formats, and destinations.
+# Added in 25.12.0
 [logging]
   # The version used by logging.dictConfig().
+  # Added in 24.09.0
   version = 1
   # The main log level to filter messages from all loggers.
+  # Added in 24.09.0
   level = "INFO"
   # Disable the existing loggers when applying the config.
+  # Added in 24.09.0
   disable-existing-loggers = false
-  # The list of log drivers to activate.
-  drivers = [ "console",]
-
   # The mapping of log handler configurations.
-  [logging.handlers]
-
+  # Added in 24.09.0
+  handlers = {}
   # The mapping of per-namespace logger configurations.
-  [logging.loggers]
+  # Added in 24.09.0
+  loggers = {}
+  # The list of log drivers to activate.
+  # Added in 24.09.0
+  drivers = ["console", "file"]
+  # Override default log level for specific scope of package.
+  # Added in 24.09.0
+  pkg-ns = "{ \"\" = \"WARNING\", \"ai.backend\" = \"INFO\" }"
 
+  # Console logging driver configuration.
+  # Added in 24.09.0
   [logging.console]
     # Opt to print colorized log.
+    # Added in 24.09.0
     ## colored = true
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # File logging driver configuration.
+  # Added in 24.09.0
   [logging.file]
     # Path to store log.
+    # Added in 24.09.0
     path = "/var/log/backend.ai"
     # Log file name.
-    filename = "wsproxy.log"
+    # Added in 24.09.0
+    filename = "manager.log"
     # Number of outdated log files to retain.
-    backup-count = 5
+    # Added in 24.09.0
+    backup-count = 10
     # Maximum size for a single log file.
-    ## rotation-size = "..."  # |     # min=0
+    # Added in 24.09.0
+    rotation-size = "100MB"
     # Determine verbosity of log.
+    # Added in 24.09.0
     format = "verbose"
 
+  # Logstash logging driver configuration.
+  # Added in 24.09.0
   [logging.logstash]
-    # Connection information of logstash node.
-    endpoint = { host = "127.0.0.1", port = 8001 }
     # Protocol to communicate with logstash server.
+    # Added in 24.09.0
     protocol = "tcp"
     # Use TLS to communicate with logstash server.
+    # Added in 24.09.0
     ssl-enabled = true
     # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
     ssl-verify = true
 
+    # Connection information of logstash node.
+    # Added in 24.09.0
+    [logging.logstash.endpoint]
+
+  # Graylog logging driver configuration.
+  # Added in 24.09.0
   [logging.graylog]
     # Graylog hostname.
-    host = "127.0.0.1"
+    # Added in 24.09.0
+    host = "graylog-server"
     # Graylog server port number.
-    port = 8000
+    # Added in 24.09.0
+    port = 12201
     # Log level.
+    # Added in 24.09.0
     level = "INFO"
     # The custom source identifier. If not specified, fqdn will be used instead.
-    ## localname = "..."
-    # The fuly qualified domain name of the source.
-    ## fqdn = "..."
-    # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
+    ## localname = "prod-manager-01"
+    # The fully qualified domain name of the source.
+    # Added in 24.09.0
+    ## fqdn = "manager.backend.ai"
+    # Verify validity of TLS certificate when communicating with Graylog.
+    # Added in 24.09.0
     ssl-verify = true
     # Path to Root CA certificate file.
+    # Added in 24.09.0
     ## ca-certs = "/etc/ssl/ca.pem"
     # Path to TLS private key file.
+    # Added in 24.09.0
     ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
     # Path to TLS certificate file.
+    # Added in 24.09.0
     ## certfile = "/etc/backend.ai/graylog/cert.pem"
 
-  # Override default log level for specific scope of package
-  [logging.pkg_ns]
-
-# Debug configuration.
+# Debug mode settings for development and troubleshooting.
+# Added in 25.12.0
 [debug]
-  # Whether to enable debug mode.
+  # Enable debug mode for the web server. When enabled, provides verbose
+  # logging, detailed error messages, and development tools. Never enable in
+  # production as it may expose sensitive information.
+  # Added in 25.12.0
   enabled = false

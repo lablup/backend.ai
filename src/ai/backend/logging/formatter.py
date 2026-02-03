@@ -5,19 +5,22 @@ import pprint
 import time
 import traceback
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
 
-_SysExcInfoType: TypeAlias = (
+type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
 
 
-def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
+def format_exception(
+    _self: logging.Formatter,
+    ei: Sequence[str] | _SysExcInfoType,
+) -> str:
     match ei:
         case (str(), *_):
             # Already foramtted from the source process for ease of serialization
@@ -27,31 +30,29 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
             s = "".join(traceback.format_exception(*ei))
         case _:
             s = "<exception-info-unavailable>"
-    s = s.rstrip("\n")
-    return s
+    return s.rstrip("\n")
 
 
 class SerializedExceptionFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
 
 class ConsoleFormatter(logging.Formatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
-        ct = self.converter(record.created)  # type: ignore
+        ct = self.converter(record.created)
         if datefmt:
             datefmt = datefmt.replace("%f", f"{int(record.msecs):03d}")
             return time.strftime(datefmt, ct)
-        else:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-            return f"{t}.{int(record.msecs):03d}"
+        t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+        return f"{t}.{int(record.msecs):03d}"
 
 
 class CustomJsonFormatter(JsonFormatter):
-    def formatException(self, ei) -> str:
+    def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
     def add_fields(
@@ -63,7 +64,7 @@ class CustomJsonFormatter(JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         if not log_record.get("timestamp"):
             # this doesn't use record.created, so it is slightly off
-            now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             log_record["timestamp"] = now
         if loglevel := log_record.get("level"):
             log_record["level"] = loglevel.upper()
@@ -71,8 +72,8 @@ class CustomJsonFormatter(JsonFormatter):
             log_record["level"] = record.levelname.upper()
 
 
-class ColorizedFormatter(coloredlogs.ColoredFormatter):
-    def __init__(self, *args, **kwargs) -> None:
+class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
 

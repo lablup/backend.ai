@@ -2,21 +2,13 @@ import dataclasses
 import enum
 import json
 import textwrap
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Annotated,
     Any,
-    Awaitable,
-    Callable,
-    Generic,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    TypeAlias,
     TypeVar,
-    Union,
 )
 from uuid import UUID
 
@@ -46,6 +38,8 @@ class ProxyProtocol(enum.StrEnum):
     HTTP2 = "h2"
     TCP = "tcp"
     PREOPEN = "preopen"
+    VNC = "vnc"
+    RDP = "rdp"
 
 
 class AppMode(enum.StrEnum):
@@ -74,17 +68,17 @@ class DigestModType(enum.StrEnum):
     SHA512 = "sha512"
 
 
-WebRequestHandler: TypeAlias = Callable[
+type WebRequestHandler = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Callable[
+type WebMiddleware = Callable[
     [web.Request, WebRequestHandler],
     Awaitable[web.StreamResponse],
 ]
 
-CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
-AppCreator: TypeAlias = Callable[
+type CORSOptions = Mapping[str, aiohttp_cors.ResourceOptions]
+type AppCreator = Callable[
     [CORSOptions],
     tuple[web.Application, Iterable[WebMiddleware]],
 ]
@@ -105,7 +99,7 @@ class RouteInfo(BaseModel):
     """
 
     route_id: Annotated[
-        Optional[UUID],
+        UUID | None,
         Field(
             default=None,
             description="Unique identifier for the route. If None, indicates a temporary route.",
@@ -123,7 +117,7 @@ class RouteInfo(BaseModel):
         ),
     ]
     session_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             description="Name of the session associated with this route.",
@@ -132,7 +126,7 @@ class RouteInfo(BaseModel):
         ),
     ]
     kernel_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             ...,
             description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",
@@ -304,11 +298,11 @@ class HealthCheckState(BaseModel):
     status: ModelServiceStatus | None = None
 
 
-TBaseModel = TypeVar("TBaseModel", bound=Union[BaseModel, Sequence[BaseModel]])
+TBaseModel = TypeVar("TBaseModel", bound=BaseModel | Sequence[BaseModel])
 
 
 @dataclass
-class PydanticResponse(Generic[TBaseModel]):
+class PydanticResponse[TBaseModel: BaseModel | Sequence[BaseModel]]:
     response: TBaseModel
-    headers: dict[str, Any] = dataclasses.field(default_factory=lambda: {})
+    headers: dict[str, Any] = dataclasses.field(default_factory=dict)
     status: int = 200

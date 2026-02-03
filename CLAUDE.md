@@ -27,6 +27,42 @@ Update README when:
 Example: Adding a new service → Read `services/README.md` → Follow patterns → Update service index
 
 
+## BEP-First Development
+
+**For significant new features, check BEP (Backend.AI Enhancement Proposals) first.**
+
+BEP documents define architectural decisions, API designs, and implementation strategies for major features.
+
+### Before Starting Development
+
+1. Read `proposals/README.md` for the BEP process overview
+2. Check the BEP Number Registry table for existing proposals related to your work
+3. If a relevant BEP exists:
+   - Read the BEP document in `proposals/BEP-XXXX-*.md`
+   - Follow the design decisions and implementation plans documented
+4. If no BEP exists for a significant feature:
+   - **Do not start implementation** until the BEP is created and discussed
+   - Reserve a BEP number in the registry
+   - Create the BEP document using the template at `proposals/BEP-0000-template.md`
+   - Submit a PR and discuss with maintainers
+
+### When BEP is Required
+
+- New subsystems or major components
+- Significant API changes or additions
+- Architectural changes affecting multiple packages
+- New integrations with external systems
+- Changes to core workflows (scheduling, storage, etc.)
+
+### When BEP is NOT Required
+
+- Bug fixes
+- Minor enhancements to existing features
+- Refactoring without behavioral changes
+- Documentation updates
+- Test additions
+
+
 ## General
 
 ### Tidy First Approach
@@ -46,8 +82,9 @@ Example: Adding a new service → Read `services/README.md` → Follow patterns 
 * Minimize state and side effects
 * Use the simplest solution that could possibly work
 * Make dependencies explicit
-  - Use relative imports when referring to modules in a subtree under `src` sharing a single BUILD file
-  - Use absolute imports when referring to modules in other subtrees under `src`, 3rd-party packages, and Python intrinsic packages
+  - Use child relative imports (`from .submodule`) only for modules within the same package directory
+  - Use absolute imports (`from ai.backend.package.module`) for parent modules and cross-package references
+  - Never use parent relative imports (`from ..module`) - always convert to absolute imports
 * Express intent clearly through naming and structure
 * Name things with meaningful, predictable, and explicit but concise tones
   - When reading codes, variable names should align with what intermediate-level developers could expect from them.
@@ -124,7 +161,86 @@ Example: Adding a new service → Read `services/README.md` → Follow patterns 
 * Utilize `typing.Protocol` and `typing.TypedDict` when typing mocked objects and functions if applicable
   - When using partial data structures, use `typing.cast()` to minimal scopes.
 * Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
-* Prefer pytest-style module-level test functions rather than unittest-style test classes
+
+### Test Structure and Organization
+
+* **Use Test Classes**: Group tests by target unit (class, module, or function being tested)
+  - Each test class should focus on a single target
+  - Test methods within the class test different scenarios for that target
+  ```python
+  class TestScheduleSessionsLifecycleHandler:
+      """Tests for ScheduleSessionsLifecycleHandler."""
+
+      async def test_all_sessions_scheduled_successfully(self, ...) -> None:
+          ...
+
+      async def test_partial_scheduling_failure(self, ...) -> None:
+          ...
+  ```
+
+* **Use Fixtures for Test Scenarios**: Express test conditions through fixtures, not inline setup code
+  - Fixtures should have descriptive names that indicate the scenario
+  - Keep test functions concise by delegating setup to fixtures
+  ```python
+  @pytest.fixture
+  def session_with_pending_status() -> SessionData:
+      return create_session(status=SessionStatus.PENDING)
+
+  @pytest.fixture
+  def mock_provisioner_success(mock_provisioner: AsyncMock) -> AsyncMock:
+      mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(...)
+      return mock_provisioner
+  ```
+
+* **No Cross-Test Imports**: Never import from other test files
+  - Shared test utilities go in `conftest.py` or `ai.backend.testutils`
+  - Each test file should be self-contained
+
+* **Keep Test Functions Concise**: Test functions should focus on:
+  1. Arrange: Receive pre-configured fixtures
+  2. Act: Call the method under test
+  3. Assert: Verify the expected outcome
+  ```python
+  async def test_session_scheduled_successfully(
+      self,
+      handler: ScheduleSessionsLifecycleHandler,
+      session_with_pending_status: SessionData,
+      mock_provisioner_success: AsyncMock,
+  ) -> None:
+      # Act
+      result = await handler.execute("default", [session_with_pending_status])
+
+      # Assert
+      assert len(result.successes) == 1
+      mock_provisioner_success.schedule_scaling_group.assert_called_once()
+  ```
+
+### Database Tests with `with_tables`
+
+When writing repository tests that use real database with `with_tables` from `ai.backend.testutils.db`:
+
+* **Include all Row dependencies**: SQLAlchemy ORM uses string-based relationship references.
+  When a Row model has relationships to other Row models, all related models must be imported
+  AND included in `with_tables` to ensure proper mapper initialization.
+  ```python
+  # Example: If UserRow has relationship to EndpointRow
+  from ai.backend.manager.models.user import UserRow
+  from ai.backend.manager.models.endpoint import EndpointRow  # Required for UserRow's relationship
+
+  async with with_tables(db, [
+      DomainRow,
+      UserRow,
+      EndpointRow,  # Must be included, not just imported
+      # ... other dependencies
+  ]):
+  ```
+* **Order by FK dependencies**: Tables must be ordered with parent tables before children
+  to satisfy foreign key constraints during table creation.
+* **Trace relationship chains**: If `RowA` → `RowB` → `RowC` via relationships,
+  all three must be in `with_tables`. Check each Row's `relationship()` definitions
+  for string references to other Row classes.
+* **Do NOT use `# noqa: F401` for mapper-only imports**: All Row models needed for mapper
+  configuration should also be in `with_tables` to avoid FK constraint errors.
 
 ## Build System & Development Commands
 

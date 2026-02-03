@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
+from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
+from ai.backend.agent.kernel_registry.types import KernelRecoveryData
+from ai.backend.agent.scratch.types import KernelRecoveryScratchData
+from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ...scratch.types import KernelRecoveryScratchData
-from ...scratch.utils import ScratchConfig, ScratchUtils
-from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 
@@ -30,12 +31,15 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
     def _parse_recovery_data_from_kernel(
         self,
         kernel: AbstractKernel,
-    ) -> Optional[KernelRecoveryData]:
+    ) -> KernelRecoveryData | None:
         from ai.backend.agent.docker.kernel import DockerKernel
 
         match kernel:
             case DockerKernel():
-                return KernelRecoveryData.from_docker_kernel(kernel)
+                try:
+                    return KernelRecoveryData.from_docker_kernel(kernel)
+                except KeyError as e:
+                    raise KernelRecoveryDataParseError from e
             case _:
                 return None
 
@@ -46,7 +50,13 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
         for kernel_id, kernel in data.items():
             config_path = ScratchUtils.get_scratch_kernel_config_dir(self._scratch_root, kernel_id)
             config_mgr = ScratchConfig(config_path)
-            original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
+            try:
+                original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
+            except KernelRecoveryDataParseError as e:
+                log.exception(
+                    "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
+                )
+                continue
             if original_recovery_data is None:
                 continue
             recovery_data = KernelRecoveryScratchData.from_kernel_recovery_data(

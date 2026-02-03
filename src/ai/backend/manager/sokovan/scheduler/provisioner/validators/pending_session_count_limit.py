@@ -1,6 +1,6 @@
 """Validator for pending session count limits."""
 
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .exceptions import PendingSessionCountLimitExceeded
 from .validator import ValidatorRule

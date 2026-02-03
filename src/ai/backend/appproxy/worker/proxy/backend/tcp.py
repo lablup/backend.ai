@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 import socket
-from typing import Final
+from typing import Any, Final
 
 import aiotools
 
@@ -12,7 +12,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
@@ -20,7 +20,7 @@ MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 class TCPBackend(BaseBackend):
     routes: list[RouteInfo]
 
-    def __init__(self, routes: list[RouteInfo], *args, **kwargs) -> None:
+    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.routes = routes
 
@@ -28,7 +28,7 @@ class TCPBackend(BaseBackend):
     def selected_route(self) -> RouteInfo:
         if len(self.routes) == 0:
             raise WorkerNotAvailable
-        elif len(self.routes) == 1:
+        if len(self.routes) == 1:
             selected_route = self.routes[0]
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable
@@ -47,7 +47,7 @@ class TCPBackend(BaseBackend):
         async def _pipe(
             reader: asyncio.StreamReader,
             writer: asyncio.StreamWriter,
-            tag="(unknown)",
+            tag: str = "(unknown)",
         ) -> None:
             nonlocal total_bytes
 
@@ -71,7 +71,7 @@ class TCPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(interval: float) -> None:
+        async def _last_access_marker_task(_interval: float) -> None:
             await self.mark_last_used_time(route)
 
         route = self.selected_route

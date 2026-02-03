@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from aiotools import cancel_and_wait
 
@@ -41,10 +41,10 @@ class RegisteredChecker:
     """
 
     checker: ServiceHealthChecker
-    result: Optional[ServiceHealth] = None
+    result: ServiceHealth | None = None
 
     @property
-    def current_result(self) -> Optional[ServiceHealth]:
+    def current_result(self) -> ServiceHealth | None:
         """
         Get the current health check result.
 
@@ -65,7 +65,7 @@ class HealthProbe:
 
     _checkers: dict[ServiceGroup, RegisteredChecker]
     _lock: asyncio.Lock
-    _loop_task: Optional[asyncio.Task]
+    _loop_task: asyncio.Task[Any] | None
     _running: bool
     _options: HealthProbeOptions
 
@@ -128,7 +128,7 @@ class HealthProbe:
             AllServicesHealth containing results from all registered checkers
         """
         registered = await self._get_all_registered()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Run all checks in parallel
         check_tasks = [
@@ -138,7 +138,9 @@ class HealthProbe:
         results_or_exc = await asyncio.gather(*check_tasks, return_exceptions=True)
 
         results: dict[ServiceGroup, ServiceHealth] = {}
-        for (service_group, _), result_or_exc in zip(registered.items(), results_or_exc):
+        for (service_group, _), result_or_exc in zip(
+            registered.items(), results_or_exc, strict=True
+        ):
             if isinstance(result_or_exc, BaseException):
                 log.error(f"Unexpected error checking {service_group}: {result_or_exc}")
                 continue
@@ -277,7 +279,7 @@ class HealthProbe:
             log.debug(f"Health check succeeded for {service_group}")
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Health check timed out - return empty result
             log.warning(f"Health check timed out for {service_group} after {checker.timeout}s")
             return ServiceHealth(results={})
@@ -321,5 +323,5 @@ class HealthProbe:
         return ConnectivityCheckResponse(
             overall_healthy=overall_healthy,
             connectivity_checks=components,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )

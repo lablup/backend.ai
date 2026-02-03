@@ -38,24 +38,24 @@ if TYPE_CHECKING:
         ServiceDiscoveryLoop,
     )
     from ai.backend.common.types import ValkeyProfileTarget
+    from ai.backend.manager.agent_cache import AgentRPCCache
+    from ai.backend.manager.clients.agent import AgentClientPool
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+    from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.storage import StorageSessionManager
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.notification import NotificationCenter
+    from ai.backend.manager.plugin.network import NetworkPluginContext
+    from ai.backend.manager.plugin.webapp import WebappPluginContext
+    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.repositories import Repositories
+    from ai.backend.manager.service.base import ServicesContext
+    from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment import DeploymentController
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
     from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+    from ai.backend.manager.types import DistributedLockFactory
 
-    from ..agent_cache import AgentRPCCache
-    from ..config.provider import ManagerConfigProvider
-    from ..idle import IdleCheckerHost
-    from ..models.storage import StorageSessionManager
-    from ..models.utils import ExtendedAsyncSAEngine
-    from ..notification import NotificationCenter
-    from ..plugin.network import NetworkPluginContext
-    from ..plugin.webapp import WebappPluginContext
-    from ..registry import AgentRegistry
-    from ..repositories.repositories import Repositories
-    from ..scheduler.dispatcher import SchedulerDispatcher
-    from ..service.base import ServicesContext
-    from ..services.processors import Processors
-    from ..types import DistributedLockFactory
     from .gql.adapter import BaseGQLAdapter
     from .types import CORSOptions
 
@@ -96,7 +96,7 @@ class RootContext(BaseContext):
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
-    scheduler_dispatcher: SchedulerDispatcher
+    agent_client_pool: AgentClientPool
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController

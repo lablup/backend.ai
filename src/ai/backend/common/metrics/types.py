@@ -7,3 +7,4 @@ UTILIZATION_METRIC_DETENTION: Final[float] = 600.0  # 10 minutes
 
 CONTAINER_UTILIZATION_METRIC_LABEL_NAME: Final[str] = "container_metric_name"
 DEVICE_UTILIZATION_METRIC_LABEL_NAME: Final[str] = "device_metric_name"
+PROCESS_UTILIZATION_METRIC_LABEL_NAME: Final[str] = "process_metric_name"

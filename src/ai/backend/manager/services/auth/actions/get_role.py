@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.auth.actions.base import AuthAction
@@ -9,12 +9,12 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 @dataclass
 class GetRoleAction(AuthAction):
     user_id: uuid.UUID
-    group_id: Optional[uuid.UUID]
+    group_id: uuid.UUID | None
     is_superadmin: bool
     is_admin: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_id)
 
     @override
@@ -27,8 +27,8 @@ class GetRoleAction(AuthAction):
 class GetRoleActionResult(BaseActionResult):
     global_role: str
     domain_role: str
-    group_role: Optional[str]
+    group_role: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

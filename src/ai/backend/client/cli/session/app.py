@@ -2,28 +2,29 @@ import asyncio
 import json
 import shlex
 import sys
-from typing import Dict, List, MutableMapping, Optional, Sequence, Union
+from collections.abc import MutableMapping, Sequence
+from typing import Any
 
 import aiohttp
 import click
 
-from ...compat import asyncio_run, asyncio_run_forever
-from ...config import DEFAULT_CHUNK_SIZE
-from ...request import Request
-from ...session import AsyncSession
-from ...versioning import get_naming
-from ..main import main
-from ..pretty import print_error, print_fail, print_info, print_warn
+from ai.backend.client.cli.main import main
+from ai.backend.client.cli.pretty import print_error, print_fail, print_info, print_warn
+from ai.backend.client.compat import asyncio_run, asyncio_run_forever
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
+from ai.backend.client.request import Request
+from ai.backend.client.session import AsyncSession
+from ai.backend.client.versioning import get_naming
 
 
 class WSProxy:
     __slots__ = (
         "api_session",
-        "session_name",
         "app_name",
         "args",
         "envs",
         "reader",
+        "session_name",
         "writer",
     )
 
@@ -32,7 +33,7 @@ class WSProxy:
         api_session: AsyncSession,
         session_name: str,
         app_name: str,
-        args: MutableMapping[str, Union[None, str, List[str]]],
+        args: MutableMapping[str, None | str | list[str]],
         envs: MutableMapping[str, str],
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
@@ -64,11 +65,11 @@ class WSProxy:
                         if msg.type == aiohttp.WSMsgType.ERROR:
                             await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.CLOSE:
+                        if msg.type == aiohttp.WSMsgType.CLOSE:
                             if msg.data != aiohttp.WSCloseCode.OK:
                                 await self.write_error(msg)
                             break
-                        elif msg.type == aiohttp.WSMsgType.BINARY:
+                        if msg.type == aiohttp.WSMsgType.BINARY:
                             self.writer.write(msg.data)
                             await self.writer.drain()
                 except ConnectionResetError:
@@ -79,7 +80,7 @@ class WSProxy:
                     self.writer.close()
                     try:
                         await self.writer.wait_closed()
-                    except (BrokenPipeError, IOError):
+                    except (OSError, BrokenPipeError):
                         # closed
                         pass
 
@@ -107,7 +108,7 @@ class WSProxy:
         rsp = (
             "HTTP/1.1 503 Service Unavailable\r\n"
             "Connection: Closed\r\n\r\n"
-            "WebSocket reply: {}".format(error_msg)
+            f"WebSocket reply: {error_msg}"
         )
         self.writer.write(rsp.encode())
         await self.writer.drain()
@@ -115,16 +116,16 @@ class WSProxy:
 
 class ProxyRunnerContext:
     __slots__ = (
-        "session_name",
+        "api_session",
         "app_name",
-        "protocol",
-        "host",
-        "port",
         "args",
         "envs",
-        "api_session",
-        "local_server",
         "exit_code",
+        "host",
+        "local_server",
+        "port",
+        "protocol",
+        "session_name",
     )
 
     session_name: str
@@ -132,10 +133,10 @@ class ProxyRunnerContext:
     protocol: str
     host: str
     port: int
-    args: Dict[str, Union[None, str, List[str]]]
-    envs: Dict[str, str]
-    api_session: Optional[AsyncSession]
-    local_server: Optional[asyncio.AbstractServer]
+    args: dict[str, None | str | list[str]]
+    envs: dict[str, str]
+    api_session: AsyncSession | None
+    local_server: asyncio.AbstractServer | None
     exit_code: int
 
     def __init__(
@@ -146,8 +147,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Optional[Sequence[str]] = None,
-        envs: Optional[Sequence[str]] = None,
+        args: Sequence[str] | None = None,
+        envs: Sequence[str] | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -190,7 +191,8 @@ class ProxyRunnerContext:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session is not initialized")
         p = WSProxy(
             self.api_session,
             self.session_name,
@@ -235,9 +237,9 @@ class ProxyRunnerContext:
                 port=self.port,
             )
             print_info(
-                'A local proxy to the application "{0}" '.format(self.app_name)
-                + 'provided by the session "{0}" '.format(self.session_name)
-                + "is available at:\n{0}".format(user_url),
+                f'A local proxy to the application "{self.app_name}" '
+                f'provided by the session "{self.session_name}" '
+                f"is available at:\n{user_url}",
             )
             if self.host == "0.0.0.0":
                 print_warn(
@@ -248,16 +250,18 @@ class ProxyRunnerContext:
             await self.api_session.__aexit__(*sys.exc_info())
             raise
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         if self.local_server is not None:
             print_info("Shutting down....")
             self.local_server.close()
             await self.local_server.wait_closed()
-        assert self.api_session is not None
+        if self.api_session is None:
+            raise RuntimeError("API session was not properly initialized")
         await self.api_session.__aexit__(*exc_info)
-        assert self.api_session.closed
+        if not self.api_session.closed:
+            raise RuntimeError("Failed to close API session")
         if self.local_server is not None:
-            print_info('The local proxy to "{}" has terminated.'.format(self.app_name))
+            print_info(f'The local proxy to "{self.app_name}" has terminated.')
         self.local_server = None
 
 
@@ -287,7 +291,7 @@ class ProxyRunnerContext:
     metavar='"ENVNAME=envvalue"',
     help="Add additional environment variable when starting service.",
 )
-def app(session_name, app, bind, arg, env):
+def app(session_name: str, app: str, bind: str, arg: tuple[str, ...], env: tuple[str, ...]) -> None:
     """
     Run a local proxy to a service provided by Backend.AI compute sessions.
 
@@ -298,10 +302,12 @@ def app(session_name, app, bind, arg, env):
     APP: The name of service provided by the given session.
     """
     bind_parts = bind.rsplit(":", maxsplit=1)
+    host: str
+    port: int
     if len(bind_parts) == 1:
         host = "127.0.0.1"
         port = int(bind_parts[0])
-    elif len(bind_parts) == 2:
+    else:
         host = bind_parts[0]
         port = int(bind_parts[1])
     try:
@@ -325,7 +331,7 @@ def app(session_name, app, bind, arg, env):
 @click.argument("session_name", type=str, metavar="NAME", nargs=1)
 @click.argument("app_name", type=str, metavar="APP", nargs=-1)
 @click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
-def apps(session_name, app_name, list_names):
+def apps(session_name: str, app_name: tuple[str, ...], list_names: bool) -> None:
     """
     List available additional arguments and environment variables when starting service.
 
@@ -335,16 +341,16 @@ def apps(session_name, app_name, list_names):
          If none provided, this will print all available services.
     """
 
-    async def print_arguments():
-        apps = []
+    async def print_arguments() -> None:
+        apps: list[dict[str, Any]] = []
         async with AsyncSession() as api_session:
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x["name"] in app_name))
+                apps = list(filter(lambda x: x["name"] in app_name, apps))
         if list_names:
             print_info(
-                "This session provides the following app services: {0}".format(
+                "This session provides the following app services: {}".format(
                     ", ".join(list(map(lambda x: x["name"], apps)))
                 )
             )
@@ -354,14 +360,14 @@ def apps(session_name, app_name, list_names):
             has_envs = "allowed_envs" in service.keys()
 
             if has_arguments or has_envs:
-                print_info("Information for service {0}:".format(service["name"]))
+                print_info("Information for service {}:".format(service["name"]))
                 if has_arguments:
-                    print("\tAvailable arguments: {0}".format(service["allowed_arguments"]))
+                    print("\tAvailable arguments: {}".format(service["allowed_arguments"]))
                 if has_envs:
-                    print("\tAvailable environment variables: {0}".format(service["allowed_envs"]))
+                    print("\tAvailable environment variables: {}".format(service["allowed_envs"]))
             else:
                 print_info(
-                    "Service {0} does not have customizable arguments.".format(service["name"])
+                    "Service {} does not have customizable arguments.".format(service["name"])
                 )
 
     try:

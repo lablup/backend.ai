@@ -1,4 +1,7 @@
-from typing import Callable, Iterable, Mapping, Optional, Self
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable, Mapping
+from typing import Self
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
@@ -33,7 +36,7 @@ class SecurityPolicy:
         cls,
         request_policy_config: list[str],
         response_policy_config: list[str],
-        csp_config: Optional[Mapping[str, Optional[list[str]]]] = None,
+        csp_config: Mapping[str, list[str] | None] | None = None,
     ) -> Self:
         request_policy_map = {
             "reject_metadata_local_link_policy": reject_metadata_local_link_policy,
@@ -50,7 +53,7 @@ class SecurityPolicy:
             for policy_name in response_policy_config:
                 response_policies.append(response_policy_map[policy_name])
         except KeyError as e:
-            raise ValueError(f"Unknown security policy name: {e}")
+            raise ValueError(f"Unknown security policy name: {e}") from e
         if csp_config is not None:
             response_policies.append(csp_policy_builder(csp_config))
         return cls(request_policies, response_policies)
@@ -100,7 +103,7 @@ def add_self_content_security_policy(response: web.StreamResponse) -> web.Stream
     return response
 
 
-def csp_policy_builder(csp_config: Mapping[str, Optional[list[str]]]) -> ResponsePolicy:
+def csp_policy_builder(csp_config: Mapping[str, list[str] | None]) -> ResponsePolicy:
     csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
     csp_str = "; ".join(csp)
     if csp_str:

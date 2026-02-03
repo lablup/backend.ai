@@ -1,6 +1,7 @@
 import importlib.resources
 import logging
 import ssl
+from typing import Any
 
 import aiohttp_jinja2
 import jinja2
@@ -8,21 +9,21 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.worker.config import WildcardDomainConfig
+from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging import BraceStyleAdapter
 
-from ....config import WildcardDomainConfig
-from ....errors import InvalidFrontendTypeError
-from ....types import Circuit, SubdomainFrontendInfo
 from .base import BaseHTTPFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SubdomainFrontend(BaseHTTPFrontend[str]):
     site: web.TCPSite | None
     wildcard_config: WildcardDomainConfig
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.site = None

@@ -1,7 +1,43 @@
 from dataclasses import dataclass
 from typing import Self
 
-from .types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+
+__all__ = [
+    "EntityType",
+    "FieldType",
+    "ScopeType",
+    "FieldRef",
+    "ScopeId",
+    "ObjectId",
+]
+
+
+@dataclass(frozen=True)
+class FieldRef:
+    """
+    Represents a reference to a field within an entity.
+
+    A field is a sub-resource that belongs to a parent entity.
+
+    This class combines both the field type and its identifier to form
+    a complete reference to a specific field instance.
+
+    Attributes:
+        field_type: The type of the field (FieldType enum).
+        field_id: The unique identifier of the field.
+    """
+
+    field_type: FieldType
+    field_id: str
+
+    @classmethod
+    def from_str(cls, val: str) -> Self:
+        field_type, _, field_id = val.partition(":")
+        return cls(field_type=FieldType(field_type), field_id=field_id)
+
+    def to_str(self) -> str:
+        return f"{self.field_type}:{self.field_id}"
 
 
 @dataclass(frozen=True)

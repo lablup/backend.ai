@@ -1,32 +1,30 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import socket
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
-import redis.exceptions
+import glide
 from pydantic import (
     BaseModel,
     Field,
 )
-from sqlalchemy.pool import Pool
 
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..api.context import RootContext
+    from ai.backend.manager.api.context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: tuple[str, ...] = (
-    "SQLAlchemyConnectionInfo",
     "RedisObjectConnectionInfo",
-    "get_sqlalchemy_connection_info",
-    "get_redis_object_info_list",
+    "SQLAlchemyConnectionInfo",
     "_get_connnection_info",
+    "get_redis_object_info_list",
+    "get_sqlalchemy_connection_info",
     "report_manager_status",
 )
 
@@ -66,11 +64,11 @@ class SQLAlchemyConnectionInfo(BaseModel):
 
 class RedisObjectConnectionInfo(BaseModel):
     name: str
-    num_connections: Optional[int] = Field(
+    num_connections: int | None = Field(
         description="The number of connections in Redis Client's connection pool."
     )
     max_connections: int
-    err_msg: Optional[str] = Field(
+    err_msg: str | None = Field(
         description="Error message occurred when fetch connection info from Redis client objects.",
         default=None,
     )
@@ -84,17 +82,16 @@ class ConnectionInfoOfProcess(BaseModel):
 
 
 async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyConnectionInfo:
-    pool = cast(Pool, root_ctx.db.pool)
-    sqlalchemy_info = SQLAlchemyConnectionInfo(
+    pool = root_ctx.db.pool
+    return SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
-        num_checkedout_cxn=pool.checkedout(),
-        num_checkedin_cxn=pool.checkedin(),
+        num_checkedout_cxn=pool.checkedout(),  # type: ignore[attr-defined]
+        num_checkedin_cxn=pool.checkedin(),  # type: ignore[attr-defined]
     )
-    return sqlalchemy_info
 
 
-async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
+async def get_redis_object_info_list(_root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
     log.warning("get_redis_object_info_list is deprecated.")
     return []
 
@@ -134,7 +131,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
                 f"{MANAGER_STATUS_KEY}*",
             ),
         )
-    except (asyncio.TimeoutError, redis.exceptions.ConnectionError):
+    except (TimeoutError, glide.ConnectionError, glide.TimeoutError):
         # Cannot get data from redis. Return process's own info.
         cxn_infos = [(await _get_connnection_info(root_ctx))]
     else:

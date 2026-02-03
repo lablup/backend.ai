@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from dataclasses import dataclass
+from typing import Any, override
 
 from ai.backend.common.types import (
     AccessKey,
@@ -15,6 +15,7 @@ from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
 )
+from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
@@ -22,10 +23,15 @@ from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderRow,
 )
-from ai.backend.manager.types import OptionalState, PartialModifier
-
-from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.services.vfolder.types import (
+    VFolderBaseInfo,
+    VFolderOwnershipInfo,
+    VFolderUsageInfo,
+)
 
 
 class VFolderAction(BaseAction):
@@ -52,6 +58,10 @@ class VFolderSingleEntityAction(BaseSingleEntityAction):
     def entity_type(cls) -> str:
         return "vfolder"
 
+    @override
+    def field_data(self) -> FieldData | None:
+        return None
+
 
 class VFolderSingleEntityActionResult(BaseSingleEntityActionResult):
     pass
@@ -63,9 +73,9 @@ class CreateVFolderAction(VFolderScopeAction):
 
     keypair_resource_policy: Mapping[str, Any]
     domain_name: str
-    group_id_or_name: Optional[str | uuid.UUID]
-    folder_host: Optional[str]
-    unmanaged_path: Optional[str]
+    group_id_or_name: str | uuid.UUID | None
+    folder_host: str | None
+    unmanaged_path: str | None
     mount_permission: VFolderPermission
     usage_mode: VFolderUsageMode
     cloneable: bool
@@ -80,7 +90,7 @@ class CreateVFolderAction(VFolderScopeAction):
     creator_email: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -108,18 +118,18 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
     name: str
     quota_scope_id: QuotaScopeID
     host: str
-    unmanaged_path: Optional[str]
+    unmanaged_path: str | None
     mount_permission: VFolderPermission
     usage_mode: VFolderUsageMode
     creator_email: str
     ownership_type: VFolderOwnershipType
-    user_uuid: Optional[uuid.UUID]
-    group_uuid: Optional[uuid.UUID]
+    user_uuid: uuid.UUID | None
+    group_uuid: uuid.UUID | None
     cloneable: bool
     status: VFolderOperationStatus
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.id)
 
     @override
@@ -132,28 +142,13 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
 
 
 @dataclass
-class VFolderAttributeModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    mount_permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.name.update_dict(to_update, "name")
-        self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "permission")
-        return to_update
-
-
-@dataclass
 class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
-    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
+    updater: Updater[VFolderRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -176,7 +171,7 @@ class UpdateVFolderAttributeActionResult(VFolderSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -190,7 +185,7 @@ class GetVFolderAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -216,7 +211,7 @@ class GetVFolderActionResult(VFolderSingleEntityActionResult):
     usage_info: VFolderUsageInfo
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_uuid)
 
     @override
@@ -231,7 +226,7 @@ class ListVFolderAction(VFolderScopeAction):
     _scope_id: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_uuid)
 
     @override
@@ -261,7 +256,7 @@ class ListVFolderActionResult(VFolderScopeActionResult):
     _scope_id: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_uuid)
 
     @override
@@ -281,7 +276,7 @@ class MoveToTrashVFolderAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -304,7 +299,7 @@ class MoveToTrashVFolderActionResult(VFolderSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -319,7 +314,7 @@ class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -342,7 +337,7 @@ class RestoreVFolderFromTrashActionResult(VFolderSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -357,7 +352,7 @@ class DeleteForeverVFolderAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -380,7 +375,43 @@ class DeleteForeverVFolderActionResult(VFolderSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
+class PurgeVFolderAction(VFolderSingleEntityAction):
+    purger: RBACEntityPurger[VFolderRow]
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.purger.pk_value)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "purge"
+
+    @override
+    @classmethod
+    def permission_operation_type(cls) -> OperationType:
+        return OperationType.HARD_DELETE
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.purger.pk_value)
+
+
+@dataclass
+class PurgeVFolderActionResult(VFolderSingleEntityActionResult):
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -399,7 +430,7 @@ class ForceDeleteVFolderAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -422,7 +453,7 @@ class ForceDeleteVFolderActionResult(VFolderSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -436,13 +467,13 @@ class CloneVFolderAction(VFolderSingleEntityAction):
 
     source_vfolder_uuid: uuid.UUID
     target_name: str
-    target_host: Optional[str]
+    target_host: str | None
     cloneable: bool
     usage_mode: VFolderUsageMode
     mount_permission: VFolderPermission
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.source_vfolder_uuid)
 
     @override
@@ -471,13 +502,13 @@ class CloneVFolderActionResult(VFolderSingleEntityActionResult):
     mount_permission: VFolderPermission
     creator_email: str
     ownership_type: VFolderOwnershipType
-    owner_user_uuid: Optional[uuid.UUID]
-    owner_group_uuid: Optional[uuid.UUID]
+    owner_user_uuid: uuid.UUID | None
+    owner_group_uuid: uuid.UUID | None
     cloneable: bool
     bgtask_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -497,7 +528,7 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
     request: Any
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -522,7 +553,7 @@ class GetTaskLogsActionResult(VFolderSingleEntityActionResult):
     vfolder_data: VFolderData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_data.id)
 
     @override

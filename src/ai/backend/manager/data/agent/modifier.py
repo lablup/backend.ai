@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import override
+from typing import Any, override
 
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.types import OptionalState, PartialModifier
@@ -13,7 +13,7 @@ class AgentStatusModifier(PartialModifier):
     lost_at: OptionalState[datetime] = field(default_factory=lambda: OptionalState.nop())
 
     @override
-    def fields_to_update(self) -> dict:
+    def fields_to_update(self) -> dict[str, Any]:
         to_update = {
             "status": self.status,
             "status_changed": self.status_changed,

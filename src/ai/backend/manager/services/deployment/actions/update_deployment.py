@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Optional, override
-from uuid import UUID
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
@@ -12,12 +12,11 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 class UpdateDeploymentAction(DeploymentBaseAction):
     """Action to update an existing deployment."""
 
-    deployment_id: UUID
-    modifier: NewDeploymentModifier
+    updater: Updater[EndpointRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.deployment_id)
+    def entity_id(self) -> str | None:
+        return str(self.updater.pk_value)
 
     @override
     @classmethod
@@ -30,5 +29,5 @@ class UpdateDeploymentActionResult(BaseActionResult):
     data: ModelDeploymentData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

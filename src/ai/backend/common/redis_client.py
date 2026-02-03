@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, AsyncIterator, Final, Optional, Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Final
 
 import hiredis
 
@@ -30,7 +32,7 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
     _keepalive_options[_TCP_KEEPCNT] = 3
 
 
-class Ellipsis(object):
+class Ellipsis:
     pass
 
 
@@ -56,7 +58,7 @@ class RedisClient(aobject):
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        verbose=False,
+        verbose: bool = False,
     ) -> None:
         self.reader = reader
         self.writer = writer
@@ -97,7 +99,7 @@ class RedisClient(aobject):
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> Any:
         return await self._send(
             commands,
@@ -110,7 +112,7 @@ class RedisClient(aobject):
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> list[Any]:
         """
         Executes a function that issues Redis commands or returns a pipeline/transaction of commands,
@@ -128,7 +130,7 @@ class RedisClient(aobject):
         while True:
             try:
                 hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
-                _blobs = bytes()
+                _blobs = b""
                 for command in commands:
                     request_blob = hiredis.pack_command(tuple(command))  # type: ignore[arg-type]
                     self.writer.write(request_blob)
@@ -143,7 +145,7 @@ class RedisClient(aobject):
                 results = []
                 first_result = ellipsis
 
-                _buf = bytes()
+                _buf = b""
 
                 met_unexpected_eof = False
 
@@ -180,7 +182,7 @@ class RedisClient(aobject):
                     results.append(next_result)
 
                 try:
-                    if not len(results) == len(commands):
+                    if len(results) != len(commands):
                         log.warning("requests: {}", commands)
                         log.warning("responses: {}", results)
                         log.warning("raw request: {}", _blobs)
@@ -196,7 +198,7 @@ class RedisClient(aobject):
                     self._prev_buf = _buf
 
                 if self.verbose:
-                    for request, response in zip(commands, results):
+                    for request, response in zip(commands, results, strict=True):
                         log.debug("{} -> {}", request, response)
 
                 return results
@@ -206,12 +208,12 @@ class RedisClient(aobject):
                 await asyncio.sleep(0)
 
 
-class RedisConnection(AsyncContextManager[RedisClient]):
+class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _redis_target: RedisTarget
     _db: int
 
-    _socket_timeout: Optional[float]
-    _socket_connect_timeout: Optional[float]
+    _socket_timeout: float | None
+    _socket_connect_timeout: float | None
     _keepalive_options: dict[int, int]
 
     def __init__(
@@ -219,8 +221,8 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         redis_target: RedisTarget,
         *,
         db: int = 0,
-        socket_timeout: Optional[float] = 5.0,
-        socket_connect_timeout: Optional[float] = 2.0,
+        socket_timeout: float | None = 5.0,
+        socket_connect_timeout: float | None = 2.0,
         keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
         self._redis_target = redis_target
@@ -235,7 +237,8 @@ class RedisConnection(AsyncContextManager[RedisClient]):
             raise RuntimeError("Redis with sentinel not supported for this library")
 
         redis_url = self._redis_target.addr
-        assert redis_url is not None
+        if redis_url is None:
+            raise ValueError("Redis URL is not configured")
 
         host = str(redis_url[0])
         port = redis_url[1]
@@ -283,5 +286,5 @@ class RedisConnection(AsyncContextManager[RedisClient]):
                     pass  # there's no more room we can do anything
                 raise e
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         return await self.disconnect()

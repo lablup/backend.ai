@@ -4,13 +4,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import (
-    Any,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-)
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -21,22 +15,20 @@ from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ...errors import (
+from ai.backend.storage.errors import (
     InvalidQuotaFormatError,
     InvalidQuotaScopeError,
     QuotaDirectoryNotEmptyError,
     QuotaTreeNotFoundError,
 )
-from ...subproc import run
-from ...types import (
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ...volumes.abc import CAP_QUOTA, CAP_VFOLDER
-from ...watcher import WatcherClient
-from ..abc import AbstractQuotaModel
-from ..vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -47,14 +39,14 @@ class XfsProjectRegistry:
     file_projects: Path = Path("/etc/projects")
     file_projid: Path = Path("/etc/projid")
     backend: BaseVolume
-    name_id_map: Dict[str, int] = dict()
-    project_id_pool: List[int] = list()
+    name_id_map: dict[str, int] = dict()
+    project_id_pool: list[int] = list()
 
     async def init(self, backend: BaseVolume) -> None:
         self.backend = backend
 
-    async def read_project_info(self):
-        def _read_projid_file():
+    async def read_project_info(self) -> None:
+        def _read_projid_file() -> str:
             return self.file_projid.read_text()
 
         # TODO: how to handle if /etc/proj* files are deleted by external reason?
@@ -79,7 +71,7 @@ class XfsProjectRegistry:
         quota_scope_id: QuotaScopeID,
         qspath: Path,
         *,
-        project_id: Optional[int] = None,
+        project_id: int | None = None,
     ) -> None:
         if project_id is None:
             project_id = self.get_free_project_id()
@@ -87,7 +79,7 @@ class XfsProjectRegistry:
         temp_name_projects = ""
         temp_name_projid = ""
 
-        def _create_temp_files():
+        def _create_temp_files() -> None:
             nonlocal temp_name_projects, temp_name_projid
             _tmp_projects = NamedTemporaryFile(delete=False)
             _tmp_projid = NamedTemporaryFile(delete=False)
@@ -111,13 +103,13 @@ class XfsProjectRegistry:
                 _tmp_projects.close()
                 _tmp_projid.close()
 
-        def _delete_temp_files():
+        def _delete_temp_files() -> None:
             try:
-                os.unlink(temp_name_projects)
+                Path(temp_name_projects).unlink()
             except FileNotFoundError:
                 pass
             try:
-                os.unlink(temp_name_projid)
+                Path(temp_name_projid).unlink()
             except FileNotFoundError:
                 pass
 
@@ -169,8 +161,8 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
@@ -188,7 +180,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 await self.project_registry.read_project_info()
                 await self.project_registry.add_project_entry(quota_scope_id, qspath)
                 await self.project_registry.read_project_info()
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             log.exception("quota-scope creation timeout")
             raise
         except Exception:
@@ -200,7 +192,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
         full_report = await run(
@@ -209,6 +201,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             # -N: without header
             ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
         )
+        report = ""
         for line in full_report.splitlines():
             if quota_scope_id.pathname in line:
                 report = line
@@ -307,8 +300,8 @@ class XfsVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,
@@ -344,5 +337,5 @@ class XfsVolume(BaseVolume):
             self._lock_path,
         )
 
-    async def get_capabilities(self) -> FrozenSet[str]:
+    async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

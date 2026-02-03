@@ -6,41 +6,54 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-
-from .types import NotificationChannelType, NotificationRuleType
+from ai.backend.common.data.notification.types import (
+    EmailMessage,
+    NotificationChannelType,
+    NotificationRuleType,
+    SMTPAuth,
+    SMTPConnection,
+)
 
 __all__ = (
-    "WebhookConfigResponse",
+    "CreateNotificationChannelResponse",
+    "CreateNotificationRuleResponse",
+    "DeleteNotificationChannelResponse",
+    "DeleteNotificationRuleResponse",
+    "GetNotificationChannelResponse",
+    "GetNotificationRuleResponse",
+    "ListNotificationChannelsResponse",
+    "ListNotificationRuleTypesResponse",
+    "ListNotificationRulesResponse",
     "NotificationChannelDTO",
     "NotificationRuleDTO",
-    "CreateNotificationChannelResponse",
-    "UpdateNotificationChannelResponse",
-    "DeleteNotificationChannelResponse",
-    "GetNotificationChannelResponse",
-    "ListNotificationChannelsResponse",
-    "CreateNotificationRuleResponse",
-    "UpdateNotificationRuleResponse",
-    "DeleteNotificationRuleResponse",
-    "GetNotificationRuleResponse",
-    "ListNotificationRulesResponse",
-    "ListNotificationRuleTypesResponse",
     "NotificationRuleTypeSchemaResponse",
+    "PaginationInfo",
+    "UpdateNotificationChannelResponse",
+    "UpdateNotificationRuleResponse",
     "ValidateNotificationChannelResponse",
     "ValidateNotificationRuleResponse",
-    "PaginationInfo",
+    "WebhookSpecResponse",
 )
 
 
-class WebhookConfigResponse(BaseResponseModel):
-    """Response model for webhook configuration."""
+class WebhookSpecResponse(BaseResponseModel):
+    """Response model for webhook specification."""
 
     url: str = Field(description="Webhook URL")
+
+
+class EmailSpecResponse(BaseResponseModel):
+    """Response model for email specification."""
+
+    smtp: SMTPConnection = Field(description="SMTP connection settings")
+    message: EmailMessage = Field(description="Email message settings")
+    auth: SMTPAuth | None = Field(default=None, description="SMTP authentication credentials")
 
 
 class NotificationChannelDTO(BaseModel):
@@ -48,9 +61,9 @@ class NotificationChannelDTO(BaseModel):
 
     id: UUID = Field(description="Channel ID")
     name: str = Field(description="Channel name")
-    description: Optional[str] = Field(default=None, description="Channel description")
+    description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: WebhookConfigResponse = Field(description="Channel configuration")
+    spec: WebhookSpecResponse | EmailSpecResponse = Field(description="Channel configuration")
     enabled: bool = Field(description="Whether the channel is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the channel")
@@ -62,7 +75,7 @@ class NotificationRuleDTO(BaseModel):
 
     id: UUID = Field(description="Rule ID")
     name: str = Field(description="Rule name")
-    description: Optional[str] = Field(default=None, description="Rule description")
+    description: str | None = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
     channel: NotificationChannelDTO = Field(description="Associated channel")
     message_template: str = Field(description="Jinja2 template for notification message")
@@ -101,7 +114,7 @@ class PaginationInfo(BaseModel):
 
     total: int = Field(description="Total number of items")
     offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
+    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class ListNotificationChannelsResponse(BaseResponseModel):

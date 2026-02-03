@@ -24,7 +24,7 @@ def upgrade() -> None:
 
     op.create_table(
         "object_storage_namespace",
-        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),  # noqa: F821
+        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("storage_id", GUID(), nullable=False),
         sa.Column("bucket", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_object_storage_namespace")),

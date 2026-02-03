@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import ContainerId, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 
 from .types import KernelLifecycleEventReason
 
@@ -19,7 +22,7 @@ class BaseKernelEvent(AbstractAnycastEvent):
         return EventDomain.KERNEL
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.kernel_id)
 
 
@@ -29,7 +32,7 @@ class KernelLifecycleEvent(BaseKernelEvent):
     reason: str = ""
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -38,7 +41,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
     creation_info: Mapping[str, Any] = field(default_factory=dict)
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -48,7 +51,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -57,7 +60,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -94,7 +97,7 @@ class KernelStartedAnycastEvent(KernelCreationEvent):
 
 class KernelCancelledAnycastEvent(KernelLifecycleEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -103,7 +106,7 @@ class KernelCancelledAnycastEvent(KernelLifecycleEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -123,7 +126,7 @@ class KernelTerminationEvent(BaseKernelEvent):
     exit_code: int = -1
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             str(self.session_id),
@@ -133,7 +136,7 @@ class KernelTerminationEvent(BaseKernelEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
@@ -142,11 +145,11 @@ class KernelTerminationEvent(BaseKernelEvent):
         )
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -168,52 +171,23 @@ class KernelTerminatedAnycastEvent(KernelTerminationEvent):
 class DoSyncKernelLogsEvent(BaseKernelEvent):
     container_id: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
             self.container_id,
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
     def event_name(cls) -> str:
         return "do_sync_kernel_logs"
-
-
-@dataclass
-class KernelHeartbeatEvent(BaseKernelEvent):
-    container_id: ContainerId
-
-    @override
-    def serialize(self) -> tuple:
-        return (
-            str(self.kernel_id),
-            str(self.container_id),
-        )
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_id=KernelId(uuid.UUID(value[0])),
-            container_id=ContainerId(str(value[1])),
-        )
-
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "kernel_heartbeat"
-
-    @override
-    def user_event(self) -> Optional[UserEvent]:
-        return None

@@ -7,7 +7,7 @@ import time
 import warnings
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Any, Protocol
 
 import aiohttp
 from aiotools import cancel_and_wait
@@ -27,8 +27,8 @@ def tcp_client_session_factory(
     ssl: bool = True,
     limit: int = 100,
     limit_per_host: int = 0,
-    timeout: Optional[aiohttp.ClientTimeout] = None,
-    **kwargs,
+    timeout: aiohttp.ClientTimeout | None = None,
+    **kwargs: Any,
 ) -> aiohttp.ClientSession:
     """
     The default TCP-based ClientSession factory.
@@ -65,7 +65,7 @@ class ClientKey:
     domain: str
     """An arbitrary string reprenting the usage scope."""
 
-    access_key: Optional[str] = None
+    access_key: str | None = None
     """An optional identifier to associate with the API request context."""
 
 

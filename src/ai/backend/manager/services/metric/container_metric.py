@@ -1,7 +1,6 @@
 import logging
 from typing import (
     Any,
-    Optional,
 )
 
 import aiohttp
@@ -43,17 +42,17 @@ class MetricResponseInfo(BaseModel):
     model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
     value_type: str
-    name: Optional[str] = Field(
+    name: str | None = Field(
         default=None, validation_alias="__name__"
     )  # "backendai_container_utilization"
-    agent_id: Optional[str] = Field(default=None)
-    container_metric_name: Optional[str] = Field(default=None)
-    instance: Optional[str] = Field(default=None)
-    job: Optional[str] = Field(default=None)
-    kernel_id: Optional[str] = Field(default=None)
-    owner_project_id: Optional[str] = Field(default=None)
-    owner_user_id: Optional[str] = Field(default=None)
-    session_id: Optional[str] = Field(default=None)
+    agent_id: str | None = Field(default=None)
+    container_metric_name: str | None = Field(default=None)
+    instance: str | None = Field(default=None)
+    job: str | None = Field(default=None)
+    kernel_id: str | None = Field(default=None)
+    owner_project_id: str | None = Field(default=None)
+    owner_user_id: str | None = Field(default=None)
+    session_id: str | None = Field(default=None)
 
     def to_response_info(self) -> ContainerMetricResponseInfo:
         return ContainerMetricResponseInfo(
@@ -90,7 +89,7 @@ class ContainerUtilizationMetricService:
 
     @property
     def _range_vector_timewindow(self) -> str:
-        # 1m by default
+        # 5m by default
         return self._config_provider.config.metric.timewindow
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
@@ -104,7 +103,7 @@ class ContainerUtilizationMetricService:
 
     async def query_metadata(
         self,
-        action: ContainerMetricMetadataAction,
+        _action: ContainerMetricMetadataAction,
     ) -> ContainerMetricMetadataActionResult:
         result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
         return ContainerMetricMetadataActionResult(result.data)

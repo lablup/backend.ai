@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, final
+from typing import final
 
 from ai.backend.manager.api.gql.base import decode_cursor
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     CursorBackwardPagination,
     CursorConditionFactory,
     CursorForwardPagination,
     OffsetPagination,
-    Querier,
     QueryCondition,
     QueryOrder,
     QueryPagination,
@@ -27,12 +27,12 @@ DEFAULT_PAGINATION_LIMIT = 10
 class PaginationOptions:
     """GraphQL pagination arguments."""
 
-    first: Optional[int] = None
-    after: Optional[str] = None
-    last: Optional[int] = None
-    before: Optional[str] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ class BaseGQLAdapter:
                 cursor_order=spec.forward_order,
                 cursor_condition=cursor_condition,
             )
-        elif options.last is not None:
+        if options.last is not None:
             if options.last <= 0:
                 raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
             cursor_condition = None
@@ -117,7 +117,7 @@ class BaseGQLAdapter:
                 cursor_order=spec.backward_order,
                 cursor_condition=cursor_condition,
             )
-        elif options.limit is not None:
+        if options.limit is not None:
             if options.limit <= 0:
                 raise InvalidGraphQLParameters(f"limit must be positive, got {options.limit}")
             if options.offset is not None and options.offset < 0:
@@ -132,19 +132,21 @@ class BaseGQLAdapter:
         self,
         pagination_options: PaginationOptions,
         pagination_spec: PaginationSpec,
-        filter: Optional[GQLFilter] = None,
-        order_by: Optional[Sequence[GQLOrderBy]] = None,
-    ) -> Querier:
-        """Build Querier from GraphQL arguments with domain configuration.
+        filter: GQLFilter | None = None,
+        order_by: Sequence[GQLOrderBy] | None = None,
+        base_conditions: Sequence[QueryCondition] | None = None,
+    ) -> BatchQuerier:
+        """Build BatchQuerier from GraphQL arguments with domain configuration.
 
         Args:
             pagination_options: Pagination parameters (first/after/last/before/limit/offset)
             pagination_spec: Domain-specific pagination specification (orders, condition factories)
             filter: Optional filter with build_conditions() method
             order_by: Optional sequence of order specifications with to_query_order() method
+            base_conditions: Optional base conditions to prepend (e.g., deployment_id filter)
 
         Returns:
-            A Querier instance with conditions, orders, and pagination configured.
+            A BatchQuerier instance with conditions, orders, and pagination configured.
 
         Raises:
             InvalidGraphQLParameters: If order_by is used with cursor pagination.
@@ -161,6 +163,10 @@ class BaseGQLAdapter:
         conditions: list[QueryCondition] = []
         orders: list[QueryOrder] = []
 
+        # Prepend base conditions first (e.g., deployment_id filter)
+        if base_conditions:
+            conditions.extend(base_conditions)
+
         if filter:
             conditions.extend(filter.build_conditions())
 
@@ -176,4 +182,4 @@ class BaseGQLAdapter:
             spec=pagination_spec,
         )
 
-        return Querier(conditions=conditions, orders=orders, pagination=pagination)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)

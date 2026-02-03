@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self
+from typing import Any, Self
 
 from sqlalchemy.engine.row import Row
 
@@ -34,7 +34,7 @@ class DomainData:
         return f"{ROLE_NAME_PREFIX}domain_{self.name}{role_type}"
 
     @classmethod
-    def from_row(cls, domain_row: Row) -> Self:
+    def from_row(cls, domain_row: Row[Any]) -> Self:
         return cls(name=domain_row.name)
 
 

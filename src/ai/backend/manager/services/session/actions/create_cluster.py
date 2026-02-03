@@ -1,6 +1,7 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
@@ -23,11 +24,11 @@ class CreateClusterAction(SessionAction):
     owner_access_key: AccessKey
     tag: str
     enqueue_only: bool
-    keypair_resource_policy: Optional[dict]
+    keypair_resource_policy: dict[str, Any] | None
     max_wait_seconds: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
@@ -45,5 +46,5 @@ class CreateClusterActionResult(BaseActionResult):
     result: Mapping[str, Any]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_id)

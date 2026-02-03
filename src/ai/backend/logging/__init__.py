@@ -10,12 +10,12 @@ __version__ = (Path(__file__).parent / "VERSION").read_text().strip()
 
 __all__ = (
     "AbstractLogger",
-    "Logger",
-    "LocalLogger",
-    "NoopLogger",
     "BraceStyleAdapter",
-    "is_active",
     "ConfigurationError",
+    "LocalLogger",
     "LogFormat",
     "LogLevel",
+    "Logger",
+    "NoopLogger",
+    "is_active",
 )

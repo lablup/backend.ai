@@ -3,15 +3,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
     Any,
-    Optional,
     override,
 )
 
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.services.vfolder.types import FileInfo
 
-from ..types import FileInfo
 from .base import VFolderAction
 
 
@@ -26,7 +25,7 @@ class CreateUploadSessionAction(VFolderAction):
     size: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -43,7 +42,7 @@ class CreateUploadSessionActionResult(BaseActionResult):
     url: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -58,7 +57,7 @@ class CreateDownloadSessionAction(VFolderAction):
     archive: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -75,7 +74,7 @@ class CreateDownloadSessionActionResult(BaseActionResult):
     url: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -87,7 +86,7 @@ class ListFilesAction(VFolderAction):
     path: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -102,7 +101,7 @@ class ListFilesActionResult(BaseActionResult):
     files: list[FileInfo]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -117,7 +116,7 @@ class RenameFileAction(VFolderAction):
     new_name: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -131,7 +130,7 @@ class RenameFileActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -144,7 +143,7 @@ class DeleteFilesAction(VFolderAction):
     recursive: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -158,7 +157,7 @@ class DeleteFilesActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -171,7 +170,7 @@ class DeleteFilesAsyncAction(VFolderAction):
     recursive: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -186,7 +185,7 @@ class DeleteFilesAsyncActionResult(BaseActionResult):
     task_id: TaskID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -200,7 +199,7 @@ class MkdirAction(VFolderAction):
     exist_ok: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
@@ -216,5 +215,5 @@ class MkdirActionResult(BaseActionResult):
     storage_resp_status: int
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -7,15 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import AccessKey
 
-from .models import (
-    UserRole,
-    domains,
-    groups,
-    keypair_resource_policies,
-    keypairs,
-    users,
-)
-from .models import association_groups_users as agus
+from .models.domain import domains
+from .models.group import association_groups_users as agus
+from .models.group import groups
+from .models.keypair import keypairs
+from .models.resource_policy import keypair_resource_policies
+from .models.user import UserRole, users
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(
@@ -51,7 +48,7 @@ async def check_if_requester_is_eligible_to_act_as_target_access_key(
     target_access_key: AccessKey,
 ) -> bool:
     query = (
-        sa.select([users.c.domain_name, users.c.role])
+        sa.select(users.c.domain_name, users.c.role)
         .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
         .where(keypairs.c.access_key == target_access_key)
     )
@@ -59,8 +56,8 @@ async def check_if_requester_is_eligible_to_act_as_target_access_key(
     row = result.first()
     if row is None:
         raise ValueError("Unknown owner access key")
-    owner_domain = row["domain_name"]
-    owner_role = row["role"]
+    owner_domain = row.domain_name
+    owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
         requester_role,
         requester_domain,
@@ -76,7 +73,7 @@ async def check_if_requester_is_eligible_to_act_as_target_user_uuid(
     target_user_uuid: UUID,
 ) -> bool:
     query = (
-        sa.select([users.c.domain_name, users.c.role])
+        sa.select(users.c.domain_name, users.c.role)
         .select_from(users)
         .where(users.c.uuid == target_user_uuid)
     )
@@ -84,8 +81,8 @@ async def check_if_requester_is_eligible_to_act_as_target_user_uuid(
     row = result.first()
     if row is None:
         raise ValueError("Unknown owner access key")
-    owner_domain = row["domain_name"]
-    owner_role = row["role"]
+    owner_domain = row.domain_name
+    owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
         requester_role,
         requester_domain,
@@ -100,11 +97,11 @@ async def query_userinfo(
     requester_access_key: AccessKey,
     requester_role: UserRole,
     requester_domain: str,
-    keypair_resource_policy: dict | None,
+    keypair_resource_policy: dict[str, Any] | None,
     requesting_domain: str,
     requesting_group: str | UUID,
-    query_on_behalf_of: Optional[AccessKey] = None,
-) -> tuple[UUID, UUID, dict]:
+    query_on_behalf_of: AccessKey | None = None,
+) -> tuple[UUID, UUID, dict[str, Any]]:
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
         await check_if_requester_is_eligible_to_act_as_target_access_key(
             conn,
@@ -124,36 +121,39 @@ async def query_userinfo(
         # Admin or superadmin is creating sessions for another user.
         # The check for admin privileges is already done in get_access_key_scope().
         query = (
-            sa.select([
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.resource_policy,
                 users.c.role,
                 users.c.domain_name,
-            ])
+            )
             .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
             .where(keypairs.c.access_key == owner_access_key)
         )
         result = await conn.execute(query)
         row = result.first()
-        owner_domain = row["domain_name"]
-        owner_uuid = row["user"]
-        owner_role = row["role"]
+        if row is None:
+            raise ValueError("Unknown owner access key")
+        owner_domain = row.domain_name
+        owner_uuid = row.user
+        owner_role = row.role
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == row["resource_policy"])
+            .where(keypair_resource_policies.c.name == row.resource_policy)
         )
         result = await conn.execute(query)
-        resource_policy = result.first()
+        _resource_policy = result.first()
+        resource_policy = dict(_resource_policy._mapping) if _resource_policy else {}
     else:
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = keypair_resource_policy
+        resource_policy = keypair_resource_policy or {}
 
     query = (
-        sa.select([domains.c.name])
+        sa.select(domains.c.name)
         .select_from(domains)
         .where(
             (domains.c.name == owner_domain) & (domains.c.is_active),
@@ -171,7 +171,7 @@ async def query_userinfo(
     if owner_role == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
         query = (
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(
                 (groups.c.domain_name == requesting_domain)
@@ -186,7 +186,7 @@ async def query_userinfo(
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
         query = (
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(
                 (groups.c.domain_name == owner_domain) & (group_match_query) & (groups.c.is_active),
@@ -199,7 +199,7 @@ async def query_userinfo(
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to your domain.")
         query = (
-            sa.select([agus.c.group_id])
+            sa.select(agus.c.group_id)
             .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
             .where(
                 (agus.c.user_id == owner_uuid)
@@ -222,16 +222,16 @@ async def query_userinfo_from_session(
     requester_access_key: AccessKey,
     requester_role: UserRole,
     requester_domain: str,
-    keypair_resource_policy: dict | None,
+    keypair_resource_policy: dict[str, Any] | None,
     requesting_domain: str,
     requesting_group: str | UUID,
-    query_on_behalf_of: Optional[AccessKey] = None,
-) -> tuple[UUID, UUID, dict]:
+    query_on_behalf_of: AccessKey | None = None,
+) -> tuple[UUID, UUID, dict[str, Any]]:
     """Version of query_userinfo that accepts SASession instead of SAConnection."""
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
         # Need to check privileges - convert session operations
         query = (
-            sa.select([users.c.domain_name, users.c.role])
+            sa.select(users.c.domain_name, users.c.role)
             .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
             .where(keypairs.c.access_key == query_on_behalf_of)
         )
@@ -239,8 +239,8 @@ async def query_userinfo_from_session(
         row = result.first()
         if row is None:
             raise ValueError("Unknown owner access key")
-        owner_domain = row["domain_name"]
-        owner_role = row["role"]
+        owner_domain = row.domain_name
+        owner_role = row.role
         check_if_requester_is_eligible_to_act_as_target_user(
             requester_role,
             requester_domain,
@@ -259,36 +259,39 @@ async def query_userinfo_from_session(
         # Admin or superadmin is creating sessions for another user.
         # The check for admin privileges is already done in get_access_key_scope().
         query = (
-            sa.select([
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.resource_policy,
                 users.c.role,
                 users.c.domain_name,
-            ])
+            )
             .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
             .where(keypairs.c.access_key == owner_access_key)
         )
         result = await db_sess.execute(query)
         row = result.first()
-        owner_domain = row["domain_name"]
-        owner_uuid = row["user"]
-        owner_role = row["role"]
+        if row is None:
+            raise ValueError("Unknown owner access key")
+        owner_domain = row.domain_name
+        owner_uuid = row.user
+        owner_role = row.role
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == row["resource_policy"])
+            .where(keypair_resource_policies.c.name == row.resource_policy)
         )
         result = await db_sess.execute(query)
-        resource_policy = result.first()
+        _resource_policy = result.first()
+        resource_policy = dict(_resource_policy._mapping) if _resource_policy else {}
     else:
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = keypair_resource_policy
+        resource_policy = keypair_resource_policy or {}
 
     query = (
-        sa.select([domains.c.name])
+        sa.select(domains.c.name)
         .select_from(domains)
         .where(
             (domains.c.name == owner_domain) & (domains.c.is_active),
@@ -306,7 +309,7 @@ async def query_userinfo_from_session(
     if owner_role == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
         query = (
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(
                 (groups.c.domain_name == requesting_domain)
@@ -321,7 +324,7 @@ async def query_userinfo_from_session(
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
         query = (
-            sa.select([groups.c.id])
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(
                 (groups.c.domain_name == owner_domain) & (group_match_query) & (groups.c.is_active),
@@ -334,7 +337,7 @@ async def query_userinfo_from_session(
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to your domain.")
         query = (
-            sa.select([agus.c.group_id])
+            sa.select(agus.c.group_id)
             .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
             .where(
                 (agus.c.user_id == owner_uuid)

@@ -4,17 +4,13 @@ import asyncio
 import copy
 import logging
 from abc import ABCMeta, abstractmethod
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
     Final,
-    Mapping,
-    Optional,
-    Sequence,
     cast,
 )
 
@@ -24,7 +20,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import (
     ImageRef,
     arch_name_aliases,
@@ -40,23 +36,26 @@ from ai.backend.common.json import read_json
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.data.image.types import (
+    ImageData,
+    ImageStatus,
+    ImageType,
+    RescanImagesResult,
+)
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
-
-from ..data.image.types import ImageStatus, ImageType
-from ..exceptions import ScanImageError, ScanTagError
-from ..models.image import ImageIdentifier, ImageRow
-from ..models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.exceptions import ScanImageError, ScanTagError
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
-progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
+progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
 )
-all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
+all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
 
 if TYPE_CHECKING:
-    from ..models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -65,8 +64,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
     max_concurrency_per_registry: int
-    base_hdrs: Dict[str, str]
-    credentials: Dict[str, str]
+    base_hdrs: dict[str, str]
+    credentials: dict[str, str]
     ssl_verify: bool
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
@@ -142,7 +141,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     try:
                         await fut
                     except Exception as e:
-                        errors.append(f"Failed to scan image! Detail: {str(e)}")
+                        errors.append(f"Failed to scan image! Detail: {e!s}")
 
             scanned_images = await self.commit_rescan_result()
             return RescanImagesResult(images=scanned_images, errors=errors)
@@ -266,7 +265,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         )
         rqst_args["headers"].update(**self.base_hdrs)
         tags = []
-        tag_list_url: Optional[yarl.URL]
+        tag_list_url: yarl.URL | None
         tag_list_url = (self.registry_url / f"v2/{image}/tags/list").with_query(
             {"n": "10"},
         )
@@ -444,7 +443,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_oci_index(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -463,7 +462,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_oci_manifest(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -509,7 +508,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if architecture:
             architecture = arch_name_aliases.get(architecture, architecture)
         else:
-            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+            if tag.endswith(("-arm64", "-aarch64")):
                 architecture = "aarch64"
             else:
                 architecture = "x86_64"
@@ -525,7 +524,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v2_multiplatform_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -546,7 +545,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v2_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -574,7 +573,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def _process_docker_v1_image(
         self,
-        tg: aiotools.TaskGroup,
+        _tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
@@ -606,9 +605,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if _accels_str := labels.get("ai.backend.accelerators"):
             accels |= set(_accels_str.split(","))
         for key in labels.keys():
-            if key.startswith("ai.backend.resource.min") or key.startswith(
-                "ai.backend.resource.max"
-            ):
+            if key.startswith(("ai.backend.resource.min", "ai.backend.resource.max")):
                 accel = key.split(
                     "."
                 )[
@@ -623,8 +620,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         image: str,
         tag: str,
-        manifests: dict[str, dict],
-        skip_reason: Optional[str] = None,
+        manifests: dict[str, dict[str, Any]],
+        skip_reason: str | None = None,
     ) -> None:
         """
         Detects if image is compatible with Backend.AI and injects the matadata to database if it complies.

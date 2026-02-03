@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -14,8 +15,8 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
-from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 
 from .session import Session
 
@@ -72,17 +73,17 @@ class SchedulingBroadcastEventPayload:
             reason=event.reason,
         )
 
-    @strawberry.field(
+    @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
-    async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, self._session_id, is_target_graphene_object=True
         )
         return Session(id=strawberry.ID(session_global_id))
 
 
-@strawberry.subscription(
+@strawberry.subscription(  # type: ignore[misc]
     description="Subscribe to real-time scheduling events for a specific session. "
     "Streams status transition events during the session lifecycle "
     "(PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). "

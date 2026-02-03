@@ -4,9 +4,8 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.pretty import print_error, print_fail, print_pretty
 
-from ...session import Session
-from ..pretty import print_error, print_fail, print_pretty
 from . import admin
 
 
@@ -23,12 +22,14 @@ def etcd() -> None:
 @click.option(
     "-p", "--prefix", is_flag=True, default=False, help="Get all keys prefixed with the given key."
 )
-def get(key, prefix):
+def get(key: str, prefix: bool) -> None:
     """
     Get a ETCD value(s).
 
     KEY: Name of ETCD key.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.EtcdConfig.get(key, prefix)
@@ -42,13 +43,15 @@ def get(key, prefix):
 @etcd.command()
 @click.argument("key", type=str, metavar="KEY")
 @click.argument("value", type=str, metavar="VALUE")
-def set(key, value):
+def set(key: str, value: str) -> None:
     """
     Set new key and value on ETCD.
 
     KEY: Name of ETCD key.
     VALUE: Value to set.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             value = json.loads(value)
@@ -75,12 +78,14 @@ def set(key, value):
     default=False,
     help="Delete all keys prefixed with the given key.",
 )
-def delete(key, prefix):
+def delete(key: str, prefix: bool) -> None:
     """
     Delete key(s) from ETCD.
 
     KEY: Name of ETCD key.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             data = session.EtcdConfig.delete(key, prefix)

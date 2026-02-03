@@ -7,7 +7,7 @@ Create Date: 2022-12-05 16:12:53.275671
 """
 
 from collections import defaultdict
-from typing import Any, Mapping, Sequence
+from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -39,7 +39,7 @@ Base = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
@@ -143,7 +143,7 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
@@ -152,7 +152,7 @@ def upgrade() -> None:
         )
         creation_id = sa.Column("creation_id", sa.String(length=32), unique=False)
         name = sa.Column("name", sa.String(length=64), unique=False)
-        session_type = sa.Column(
+        session_type: sa.Column[str] = sa.Column(
             "session_type",
             pgsql.ENUM("INTERACTIVE", "BATCH", name="sessiontypes", create_type=False),
             server_default="INTERACTIVE",
@@ -165,15 +165,15 @@ def upgrade() -> None:
 
         # Resource ownership
         scaling_group_name = sa.Column("scaling_group_name", sa.String(length=64), nullable=True)
-        target_sgroup_names = sa.Column(
+        target_sgroup_names: sa.Column[list[str] | None] = sa.Column(
             "target_sgroup_names",
             sa.ARRAY(sa.String(length=64)),
             server_default="{}",
             nullable=True,
         )
         domain_name = sa.Column("domain_name", sa.String(length=64), nullable=False)
-        group_id = sa.Column("group_id", GUID(), nullable=False)
-        user_uuid = sa.Column("user_uuid", GUID(), nullable=False)
+        group_id: sa.Column[GUID[UUID]] = sa.Column("group_id", GUID(), nullable=False)
+        user_uuid: sa.Column[GUID[UUID]] = sa.Column("user_uuid", GUID(), nullable=False)
         access_key = sa.Column("access_key", sa.String(length=20), nullable=True)
         # kp_resource_policy = sa.Column(
         #     'kp_resource_policy', sa.String(length=256), nullable=False)
@@ -191,7 +191,7 @@ def upgrade() -> None:
         resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
         environ = sa.Column("environ", pgsql.JSONB(), nullable=True)
         bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
-        use_host_network = sa.Column(
+        use_host_network: sa.Column[bool] = sa.Column(
             "use_host_network", sa.Boolean(), default=False, nullable=False
         )
 
@@ -202,7 +202,7 @@ def upgrade() -> None:
         )
         terminated_at = sa.Column("terminated_at", sa.DateTime(timezone=True), nullable=True)
         starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True)
-        status = sa.Column(
+        status: sa.Column[str] = sa.Column(
             "status",
             pgsql.ENUM(
                 *session_status,
@@ -221,7 +221,7 @@ def upgrade() -> None:
         callback_url = sa.Column("callback_url", sa.types.UnicodeText(), nullable=True)
 
         startup_command = sa.Column("startup_command", sa.Text(), nullable=True)
-        result = sa.Column(
+        result: sa.Column[str] = sa.Column(
             "result",
             pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults", create_type=True),
             server_default="UNDEFINED",
@@ -279,107 +279,107 @@ def upgrade() -> None:
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
 
-    def migrate_kernel_to_session(kernel_query: sa.sql.Select, is_single_kernel: bool) -> None:
+    def migrate_kernel_to_session(kernel_query: sa.sql.Select[Any], is_single_kernel: bool) -> None:
         session_map: dict[UUID, dict[str, Any]] = {}
         main_kernel_rows: dict[UUID, dict[str, Any]] = {}
         single_kernel_ids: dict[UUID, UUID] = {}
-        kernel_rows: Sequence[Mapping[str, Any]] = connection.execute(kernel_query).fetchall()
+        kernel_rows = connection.execute(kernel_query).fetchall()
 
-        def _map_session(session_id: UUID, kernel_row: Mapping[str, Any]) -> dict[str, Any]:
+        def _map_session(session_id: UUID, kernel_row: Any) -> dict[str, Any]:
             return {
                 "id": session_id,
-                "creation_id": kernel_row["session_creation_id"],
-                "name": kernel_row["session_name"],
-                "session_type": kernel_row["session_type"],
-                "cluster_mode": kernel_row["cluster_mode"],
-                "cluster_size": kernel_row["cluster_size"],
-                "scaling_group_name": kernel_row["scaling_group"],
-                "domain_name": kernel_row["domain_name"],
-                "group_id": kernel_row["group_id"],
-                "user_uuid": kernel_row["user_uuid"],
-                "access_key": kernel_row["access_key"],
-                # "image_id": img_map[row["image"]],
-                # "image": row["image"],
-                "tag": kernel_row["tag"],
-                "occupying_slots": kernel_row["occupied_slots"],
-                "requested_slots": kernel_row["occupied_slots"],
-                "vfolder_mounts": kernel_row["vfolder_mounts"],
-                "resource_opts": kernel_row["resource_opts"],
-                "bootstrap_script": kernel_row["bootstrap_script"],
-                "use_host_network": kernel_row["use_host_network"],
-                "created_at": kernel_row["created_at"],
-                "terminated_at": kernel_row["terminated_at"],
-                "starts_at": kernel_row["starts_at"],
-                "status": kernel_row["status"],
-                # "status_changed": row["status_changed"],
-                "status_history": kernel_row["status_history"],
-                "status_info": kernel_row["status_info"],
-                "status_data": kernel_row["status_data"],
-                "callback_url": kernel_row["callback_url"],
-                "startup_command": kernel_row["startup_command"],
-                "result": kernel_row["result"],
-                "num_queries": kernel_row["num_queries"],
-                "last_stat": kernel_row["last_stat"],
+                "creation_id": kernel_row.session_creation_id,
+                "name": kernel_row.session_name,
+                "session_type": kernel_row.session_type,
+                "cluster_mode": kernel_row.cluster_mode,
+                "cluster_size": kernel_row.cluster_size,
+                "scaling_group_name": kernel_row.scaling_group,
+                "domain_name": kernel_row.domain_name,
+                "group_id": kernel_row.group_id,
+                "user_uuid": kernel_row.user_uuid,
+                "access_key": kernel_row.access_key,
+                # "image_id": img_map[row.image],
+                # "image": row.image,
+                "tag": kernel_row.tag,
+                "occupying_slots": kernel_row.occupied_slots,
+                "requested_slots": kernel_row.occupied_slots,
+                "vfolder_mounts": kernel_row.vfolder_mounts,
+                "resource_opts": kernel_row.resource_opts,
+                "bootstrap_script": kernel_row.bootstrap_script,
+                "use_host_network": kernel_row.use_host_network,
+                "created_at": kernel_row.created_at,
+                "terminated_at": kernel_row.terminated_at,
+                "starts_at": kernel_row.starts_at,
+                "status": kernel_row.status,
+                # "status_changed": row.status_changed,
+                "status_history": kernel_row.status_history,
+                "status_info": kernel_row.status_info,
+                "status_data": kernel_row.status_data,
+                "callback_url": kernel_row.callback_url,
+                "startup_command": kernel_row.startup_command,
+                "result": kernel_row.result,
+                "num_queries": kernel_row.num_queries,
+                "last_stat": kernel_row.last_stat,
             }
 
         if is_single_kernel:
             for row in kernel_rows:
                 sess_id = uuid4()
                 session_map[sess_id] = _map_session(sess_id, row)
-                single_kernel_ids[row["id"]] = sess_id
+                single_kernel_ids[row.id] = sess_id
         else:
             for row in kernel_rows:
                 # Since main kernel of multi-kernel session has the same id with session_id
                 # insert new kernels to kernels have distinguished id with sessions.
-                if row["cluster_role"] == "main" or row["cluster_role"] == DEFAULT_ROLE:
+                if row.cluster_role == "main" or row.cluster_role == DEFAULT_ROLE:
                     new_kern_id = uuid4()
-                    main_kernel_rows[row["id"]] = {
-                        **row,
+                    main_kernel_rows[row.id] = {
+                        **row._mapping,
                         "id": new_kern_id,
                     }
 
-                sess_id = row["session_id"]
+                sess_id = row.session_id
                 if sess_id not in session_map:
                     session_map[sess_id] = _map_session(sess_id, row)
                 else:
                     sess = session_map[sess_id]
                     try:
-                        if sess["created_at"] is not None and row["created_at"] is not None:
-                            if sess["created_at"] > row["created_at"]:
-                                sess["created_at"] = row["created_at"]
+                        if sess["created_at"] is not None and row.created_at is not None:
+                            if sess["created_at"] > row.created_at:
+                                sess["created_at"] = row.created_at
                                 # st_change = row["st_change"]
                     except (TypeError, ValueError):
                         pass
 
                     try:
-                        if sess["starts_at"] is not None and row["starts_at"] is not None:
-                            if sess["starts_at"] > row["starts_at"]:
-                                sess["starts_at"] = row["starts_at"]
+                        if sess["starts_at"] is not None and row.starts_at is not None:
+                            if sess["starts_at"] > row.starts_at:
+                                sess["starts_at"] = row.starts_at
                                 # st_change = row["st_change"]
                     except (TypeError, ValueError):
                         pass
 
                     # if str(sess["status"]) not in ("ERROR", "CANCELLED"):
-                    #     if KernelStatus.index(str(sess["status"])) > KernelStatus.index(str(row["status"])):
-                    #         sess["status"] = row["status"]
-                    sess["status"] = row["status"]
+                    #     if KernelStatus.index(str(sess["status"])) > KernelStatus.index(str(row.status)):
+                    #         sess["status"] = row.status
+                    sess["status"] = row.status
 
                     try:
-                        if sess["terminated_at"] is not None and row["terminated_at"] is not None:
-                            if sess["terminated_at"] < row["terminated_at"]:
-                                sess["terminated_at"] = row["terminated_at"]
+                        if sess["terminated_at"] is not None and row.terminated_at is not None:
+                            if sess["terminated_at"] < row.terminated_at:
+                                sess["terminated_at"] = row.terminated_at
                                 # st_change = row["status_changed"]
                         elif sess["terminated_at"] is None:
                             pass
-                        elif row["terminated_at"] is None:
+                        elif row.terminated_at is None:
                             sess["terminated_at"] = None
                         # sess["status_changed"] = st_change
                     except (TypeError, ValueError):
                         pass
 
-                    if sess["status_info"] != row["status_info"]:
-                        if row["cluster_role"] == "main" or row["cluster_role"] == DEFAULT_ROLE:
-                            sess["status_info"] = row["status_info"]
+                    if sess["status_info"] != row.status_info:
+                        if row.cluster_role == "main" or row.cluster_role == DEFAULT_ROLE:
+                            sess["status_info"] = row.status_info
 
         if session_map:
             creates = tuple(session_map.values())
@@ -395,16 +395,9 @@ def upgrade() -> None:
                 | SessionDependencyRow.depends_on.in_(kern_ids)
             )
             for row in connection.execute(sess_dep_query).fetchall():
-                val = {}
-                if row["session_id"] in single_kernel_ids:
-                    val["session_id"] = single_kernel_ids[row["session_id"]]
-                else:
-                    val["session_id"] = row["session_id"]
-
-                if row["depends_on"] in single_kernel_ids:
-                    val["depends_on"] = single_kernel_ids[row["depends_on"]]
-                else:
-                    val["depends_on"] = row["depends_on"]
+                val: dict[str, Any] = {}
+                val["session_id"] = single_kernel_ids.get(row.session_id, row.session_id)
+                val["depends_on"] = single_kernel_ids.get(row.depends_on, row.depends_on)
                 insert_values.append(val)
             dep_delete_query = sa.delete(SessionDependencyRow).where(
                 SessionDependencyRow.session_id.in_(kern_ids)
@@ -440,30 +433,36 @@ def upgrade() -> None:
     op.drop_index("ix_kernels_unique_sess_token", table_name="kernels")
 
     # Multi-kernel session migration
-    session_cnt = connection.execute(
-        sa.select([sa.func.count(sa.distinct(kernels.c.session_id))]).where(
-            kernels.c.cluster_size > 1
-        )
-    ).scalar()
+    session_cnt: int = (
+        connection.execute(
+            sa.select(sa.func.count(sa.distinct(kernels.c.session_id))).where(
+                kernels.c.cluster_size > 1
+            )
+        ).scalar()
+        or 0
+    )
     for offset in range(0, session_cnt, PAGE_SIZE):
         session_id_query = (
-            sa.select([sa.distinct(kernels.c.session_id)])
+            sa.select(sa.distinct(kernels.c.session_id))
             .where(kernels.c.cluster_size > 1)
             .order_by(kernels.c.session_id)
             .offset(offset)
             .limit(PAGE_SIZE)
         )
         session_ids = connection.execute(session_id_query).scalars().all()
-        query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
+        query = sa.select(kernels).where(kernels.c.session_id.in_(session_ids))
         migrate_kernel_to_session(query, is_single_kernel=False)
 
     # Single-kernel session migration
-    kernel_cnt = connection.execute(
-        sa.select([sa.func.count()]).select_from(kernels).where(kernels.c.cluster_size == 1)
-    ).scalar()
+    kernel_cnt: int = (
+        connection.execute(
+            sa.select(sa.func.count()).select_from(kernels).where(kernels.c.cluster_size == 1)
+        ).scalar()
+        or 0
+    )
     for offset in range(0, kernel_cnt, PAGE_SIZE):
         query = (
-            sa.select([kernels])
+            sa.select(kernels)
             .where(kernels.c.cluster_size == 1)
             .order_by(kernels.c.id)
             .offset(offset)
@@ -549,7 +548,7 @@ def downgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id = sa.Column(
+        id: sa.Column[GUID[UUID]] = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
@@ -557,22 +556,24 @@ def downgrade() -> None:
             primary_key=True,
         )
 
-    session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(SessionRow)).scalar()
+    session_cnt: int = (
+        connection.execute(sa.select(sa.func.count()).select_from(SessionRow)).scalar() or 0
+    )
     for page in range(0, session_cnt, PAGE_SIZE):
         query = sa.select(SessionRow.id).order_by(SessionRow.id).offset(page).limit(PAGE_SIZE)
-        session_ids = [row["id"] for row in connection.execute(query).fetchall()]
+        session_ids = [row.id for row in connection.execute(query).fetchall()]
 
-        query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
+        query = sa.select(kernels).where(kernels.c.session_id.in_(session_ids))
         kernel_rows = connection.execute(query).fetchall()
 
         num_kernel_sess: dict[UUID, int] = defaultdict(int)
-        sess_kern_map = {}
+        sess_kern_map: dict[UUID, Any] = {}
         for kern in kernel_rows:
             # restore kernel's session_id
-            sess_id = kern["session_id"]
+            sess_id = kern.session_id
             num_kernel_sess[sess_id] += 1
             if sess_id not in sess_kern_map:
-                sess_kern_map[sess_id] = kern["id"]
+                sess_kern_map[sess_id] = kern.id
         kern_update_query = (
             sa.update(kernels)
             .where(kernels.c.id == sa.bindparam("kernel_id"))
@@ -599,18 +600,11 @@ def downgrade() -> None:
             SessionDependencyRow.session_id.in_(sess_ids)
             | SessionDependencyRow.depends_on.in_(sess_ids)
         )
-        insert_values = []
+        insert_values: list[dict[str, Any]] = []
         for row in connection.execute(sess_dep_query).fetchall():
-            val = {}
-            if row["session_id"] in single_kern_sess:
-                val["session_id"] = single_kern_sess[row["session_id"]]
-            else:
-                val["session_id"] = row["session_id"]
-
-            if row["depends_on"] in single_kern_sess:
-                val["depends_on"] = single_kern_sess[row["depends_on"]]
-            else:
-                val["depends_on"] = row["depends_on"]
+            val: dict[str, Any] = {}
+            val["session_id"] = single_kern_sess.get(row.session_id, row.session_id)
+            val["depends_on"] = single_kern_sess.get(row.depends_on, row.depends_on)
             insert_values.append(val)
         dep_delete_query = sa.delete(SessionDependencyRow).where(
             SessionDependencyRow.session_id.in_(sess_ids)

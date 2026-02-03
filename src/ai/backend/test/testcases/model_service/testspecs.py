@@ -8,6 +8,7 @@ from ai.backend.test.templates.model_service.endpoint import (
     PublicEndpointTemplate,
 )
 from ai.backend.test.templates.model_service.jwt_token import ModelServiceTokenTemplate
+from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
@@ -20,8 +21,6 @@ from ai.backend.test.testcases.model_service.scale_failure_too_many_sessions imp
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
-
-from ...templates.template import BasicTestTemplate
 
 SINGLE_NODE_SINGLE_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
     "single_node_single_container_creation_endpoint_success": TestSpec(

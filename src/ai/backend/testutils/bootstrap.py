@@ -7,8 +7,9 @@ import os
 import secrets
 import socket
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Final, Iterator
+from typing import Final
 
 import pytest
 from testcontainers.core.container import DockerContainer
@@ -20,6 +21,12 @@ from testcontainers.redis import RedisContainer
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
 
+# Type aliases for container fixtures
+RedisContainerFixture = tuple[str, HostPortPairModel]
+EtcdContainerFixture = tuple[str, HostPortPairModel]
+PostgresContainerFixture = tuple[str, HostPortPairModel]
+MinioContainerFixture = tuple[str, HostPortPairModel]
+
 log = logging.getLogger(__spec__.name)
 
 PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000"))
@@ -27,10 +34,10 @@ PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"
 
 
 @contextlib.contextmanager
-def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
+def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2) -> Iterator[None]:
     if not path.exists():
         path.touch()
-    file = open(path, "wb")
+    file = path.open("wb")
     acquired = False
     try:
         for _ in range(max_retries):

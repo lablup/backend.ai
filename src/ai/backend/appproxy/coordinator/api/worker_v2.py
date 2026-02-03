@@ -4,8 +4,9 @@ import dataclasses
 import logging
 import textwrap
 import uuid
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 import aiohttp_cors
@@ -30,13 +31,13 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
+from ai.backend.appproxy.coordinator.models import Token, Worker, WorkerAppFilter, WorkerStatus
+from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
+from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
-from ..models.utils import execute_with_txn_retry
-from ..types import RootContext
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
 
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     pass
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class WorkerModel(BaseModel):
@@ -197,7 +198,7 @@ async def update_worker(
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         try:
             worker = await Worker.find_by_authority(sess, params.authority)
             worker.frontend_mode = params.frontend_mode
@@ -211,7 +212,7 @@ async def update_worker(
             worker.wildcard_traffic_port = params.wildcard_traffic_port
             worker.filtered_apps_only = params.filtered_apps_only
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
-            worker.updated_at = datetime.now()
+            worker.updated_at = datetime.now(UTC)
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE
         except ObjectNotFound:
@@ -287,9 +288,9 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
 
-    async def _update(sess: SASession) -> dict:
+    async def _update(sess: SASession) -> dict[str, Any]:
         worker = await Worker.get(sess, worker_id)
-        worker.updated_at = datetime.now()
+        worker.updated_at = datetime.now(UTC)
         worker.status = WorkerStatus.ALIVE
         result = dict(worker.dump_model())
         result["slots"] = [
@@ -326,7 +327,7 @@ async def get_token(request: web.Request) -> PydanticResponse[TokenResponseModel
 
 
 async def check_worker_lost(
-    app: web.Application, src: AgentId, event: DoCheckWorkerLostEvent
+    app: web.Application, _src: AgentId, _event: DoCheckWorkerLostEvent
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
 

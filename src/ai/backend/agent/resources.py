@@ -9,6 +9,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     Collection,
+    Iterable,
     Iterator,
     Mapping,
     MutableMapping,
@@ -21,11 +22,8 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Optional,
+    Self,
     TextIO,
-    Type,
-    TypeAlias,
     cast,
 )
 
@@ -41,7 +39,7 @@ from ai.backend.agent.errors.resources import (
     InvalidResourceConfigError,
     ResourceOverAllocatedError,
 )
-from ai.backend.agent.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -64,11 +62,11 @@ from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
-from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
-from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
-from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
-from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
-from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
+from .alloc_map import AbstractAllocMap as AbstractAllocMap
+from .alloc_map import AllocationStrategy as AllocationStrategy
+from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
+from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
+from .alloc_map import FractionAllocMap as FractionAllocMap
 from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import AbstractAgentDiscovery, MountInfo, get_agent_discovery
@@ -80,7 +78,7 @@ if TYPE_CHECKING:
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 
-DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
+type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
@@ -132,7 +130,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: list["Mount"] = attrs.Factory(list)
+    mounts: list[Mount] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     unified_devices: Iterable[tuple[DeviceName, SlotName]] = attrs.Factory(list)
@@ -204,7 +202,7 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> "KernelResourceSpec":
+    def read_from_string(cls, text: str) -> Self:
         kvpairs = {}
         for line in text.split("\n"):
             if "=" not in line:
@@ -252,13 +250,13 @@ class KernelResourceSpec:
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> "KernelResourceSpec":
+    def read_from_file(cls, file: TextIOWrapper) -> Self:
         text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> "KernelResourceSpec":
-        text = "\n".join(await file.readlines())  # type: ignore
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> Self:
+        text = "\n".join(await file.readlines())
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:
@@ -308,8 +306,8 @@ class AbstractComputeDevice:
     hw_location: str  # either PCI bus ID or arbitrary string
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
-    _device_name: Optional[DeviceName]
-    numa_node: Optional[int]  # NUMA node ID (None if not applicable)
+    _device_name: DeviceName | None
+    numa_node: int | None  # NUMA node ID (None if not applicable)
 
     def __init__(
         self,
@@ -317,8 +315,8 @@ class AbstractComputeDevice:
         hw_location: str,
         memory_size: int,
         processing_units: int,
-        numa_node: Optional[int] = None,
-        device_name: Optional[DeviceName] = None,
+        numa_node: int | None = None,
+        device_name: DeviceName | None = None,
     ) -> None:
         self.device_id = device_id
         self.hw_location = hw_location
@@ -416,7 +414,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_alloc_map(self) -> "AbstractAllocMap":
+    async def create_alloc_map(self) -> AbstractAllocMap:
         """
         Create and return an allocation map for this plugin.
         """
@@ -519,8 +517,8 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return []
 
 
-ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
-SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
+type ComputersMap = Mapping[DeviceName, ComputerContext]
+type SlotsMap = Mapping[SlotName, Decimal]
 
 
 class ResourceAllocator(aobject):
@@ -575,7 +573,7 @@ class ResourceAllocator(aobject):
 
         self._ensure_slots_are_not_overallocated()
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         for _, computer in self.computers.items():
             try:
                 await computer.instance.cleanup()
@@ -704,7 +702,7 @@ class ResourceAllocator(aobject):
         slot_name: SlotName,
         agent_idx: int,
         agent_config: AgentUnifiedConfig,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
     ) -> Decimal:
         match agent_config.resource.allocation_mode:
             case ResourceAllocationMode.SHARED:
@@ -720,7 +718,7 @@ class ResourceAllocator(aobject):
     def _calculate_device_slot_auto_split(
         self,
         slot_name: SlotName,
-        alloc_map_type: Type[AbstractAllocMap],
+        alloc_map_type: type[AbstractAllocMap],
         agent_idx: int,
     ) -> Decimal:
         available_total_slot = self.available_total_slots[slot_name]
@@ -728,10 +726,9 @@ class ResourceAllocator(aobject):
             slot, slot_extra = divmod(available_total_slot, self.num_agents)
             remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
             return slot + remainder_value
-        elif alloc_map_type is FractionAllocMap:
+        if alloc_map_type is FractionAllocMap:
             return available_total_slot / self.num_agents
-        else:
-            raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
+        raise NotImplementedError(f"Unrecognized AbstractAllocMap type {alloc_map_type}")
 
     def _calculate_device_slot_manual(
         self,
@@ -744,14 +741,13 @@ class ResourceAllocator(aobject):
 
         if slot_name == SlotName("cpu"):
             return Decimal(resource_config.allocations.cpu)
-        elif slot_name == SlotName("mem"):
+        if slot_name == SlotName("mem"):
             return Decimal(resource_config.allocations.mem)
-        else:
-            if slot_name not in resource_config.allocations.devices:
-                raise ValueError(
-                    f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
-                )
-            return resource_config.allocations.devices[slot_name]
+        if slot_name not in resource_config.allocations.devices:
+            raise ValueError(
+                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
+            )
+        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -777,11 +773,10 @@ class ResourceAllocator(aobject):
                     or SlotName("mem") not in self.available_total_slots
                 ):
                     raise ValueError("Memory not in allocated or total slots seen")
-                scaling_factor = {
+                return {
                     slot_name: slot / self.available_total_slots[slot_name]
                     for slot_name, slot in allocated_slots.items()
                 }
-                return scaling_factor
 
     def _ensure_slots_are_not_overallocated(self) -> None:
         if self.local_config.resource.allocation_mode != ResourceAllocationMode.MANUAL:
@@ -826,12 +821,12 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
-    ) -> Iterator[tuple[str, Type[AbstractComputePlugin]]]:
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
+    ) -> Iterator[tuple[str, type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
-        def accel_lt_intrinsic(item):
+        def accel_lt_intrinsic(item: tuple[str, type[AbstractComputePlugin]]) -> int:
             # push back "intrinsic" plugins (if exists)
             if item[0] in ("cpu", "mem"):
                 return 0
@@ -847,31 +842,34 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
 @attrs.define(auto_attribs=True, slots=True)
 class Mount:
     type: MountTypes
-    source: Optional[Path]
+    source: Path | None
     target: Path
     permission: MountPermission = MountPermission.READ_ONLY
-    opts: Optional[Mapping[str, Any]] = None
+    opts: Mapping[str, Any] | None = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
-    def from_str(cls, s):
-        source, target, perm = s.split(":")
-        source = Path(source)
+    def from_str(cls, s: str) -> Self:
+        source_str, target_str, perm_str = s.split(":")
+        source_path = Path(source_str)
         type = MountTypes.BIND
-        if not source.is_absolute():
-            if len(source.parts) == 1:
-                source = str(source)
+        source: Path | None
+        if not source_path.is_absolute():
+            if len(source_path.parts) == 1:
+                source = Path(source_str)
                 type = MountTypes.VOLUME
             else:
                 raise ValueError(
-                    "Mount source must be an absolute path if it is not a volume name.", source
+                    "Mount source must be an absolute path if it is not a volume name.", source_path
                 )
-        target = Path(target)
+        else:
+            source = source_path
+        target = Path(target_str)
         if not target.is_absolute():
             raise ValueError("Mount target must be an absolute path.", target)
-        perm = MountPermission(perm)
+        perm = MountPermission(perm_str)
         return cls(type, source, target, perm, None)
 
 
@@ -893,13 +891,11 @@ async def scan_resource_usage_per_slot(
         except FileNotFoundError:
             # there may be races with container destruction
             return
-        if resource_spec is None:
-            return
         for raw_slot_name in resource_spec.slots.keys():
             slot_name = SlotName(raw_slot_name)
             slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])
 
-    async def _wrap_future(fut: asyncio.Future) -> None:
+    async def _wrap_future(fut: asyncio.Future[Any]) -> None:
         # avoid type check failures when a future is directly consumed by a taskgroup
         await fut
 
@@ -945,7 +941,7 @@ async def scan_gpu_alloc_map(
 
         except Exception as e:
             setattr(e, "kernel_id", kernel_id)
-            raise e
+            raise
 
         return alloc_map
 

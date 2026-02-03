@@ -8,17 +8,17 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
+    Any,
     Final,
-    Iterable,
     Literal,
-    Mapping,
     NamedTuple,
-    Optional,
     Self,
+    cast,
 )
 
 import aiohttp
@@ -39,18 +39,18 @@ if TYPE_CHECKING:
     from .types import ImageConfig
 
 __all__ = (
+    "MAX_KERNELSPEC",
+    "MIN_KERNELSPEC",
+    "ImageRef",
+    "ParsedImageStr",
     "arch_name_aliases",
+    "common_image_label_schema",
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
-    "common_image_label_schema",
     "inference_image_label_schema",
-    "validate_image_labels",
     "login",
-    "MIN_KERNELSPEC",
-    "MAX_KERNELSPEC",
-    "ImageRef",
-    "ParsedImageStr",
+    "validate_image_labels",
 )
 
 # generalize architecture symbols to match docker API's norm
@@ -163,18 +163,18 @@ class DockerConnector:
     source: DockerConnectorSource
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_docker_context_host() -> str | None:
     try:
         docker_config_path = Path.home() / ".docker" / "config.json"
         docker_config = json.loads(docker_config_path.read_bytes())
-    except IOError:
+    except OSError:
         return None
     current_context_name = docker_config.get("currentContext", "default")
     for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
         context_data = json.loads(meta_path.read_bytes())
         if context_data["Name"] == current_context_name:
-            return context_data["Endpoints"]["docker"]["Host"]
+            return cast(str | None, context_data["Endpoints"]["docker"]["Host"])
     return None
 
 
@@ -182,6 +182,8 @@ def parse_docker_host_url(
     docker_host: yarl.URL,
 ) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    path: Path
+    decoded_path: str
     match docker_host.scheme:
         case "http" | "https":
             return None, docker_host, aiohttp.TCPConnector()
@@ -207,11 +209,12 @@ def parse_docker_host_url(
 
 
 # We may cache the connector type but not connector instances!
-@functools.lru_cache()
+@functools.lru_cache
 def _search_docker_socket_files_impl() -> tuple[
     Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
 ]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    search_paths: list[Path]
     match sys.platform:
         case "linux" | "darwin":
             search_paths = [
@@ -276,8 +279,8 @@ def get_docker_connector() -> DockerConnector:
 
 
 async def login(
-    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict, scope: str
-) -> dict:
+    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict[str, Any], scope: str
+) -> dict[str, Any]:
     """
     Authorize to the docker registry using the given credentials and token scope, and returns a set
     of required aiohttp.ClientSession.request() keyword arguments for further API requests.
@@ -285,7 +288,7 @@ async def login(
     Some registry servers only rely on HTTP Basic Authentication without token-based access controls
     (usually via nginx proxy). We do support them also. :)
     """
-    basic_auth: Optional[aiohttp.BasicAuth]
+    basic_auth: aiohttp.BasicAuth | None
 
     if credentials.get("username") and credentials.get("password"):
         basic_auth = aiohttp.BasicAuth(
@@ -309,11 +312,11 @@ async def login(
     if ping_status == 200:
         log.debug("docker-registry: {0} -> basic-auth", registry_url)
         return {"auth": basic_auth, "headers": {}}
-    elif ping_status == 404:
+    if ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
     # Check also 400 response since the AWS ECR Public server returns a 400 response
     # when given invalid credential authorization.
-    elif ping_status in [400, 401]:
+    if ping_status in [400, 401]:
         params = {
             "scope": scope,
             "offline_token": "true",
@@ -358,15 +361,15 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
             common_labels.update(inference_labels)
         case _:
             pass
-    return common_labels
+    return cast(dict[str, str], common_labels)
 
 
-class PlatformTagSet(Mapping):
+class PlatformTagSet(Mapping[str, str]):
     __slots__ = ("_data",)
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str], value: Optional[str] = None) -> None:
+    def __init__(self, tags: Iterable[str], value: str | None = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
@@ -381,31 +384,31 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
-    def __str__(self):
-        return f"PlatformTagSet({str(self._data)})"
+    def __str__(self) -> str:
+        return f"PlatformTagSet({self._data!s})"
 
-    def has(self, key: str, version: Optional[str] = None):
+    def has(self, key: str, version: str | None = None) -> bool:
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)
         return _v == version
 
-    def __getitem__(self, key: str):
+    def __getitem__(self, key: str) -> str:
         return self._data[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
-        return self._data == other
+        return cast(bool, self._data == other)
 
 
 class ParsedImageStr(NamedTuple):
@@ -546,10 +549,9 @@ class ImageRef:
                 or is_ip_address_format(maybe_registry)
             ):
                 return (maybe_registry, maybe_project_and_image_name)
-            elif registry is None:
+            if registry is None:
                 return (default_registry, image_str)
-            else:
-                return (registry, image_str)
+            return (registry, image_str)
 
         registry_part, project_and_image_name_part = divide_parts(image_str, registry)
 
@@ -591,11 +593,11 @@ class ImageRef:
             image = default_repository + "/" + image
         return image, tag
 
-    def _update_tag_set(self):
+    def _update_tag_set(self) -> None:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
-    def generate_aliases(self) -> Mapping[str, "ImageRef"]:
+    def generate_aliases(self) -> Mapping[str, ImageRef]:
         basename = self.name.split("/")[-1]
         possible_names = basename.rsplit("-")
         if len(possible_names) > 1:
@@ -626,7 +628,9 @@ class ImageRef:
         return ret
 
     @staticmethod
-    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, "ImageRef"]:
+    def merge_aliases(
+        genned_aliases_1: Mapping[str, ImageRef], genned_aliases_2: Mapping[str, ImageRef]
+    ) -> Mapping[str, ImageRef]:
         ret = {}
         aliases_set_1, aliases_set_2 = set(genned_aliases_1.keys()), set(genned_aliases_2.keys())
         aliases_dup = aliases_set_1 & aliases_set_2
@@ -670,7 +674,9 @@ class ImageRef:
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ImageRef):
+            return NotImplemented
         if self == other:  # call __eq__ first for resolved check
             return False
         if not (self.name == other.name and self.project == other.project):

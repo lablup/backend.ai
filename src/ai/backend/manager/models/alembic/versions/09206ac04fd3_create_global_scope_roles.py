@@ -8,6 +8,7 @@ Create Date: 2025-09-22 19:44:13.067238
 
 import enum
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -64,7 +65,7 @@ ENTITY_TYPES = {
 class Tables:
     @staticmethod
     def get_users_table() -> sa.Table:
-        users_table = sa.Table(
+        return sa.Table(
             "users",
             mapper_registry.metadata,
             IDColumn("uuid"),
@@ -72,7 +73,6 @@ class Tables:
             sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
             extend_existing=True,
         )
-        return users_table
 
 
 class RoleCreator:
@@ -105,7 +105,7 @@ class RoleCreator:
     @classmethod
     def _query_user_row_by_role(
         cls, db_conn: Connection, role: UserRole, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """

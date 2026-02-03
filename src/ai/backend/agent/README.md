@@ -224,6 +224,28 @@ VFolders are mounted to containers at runtime:
 - Detect OOM (Out-of-Memory) conditions
 - Enforce memory limits via cgroups
 
+### Shared Memory (shmem)
+Containers can request shared memory (`/dev/shm`) for inter-process communication.
+
+**Docker Memory Architecture**:
+- shm (tmpfs) and app memory share the Memory cgroup space
+- shm has an additional ShmSize limit (tmpfs maximum size)
+- Effective shm limit = `min(ShmSize, Memory cgroup available space)`
+
+**OOM Conditions**:
+| Signal | Exit Code | Condition |
+|--------|-----------|-----------|
+| SIGKILL | 137 | shm + app > Memory cgroup limit |
+| SIGBUS | 135 | shm > ShmSize |
+
+**Configuration**:
+- Set via `resource_opts.shmem` in session specification
+- Docker HostConfig: `ShmSize` parameter
+
+**References**:
+- [Linux Kernel cgroup v1 Memory](https://docs.kernel.org/admin-guide/cgroup-v1/memory.html) - tmpfs/shm charged to cgroup
+- [Linux Kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html) - shmem in memory.stat
+
 ### GPU Monitoring
 - Query NVIDIA GPUs via NVML (nvidia-ml-py)
 - Query AMD GPUs via ROCm SMI

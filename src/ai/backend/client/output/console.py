@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Iterator, List, Mapping, Optional, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, TypeVar, cast
 
 from tabulate import tabulate
 
@@ -12,6 +13,7 @@ from ai.backend.common.types import ResultSet
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
 _Item = Mapping[str, Any]
+T = TypeVar("T")
 
 
 class NoItems(Exception):
@@ -21,7 +23,7 @@ class NoItems(Exception):
 class ConsoleOutputHandler(BaseOutputHandler):
     def print_item(
         self,
-        item: Optional[_Item],
+        item: _Item | None,
         fields: Sequence[FieldSpec],
     ) -> None:
         if item is None:
@@ -94,10 +96,11 @@ class ConsoleOutputHandler(BaseOutputHandler):
         is_scalar: bool = False,
     ) -> None:
         if is_scalar:
-            assert len(fields) == 1
+            if len(fields) != 1:
+                raise ValueError("Scalar output requires exactly one field")
         if sys.stdout.isatty():
 
-            def infinite_fetch():
+            def infinite_fetch() -> Iterator[_Item]:
                 current_offset = 0
                 page_size = get_preferred_page_size()
                 while True:
@@ -129,7 +132,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         else:
             if is_scalar:
                 for line in tabulate_items(
-                    map(lambda v: {fields[0].field_name: v}, items),  # type: ignore
+                    map(lambda v: {fields[0].field_name: v}, items),
                     fields,
                 ):
                     print(line, end="")
@@ -142,12 +145,12 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_paginated_list(
         self,
-        fetch_func: Callable[[int, int], PaginatedResult],
+        fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
-        page_size: Optional[int] = None,
-        plain=False,
+        page_size: int | None = None,
+        plain: bool = False,
     ) -> None:
-        fields: List[FieldSpec] = []
+        fields: list[FieldSpec] = []
 
         def infinite_fetch(_page_size: int) -> Iterator[_Item]:
             nonlocal fields
@@ -163,7 +166,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     else:
                         raise NoItems
                 current_offset += len(result.items)
-                yield from result.items
+                yield from cast(Sequence[_Item], result.items)
                 if current_offset >= result.total_count:
                     break
 
@@ -195,9 +198,9 @@ class ConsoleOutputHandler(BaseOutputHandler):
     def print_mutation_result(
         self,
         item: _Item,
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
-        extra_info: Mapping = {},
+        item_name: str | None = None,
+        action_name: str | None = None,
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["ok", item["ok"]],
@@ -217,11 +220,11 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_mutation_error(
         self,
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
         msg: str = "Failed",
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
-        extra_info: Mapping = {},
+        item_name: str | None = None,
+        action_name: str | None = None,
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         t = [
             ["Message", msg],

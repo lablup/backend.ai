@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ..types import NotificationMessage, SendResult
+from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
 __all__ = ("AbstractNotificationChannel",)
 

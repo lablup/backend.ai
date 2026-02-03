@@ -1,6 +1,7 @@
 import logging
+from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import AsyncIterator, Optional, cast, override
+from typing import cast, override
 
 import aiohttp
 import typing_extensions
@@ -29,7 +30,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         raise DeprecationWarning(
             "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
         )
-        yield ""  # dead code to ensure the type of method
+        yield ""  # type: ignore[unreachable]  # dead code to ensure the type of method
 
     async def fetch_repositories_legacy(
         self,
@@ -38,7 +39,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         params = {"page_size": "30"}
         username = self.registry_info.username
         hub_url = yarl.URL("https://hub.docker.com")
-        repo_list_url: Optional[yarl.URL]
+        repo_list_url: yarl.URL | None
         repo_list_url = hub_url / f"v2/repositories/{username}/"
         while repo_list_url is not None:
             async with sess.get(repo_list_url, params=params) as resp:
@@ -81,7 +82,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
             self.credentials,
             "registry:catalog:*",
         )
-        catalog_url: Optional[yarl.URL]
+        catalog_url: yarl.URL | None
         catalog_url = (self.registry_url / "v2/_catalog").with_query(
             {"n": "30"},
         )

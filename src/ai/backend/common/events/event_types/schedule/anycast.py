@@ -1,4 +1,4 @@
-from typing import Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -6,12 +6,12 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 class BaseScheduleEvent(AbstractAnycastEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -20,40 +20,12 @@ class BaseScheduleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
-
-
-class DoScheduleEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_schedule"
-
-
-class DoCheckPrecondEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_check_precond"
-
-
-class DoStartSessionEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_start_session"
-
-
-class DoScaleEvent(BaseScheduleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_scale"
 
 
 class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
@@ -65,12 +37,12 @@ class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
         self.schedule_type = schedule_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.schedule_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(schedule_type=value[0])
 
     @classmethod
@@ -84,11 +56,11 @@ class DoSokovanProcessIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -99,12 +71,12 @@ class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
         self.schedule_type = schedule_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.schedule_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(schedule_type=value[0])
 
     @classmethod
@@ -118,11 +90,11 @@ class DoSokovanProcessScheduleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -135,12 +107,12 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -154,11 +126,11 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -171,12 +143,12 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -190,11 +162,11 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -207,12 +179,12 @@ class DoRouteLifecycleIfNeededEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -226,11 +198,11 @@ class DoRouteLifecycleIfNeededEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -243,12 +215,12 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
         self.lifecycle_type = lifecycle_type
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.lifecycle_type,)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(lifecycle_type=value[0])
 
     @classmethod
@@ -262,9 +234,9 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SCHEDULE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.resource.types import TotalResourceData
@@ -21,12 +20,12 @@ class ScheduleCacheSource:
 
     _valkey_stat: ValkeyStatClient
 
-    def __init__(self, valkey_stat: ValkeyStatClient):
+    def __init__(self, valkey_stat: ValkeyStatClient) -> None:
         self._valkey_stat = valkey_stat
 
     async def get_keypair_concurrency(
         self, access_key: AccessKey, is_sftp: bool = False
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Get single keypair concurrency value from cache.
 
@@ -61,7 +60,7 @@ class ScheduleCacheSource:
             sftp_concurrency=sftp_concurrency,
         )
 
-    async def get_total_resource_slots(self) -> Optional[TotalResourceData]:
+    async def get_total_resource_slots(self) -> TotalResourceData | None:
         """
         Get total resource slots data from cache.
 

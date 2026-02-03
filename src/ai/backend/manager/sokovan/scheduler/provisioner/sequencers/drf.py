@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
-from ...types import SessionWorkload, SystemSnapshot
 from .sequencer import WorkloadSequencer
 
 
@@ -31,11 +31,16 @@ class DRFSequencer(WorkloadSequencer):
         return "Sessions sequenced using Dominant Resource Fairness algorithm"
 
     @override
-    def sequence(
-        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
+    async def sequence(
+        self,
+        resource_group: str,
+        system_snapshot: SystemSnapshot,
+        workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on Dominant Resource Fairness.
+
+        :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects sequenced by DRF.
@@ -55,8 +60,7 @@ class DRFSequencer(WorkloadSequencer):
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
         # For users with the same dominant share, maintain original order
-        sorted_workloads = sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
-        return sorted_workloads
+        return sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
 
     def _calculate_dominant_share(
         self, resource_slots: ResourceSlot, total_capacity: ResourceSlot

@@ -85,9 +85,7 @@ class SMTPReporter(AbstractReporter):
         template = template.replace("{{ ended_at }}", str(message.ended_at))
         template = template.replace("{{ duration }}", str(message.duration))
         template = template.replace("{{ status }}", message.status.value)
-        template = template.replace("{{ description }}", message.description)
-
-        return template
+        return template.replace("{{ description }}", message.description)
 
     def _make_subject(self, action_type: str) -> str:
         return f"Backend.AI SMTP Log Alert ({action_type})"

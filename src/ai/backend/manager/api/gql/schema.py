@@ -2,10 +2,14 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .agent_stats import (
+from .agent import (
     agent_stats,
+    agents_v2,
 )
 from .app_config import (
+    admin_delete_domain_app_config,
+    admin_domain_app_config,
+    admin_upsert_domain_app_config,
     delete_domain_app_config,
     delete_user_app_config,
     domain_app_config,
@@ -36,6 +40,70 @@ from .artifact import (
 )
 from .artifact_registry import default_artifact_registry
 from .background_task import background_task_events
+from .deployment import (
+    # Revision
+    activate_deployment_revision,
+    add_model_revision,
+    # Access Token
+    create_access_token,
+    # Auto Scaling
+    create_auto_scaling_rule,
+    # Deployment
+    create_model_deployment,
+    create_model_revision,
+    delete_auto_scaling_rule,
+    delete_model_deployment,
+    deployment,
+    deployment_status_changed,
+    deployments,
+    inference_runtime_config,
+    inference_runtime_configs,
+    # Replica
+    replica,
+    replica_status_changed,
+    replicas,
+    revision,
+    revisions,
+    # Route
+    route,
+    routes,
+    sync_replicas,
+    update_auto_scaling_rule,
+    update_model_deployment,
+    update_route_traffic_status,
+)
+from .fair_share import (
+    admin_bulk_upsert_domain_fair_share_weight,
+    admin_bulk_upsert_project_fair_share_weight,
+    admin_bulk_upsert_user_fair_share_weight,
+    admin_domain_fair_share,
+    admin_domain_fair_shares,
+    admin_project_fair_share,
+    admin_project_fair_shares,
+    admin_upsert_domain_fair_share_weight,
+    admin_upsert_project_fair_share_weight,
+    admin_upsert_user_fair_share_weight,
+    admin_user_fair_share,
+    admin_user_fair_shares,
+    bulk_upsert_domain_fair_share_weight,
+    bulk_upsert_project_fair_share_weight,
+    bulk_upsert_user_fair_share_weight,
+    domain_fair_share,
+    domain_fair_shares,
+    project_fair_share,
+    project_fair_shares,
+    rg_domain_fair_share,
+    rg_domain_fair_shares,
+    rg_project_fair_share,
+    rg_project_fair_shares,
+    rg_user_fair_share,
+    rg_user_fair_shares,
+    upsert_domain_fair_share_weight,
+    upsert_project_fair_share_weight,
+    upsert_user_fair_share_weight,
+    user_fair_share,
+    user_fair_shares,
+)
 from .huggingface_registry import (
     create_huggingface_registry,
     delete_huggingface_registry,
@@ -43,31 +111,23 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
-from .model_deployment.access_token import create_access_token
-from .model_deployment.auto_scaling_rule import (
-    create_auto_scaling_rule,
-    delete_auto_scaling_rule,
-    update_auto_scaling_rule,
-)
-from .model_deployment.model_deployment import (
-    create_model_deployment,
-    delete_model_deployment,
-    deployment,
-    deployment_status_changed,
-    deployments,
-    sync_replicas,
-    update_model_deployment,
-)
-from .model_deployment.model_replica import replica, replica_status_changed, replicas
-from .model_deployment.model_revision import (
-    add_model_revision,
-    create_model_revision,
-    inference_runtime_config,
-    inference_runtime_configs,
-    revision,
-    revisions,
+from .image import (
+    image_v2,
+    images_v2,
 )
 from .notification import (
+    admin_create_notification_channel,
+    admin_create_notification_rule,
+    admin_delete_notification_channel,
+    admin_delete_notification_rule,
+    admin_notification_channel,
+    admin_notification_channels,
+    admin_notification_rule,
+    admin_notification_rules,
+    admin_update_notification_channel,
+    admin_update_notification_rule,
+    admin_validate_notification_channel,
+    admin_validate_notification_rule,
     create_notification_channel,
     create_notification_rule,
     delete_notification_channel,
@@ -98,9 +158,33 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
-from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
+from .resource_group import (
+    admin_resource_groups,
+    admin_update_resource_group_fair_share_spec,
+    resource_groups,
+    update_resource_group_fair_share_spec,
+)
+from .resource_usage import (
+    admin_domain_usage_buckets,
+    admin_project_usage_buckets,
+    admin_user_usage_buckets,
+    domain_usage_buckets,
+    project_usage_buckets,
+    rg_domain_usage_buckets,
+    rg_project_usage_buckets,
+    rg_user_usage_buckets,
+    user_usage_buckets,
+)
 from .scheduler import (
     scheduling_events_by_session,
+)
+from .scheduling_history import (
+    admin_deployment_histories,
+    admin_route_histories,
+    admin_session_scheduling_histories,
+    deployment_histories,
+    route_histories,
+    session_scheduling_histories,
 )
 from .storage_namespace import (
     register_storage_namespace,
@@ -117,11 +201,12 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
+    agent_stats = agent_stats
+    agents_v2 = agents_v2
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
-    domain_app_config = domain_app_config
     user_app_config = user_app_config
     merged_app_config = merged_app_config
     deployments = deployments
@@ -130,10 +215,6 @@ class Query:
     revision = revision
     replicas = replicas
     replica = replica
-    notification_channel = notification_channel
-    notification_channels = notification_channels
-    notification_rule = notification_rule
-    notification_rules = notification_rules
     notification_rule_types = notification_rule_types
     object_storage = object_storage
     object_storages = object_storages
@@ -143,12 +224,61 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
-    scaling_groups_v2 = scaling_groups_v2
-    all_scaling_groups_v2 = all_scaling_groups_v2
+    # Admin APIs
+    admin_resource_groups = admin_resource_groups
+    admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployment_histories = admin_deployment_histories
+    admin_route_histories = admin_route_histories
+    admin_notification_channel = admin_notification_channel
+    admin_notification_channels = admin_notification_channels
+    admin_notification_rule = admin_notification_rule
+    admin_notification_rules = admin_notification_rules
+    admin_domain_app_config = admin_domain_app_config
+    admin_domain_fair_share = admin_domain_fair_share
+    admin_domain_fair_shares = admin_domain_fair_shares
+    admin_project_fair_share = admin_project_fair_share
+    admin_project_fair_shares = admin_project_fair_shares
+    admin_user_fair_share = admin_user_fair_share
+    admin_user_fair_shares = admin_user_fair_shares
+    admin_domain_usage_buckets = admin_domain_usage_buckets
+    admin_project_usage_buckets = admin_project_usage_buckets
+    admin_user_usage_buckets = admin_user_usage_buckets
+    # Resource Group Scoped APIs
+    rg_domain_fair_share = rg_domain_fair_share
+    rg_domain_fair_shares = rg_domain_fair_shares
+    rg_project_fair_share = rg_project_fair_share
+    rg_project_fair_shares = rg_project_fair_shares
+    rg_user_fair_share = rg_user_fair_share
+    rg_user_fair_shares = rg_user_fair_shares
+    rg_domain_usage_buckets = rg_domain_usage_buckets
+    rg_project_usage_buckets = rg_project_usage_buckets
+    rg_user_usage_buckets = rg_user_usage_buckets
+    # Legacy APIs (deprecated)
+    resource_groups = resource_groups
+    domain_app_config = domain_app_config
+    domain_fair_share = domain_fair_share
+    domain_fair_shares = domain_fair_shares
+    project_fair_share = project_fair_share
+    project_fair_shares = project_fair_shares
+    user_fair_share = user_fair_share
+    user_fair_shares = user_fair_shares
+    domain_usage_buckets = domain_usage_buckets
+    project_usage_buckets = project_usage_buckets
+    user_usage_buckets = user_usage_buckets
+    notification_channel = notification_channel
+    notification_channels = notification_channels
+    notification_rule = notification_rule
+    notification_rules = notification_rules
     default_artifact_registry = default_artifact_registry
-    agent_stats = agent_stats
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
+    route = route
+    routes = routes
+    session_scheduling_histories = session_scheduling_histories
+    deployment_histories = deployment_histories
+    route_histories = route_histories
+    image_v2 = image_v2
+    images_v2 = images_v2
 
 
 @strawberry.type
@@ -156,9 +286,7 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
-    upsert_domain_app_config = upsert_domain_app_config
     upsert_user_app_config = upsert_user_app_config
-    delete_domain_app_config = delete_domain_app_config
     delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
@@ -173,6 +301,19 @@ class Mutation:
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     create_model_revision = create_model_revision
+    # Notification - Admin APIs
+    admin_create_notification_channel = admin_create_notification_channel
+    admin_update_notification_channel = admin_update_notification_channel
+    admin_delete_notification_channel = admin_delete_notification_channel
+    admin_validate_notification_channel = admin_validate_notification_channel
+    admin_create_notification_rule = admin_create_notification_rule
+    admin_update_notification_rule = admin_update_notification_rule
+    admin_delete_notification_rule = admin_delete_notification_rule
+    admin_validate_notification_rule = admin_validate_notification_rule
+    # App Config - Admin APIs
+    admin_upsert_domain_app_config = admin_upsert_domain_app_config
+    admin_delete_domain_app_config = admin_delete_domain_app_config
+    # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
@@ -181,6 +322,9 @@ class Mutation:
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
+    # App Config - Legacy (deprecated)
+    upsert_domain_app_config = upsert_domain_app_config
+    delete_domain_app_config = delete_domain_app_config
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
@@ -203,6 +347,26 @@ class Mutation:
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
+    activate_deployment_revision = activate_deployment_revision
+    update_route_traffic_status = update_route_traffic_status
+    # Fair Share - Admin APIs
+    admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
+    admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
+    admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
+    admin_bulk_upsert_domain_fair_share_weight = admin_bulk_upsert_domain_fair_share_weight
+    admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
+    admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
+    # Fair Share - Legacy (deprecated)
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
+    bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
+    bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
+    # Resource Group - Admin APIs
+    admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
+    # Resource Group - Legacy (deprecated)
+    update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
 
 
 @strawberry.type
@@ -222,9 +386,7 @@ class CustomizedSchema(Schema):
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
         )
         # Convert escaped newlines to actual newlines for better description formatting
-        sdl = sdl.replace("\\n", "\n")
-
-        return sdl
+        return sdl.replace("\\n", "\n")
 
 
 schema = CustomizedSchema(

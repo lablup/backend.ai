@@ -1,8 +1,9 @@
 import shutil
 import tempfile
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator, Optional, override
+from typing import override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
@@ -49,8 +50,7 @@ class LoginTemplate(WrapperTestTemplate):
 
 def _get_test_temp_dir(test_id: str) -> Path:
     temp_base = Path(tempfile.gettempdir()) / "backend_ai_tests"
-    temp_dir = temp_base / test_id
-    return temp_dir
+    return temp_base / test_id
 
 
 async def _login(
@@ -58,7 +58,7 @@ async def _login(
     test_id: str,
     user_id: str,
     password: str,
-    otp: Optional[str] = None,
+    otp: str | None = None,
 ) -> None:
     temp_dir = _get_test_temp_dir(test_id)
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -66,7 +66,7 @@ async def _login(
     cookie_file = temp_dir / "cookie.dat"
     if cookie_file.exists():
         try:
-            session.aiohttp_session.cookie_jar.load(cookie_file)  # type: ignore
+            session.aiohttp_session.cookie_jar.load(cookie_file)
             return
         except Exception:
             pass
@@ -76,7 +76,7 @@ async def _login(
         raise ValueError("Login failed: " + result.get("data", {}).get("details", "Unknown error"))
 
     session.aiohttp_session.cookie_jar.update_cookies(result["cookies"])
-    session.aiohttp_session.cookie_jar.save(cookie_file)  # type: ignore
+    session.aiohttp_session.cookie_jar.save(cookie_file)
 
 
 async def _logout(session: AsyncSession, test_id: str) -> None:

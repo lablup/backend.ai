@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncContextManager, Generic, Optional, TypeVar, final
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, TypeVar, final
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker import ServiceHealthChecker
@@ -11,7 +12,7 @@ ResourceT = TypeVar("ResourceT")
 ResourcesT = TypeVar("ResourcesT")
 
 
-class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
+class DependencyProvider[SetupInputT, ResourceT](ABC):
     """Base class for all dependency providers.
 
     Dependency providers are stateless objects that provide async context managers
@@ -33,7 +34,7 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
         raise NotImplementedError
 
     @abstractmethod
-    def provide(self, setup_input: SetupInputT) -> AsyncContextManager[ResourceT]:
+    def provide(self, setup_input: SetupInputT) -> AbstractAsyncContextManager[ResourceT]:
         """Return an async context manager for the dependency.
 
         Args:
@@ -45,7 +46,7 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
         raise NotImplementedError
 
     @abstractmethod
-    def gen_health_checkers(self, resource: ResourceT) -> Optional[ServiceHealthChecker]:
+    def gen_health_checkers(self, resource: ResourceT) -> ServiceHealthChecker | None:
         """
         Return a health checker for the provided resource.
 
@@ -81,10 +82,10 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
         Returns:
             None indicating no health checks
         """
-        return None
+        return
 
 
-class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
+class DependencyComposer[SetupInputT, ResourcesT](ABC):
     """Abstract base for dependency composers.
 
     Composers compose multiple dependency providers into a larger unit,
@@ -106,7 +107,7 @@ class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
         self,
         stack: DependencyStack,
         setup_input: SetupInputT,
-    ) -> AsyncContextManager[ResourcesT]:
+    ) -> AbstractAsyncContextManager[ResourcesT]:
         """Compose multiple dependencies using the provided stack.
 
         Args:

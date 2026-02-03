@@ -4,31 +4,32 @@ import logging
 import os
 import sys
 import traceback
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, Any, override
 
 import msgpack
 import psutil
 import zmq
 
 if TYPE_CHECKING:
-    from ..logger import MsgpackOptions
+    from ai.backend.logging.types import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):
-    _sock: zmq.Socket | None
+    _sock: zmq.Socket[Any] | None
 
     def __init__(self, *, endpoint: str, msgpack_options: MsgpackOptions) -> None:
         super().__init__()
         self.endpoint = endpoint
         self.msgpack_options = msgpack_options
-        self._zctx = zmq.Context[zmq.Socket]()
+        self._zctx = zmq.Context[zmq.Socket[Any]]()
         self._pid = os.getpid()
         self._process_name = psutil.Process().name()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
         if endpoint:
             self._sock = self._zctx.socket(zmq.PUSH)
-            assert self._sock is not None
+            if self._sock is None:
+                raise RuntimeError("Failed to create ZMQ PUSH socket")
             self._sock.setsockopt(zmq.LINGER, 100)
             self._sock.connect(self.endpoint)
         else:
@@ -39,13 +40,13 @@ class RelayHandler(logging.Handler):
             self._sock.close()
         self._zctx.term()
 
-    def _fallback(self, record: Optional[logging.LogRecord]) -> None:
+    def _fallback(self, record: logging.LogRecord | None) -> None:
         if record is None:
             return
         print(record.getMessage(), file=sys.stderr)
 
     @override
-    def emit(self, record: Optional[logging.LogRecord]) -> None:
+    def emit(self, record: logging.LogRecord | None) -> None:
         if self._sock is None:
             self._fallback(record)
             return

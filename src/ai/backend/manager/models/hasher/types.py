@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Final, Optional
+from typing import Any, Final
+
+from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -22,7 +24,7 @@ class HashInfo:
 
     algorithm: PasswordHashAlgorithm
     rounds: int
-    salt: Optional[str]  # bcrypt includes salt in hash_value
+    salt: str | None  # bcrypt includes salt in hash_value
     hash_value: str
 
     @classmethod
@@ -119,6 +121,29 @@ class PasswordInfo:
         """
         if self.algorithm != hash_info.algorithm:
             return True
-        if self.rounds != hash_info.rounds:
-            return True
-        return False
+        return self.rounds != hash_info.rounds
+
+
+class PasswordColumn(TypeDecorator[str]):
+    """Custom column type that prevents direct password assignment.
+
+    Passwords should be set using proper functions that have access to config:
+    - Use check_credential() for login with gradual migration
+    - Use explicit UPDATE queries with pre-hashed passwords
+
+    This column type is kept for backward compatibility but should not be used
+    for setting passwords directly.
+    """
+
+    impl = VARCHAR
+    cache_ok = True
+
+    def process_bind_param(self, value: Any, _dialect: Any) -> str | None:
+        if value is None:
+            return None
+
+        if not isinstance(value, PasswordInfo):
+            raise ValueError("Password must be set using PasswordInfo for hashing.")
+
+        hash_info = value.generate_new_hash()
+        return hash_info.to_string()

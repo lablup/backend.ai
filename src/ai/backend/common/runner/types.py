@@ -2,10 +2,9 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
+from ai.backend.common.observer.types import AbstractObserver
+from ai.backend.common.resource.types import AbstractResource
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..observer.types import AbstractObserver
-from ..resource.types import AbstractResource
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,7 +29,7 @@ class Runner:
     _resources: Sequence[AbstractResource]
     _closed_event: asyncio.Event
 
-    def __init__(self, resources: Sequence[AbstractResource]):
+    def __init__(self, resources: Sequence[AbstractResource]) -> None:
         self._resources = resources
         self._closed_event = asyncio.Event()
 
@@ -49,7 +48,7 @@ class Runner:
             try:
                 async with asyncio.timeout(observer.timeout()):
                     await observer.observe()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.warning(
                     "Observer {} timed out after {} seconds.",
                     observer.name,

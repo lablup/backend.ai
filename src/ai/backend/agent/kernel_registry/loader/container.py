@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
+from ai.backend.agent.kernel_registry.exception import KernelRegistryNotFound
+from ai.backend.agent.kernel_registry.types import KernelRecoveryData
+from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ...scratch.utils import ScratchConfig, ScratchUtils
-from ..exception import KernelRegistryNotFound
-from ..types import KernelRecoveryData
 from .abc import AbstractKernelRegistryLoader
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     def __init__(
         self,
         scratch_root: Path,
-        agent: AbstractAgent,
+        agent: AbstractAgent[Any, Any],
     ) -> None:
         self._scratch_root = scratch_root
         self._agent = agent
@@ -36,11 +36,10 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             raise KernelRegistryNotFound
         environ = await config.get_kernel_environ()
         resource_spec = await config.get_kernel_resource_spec()
-        recovery_data = json_data.to_kernel_recovery_data(
+        return json_data.to_kernel_recovery_data(
             resource_spec,
             environ,
         )
-        return recovery_data
 
     @override
     async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:

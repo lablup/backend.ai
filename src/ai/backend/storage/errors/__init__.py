@@ -19,6 +19,7 @@ from .common import (
     StorageStepRequiredStepNotProvided,
     StorageTransferError,
     StorageTypeInvalidError,
+    UploadOffsetMismatchError,
 )
 from .object import (
     ArtifactImportError,
@@ -86,6 +87,7 @@ __all__ = [
     "InvalidConfigurationSourceError",
     "InvalidDataLengthError",
     "ServiceNotInitializedError",
+    "UploadOffsetMismatchError",
     # vfolder
     "VFolderNotFoundError",
     "InvalidSubpathError",

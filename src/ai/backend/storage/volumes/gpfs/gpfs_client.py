@@ -2,9 +2,10 @@ import contextlib
 import json
 import logging
 import urllib.parse
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Mapping, Optional, TypeAlias
+from typing import Any, TypeVar, cast
 
 import aiohttp
 from aiohttp import BasicAuth, web
@@ -41,19 +42,23 @@ from .types import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-ResponseHandler: TypeAlias = Callable[
+type ResponseHandler = Callable[
     [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]
 ]
 
+_T = TypeVar("_T")
 
-def error_handler(inner):
-    async def outer(*args, **kwargs):
+
+def error_handler[T](
+    inner: Callable[..., Coroutine[Any, Any, T]],
+) -> Callable[..., Coroutine[Any, Any, T]]:
+    async def outer(*args: Any, **kwargs: Any) -> T:
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise GPFSInvalidBodyError
-        except web.HTTPNotFound:
-            raise GPFSNotFoundError
+        except web.HTTPBadRequest as e:
+            raise GPFSInvalidBodyError from e
+        except web.HTTPNotFound as e:
+            raise GPFSNotFoundError from e
 
     return outer
 
@@ -65,14 +70,17 @@ async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.Cli
         case 4:
             pass
         case 5:
+            msg_detail = ""
+            exc_to_chain = None
             try:
                 data = await response.json()
                 msg_detail = str(data)
-            except json.decoder.JSONDecodeError:
+            except json.decoder.JSONDecodeError as e:
                 msg_detail = "Unable to decode response body."
+                exc_to_chain = e
             raise ExternalStorageServiceError(
                 f"GPFS API server error. (status code: {response.status}, detail: {msg_detail})"
-            )
+            ) from exc_to_chain
     return response
 
 
@@ -103,9 +111,9 @@ class GPFSAPIClient:
         sess: aiohttp.ClientSession,
         method: str,
         path: str,
-        body: Optional[Any] = None,
+        body: Any | None = None,
         *,
-        err_handler: Optional[ResponseHandler] = None,
+        err_handler: ResponseHandler | None = None,
     ) -> aiohttp.ClientResponse:
         response_handler = err_handler or base_response_handler
         match method:
@@ -131,8 +139,8 @@ class GPFSAPIClient:
                     "/scalemgmt/v2" + path, headers=self._req_header, json=body, ssl=self.ssl
                 )
             return await response_handler(response)
-        except web.HTTPUnauthorized:
-            raise GPFSUnauthorizedError
+        except web.HTTPUnauthorized as e:
+            raise GPFSUnauthorizedError from e
 
     async def _wait_for_job_done(self, jobs: list[GPFSJob]) -> None:
         for job_to_wait in jobs:
@@ -149,7 +157,7 @@ class GPFSAPIClient:
                         case GPFSJobStatus.COMPLETED:
                             return
                         case GPFSJobStatus.FAILED:
-                            log.error(f"Failed to run GPFS job. (e:{str(jobs)})")
+                            log.error(f"Failed to run GPFS job. (e:{jobs!s})")
                             raise GPFSJobFailedError(
                                 job.result.to_json() if job.result is not None else ""
                             )
@@ -173,7 +181,7 @@ class GPFSAPIClient:
             return GPFSJob.from_dict(data["jobs"][0])
 
     @error_handler
-    async def list_fs(self) -> List[GPFSFilesystem]:
+    async def list_fs(self) -> list[GPFSFilesystem]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/filesystems")
             data = await response.json()
@@ -189,7 +197,7 @@ class GPFSAPIClient:
         return GPFSFilesystem.from_dict(data["filesystems"][0])
 
     @error_handler
-    async def list_fs_pools(self, fs_name: str) -> List[GPFSStoragePoolUsage]:
+    async def list_fs_pools(self, fs_name: str) -> list[GPFSStoragePoolUsage]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/filesystems/{fs_name}/pools")
             data = await response.json()
@@ -209,7 +217,7 @@ class GPFSAPIClient:
         return GPFSStoragePoolUsage.from_dict(data["storagePool"][0])
 
     @error_handler
-    async def list_fs_disks(self, fs_name: str) -> List[GPFSDisk]:
+    async def list_fs_disks(self, fs_name: str) -> list[GPFSDisk]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/filesystems/{fs_name}/disks")
             data = await response.json()
@@ -220,7 +228,7 @@ class GPFSAPIClient:
     @error_handler
     async def list_quotas(
         self, fs_name: str, quota_type: GPFSQuotaType = GPFSQuotaType.FILESET
-    ) -> List[GPFSQuota]:
+    ) -> list[GPFSQuota]:
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,
@@ -236,7 +244,7 @@ class GPFSAPIClient:
         fs_name: str,
         fileset_name: str,
         quota_type: GPFSQuotaType = GPFSQuotaType.FILESET,
-    ) -> List[GPFSQuota]:
+    ) -> list[GPFSQuota]:
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,
@@ -281,12 +289,12 @@ class GPFSAPIClient:
         self,
         fs_name: str,
         fileset_name: str,
-        path: Optional[Path] = None,
-        owner: Optional[str] = None,
-        permissions: Optional[int] = None,
-        create_directory=True,
+        path: Path | None = None,
+        owner: str | None = None,
+        permissions: int | None = None,
+        create_directory: bool = True,
     ) -> None:
-        body: Dict[str, Any] = {
+        body: dict[str, Any] = {
             "filesetName": fileset_name,
         }
         if owner is not None:
@@ -363,7 +371,7 @@ class GPFSAPIClient:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/cluster")
             data = await response.json()
-            return data["cluster"]
+            return cast(Mapping[str, Any], data["cluster"])
 
     @error_handler
     async def get_metric(
@@ -377,18 +385,17 @@ class GPFSAPIClient:
                 "GET",
                 f"/perfmon/data?{querystring}",
             )
-            data = await response.json()
-            return data
+            return cast(Mapping[str, Any], await response.json())
 
     @error_handler
-    async def list_nodes(self) -> List[str]:
+    async def list_nodes(self) -> list[str]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", "/nodes")
             data = await response.json()
             return [x["adminNodeName"] for x in data["nodes"]]
 
     @error_handler
-    async def get_node_health(self, node_name: str) -> List[GPFSSystemHealthState]:
+    async def get_node_health(self, node_name: str) -> list[GPFSSystemHealthState]:
         async with self._build_session() as sess:
             response = await self._build_request(sess, "GET", f"/nodes/{node_name}/health/states")
             data = await response.json()

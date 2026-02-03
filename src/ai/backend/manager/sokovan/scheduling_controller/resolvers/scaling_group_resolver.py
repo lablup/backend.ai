@@ -4,7 +4,7 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models import PRIVATE_SESSION_TYPES
+from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     SessionCreationSpec,

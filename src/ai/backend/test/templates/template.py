@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Protocol, final
+from typing import Protocol, final
 
 from ai.backend.test.tester.exporter import TestExporter
 
@@ -114,7 +115,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         This method should be overridden by subclasses to implement specific setup and cleanup logic.
         """
         raise NotImplementedError("Subclasses must implement this method.")
-        yield  # Not used, but required for type checking (mypy issue)
+        yield  # type: ignore[unreachable]  # Required for async generator typing
 
     @final
     async def run_test(self, exporter: TestExporter) -> None:

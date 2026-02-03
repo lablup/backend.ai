@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 import sys
-from typing import TYPE_CHECKING
+from decimal import Decimal
+from typing import TYPE_CHECKING, BinaryIO
 
 import click
 
@@ -47,10 +48,10 @@ def cli() -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def put(cli_ctx: CLIContext, key, value, scope) -> None:
+def put(cli_ctx: CLIContext, key: str, value: str, scope: ConfigScopes) -> None:
     """Put a single key-value pair into the etcd."""
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 await etcd.put(key, value, scope=scope)
@@ -71,13 +72,13 @@ def put(cli_ctx: CLIContext, key, value, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
+def put_json(cli_ctx: CLIContext, key: str, file: BinaryIO, scope: ConfigScopes) -> None:
     """
     Put a JSON object from FILE to the etcd as flattened key-value pairs
     under the given KEY prefix.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 value = json.load(file)
@@ -103,16 +104,18 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     ),
 )
 @click.pass_obj
-def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
+def move_subtree(
+    cli_ctx: CLIContext, src_prefix: str, dst_prefix: str, scope: ConfigScopes
+) -> None:
     """
     Move a subtree to another key prefix.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 subtree = await etcd.get_prefix(src_prefix, scope=scope)
-                await etcd.put_prefix(dst_prefix, subtree, scope=scope)
+                await etcd.put_prefix(dst_prefix, subtree, scope=scope)  # type: ignore[arg-type]
                 await etcd.delete_prefix(src_prefix, scope=scope)
             except Exception:
                 log.exception("An error occurred.")
@@ -135,12 +138,12 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
+def get(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> None:
     """
     Get the value of a key in the configured etcd namespace.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 if prefix:
@@ -168,26 +171,26 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
+def delete(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> None:
     """Delete the key in the configured etcd namespace."""
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 if prefix:
-                    data = await etcd.get_prefix(key, scope=scope)
-                    if not data:
+                    prefix_data = await etcd.get_prefix(key, scope=scope)
+                    if not prefix_data:
                         log.info(f"No keys found to delete with prefix: {key}")
                         return
                     await etcd.delete_prefix(key, scope=scope)
                     log.info(f"All keys starting with '{key}' successfully deleted.")
                 else:
-                    data = await etcd.get(key, scope=scope)
-                    if data is None:
+                    single_data = await etcd.get(key, scope=scope)
+                    if single_data is None:
                         log.info(f"No key found to delete: {key}")
                         return
                     await etcd.delete(key, scope=scope)
-                log.info(f"Key '{key}' successfully deleted.")
+                    log.info(f"Key '{key}' successfully deleted.")
             except Exception:
                 log.exception("An error occurred.")
 
@@ -198,7 +201,7 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
 @click.option("-s", "--short", is_flag=True, help="Show only the image references and digests.")
 @click.option("-i", "--installed", is_flag=True, help="Show only the installed images.")
 @click.pass_obj
-def list_images(cli_ctx, short, installed) -> None:
+def list_images(cli_ctx: CLIContext, short: bool, installed: bool) -> None:
     """List all configured images."""
     log.warning("etcd list-images command is deprecated, use image list instead")
     asyncio.run(list_images_impl(cli_ctx, short, installed))
@@ -208,7 +211,7 @@ def list_images(cli_ctx, short, installed) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
+def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Show the details of the given image or alias."""
     log.warning("etcd inspect-image command is deprecated, use image inspect instead")
     asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
@@ -218,7 +221,7 @@ def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
 @click.pass_obj
-def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
+def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     """Forget (delete) a specific image."""
     log.warning("etcd forget-image command is deprecated, use image forget instead")
     asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
@@ -231,11 +234,11 @@ def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("architecture")
 @click.pass_obj
 def set_image_resource_limit(
-    cli_ctx,
-    canonical_or_alias,
-    slot_type,
-    range_value,
-    architecture,
+    cli_ctx: CLIContext,
+    canonical_or_alias: str,
+    slot_type: str,
+    range_value: tuple[Decimal | None, Decimal | None],
+    architecture: str,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
     log.warning(
@@ -288,7 +291,7 @@ def dealias(cli_ctx: CLIContext, alias: str) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def quote(cli_ctx: CLIContext, value: str) -> None:
+def quote(_cli_ctx: CLIContext, value: str) -> None:
     """
     Quote the given string for use as a URL piece in etcd keys.
     Use this to generate argument inputs for aliases and raw image keys.
@@ -299,7 +302,7 @@ def quote(cli_ctx: CLIContext, value: str) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def unquote(cli_ctx: CLIContext, value: str) -> None:
+def unquote(_cli_ctx: CLIContext, value: str) -> None:
     """
     Unquote the given string used as a URL piece in etcd keys.
     """
@@ -328,7 +331,7 @@ def set_storage_sftp_scaling_group(
     To enter multiple scaling groups concatenate names with comma(,).
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:
@@ -361,7 +364,7 @@ def remove_storage_sftp_scaling_group(
     Removes storage proxy node config's SFTP desginated scaling groups.
     """
 
-    async def _impl():
+    async def _impl() -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:

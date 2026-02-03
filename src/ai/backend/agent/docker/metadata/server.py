@@ -1,7 +1,7 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from http import HTTPStatus
-from typing import Any, List, Mapping, MutableMapping, cast
+from typing import Any, cast
 from uuid import UUID
 
 import attr
@@ -41,7 +41,7 @@ class RootContext(BaseContext):
     metadata_plugin_ctx: MetadataPluginContext
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -83,7 +83,7 @@ async def container_resolver_middleware(
     return await handler(request)
 
 
-async def list_versions(request: web.Request) -> web.Response:
+async def list_versions(_request: web.Request) -> web.Response:
     return web.Response(body="latest/")
 
 
@@ -91,7 +91,7 @@ class MetadataServer(aobject):
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
-    loaded_apps: List[str]
+    loaded_apps: list[str]
 
     def __init__(
         self,
@@ -113,12 +113,12 @@ class MetadataServer(aobject):
         self.loaded_apps = []
         self.route_structure = {"latest": {"extension": {}}}
 
-    async def __ainit__(self):
+    async def __ainit__(self) -> None:
         local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode
         log.info("Loading metadata plugin: meta-data")
-        metadata_plugin = ContainerMetadataPlugin({}, local_config)
+        metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
         self._init_subapp(
@@ -150,7 +150,7 @@ class MetadataServer(aobject):
             structure_pointer = self.route_structure
             for component in components:
                 if structure_pointer.get(component) is None:
-                    raise web.HTTPNotFound
+                    raise web.HTTPNotFound from None
                 structure_pointer = structure_pointer[component]
             resources = []
             for k, v in structure_pointer.items():
@@ -172,7 +172,7 @@ class MetadataServer(aobject):
     ) -> None:
         subapp.on_response_prepare.append(on_prepare)
 
-        async def _set_root_ctx(subapp: web.Application):
+        async def _set_root_ctx(subapp: web.Application) -> None:
             # Allow subapp's access to the root app properties.
             # These are the public APIs exposed to plugins as well.
             subapp["_root.context"] = root_app["_root.context"]

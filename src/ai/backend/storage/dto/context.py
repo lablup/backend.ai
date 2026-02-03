@@ -6,8 +6,7 @@ from aiohttp import web
 from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import MiddlewareParam
-
-from ..context import RootContext
+from ai.backend.storage.context import RootContext
 
 
 class StorageRootCtx(MiddlewareParam):

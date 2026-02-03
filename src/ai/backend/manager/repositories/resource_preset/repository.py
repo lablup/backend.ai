@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Mapping, Optional
+from typing import Any
 from uuid import UUID
 
 import trafaret as t
@@ -17,11 +18,10 @@ from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.resource_preset.types import (
-    ResourcePresetCreator,
-    ResourcePresetModifier,
-)
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 
 from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
@@ -66,7 +66,9 @@ class ResourcePresetRepository:
         self._config_provider = config_provider
 
     @resource_preset_repository_resilience.apply()
-    async def create_preset_validated(self, creator: ResourcePresetCreator) -> ResourcePresetData:
+    async def create_preset_validated(
+        self, creator: Creator[ResourcePresetRow]
+    ) -> ResourcePresetData:
         """
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
@@ -116,7 +118,7 @@ class ResourcePresetRepository:
 
     @resource_preset_repository_resilience.apply()
     async def get_preset_by_id_or_name(
-        self, preset_id: Optional[UUID], name: Optional[str]
+        self, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetData:
         """
         Gets a resource preset by ID or name.
@@ -127,22 +129,25 @@ class ResourcePresetRepository:
 
     @resource_preset_repository_resilience.apply()
     async def modify_preset_validated(
-        self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
+        self, updater: Updater[ResourcePresetRow]
     ) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.modify_preset(preset_id, name, modifier)
+        preset = await self._db_source.modify_preset(updater)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):
-            await self._cache_source.invalidate_preset(preset_id, name)
+            await self._cache_source.invalidate_preset(
+                updater.pk_value if isinstance(updater.pk_value, UUID) else None,
+                None,
+            )
         return preset
 
     @resource_preset_repository_resilience.apply()
     async def delete_preset_validated(
-        self, preset_id: Optional[UUID], name: Optional[str]
+        self, preset_id: UUID | None, name: str | None
     ) -> ResourcePresetData:
         """
         Deletes a resource preset.
@@ -157,9 +162,7 @@ class ResourcePresetRepository:
         return preset
 
     @resource_preset_repository_resilience.apply()
-    async def list_presets(
-        self, scaling_group_name: Optional[str] = None
-    ) -> list[ResourcePresetData]:
+    async def list_presets(self, scaling_group_name: str | None = None) -> list[ResourcePresetData]:
         """
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
@@ -187,8 +190,8 @@ class ResourcePresetRepository:
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, str],
-        scaling_group: Optional[str] = None,
+        resource_policy: Mapping[str, Any],
+        scaling_group: str | None = None,
     ) -> CheckPresetsResult:
         """
         Check resource presets availability and resource limits.

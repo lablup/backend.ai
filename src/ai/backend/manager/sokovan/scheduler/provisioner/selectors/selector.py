@@ -5,13 +5,23 @@ This module defines the interface for agent selection that abstracts away
 the row-based implementation details of the legacy selectors.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Optional, Sequence
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -19,6 +29,10 @@ from .exceptions import (
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
+    from ai.backend.manager.sokovan.data import AgentOccupancy
 
 
 @dataclass
@@ -39,6 +53,33 @@ class AgentInfo:
     scaling_group: str
     # Number of containers currently running on the agent
     container_count: int
+
+    @classmethod
+    def from_meta_and_occupancy(
+        cls,
+        meta: AgentMeta,
+        occupancy_map: Mapping[AgentId, AgentOccupancy],
+    ) -> AgentInfo:
+        """
+        Create an AgentInfo from agent metadata and occupancy mapping.
+
+        Args:
+            meta: Agent metadata containing static information
+            occupancy_map: Mapping of agent IDs to occupancy data
+
+        Returns:
+            AgentInfo instance with occupancy data looked up by agent ID
+        """
+        occupancy = occupancy_map.get(meta.id)
+        return cls(
+            agent_id=meta.id,
+            agent_addr=meta.addr,
+            architecture=meta.architecture,
+            scaling_group=meta.scaling_group,
+            available_slots=meta.available_slots,
+            occupied_slots=occupancy.occupied_slots if occupancy else ResourceSlot(),
+            container_count=occupancy.container_count if occupancy else 0,
+        )
 
 
 @dataclass
@@ -82,7 +123,7 @@ class AgentSelectionConfig:
     """Configuration for agent selection."""
 
     # Maximum number of containers allowed per agent
-    max_container_count: Optional[int]
+    max_container_count: int | None
     # Whether to enforce endpoint replica spreading (from sgroup_opts)
     enforce_spreading_endpoint_replica: bool = False
 
@@ -129,7 +170,7 @@ class AgentSelectionCriteria:
     # Mapping of kernel IDs to their resource specifications
     kernel_requirements: Mapping[UUID, KernelResourceSpec]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
-    kernel_counts_at_endpoint: Optional[Mapping[AgentId, int]] = None
+    kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
@@ -176,16 +217,15 @@ class AgentSelectionCriteria:
                     kernel_ids=kernel_ids,
                 )
             ]
-        else:
-            # Return individual kernel resources for multi-node sessions
-            return [
-                ResourceRequirements(
-                    requested_slots=req.requested_slots,
-                    required_architecture=req.required_architecture,
-                    kernel_ids=[kernel_id],
-                )
-                for kernel_id, req in self.kernel_requirements.items()
-            ]
+        # Return individual kernel resources for multi-node sessions
+        return [
+            ResourceRequirements(
+                requested_slots=req.requested_slots,
+                required_architecture=req.required_architecture,
+                kernel_ids=[kernel_id],
+            )
+            for kernel_id, req in self.kernel_requirements.items()
+        ]
 
 
 class AbstractAgentSelector(ABC):
@@ -248,12 +288,24 @@ class AgentSelector:
     def __init__(self, strategy: AbstractAgentSelector) -> None:
         self._strategy = strategy
 
+    def strategy_name(self) -> str:
+        """
+        Return the strategy name for predicates.
+        """
+        return self._strategy.name()
+
+    def strategy_success_message(self) -> str:
+        """
+        Return a message describing successful agent selection.
+        """
+        return self._strategy.success_message()
+
     async def select_agents_for_batch_requirements(
         self,
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> list[AgentSelection]:
         """
         Select agents for a batch of resource requirements.
@@ -326,7 +378,7 @@ class AgentSelector:
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
         arch_compatible_trackers: list[AgentStateTracker] = []
@@ -426,8 +478,6 @@ class AgentSelector:
 
                 # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
                 if resource_name == "mem":
-                    from ai.backend.common.types import BinarySize
-
                     insufficient_details[resource_name] = (
                         str(BinarySize(requested)),
                         str(BinarySize(available)),

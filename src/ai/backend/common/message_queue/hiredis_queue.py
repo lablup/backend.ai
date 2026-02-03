@@ -2,7 +2,8 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import AsyncGenerator, Mapping, Optional
+from collections.abc import AsyncGenerator, Mapping
+from typing import Any, cast
 
 import hiredis
 from aiotools.server import process_index
@@ -10,9 +11,9 @@ from aiotools.server import process_index
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.redis_client import RedisConnection
+from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import RedisTarget
 from .queue import AbstractMessageQueue
 from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
@@ -43,7 +44,7 @@ class HiRedisQueue(AbstractMessageQueue):
     _consumer_id: str
     _closed: bool
     # loop tasks for consuming messages
-    _loop_tasks: list[asyncio.Task]
+    _loop_tasks: list[asyncio.Task[Any]]
 
     def __init__(self, target: RedisTarget, args: RedisMQArgs) -> None:
         self._target = target
@@ -113,14 +114,14 @@ class HiRedisQueue(AbstractMessageQueue):
                 ],
             ])
 
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         if self._closed:
             raise RuntimeError("Queue is closed")
         async with RedisConnection(self._target, db=self._db) as client:
             reply = await client.execute(["GET", cache_id])
             if reply is None:
                 return None
-            return load_json(reply)
+            return cast(Mapping[str, str] | None, load_json(reply))
 
     async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
@@ -364,7 +365,7 @@ class HiRedisQueue(AbstractMessageQueue):
             log.error("Error while creating group: {}", internal_e)
 
 
-def _generate_consumer_id(node_id: Optional[str]) -> str:
+def _generate_consumer_id(node_id: str | None) -> str:
     h = hashlib.sha1(usedforsecurity=False)
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()

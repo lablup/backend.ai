@@ -1,12 +1,12 @@
 import asyncio
 from asyncio import Future
 from pathlib import Path
-from typing import Set, Tuple
+from typing import Any
 
 import attrs
 from pydantic import BaseModel
 
-from ai.backend.common.utils import current_loop
+from ai.backend.common.asyncio import current_loop
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -26,7 +26,7 @@ async def proxy_connection(
 ) -> None:
     up_reader, up_writer = await asyncio.open_unix_connection(str(upper_sock_path))
 
-    async def _downstream():
+    async def _downstream() -> None:
         try:
             while True:
                 data = await up_reader.read(4096)
@@ -41,7 +41,7 @@ async def proxy_connection(
             await down_writer.wait_closed()
             await asyncio.sleep(0)
 
-    async def _upstream():
+    async def _upstream() -> None:
         try:
             while True:
                 data = await down_reader.read(4096)
@@ -66,8 +66,9 @@ async def proxy_connection(
     # docker commands are usually disconnected by the client first, but the connections for
     # long-running streaming commands are disconnected by the server first when the server-side
     # processing finishes.
+    pending: set[Future[Any]] = set()
     try:
-        task_results: Tuple[Set[Future], Set[Future]] = await asyncio.wait(
+        task_results: tuple[set[Future[Any]], set[Future[Any]]] = await asyncio.wait(
             tasks, return_when=asyncio.FIRST_COMPLETED
         )
         done, pending = task_results

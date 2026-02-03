@@ -1,17 +1,20 @@
+from __future__ import annotations
+
 import uuid
 
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
-from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class ObjectStorageDBSource:
@@ -29,7 +32,7 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow).where(ObjectStorageRow.name == storage_name)
             result = await db_session.execute(query)
-            row: ObjectStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with name {storage_name} not found."
@@ -43,7 +46,7 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow).where(ObjectStorageRow.id == storage_id)
             result = await db_session.execute(query)
-            row: ObjectStorageRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
             return row.to_dataclass()
@@ -59,43 +62,36 @@ class ObjectStorageDBSource:
                 .options(selectinload(StorageNamespaceRow.object_storage_row))
             )
             result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
+            row = result.scalar_one_or_none()
             if row is None:
                 raise ObjectStorageNotFoundError(
                     f"Object storage with namespace ID {storage_namespace_id} not found."
                 )
+            if row.object_storage_row is None:
+                raise ObjectStorageNotFoundError(
+                    f"Object storage not found for namespace ID {storage_namespace_id}."
+                )
             return row.object_storage_row.to_dataclass()
 
-    async def create(self, creator: ObjectStorageCreator) -> ObjectStorageData:
+    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            object_storage_data = creator.fields_to_store()
-            object_storage_row = ObjectStorageRow(**object_storage_data)
-            db_session.add(object_storage_row)
-            await db_session.flush()
-            await db_session.refresh(object_storage_row)
-            return object_storage_row.to_dataclass()
+            creator_result = await execute_creator(db_session, creator)
+            return creator_result.row.to_dataclass()
 
-    async def update(
-        self, storage_id: uuid.UUID, modifier: ObjectStorageModifier
-    ) -> ObjectStorageData:
+    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            data = modifier.fields_to_update()
-            update_stmt = (
-                sa.update(ObjectStorageRow)
-                .where(ObjectStorageRow.id == storage_id)
-                .values(**data)
-                .returning(*sa.select(ObjectStorageRow).selected_columns)
-            )
-            stmt = sa.select(ObjectStorageRow).from_statement(update_stmt)
-            row: ObjectStorageRow = (await db_session.execute(stmt)).scalars().one()
-
-            return row.to_dataclass()
+            result = await execute_updater(db_session, updater)
+            if result is None:
+                raise ObjectStorageNotFoundError(
+                    f"Object storage with ID {updater.pk_value} not found."
+                )
+            return result.row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
         """
@@ -109,6 +105,8 @@ class ObjectStorageDBSource:
             )
             result = await db_session.execute(delete_query)
             deleted_id = result.scalar()
+            if deleted_id is None:
+                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
             return deleted_id
 
     async def list_object_storages(self) -> list[ObjectStorageData]:
@@ -118,5 +116,28 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             query = sa.select(ObjectStorageRow)
             result = await db_session.execute(query)
-            rows: list[ObjectStorageRow] = result.scalars().all()
+            rows = result.scalars().all()
             return [row.to_dataclass() for row in rows]
+
+    async def search(
+        self,
+        querier: BatchQuerier,
+    ) -> ObjectStorageListResult:
+        """Searches Object storages with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ObjectStorageRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ObjectStorageRow.to_dataclass() for row in result.rows]
+
+            return ObjectStorageListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

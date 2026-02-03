@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ..types import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
+
 from .repository import DeploymentRepository
 
 

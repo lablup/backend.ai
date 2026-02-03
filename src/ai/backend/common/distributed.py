@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Callable, Final
+from collections.abc import Callable
+from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 
@@ -41,7 +42,7 @@ class GlobalTimer:
         self.initial_delay = initial_delay
         self.task_name = task_name
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def generate_tick(self) -> None:
         try:
             await asyncio.sleep(self.initial_delay)
@@ -50,15 +51,15 @@ class GlobalTimer:
             while True:
                 try:
                     async with self._dist_lock:
-                        if self._stopped:
-                            return
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
                         await self._event_producer.anycast_event(self._event_factory())
-                        if self._stopped:
-                            return
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
                         await asyncio.sleep(self.interval)
                 except Exception:
-                    if self._stopped:
-                        return
+                    if self._stopped:  # _stopped can change during await
+                        return  # type: ignore[unreachable]
                     log.debug("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass

@@ -2,10 +2,9 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -27,7 +26,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         self,
         deployment_executor: DeploymentExecutor,
         deployment_controller: DeploymentController,
-    ):
+    ) -> None:
         self._deployment_executor = deployment_executor
         self._deployment_controller = deployment_controller
 
@@ -37,9 +36,9 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return "check-replica-deployments"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
-        """No lock needed for checking replicas."""
-        return None
+    def lock_id(self) -> LockID | None:
+        """Lock for checking replicas."""
+        return LockID.LOCKID_DEPLOYMENT_CHECK_REPLICA
 
     @classmethod
     def target_statuses(cls) -> list[EndpointLifecycle]:
@@ -47,13 +46,25 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         return [EndpointLifecycle.READY]
 
     @classmethod
-    def next_status(cls) -> Optional[EndpointLifecycle]:
+    def next_status(cls) -> EndpointLifecycle | None:
         """Get the next deployment status after this handler's operation."""
         return EndpointLifecycle.SCALING
 
     @classmethod
-    def failure_status(cls) -> Optional[EndpointLifecycle]:
+    def failure_status(cls) -> EndpointLifecycle | None:
         return None
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        """Define state transitions for check replica deployment handler (BEP-1030).
+
+        - success: Deployment → SCALING
+        - failure: None (stays in current state)
+        """
+        return DeploymentStatusTransitions(
+            success=EndpointLifecycle.SCALING,
+            failure=None,
+        )
 
     async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
         """Check and manage deployment replicas."""
@@ -62,7 +73,7 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         # Calculate desired replicas and adjust
         return await self._deployment_executor.calculate_desired_replicas(deployments)
 
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
+    async def post_process(self, _result: DeploymentExecutionResult) -> None:
         """Handle post-processing after checking replicas."""
         log.debug("Post-processing after checking deployment replicas")
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.SCALING)

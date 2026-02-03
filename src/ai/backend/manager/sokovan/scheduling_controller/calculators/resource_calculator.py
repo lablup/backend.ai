@@ -1,8 +1,9 @@
 """Stateless calculator for resource requirements."""
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, cast
 
 from ai.backend.common.types import (
     BinarySize,
@@ -21,8 +22,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationContext,
     SessionCreationSpec,
 )
-
-from ..types import CalculatedResources, KernelResourceInfo
+from ai.backend.manager.sokovan.scheduling_controller.types import (
+    CalculatedResources,
+    KernelResourceInfo,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,7 +33,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ResourceCalculator:
     """Stateless calculator for resource requirements."""
 
-    def __init__(self, config_provider: ManagerConfigProvider):
+    def __init__(self, config_provider: ManagerConfigProvider) -> None:
         self._config_provider = config_provider
 
     async def calculate(
@@ -114,10 +117,10 @@ class ResourceCalculator:
     async def calculate_kernel_resources(
         self,
         validated_scaling_group: AllowedScalingGroup,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_info: ImageInfo,
-        scaling_group_network: ScalingGroupNetworkInfo,
-    ) -> tuple[ResourceSlot, dict]:
+        _scaling_group_network: ScalingGroupNetworkInfo,
+    ) -> tuple[ResourceSlot, dict[str, Any]]:
         """
         Calculate resource requirements for a kernel.
 
@@ -203,7 +206,7 @@ class ResourceCalculator:
 
     async def _calculate_requested_slots(
         self,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -215,17 +218,16 @@ class ResourceCalculator:
                 image_min_slots,
                 known_slot_types,
             )
-        else:
-            # Legacy client support (prior to v19.03)
-            return await self._calculate_from_legacy(
-                creation_config,
-                image_min_slots,
-                known_slot_types,
-            )
+        # Legacy client support (prior to v19.03)
+        return await self._calculate_from_legacy(
+            creation_config,
+            image_min_slots,
+            known_slot_types,
+        )
 
     async def _calculate_from_resources(
         self,
-        resources: dict,
+        resources: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -237,11 +239,11 @@ class ResourceCalculator:
 
         try:
             requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
-        except ValueError:
+        except ValueError as e:
             log.exception("request_slots & image_slots calculation error")
             raise InvalidAPIParameters(
                 "Your resource request has resource type(s) not supported by the image."
-            )
+            ) from e
 
         # Fill intrinsic resources with image minimums if not specified
         for k, v in requested_slots.items():
@@ -252,7 +254,7 @@ class ResourceCalculator:
 
     async def _calculate_from_legacy(
         self,
-        creation_config: dict,
+        creation_config: dict[str, Any],
         image_min_slots: ResourceSlot,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
@@ -285,14 +287,14 @@ class ResourceCalculator:
         self,
         validated_scaling_group: AllowedScalingGroup,
         resource_opts: dict[str, Any],
-        image_labels: dict,
+        image_labels: dict[str, Any],
         image_min_slots: ResourceSlot,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Apply shared memory adjustments to resource options."""
         resource_opts = resource_opts.copy()
 
         # Get shared memory size
-        raw_shmem: Optional[str] = resource_opts.get("shmem")
+        raw_shmem: str | None = resource_opts.get("shmem")
         if raw_shmem is None:
             raw_shmem = image_labels.get("ai.backend.resource.preferred.shmem")
         if not raw_shmem:
@@ -300,10 +302,11 @@ class ResourceCalculator:
 
         try:
             shmem = BinarySize.from_str(raw_shmem)
-        except ValueError:
+        except ValueError as e:
             log.warning(
                 f"Failed to convert raw `shmem({raw_shmem})` "
-                f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
+                f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE}).",
+                exc_info=e,
             )
             shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
 
@@ -326,15 +329,18 @@ class ResourceCalculator:
         self,
         requested_slots: ResourceSlot,
         image_min_slots: ResourceSlot,
-        image_max_slots: ResourceSlot,
-        shmem: Optional[BinarySize],
+        _image_max_slots: ResourceSlot,
+        shmem: BinarySize | None,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> None:
         """Validate requested resources against image limits."""
         # Check if: requested >= image-minimum
         if image_min_slots > requested_slots:
             min_humanized = " ".join(
-                f"{k}={v}" for k, v in image_min_slots.to_humanized(known_slot_types).items()
+                f"{k}={v}"
+                for k, v in image_min_slots.to_humanized(
+                    cast(Mapping[str, Any], known_slot_types)
+                ).items()
             )
             raise InvalidAPIParameters(
                 f"Your resource request is smaller than the minimum required by the image. ({min_humanized})"

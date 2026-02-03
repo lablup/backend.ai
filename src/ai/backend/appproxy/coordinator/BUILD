@@ -34,7 +34,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "app-proxy-coordinator": "ai.backend.appproxy.coordinator.cli.__main__:main",
-            "app-proxy-coordinator.start-server": "ai.backend.appproxy.coordinator.server:main",
+            "app-proxy-coordinator.start-server": "ai.backend.appproxy.coordinator.cli.start_server:main",
         },
     },
     generate_setup=True,

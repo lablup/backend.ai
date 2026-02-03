@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.kernel.broadcast import (
     BaseKernelEvent,
     KernelCancelledBroadcastEvent,
@@ -25,15 +25,17 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionFailureBroadcastEvent,
-    SessionScheduledBroadcastEvent,
-    SessionStartedBroadcastEvent,
     SessionSuccessBroadcastEvent,
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.hub import WILDCARD, EventPropagator
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRole
 
 if TYPE_CHECKING:
     from aiohttp_sse import EventSourceResponse
@@ -50,7 +52,7 @@ class SessionEventPropagator(EventPropagator):
     """
 
     _id: uuid.UUID
-    _queue: asyncio.Queue[Optional[AbstractEvent]]
+    _queue: asyncio.Queue[AbstractEvent | None]
     _closed: bool
     _response: EventSourceResponse
     _db: ExtendedAsyncSAEngine
@@ -129,9 +131,7 @@ class SessionEventPropagator(EventPropagator):
             log.warning("Failed to send SSE event: {}", e)
             await self.close()
 
-    async def _get_event_data(
-        self, event: AbstractEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    async def _get_event_data(self, event: AbstractEvent) -> tuple[str, Mapping[str, Any]] | None:
         """Get event data from database based on event type."""
         match event:
             case SchedulingBroadcastEvent():
@@ -148,8 +148,6 @@ class SessionEventPropagator(EventPropagator):
                 return await self._fetch_kernel_data(event)
             case (
                 SessionEnqueuedBroadcastEvent()
-                | SessionScheduledBroadcastEvent()
-                | SessionStartedBroadcastEvent()
                 | SessionCancelledBroadcastEvent()
                 | SessionTerminatingBroadcastEvent()
                 | SessionTerminatedBroadcastEvent()
@@ -163,14 +161,12 @@ class SessionEventPropagator(EventPropagator):
 
     async def _fetch_kernel_data(
         self, event: BaseKernelEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch kernel data from database."""
         try:
-            from ai.backend.manager.models import kernels
-
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
                 query = (
-                    sa.select([
+                    sa.select(
                         kernels.c.id,
                         kernels.c.session_id,
                         kernels.c.session_name,
@@ -180,7 +176,7 @@ class SessionEventPropagator(EventPropagator):
                         kernels.c.domain_name,
                         kernels.c.group_id,
                         kernels.c.user_uuid,
-                    ])
+                    )
                     .select_from(kernels)
                     .where(kernels.c.id == event.kernel_id)
                 )
@@ -200,12 +196,10 @@ class SessionEventPropagator(EventPropagator):
 
     async def _fetch_session_data(
         self, event: BaseSessionEvent | SchedulingBroadcastEvent
-    ) -> Optional[tuple[str, Mapping[str, Any]]]:
+    ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch session data from database."""
         event_name = event.event_name()
         try:
-            from ai.backend.manager.models.session import SessionRow
-
             async with self._db.begin_readonly_session(
                 isolation_level="READ COMMITTED"
             ) as db_session:
@@ -252,8 +246,6 @@ class SessionEventPropagator(EventPropagator):
 
     async def _should_send_event(self, event_data: Mapping[str, Any]) -> bool:
         """Check if event should be sent based on filters."""
-        from ai.backend.manager.models import UserRole
-
         user_role = self._filters.get("user_role")
         user_uuid = self._filters.get("user_uuid")
         domain_name = self._filters.get("domain_name")

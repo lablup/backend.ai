@@ -9,7 +9,7 @@ Create Date: 2025-11-06 02:15:23.499766
 import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.data.notification import NotificationChannelType
+from ai.backend.common.data.notification import NotificationChannelType
 from ai.backend.manager.models.base import GUID, EnumType
 
 # revision identifiers, used by Alembic.

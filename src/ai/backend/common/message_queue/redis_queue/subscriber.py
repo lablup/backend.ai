@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable
-from typing import AsyncGenerator, Optional, Self, override
+from collections.abc import AsyncGenerator, Iterable
+from typing import Any, Self, override
 
 import glide
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.message_queue.abc import AbstractSubscriber
+from ai.backend.common.message_queue.types import BroadcastMessage
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
-
-from ..abc import AbstractSubscriber
-from ..types import BroadcastMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -29,7 +28,7 @@ class RedisSubscriber(AbstractSubscriber):
     _subscribe_queue: asyncio.Queue[BroadcastMessage]
     _channels: set[str]
     _closed: bool
-    _loop_task: Optional[asyncio.Task]
+    _loop_task: asyncio.Task[Any] | None
 
     def __init__(self, client: ValkeyStreamClient, channels: Iterable[str]) -> None:
         """

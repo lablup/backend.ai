@@ -1,10 +1,9 @@
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     Any,
     Final,
-    Optional,
     Self,
     cast,
 )
@@ -137,12 +136,12 @@ class ValkeyLiveClient:
         return await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_live_resilience.apply()
-    async def get_live_data(self, key: str) -> Optional[bytes]:
+    async def get_live_data(self, key: str) -> bytes | None:
         """Get live data value by key."""
         return await self._client.client.get(key)
 
     @valkey_live_resilience.apply()
-    async def get_multiple_live_data(self, keys: list[str]) -> list[Optional[bytes]]:
+    async def get_multiple_live_data(self, keys: list[str]) -> list[bytes | None]:
         """
         Get multiple live data keys in a single batch operation.
 
@@ -159,8 +158,8 @@ class ValkeyLiveClient:
         key: str,
         value: str | bytes,
         *,
-        ex: Optional[int] = None,
-        xx: Optional[bool] = None,
+        ex: int | None = None,
+        xx: bool | None = None,
     ) -> None:
         """Store live data value for key with optional expiration."""
         expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION if ex is None else ex)
@@ -172,8 +171,8 @@ class ValkeyLiveClient:
         self,
         data: Mapping[str, str | bytes],
         *,
-        ex: Optional[int] = None,
-        xx: Optional[bool] = None,
+        ex: int | None = None,
+        xx: bool | None = None,
     ) -> None:
         """Store multiple live data values for key with optional expiration."""
         if not data:
@@ -196,7 +195,7 @@ class ValkeyLiveClient:
         self,
         key: str,
         *,
-        ex: Optional[int] = None,
+        ex: int | None = None,
     ) -> int:
         """Increment a key in the live data."""
         expiration_sec = _DEFAULT_EXPIRATION if ex is None else ex
@@ -204,7 +203,7 @@ class ValkeyLiveClient:
         batch.incr(key)
         batch.expire(key, expiration_sec)
         results = await self._execute_batch(batch)
-        return results[0]
+        return cast(int, results[0])
 
     @valkey_live_resilience.apply()
     async def replace_schedule_data(self, key: str, values: Mapping[str, str]) -> None:
@@ -264,9 +263,6 @@ class ValkeyLiveClient:
         :return: Dictionary of field names to values.
         """
         result = await self._client.client.hgetall(name)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
         for key, value in result.items():
@@ -403,7 +399,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def get_session_statistics_batch(
         self, session_ids: list[str]
-    ) -> list[Optional[dict[str, int]]]:
+    ) -> list[dict[str, int] | None]:
         """
         Get session statistics (requests and last response time) for multiple sessions.
 
@@ -425,7 +421,7 @@ class ValkeyLiveClient:
         results = await self.get_multiple_live_data(keys)
 
         # Process results in pairs (requests, last_response_time)
-        stats: list[Optional[dict[str, int]]] = []
+        stats: list[dict[str, int] | None] = []
         for i in range(0, len(results), 2):
             requests_result = results[i]
             last_response_result = results[i + 1]
@@ -522,9 +518,6 @@ class ValkeyLiveClient:
         :return: Dictionary of field names to values.
         """
         result = await self._client.client.hgetall(key)
-        if result is None:
-            return {}
-
         # Convert bytes keys and values to strings
         str_result: dict[str, str] = {}
         for k, v in result.items():
@@ -539,7 +532,7 @@ class ValkeyLiveClient:
         self,
         endpoint_id: UUID,
         connection_info: dict[str, Any],
-        health_check_config: Optional[ModelHealthCheck],
+        health_check_config: ModelHealthCheck | None,
     ) -> None:
         pipe = self._create_batch()
         pipe.set(
@@ -594,3 +587,13 @@ class ValkeyLiveClient:
         :return: The value for active app connections.
         """
         return f"{kernel_id}:{service}:{stream_id}"
+
+    @valkey_live_resilience.apply()
+    async def exists(self, keys: Sequence[str]) -> int:
+        """
+        Check if keys exist.
+
+        :param keys: List of keys to check.
+        :return: Number of keys that exist.
+        """
+        return await self._client.client.exists(cast(list[str | bytes], list(keys)))

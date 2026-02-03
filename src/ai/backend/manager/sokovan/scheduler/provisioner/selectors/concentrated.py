@@ -8,8 +8,8 @@ resource utilization by concentrating workloads.
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Sequence, Union
 
 from ai.backend.common.types import SessionTypes
 
@@ -72,7 +72,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         )
 
         # Choose the tracker with minimum resources (to concentrate workloads)
-        def tracker_sort_key(tracker: AgentStateTracker) -> tuple[Union[int, Decimal], ...]:
+        def tracker_sort_key(tracker: AgentStateTracker) -> tuple[int | Decimal, ...]:
             agent = tracker.original_agent
             occupied_slots = tracker.get_current_occupied_slots()
             sort_key: list[int | Decimal] = []
@@ -95,6 +95,4 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
 
             return tuple(sort_key)
 
-        chosen_tracker = min(trackers, key=tracker_sort_key)
-
-        return chosen_tracker
+        return min(trackers, key=tracker_sort_key)
