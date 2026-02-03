@@ -18,21 +18,25 @@ from ai.backend.logging.formatter import CustomJsonFormatter
 
 @dataclass
 class OpenTelemetrySpec:
-    service_id: uuid.UUID
     service_name: str
     service_version: str
     log_level: str
     endpoint: str
-    service_instance_id: str | None = None
+    service_instance_name: str
 
     def to_resource(self) -> Resource:
+        # Generate stable UUID from instance name using UUID v5
+        # as recommended by OpenTelemetry specification
+        # Official OTEL namespace UUID for service.instance.id generation
+        otel_namespace_uuid = uuid.UUID("4d63009a-8d0f-11ee-aad7-4c796ed8e320")
+        instance_uuid = uuid.uuid5(otel_namespace_uuid, self.service_instance_name)
+
         attributes = {
             "service.name": self.service_name,
-            "service.id": str(self.service_id),
             "service.version": self.service_version,
+            "service.instance.id": str(instance_uuid),
+            "service.instance.name": self.service_instance_name,
         }
-        if self.service_instance_id:
-            attributes["service.instance.id"] = self.service_instance_id
         return Resource.create(attributes)
 
 
