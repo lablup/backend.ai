@@ -30,7 +30,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         raise DeprecationWarning(
             "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
         )
-        yield ""  # dead code to ensure the type of method
+        yield ""  # type: ignore[unreachable]  # dead code to ensure the type of method
 
     async def fetch_repositories_legacy(
         self,

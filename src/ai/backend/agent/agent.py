@@ -1696,14 +1696,13 @@ class AbstractAgent[
                 if self.local_config.debug.log_events:
                     log.info(f"lifecycle event: {ev!r}")
                 try:
-                    if ev.event == LifecycleEvent.START:
-                        tg.create_task(self._handle_start_event(ev))
-                    elif ev.event == LifecycleEvent.DESTROY:
-                        tg.create_task(self._handle_destroy_event(ev))
-                    elif ev.event == LifecycleEvent.CLEAN:
-                        tg.create_task(self._handle_clean_event(ev))
-                    else:
-                        log.warning("unsupported lifecycle event: {!r}", ev)
+                    match ev.event:
+                        case LifecycleEvent.START:
+                            tg.create_task(self._handle_start_event(ev))
+                        case LifecycleEvent.DESTROY:
+                            tg.create_task(self._handle_destroy_event(ev))
+                        case LifecycleEvent.CLEAN:
+                            tg.create_task(self._handle_clean_event(ev))
                 except Exception:
                     log.exception(
                         "unexpected error in process_lifecycle_events(): {!r}, continuing...",
@@ -3094,7 +3093,11 @@ class AbstractAgent[
                                     for live_service in live_services["data"]:
                                         for service_port in service_ports:
                                             if live_service["name"] == service_port["name"]:
+                                                # Preserve protocol from image labels, don't overwrite with live_service data
+                                                original_protocol = service_port.get("protocol")
                                                 service_port.update(live_service)
+                                                if original_protocol is not None:
+                                                    service_port["protocol"] = original_protocol
                                                 break
                                 else:
                                     log.warning(

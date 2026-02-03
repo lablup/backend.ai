@@ -844,13 +844,9 @@ async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
     advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
-    if advertised_addr is None:
-        return web.json_response({
-            "api_version": "v2",
-        })
     return web.json_response({
         "api_version": "v2",
-        "advertise_address": str(advertised_addr),
+        "advertise_address": advertised_addr,
     })
 
 
@@ -930,7 +926,7 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] = [],
+    subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
     root_ctx.metrics = CoordinatorMetricRegistry.instance()
@@ -1002,8 +998,6 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
-    if subapp_pkgs is None:
-        subapp_pkgs = []
     for pkg_name in subapp_pkgs:
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])

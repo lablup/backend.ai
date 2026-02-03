@@ -345,9 +345,10 @@ class SessionService:
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
-            await self._session_repository.resolve_image([
-                ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
-            ])
+            await self._session_repository.resolve_image(
+                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
+                alive_only=False,
+            )
 
         # Create manifest for background task
         manifest = CommitSessionManifest(
@@ -887,20 +888,6 @@ class SessionService:
                     opts,
                     flush_timeout=2.0,
                 )
-                if raw_result is None:
-                    # the kernel may have terminated from its side,
-                    # or there was interruption of agents.
-                    resp["result"] = {
-                        "status": "finished",
-                        "runId": run_id,
-                        "exitCode": 130,
-                        "options": {},
-                        "files": [],
-                        "console": [],
-                    }
-                    return ExecuteSessionActionResult(
-                        result=resp, session_data=session.to_dataclass()
-                    )
                 # Keep internal/public API compatilibty
                 result = {
                     "status": raw_result["status"],

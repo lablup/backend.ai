@@ -23,6 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
+    VFolderMountPermission,
 )
 from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -449,7 +450,9 @@ class VFolderService:
                     host=access_info.vfolder_data.host,
                     status=access_info.vfolder_data.status,
                     unmanaged_path=access_info.vfolder_data.unmanaged_path,
-                    mount_permission=access_info.effective_permission,
+                    # None means owner, who has full permissions
+                    mount_permission=access_info.effective_permission
+                    or VFolderMountPermission.RW_DELETE,
                     usage_mode=access_info.vfolder_data.usage_mode,
                     created_at=access_info.vfolder_data.created_at,
                     cloneable=access_info.vfolder_data.cloneable,

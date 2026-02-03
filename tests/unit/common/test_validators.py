@@ -25,24 +25,28 @@ def test_aliased_key() -> None:
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "y" in err_data
     assert "is required" in err_data["y"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"y": 2})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "x" in err_data
     assert "is required" in err_data["x"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1, "y": "string"})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "y" in err_data
     assert "can't be converted to int" in err_data["y"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1, "Y": "string"})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "Y" in err_data
     assert "can't be converted to int" in err_data["Y"]
 
@@ -60,6 +64,7 @@ def test_aliased_key() -> None:
     with pytest.raises(t.DataError) as e:
         iv.check({"z": 99})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "z" in err_data
     assert "not allowed key" in err_data["z"]
 

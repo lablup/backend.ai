@@ -18,6 +18,7 @@ from ai.backend.appproxy.common.errors import (
 from ai.backend.appproxy.common.types import (
     CORSOptions,
     FrontendMode,
+    FrontendServerMode,
     ProxyProtocol,
     PydanticResponse,
     WebMiddleware,
@@ -31,8 +32,7 @@ from ai.backend.appproxy.worker.config import (
     WildcardDomainConfig,
 )
 from ai.backend.appproxy.worker.coordinator_client import get_circuit_info
-from ai.backend.appproxy.worker.errors import MissingPortConfigError
-from ai.backend.appproxy.worker.types import FrontendServerMode, InteractiveAppInfo, RootContext
+from ai.backend.appproxy.worker.types import InteractiveAppInfo, RootContext
 
 
 def generate_proxy_url(
@@ -107,7 +107,13 @@ async def setup(
     requested_circuit_id = UUID(jwt_body["circuit"])
 
     config = root_ctx.local_config.proxy_worker
-    port_config = config.port_proxy  # As a default fallback
+    port_config: (
+        PortProxyConfig
+        | WildcardDomainConfig
+        | TraefikPortProxyConfig
+        | TraefikWildcardDomainConfig
+        | None
+    ) = config.port_proxy  # As a default fallback
     circuit = await get_circuit_info(root_ctx, request["request_id"], str(requested_circuit_id))
 
     match config.frontend_mode:
@@ -140,12 +146,6 @@ async def setup(
                 raise ServerMisconfiguredError(
                     "proxy_worker: Missing root-level 'wildcard_domain' config section"
                 )
-        case _:
-            raise ServerMisconfiguredError(
-                f"proxy_worker: Invalid root-level 'frontend_mode': {config.frontend_mode}"
-            )
-    if port_config is None:
-        raise MissingPortConfigError("Port configuration is required")
 
     use_tls = config.tls_advertised or config.tls_listen
     if not isinstance(circuit.app_info, InteractiveAppInfo):

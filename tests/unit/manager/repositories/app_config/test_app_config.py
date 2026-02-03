@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import BinarySize, ValkeyTarget
+from ai.backend.common.types import BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
@@ -105,7 +105,7 @@ class TestAppConfigRepository:
                 name=domain_name,
                 description="Test domain for app config",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

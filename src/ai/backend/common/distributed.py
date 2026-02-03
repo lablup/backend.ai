@@ -51,15 +51,15 @@ class GlobalTimer:
             while True:
                 try:
                     async with self._dist_lock:
-                        if self._stopped:
-                            return
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
                         await self._event_producer.anycast_event(self._event_factory())
-                        if self._stopped:
-                            return
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
                         await asyncio.sleep(self.interval)
                 except Exception:
-                    if self._stopped:
-                        return
+                    if self._stopped:  # _stopped can change during await
+                        return  # type: ignore[unreachable]
                     log.debug("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass

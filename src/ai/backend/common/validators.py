@@ -698,11 +698,10 @@ class URL(t.Trafaret):
 
 
 class ToSet(t.Trafaret):
-    def check_and_return(self, value: Any) -> set[Any]:
+    def check_and_return(self, value: Any) -> set[Any]:  # noqa: RET503
         if isinstance(value, Iterable):
             return set(value)
-        self._failure("value must be Iterable")
-        return None
+        self._failure("value must be Iterable")  # raises DataError
 
 
 class ToNone(t.Trafaret):
@@ -723,7 +722,7 @@ class Delay(t.Trafaret):
     to use in time.sleep() or asyncio.sleep()
     """
 
-    def check_and_return(self, value: Any) -> float:
+    def check_and_return(self, value: Any) -> float:  # noqa: RET503
         match value:
             case float() | int():
                 return float(value)
@@ -732,8 +731,9 @@ class Delay(t.Trafaret):
             case None:
                 return 0
             case _:
-                self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
-        return None
+                self._failure(
+                    f"Value must be (float, tuple of float or None), not {type(value)}."
+                )  # raises DataError
 
 
 class SessionName(t.Regexp):

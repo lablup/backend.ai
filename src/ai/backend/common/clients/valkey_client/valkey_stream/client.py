@@ -181,8 +181,6 @@ class ValkeyStreamClient:
             return None
         messages: list[StreamMessage] = []
         for _, payload in result.items():
-            if payload is None:
-                continue
             for msg_id, msg_data in payload.items():
                 if msg_data is None:
                     continue

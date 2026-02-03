@@ -473,6 +473,8 @@ class ServicePortProtocols(enum.StrEnum):
     TCP = "tcp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
+    VNC = "vnc"
+    RDP = "rdp"
 
 
 class SessionTypes(CIStrEnum):
@@ -1220,8 +1222,6 @@ class VFolderID:
                 self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
             case None:
                 self.quota_scope_id = None
-            case _:
-                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
 
     def __str__(self) -> str:
         if self.quota_scope_id is None:
@@ -1421,7 +1421,7 @@ class ClusterInfo(TypedDict):
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_config: Mapping[str, Any]
-    ssh_keypair: ClusterSSHKeyPair
+    ssh_keypair: ClusterSSHKeyPair | None
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
 
 
@@ -1607,10 +1607,8 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
             result = f"{v:f}"
     elif isinstance(v, BinarySize):
         result = f"{int(v):d}"
-    elif isinstance(v, int):
-        result = f"{v:d}"
     else:
-        result = str(v)
+        result = f"{v:d}"
     return result
 
 

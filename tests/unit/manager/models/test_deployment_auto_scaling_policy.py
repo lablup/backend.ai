@@ -114,7 +114,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -207,7 +207,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 is_active=True,
                 domain_name=test_domain.name,
                 resource_policy=test_project_resource_policy.name,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)

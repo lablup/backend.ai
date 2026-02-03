@@ -117,7 +117,8 @@ async def netstat_ns(ns_path: Path) -> dict[str, Any]:
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
     short_cid = container.id[:7]
     try:
-        ret = await container.stats(stream=False)  # TODO: cache
+        # aiodocker may return list[dict] or dict depending on version
+        ret: list[dict[str, Any]] | dict[str, Any] = await container.stats(stream=False)
     except RuntimeError as e:
         msg = str(e.args[0]).lower()
         if "event loop is closed" in msg or "session is closed" in msg:

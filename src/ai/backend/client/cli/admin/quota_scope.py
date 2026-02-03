@@ -54,7 +54,7 @@ def _get_qsid_from_identifier(
                     fields=_user_query_fields,
                 )
                 if user_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 user_id = uuid.UUID(user_info["uuid"])
             else:
                 # Use the user_id as-is if it's already a valid uuid.
@@ -71,7 +71,7 @@ def _get_qsid_from_identifier(
                     fields=_project_query_fields,
                 )
                 if project_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 project_id = uuid.UUID(project_info["id"])
             else:
                 # Use the project_id as-is if it's already a valid uuid.

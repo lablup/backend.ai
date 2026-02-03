@@ -4,7 +4,7 @@ import asyncio
 import functools
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
@@ -366,41 +366,6 @@ async def connect_database(
     )
     yield db
     await db.dispose()
-
-
-@actxmgr
-async def reenter_txn(
-    pool: ExtendedAsyncSAEngine,
-    conn: SAConnection,
-    execution_opts: Mapping[str, Any] | None = None,
-) -> AsyncIterator[SAConnection]:
-    if conn is None:
-        async with pool.connect() as conn:
-            if execution_opts:
-                await conn.execution_options(**execution_opts)
-            async with conn.begin():
-                yield conn
-    else:
-        async with conn.begin_nested():
-            yield conn
-
-
-@actxmgr
-async def reenter_txn_session(
-    pool: ExtendedAsyncSAEngine,
-    sess: SASession,
-    read_only: bool = False,
-) -> AsyncIterator[SASession]:
-    if sess is None:
-        if read_only:
-            async with pool.begin_readonly_session() as sess:
-                yield sess
-        else:
-            async with pool.begin_session() as sess:
-                yield sess
-    else:
-        async with sess.begin_nested():
-            yield sess
 
 
 def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:

@@ -421,8 +421,7 @@ class HuggingFaceScanner:
                                 download_url=self._client.get_download_url(model, file.path),
                             )
                         case _:
-                            log.error("Unknown file type for {}, skipping...", file)
-                            continue
+                            continue  # type: ignore[unreachable]
                     file_infos.append(file_obj)
 
                 except Exception as e:

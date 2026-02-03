@@ -1606,8 +1606,6 @@ class SessionRow(Base):  # type: ignore[misc]
             case NetworkType.PERSISTENT:
                 network_row = await NetworkRow.get(db_sess, UUID(self.network_id))
                 return network_row.ref_name
-            case _:
-                return None
 
     @classmethod
     def get_status_elapsed_time(

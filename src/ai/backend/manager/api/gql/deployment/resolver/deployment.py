@@ -143,5 +143,5 @@ async def deployment_status_changed(
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    if False:  # Placeholder to satisfy type checker
-        yield DeploymentStatusChangedPayload(deployment=ModelDeployment())
+    raise NotImplementedError("Subscription not implemented")
+    yield  # type: ignore[unreachable]  # Makes this an async generator

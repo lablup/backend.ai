@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.error_log.types import (
     ErrorLogData,
     ErrorLogSeverity,
@@ -101,7 +101,7 @@ class TestErrorLogRepository:
                 name=domain_name,
                 description="Test domain for error log",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

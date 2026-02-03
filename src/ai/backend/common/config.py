@@ -431,7 +431,10 @@ def check(table: Any, iv: t.Trafaret) -> Any:
     try:
         config = iv.check(table)
     except t.DataError as e:
-        raise ConfigurationError(e.as_dict()) from e
+        err_data = e.as_dict()
+        if isinstance(err_data, str):
+            raise ConfigurationError({"error": err_data}) from e
+        raise ConfigurationError(err_data) from e
     else:
         return config
 

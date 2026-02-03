@@ -69,14 +69,6 @@ class KernelEventHandler:
             list_size = await self._valkey_container_log.container_log_len(
                 container_id=event.container_id
             )
-            if list_size is None:
-                # The log data is expired due to a very slow event delivery.
-                # (should never happen!)
-                log.warning(
-                    "tried to store console logs for cid:{}, but the data is expired",
-                    event.container_id,
-                )
-                return
             for _ in range(list_size):
                 # Read chunk-by-chunk to allow interleaving with other Redis operations.
                 chunks = await self._valkey_container_log.pop_container_logs(

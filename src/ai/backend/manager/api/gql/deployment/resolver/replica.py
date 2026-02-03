@@ -73,5 +73,5 @@ async def replica_status_changed(
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
     """Subscribe to replica status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    if False:  # Placeholder to satisfy type checker
-        yield ReplicaStatusChangedPayload(replica=ModelReplica())
+    raise NotImplementedError("Subscription not implemented")
+    yield  # type: ignore[unreachable]  # Makes this an async generator

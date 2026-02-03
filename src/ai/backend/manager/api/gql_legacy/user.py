@@ -478,7 +478,7 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Self | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> Self | None:
         if row is None:
             return None
         return cls(

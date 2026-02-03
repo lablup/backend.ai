@@ -11,7 +11,12 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import BinarySize, VFolderHostPermissionMap, VFolderUsageMode
+from ai.backend.common.types import (
+    BinarySize,
+    ResourceSlot,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.types import RoleSource
@@ -145,7 +150,7 @@ class TestVfolderRepository:
                 name=domain_name,
                 description="Test domain for vfolder",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -265,7 +270,7 @@ class TestVfolderRepository:
                 domain_name=test_domain_name,
                 description="Test model-store group",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_project_resource_policy_name,
                 type=ProjectType.MODEL_STORE,
@@ -356,7 +361,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -458,7 +463,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 domain_name=test_domain_name,
                 description="Test group with vfolder hosts",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={
                     "local": ["create-vfolder", "mount-in-session"],
                 },
@@ -532,7 +537,7 @@ class TestVfolderRepositoryPurge:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

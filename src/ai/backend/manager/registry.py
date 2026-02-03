@@ -404,9 +404,8 @@ class AgentRegistry:
         if len(alias_folders) != len(set(alias_folders)):
             raise InvalidAPIParameters("Duplicate alias folder name exists.")
 
-        alias_name: str
         for alias_name in alias_folders:
-            if alias_name is None:
+            if not isinstance(alias_name, str):
                 continue
             if alias_name.startswith("/home/work/"):
                 alias_name = alias_name.replace("/home/work/", "")

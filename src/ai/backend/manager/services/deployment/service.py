@@ -158,8 +158,6 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
             return ModelDeploymentStatus.STOPPING
         case EndpointLifecycle.DESTROYED:
             return ModelDeploymentStatus.STOPPED
-        case _:
-            return ModelDeploymentStatus.PENDING
 
 
 def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
