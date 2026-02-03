@@ -269,7 +269,6 @@ python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/py
 disable_error_code = ["typeddict-unknown-key"]
 
 # Ignore errors in alembic migration files
-# These are auto-generated, write-once files with SQLAlchemy 2.0 type stub incompatibilities
 [[tool.mypy.overrides]]
 module = [
     "ai.backend.manager.models.alembic.versions.*",
