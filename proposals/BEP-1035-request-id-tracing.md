@@ -129,15 +129,15 @@ Detailed specifications are organized into component-specific documents:
 
 ### Phase 1: Common Infrastructure
 
-1. Add RPC headers model to common
-2. Add decorator for background task/event handler context binding
-3. Add context utilities for request ID propagation
+1. Add decorator for background task/event handler context binding
+2. Enhance context utilities for request ID propagation
 
 ### Phase 2: Agent RPC Headers
 
-1. Add RPC headers support to Agent
-2. Update Manager to send headers in RPC calls
-3. Maintain backward compatibility with legacy Agents
+1. Add RPC headers model to Agent
+2. Add RPC headers support to Agent RPC dispatcher
+3. Update Manager to send headers in RPC calls
+4. Maintain backward compatibility with legacy Agents
 
 ### Phase 3: App-Proxy Standardization
 

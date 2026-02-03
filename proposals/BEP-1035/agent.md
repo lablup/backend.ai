@@ -88,7 +88,7 @@ Legacy Agents ignore unknown `headers` field. New Agents use it for tracing.
 
 ## Implementation Checklist
 
-- [ ] Add RPC headers model to common
+- [ ] Add RPC headers model to Agent
 - [ ] Update Agent RPC dispatcher for new format
 - [ ] Add legacy format fallback
 - [ ] Update Manager to send headers
