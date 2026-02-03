@@ -28,8 +28,9 @@ class ClusterConfigurationRule(SessionPreparerRule):
         if spec.cluster_size > 1:
             kernel_configs = self._prepare_cluster_kernels(spec)
         else:
-            # Single kernel session - cluster_role is already set in KernelEnqueueingConfig
             kernel_configs = spec.kernel_specs.copy()
+            if kernel_configs and "cluster_role" not in kernel_configs[0]:
+                kernel_configs[0]["cluster_role"] = DEFAULT_ROLE  # type: ignore[unreachable]
 
         preparation_data["kernel_configs"] = kernel_configs
 

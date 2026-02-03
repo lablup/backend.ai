@@ -328,7 +328,7 @@ class TestResourceInfo:
                 name=test_domain,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
             )
             db_sess.add(domain)
 
@@ -379,7 +379,7 @@ class TestResourceInfo:
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,
             )

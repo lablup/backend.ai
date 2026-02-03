@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -88,7 +88,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 name=domain_name,
                 description="Test domain for quota scope",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -110,7 +110,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 name=domain_name,
                 description="Other test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -293,7 +293,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 resource_policy=test_project_resource_policy_name,
                 description="",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 type=ProjectType.GENERAL,
             )

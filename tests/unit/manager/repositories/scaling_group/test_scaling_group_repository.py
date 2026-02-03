@@ -7,7 +7,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, SessionTypes
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -302,7 +302,7 @@ class TestScalingGroupRepositoryDB:
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
             )
             db_sess.add(domain)
 
@@ -353,7 +353,7 @@ class TestScalingGroupRepositoryDB:
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,
             )
@@ -462,7 +462,7 @@ class TestScalingGroupRepositoryDB:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
             )
             db_sess.add(domain)
 
@@ -865,7 +865,7 @@ class TestScalingGroupRepositoryDB:
                     name=domain_name,
                     description=f"Test domain {domain_name}",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                 )
                 db_sess.add(domain)
 
@@ -966,7 +966,7 @@ class TestScalingGroupRepositoryDB:
             keypair_policy = KeyPairResourcePolicyRow(
                 name=keypair_policy_name,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
                 max_concurrent_sessions=30,
                 max_pending_session_count=None,

@@ -16,7 +16,7 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -127,7 +127,7 @@ class TestNotificationRepository:
                 name=domain_name,
                 description="Test domain for notification",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

@@ -113,7 +113,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -529,7 +529,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -985,7 +985,7 @@ class TestDeploymentHistoryMergeLogic:
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -1314,7 +1314,7 @@ class TestRouteHistoryMergeLogic:
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )

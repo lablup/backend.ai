@@ -17,7 +17,7 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -123,7 +123,7 @@ class TestNotificationOptions:
                 name=domain_name,
                 description="Test domain for notification",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -1035,7 +1035,7 @@ class TestNotificationCursorPagination:
                 name=domain_name,
                 description="Test domain for cursor pagination",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )

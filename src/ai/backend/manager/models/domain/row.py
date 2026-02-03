@@ -107,13 +107,13 @@ class DomainRow(Base):  # type: ignore[misc]
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
-        "total_resource_slots", ResourceSlotColumn(), default=dict, nullable=False
+        "total_resource_slots", ResourceSlotColumn(), default=ResourceSlot, nullable=False
     )
     allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
-        default=dict,
+        default=VFolderHostPermissionMap,
     )
     allowed_docker_registries: Mapped[list[str]] = mapped_column(
         "allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default=list

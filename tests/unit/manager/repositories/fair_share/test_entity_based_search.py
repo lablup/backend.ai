@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
@@ -137,7 +138,7 @@ class TestSearchDomainFairSharesEntityBased:
                     name=domain_name,
                     description="Domain with fair share record",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -170,7 +171,7 @@ class TestSearchDomainFairSharesEntityBased:
                     name=domain_name,
                     description="Domain without fair share record",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -241,7 +242,7 @@ class TestSearchDomainFairSharesEntityBased:
                         name=domain_name,
                         description=f"Test {domain_name}",
                         is_active=True,
-                        total_resource_slots={},
+                        total_resource_slots=ResourceSlot(),
                         allowed_vfolder_hosts={},
                         allowed_docker_registries=[],
                     )
@@ -272,7 +273,7 @@ class TestSearchDomainFairSharesEntityBased:
                         name=name,
                         description=f"Test {name}",
                         is_active=True,
-                        total_resource_slots={},
+                        total_resource_slots=ResourceSlot(),
                         allowed_vfolder_hosts={},
                         allowed_docker_registries=[],
                     )
@@ -514,7 +515,7 @@ class TestSearchProjectFairSharesEntityBased:
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -789,7 +790,7 @@ class TestSearchUserFairSharesEntityBased:
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                 )
@@ -865,7 +866,7 @@ class TestSearchUserFairSharesEntityBased:
             db_sess.add(
                 KeyPairResourcePolicyRow(
                     name=kp_policy_name,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     max_session_lifetime=0,
                     max_concurrent_sessions=10,
                     max_concurrent_sftp_sessions=5,

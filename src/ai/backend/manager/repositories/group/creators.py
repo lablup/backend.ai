@@ -34,7 +34,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             type=self.type or ProjectType.GENERAL,
             description=self.description,
             is_active=self.is_active if self.is_active is not None else True,
-            total_resource_slots=self.total_resource_slots or {},
+            total_resource_slots=self.total_resource_slots or ResourceSlot(),
             allowed_vfolder_hosts=self.allowed_vfolder_hosts or VFolderHostPermissionMap(),
             integration_id=self.integration_id,
             resource_policy=self.resource_policy,

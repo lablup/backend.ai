@@ -14,7 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
@@ -121,7 +121,7 @@ class TestAuthRepository:
                 name=domain_name,
                 description="Default domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -280,7 +280,7 @@ class TestAuthRepository:
                 description="Test Group",
                 is_active=True,
                 domain_name=sample_user_data.domain_name,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
                 resource_policy=project_resource_policy.name,
