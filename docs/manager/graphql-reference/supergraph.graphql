@@ -4958,6 +4958,7 @@ enum KernelOrderField
   STATUS @join__enumValue(graph: STRAWBERRY)
   CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
   CLUSTER_HOSTNAME @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_IDX @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.2.0. Resource allocation information for a kernel."""
@@ -8423,11 +8424,11 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
-"""
+  """
   Added in 26.2.0.
-
+  
   Retrieve a specific image by its ID.
-
+  
   Returns detailed information about the image including its identity,
   metadata, resource requirements, and permission settings.
   """
@@ -8498,22 +8499,25 @@ type Query
   adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
-  """
-  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
-
-  """
   Added in 26.2.0.
-
+  
   Query images with optional filtering, ordering, and pagination (admin only).
-
+  
   Returns container images available in the system. Images are container
   specifications that define runtime environments for compute sessions.
-
+  
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
   adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
+  """
+  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query kernels within a specific session."""
+  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
@@ -8552,12 +8556,12 @@ type Query
   """
   rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
-"""
+  """
   Added in 26.2.0.
-
+  
   Query images within a specific container registry with optional filtering,
   ordering, and pagination.
-
+  
   Returns container images that belong to the specified registry.
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
@@ -10021,11 +10025,15 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Scope for session scheduling history query"""
+"""
+Added in 26.2.0. Scope for querying resources within a specific session.
+"""
 input SessionScope
   @join__type(graph: STRAWBERRY)
 {
-  """Session ID to get history for"""
+  """
+  Session UUID to scope the query. Only resources belonging to this session will be returned.
+  """
   sessionId: UUID!
 }
 

@@ -142,6 +142,7 @@ class KernelOrderFieldGQL(StrEnum):
     STATUS = "status"
     CLUSTER_MODE = "cluster_mode"
     CLUSTER_HOSTNAME = "cluster_hostname"
+    CLUSTER_IDX = "cluster_idx"
 
 
 @strawberry.input(
@@ -178,6 +179,18 @@ class KernelStatusFilterGQL:
                 )
             )
         return None
+
+
+@strawberry.input(
+    name="SessionScope",
+    description="Added in 26.2.0. Scope for querying resources within a specific session.",
+)
+class SessionScopeGQL:
+    """Scope for session-level queries."""
+
+    session_id: UUID = strawberry.field(
+        description="Session UUID to scope the query. Only resources belonging to this session will be returned."
+    )
 
 
 @strawberry.input(
@@ -233,6 +246,8 @@ class KernelOrderByGQL(GQLOrderBy):
                 return KernelOrders.cluster_mode(ascending)
             case KernelOrderFieldGQL.CLUSTER_HOSTNAME:
                 return KernelOrders.cluster_hostname(ascending)
+            case KernelOrderFieldGQL.CLUSTER_IDX:
+                return KernelOrders.cluster_idx(ascending)
             case _:
                 raise ValueError(f"Unhandled KernelOrderFieldGQL value: {self.field!r}")
 
