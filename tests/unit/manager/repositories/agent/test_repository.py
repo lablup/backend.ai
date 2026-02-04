@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -573,10 +573,48 @@ class KernelFilteringTestCase:
     non_occupied_kernel_count: int
     cpu_per_kernel: Decimal
     expected_actual_occupied_cpu: Decimal
+    agent_capacity_cpu: Decimal = Decimal("16.0")
+
+    @property
+    def expected_free_cpu(self) -> Decimal:
+        """Calculate expected free CPU slots."""
+        return self.agent_capacity_cpu - self.expected_actual_occupied_cpu
 
 
-class TestAgentDBSourceKernelFiltering:
-    """Test kernel filtering with with_loader_criteria at db_source level"""
+@dataclass
+class MultipleAgentsTestCase:
+    """Test case data for multiple agents resource slots test."""
+
+    test_id: str
+    agent1_occupied_kernel_count: int
+    agent1_cpu_per_kernel: Decimal
+    agent1_capacity_cpu: Decimal
+    agent2_occupied_kernel_count: int
+    agent2_cpu_per_kernel: Decimal
+    agent2_capacity_cpu: Decimal
+    # Fields below are populated by the fixture with actual generated values
+    agent1_id: AgentId = field(default_factory=lambda: AgentId(""))
+    agent2_id: AgentId = field(default_factory=lambda: AgentId(""))
+
+    @property
+    def expected_agent1_cpu(self) -> Decimal:
+        return self.agent1_occupied_kernel_count * self.agent1_cpu_per_kernel
+
+    @property
+    def expected_agent2_cpu(self) -> Decimal:
+        return self.agent2_occupied_kernel_count * self.agent2_cpu_per_kernel
+
+    @property
+    def expected_agent1_free_cpu(self) -> Decimal:
+        return self.agent1_capacity_cpu - self.expected_agent1_cpu
+
+    @property
+    def expected_agent2_free_cpu(self) -> Decimal:
+        return self.agent2_capacity_cpu - self.expected_agent2_cpu
+
+
+class TestAgentDBSourceWithKernels:
+    """Test AgentDBSource operations involving kernels (filtering, resource calculation)"""
 
     @pytest.fixture
     async def db_with_tables(
@@ -716,7 +754,9 @@ class TestAgentDBSourceKernelFiltering:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group,
-                available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): float(test_case.agent_capacity_cpu)
+                }),
                 occupied_slots=ResourceSlot({}),
                 addr=f"tcp://{random_ip}:6001",
                 first_contact=datetime.now(tzutc()),
@@ -904,3 +944,333 @@ class TestAgentDBSourceKernelFiltering:
         # Validate actual_occupied_slots reflects only resource-occupied kernels
         actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
         assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
+
+    @pytest.mark.parametrize(
+        "agent_with_kernels",
+        [
+            KernelFilteringTestCase(
+                test_id="mixed_kernels_resource_calc",
+                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
+                occupied_kernel_count=3,
+                non_occupied_kernel_count=2,
+                cpu_per_kernel=Decimal("2.0"),
+                expected_actual_occupied_cpu=Decimal("6.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="only_occupied_resource_calc",
+                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
+                occupied_kernel_count=4,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("1.5"),
+                expected_actual_occupied_cpu=Decimal("6.0"),
+            ),
+            KernelFilteringTestCase(
+                test_id="no_kernels_resource_calc",
+                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
+                occupied_kernel_count=0,
+                non_occupied_kernel_count=0,
+                cpu_per_kernel=Decimal("0.0"),
+                expected_actual_occupied_cpu=Decimal("0.0"),
+            ),
+        ],
+        indirect=True,
+        ids=["mixed_kernels", "only_occupied", "no_kernels"],
+    )
+    async def test_get_agent_resource_slots_calculates_correctly(
+        self,
+        db_source: AgentDBSource,
+        agent_with_kernels: KernelFilteringTestCase,
+    ) -> None:
+        """Test that get_agent_resource_slots correctly calculates resource usage."""
+        result = await db_source.get_agent_resource_slots([agent_with_kernels.agent_id])
+
+        assert len(result) == 1
+        assert agent_with_kernels.agent_id in result
+
+        resource_data = result[agent_with_kernels.agent_id]
+
+        # Verify used_slots reflects only resource-occupied kernels
+        actual_used_cpu = resource_data.used_slots.get("cpu", Decimal("0"))
+        assert actual_used_cpu == agent_with_kernels.expected_actual_occupied_cpu
+
+        # Verify capacity_slots matches agent's available_slots
+        assert (
+            resource_data.capacity_slots.get("cpu", Decimal("0"))
+            == agent_with_kernels.agent_capacity_cpu
+        )
+
+        # Verify free_slots = capacity - used
+        assert (
+            resource_data.free_slots.get("cpu", Decimal("0"))
+            == agent_with_kernels.expected_free_cpu
+        )
+
+    @pytest.fixture
+    async def multiple_agents_with_kernels(
+        self,
+        request: pytest.FixtureRequest,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_group: tuple[str, str],
+        scaling_group: str,
+    ) -> AsyncGenerator[MultipleAgentsTestCase, None]:
+        """Create two agents with kernels based on the test case from indirect parametrization."""
+        test_case: MultipleAgentsTestCase = request.param
+        group_id_str, domain_name = test_group
+        random_suffix = uuid4().hex[:8]
+
+        agent1_id = AgentId(f"agent1-{random_suffix}")
+        agent2_id = AgentId(f"agent2-{random_suffix}")
+        agent1_ip_suffix = uuid4().int % 256
+        agent2_ip_suffix = uuid4().int % 256
+        agent1_ip = f"192.168.1.{agent1_ip_suffix}"
+        agent2_ip = f"192.168.2.{agent2_ip_suffix}"
+
+        async with db_with_tables.begin_session() as db_sess:
+            # Create agent1
+            agent1 = AgentRow(
+                id=agent1_id,
+                status=AgentStatus.ALIVE,
+                status_changed=datetime.now(tzutc()),
+                region="us-west-1",
+                scaling_group=scaling_group,
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): float(test_case.agent1_capacity_cpu)
+                }),
+                occupied_slots=ResourceSlot({}),
+                addr=f"tcp://{agent1_ip}:6001",
+                first_contact=datetime.now(tzutc()),
+                lost_at=None,
+                public_host=agent1_ip,
+                public_key=PublicKey(f"test-key-{random_suffix}-1".encode()),
+                version="24.12.0",
+                architecture="x86_64",
+                compute_plugins={},
+                schedulable=True,
+                auto_terminate_abusing_kernel=False,
+            )
+            db_sess.add(agent1)
+
+            # Create agent2
+            agent2 = AgentRow(
+                id=agent2_id,
+                status=AgentStatus.ALIVE,
+                status_changed=datetime.now(tzutc()),
+                region="us-west-1",
+                scaling_group=scaling_group,
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): float(test_case.agent2_capacity_cpu)
+                }),
+                occupied_slots=ResourceSlot({}),
+                addr=f"tcp://{agent2_ip}:6001",
+                first_contact=datetime.now(tzutc()),
+                lost_at=None,
+                public_host=agent2_ip,
+                public_key=PublicKey(f"test-key-{random_suffix}-2".encode()),
+                version="24.12.0",
+                architecture="x86_64",
+                compute_plugins={},
+                schedulable=True,
+                auto_terminate_abusing_kernel=False,
+            )
+            db_sess.add(agent2)
+            await db_sess.flush()
+
+            # Create session for agent1's kernels
+            session1_id = uuid4()
+            session1 = SessionRow(
+                id=session1_id,
+                name=f"test-session1-{uuid4().hex[:12]}",
+                session_type=SessionTypes.INTERACTIVE,
+                domain_name=domain_name,
+                group_id=UUID(group_id_str),
+                scaling_group_name=scaling_group,
+                status=SessionStatus.RUNNING,
+                status_info="test",
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                requested_slots=ResourceSlot({SlotName("cpu"): 16.0}),
+                created_at=datetime.now(tzutc()),
+                images=["python:3.11"],
+                vfolder_mounts=[],
+                environ={},
+                result=SessionResult.UNDEFINED,
+            )
+            db_sess.add(session1)
+
+            # Create session for agent2's kernels
+            session2_id = uuid4()
+            session2 = SessionRow(
+                id=session2_id,
+                name=f"test-session2-{uuid4().hex[:12]}",
+                session_type=SessionTypes.INTERACTIVE,
+                domain_name=domain_name,
+                group_id=UUID(group_id_str),
+                scaling_group_name=scaling_group,
+                status=SessionStatus.RUNNING,
+                status_info="test",
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                requested_slots=ResourceSlot({SlotName("cpu"): 16.0}),
+                created_at=datetime.now(tzutc()),
+                images=["python:3.11"],
+                vfolder_mounts=[],
+                environ={},
+                result=SessionResult.UNDEFINED,
+            )
+            db_sess.add(session2)
+            await db_sess.flush()
+
+            # Create occupied kernels for agent1
+            for i in range(test_case.agent1_occupied_kernel_count):
+                kernel = KernelRow(
+                    id=uuid4(),
+                    session_id=session1_id,
+                    agent=agent1_id,
+                    agent_addr=f"{agent1_ip}:6001",
+                    scaling_group=scaling_group,
+                    cluster_idx=i,
+                    cluster_role="main",
+                    cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
+                    image="python:3.11",
+                    architecture="x86_64",
+                    registry="docker.io",
+                    container_id=f"container-{uuid4().hex[:8]}",
+                    status=KernelStatus.RUNNING,
+                    occupied_slots=ResourceSlot({
+                        "cpu": Decimal(str(test_case.agent1_cpu_per_kernel))
+                    }),
+                    requested_slots=ResourceSlot({
+                        "cpu": Decimal(str(test_case.agent1_cpu_per_kernel))
+                    }),
+                    domain_name=domain_name,
+                    group_id=UUID(group_id_str),
+                    user_uuid=uuid4(),
+                    access_key="AKTEST" + uuid4().hex[:12],
+                    environ={},
+                    mounts=[],
+                    vfolder_mounts=[],
+                    preopen_ports=[],
+                    repl_in_port=2001 + i * 4,
+                    repl_out_port=2002 + i * 4,
+                    stdin_port=2003 + i * 4,
+                    stdout_port=2004 + i * 4,
+                )
+                db_sess.add(kernel)
+
+            # Create occupied kernels for agent2
+            for i in range(test_case.agent2_occupied_kernel_count):
+                kernel = KernelRow(
+                    id=uuid4(),
+                    session_id=session2_id,
+                    agent=agent2_id,
+                    agent_addr=f"{agent2_ip}:6001",
+                    scaling_group=scaling_group,
+                    cluster_idx=i,
+                    cluster_role="main",
+                    cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
+                    image="python:3.11",
+                    architecture="x86_64",
+                    registry="docker.io",
+                    container_id=f"container-{uuid4().hex[:8]}",
+                    status=KernelStatus.RUNNING,
+                    occupied_slots=ResourceSlot({
+                        "cpu": Decimal(str(test_case.agent2_cpu_per_kernel))
+                    }),
+                    requested_slots=ResourceSlot({
+                        "cpu": Decimal(str(test_case.agent2_cpu_per_kernel))
+                    }),
+                    domain_name=domain_name,
+                    group_id=UUID(group_id_str),
+                    user_uuid=uuid4(),
+                    access_key="AKTEST" + uuid4().hex[:12],
+                    environ={},
+                    mounts=[],
+                    vfolder_mounts=[],
+                    preopen_ports=[],
+                    repl_in_port=3001 + i * 4,
+                    repl_out_port=3002 + i * 4,
+                    stdin_port=3003 + i * 4,
+                    stdout_port=3004 + i * 4,
+                )
+                db_sess.add(kernel)
+
+        test_case_with_ids = copy(test_case)
+        test_case_with_ids.agent1_id = agent1_id
+        test_case_with_ids.agent2_id = agent2_id
+
+        yield test_case_with_ids
+
+    @pytest.mark.parametrize(
+        "multiple_agents_with_kernels",
+        [
+            MultipleAgentsTestCase(
+                test_id="both_have_kernels",
+                agent1_occupied_kernel_count=2,
+                agent1_cpu_per_kernel=Decimal("2.0"),
+                agent1_capacity_cpu=Decimal("16.0"),
+                agent2_occupied_kernel_count=3,
+                agent2_cpu_per_kernel=Decimal("1.5"),
+                agent2_capacity_cpu=Decimal("32.0"),
+            ),
+            MultipleAgentsTestCase(
+                test_id="one_empty_one_with_kernels",
+                agent1_occupied_kernel_count=0,
+                agent1_cpu_per_kernel=Decimal("0.0"),
+                agent1_capacity_cpu=Decimal("8.0"),
+                agent2_occupied_kernel_count=2,
+                agent2_cpu_per_kernel=Decimal("2.0"),
+                agent2_capacity_cpu=Decimal("16.0"),
+            ),
+        ],
+        indirect=True,
+        ids=["both_have_kernels", "one_empty_one_with_kernels"],
+    )
+    async def test_get_agent_resource_slots_multiple_agents(
+        self,
+        db_source: AgentDBSource,
+        multiple_agents_with_kernels: MultipleAgentsTestCase,
+    ) -> None:
+        """Test get_agent_resource_slots returns data for multiple agents."""
+        test_case = multiple_agents_with_kernels
+
+        result = await db_source.get_agent_resource_slots([
+            test_case.agent1_id,
+            test_case.agent2_id,
+        ])
+
+        assert len(result) == 2
+        assert test_case.agent1_id in result
+        assert test_case.agent2_id in result
+
+        # Verify each agent's resource calculation
+        agent1_data = result[test_case.agent1_id]
+        agent2_data = result[test_case.agent2_id]
+
+        # Verify used_slots
+        assert Decimal(str(agent1_data.used_slots.get("cpu", 0))) == test_case.expected_agent1_cpu
+        assert Decimal(str(agent2_data.used_slots.get("cpu", 0))) == test_case.expected_agent2_cpu
+
+        # Verify capacity_slots
+        assert (
+            Decimal(str(agent1_data.capacity_slots.get("cpu", 0))) == test_case.agent1_capacity_cpu
+        )
+        assert (
+            Decimal(str(agent2_data.capacity_slots.get("cpu", 0))) == test_case.agent2_capacity_cpu
+        )
+
+        # Verify free_slots
+        assert (
+            Decimal(str(agent1_data.free_slots.get("cpu", 0))) == test_case.expected_agent1_free_cpu
+        )
+        assert (
+            Decimal(str(agent2_data.free_slots.get("cpu", 0))) == test_case.expected_agent2_free_cpu
+        )
+
+    async def test_get_agent_resource_slots_nonexistent_agent(
+        self,
+        db_source: AgentDBSource,
+    ) -> None:
+        """Test get_agent_resource_slots returns empty for nonexistent agents."""
+        nonexistent_id = AgentId("nonexistent-agent-id")
+
+        result = await db_source.get_agent_resource_slots([nonexistent_id])
+
+        assert len(result) == 0
