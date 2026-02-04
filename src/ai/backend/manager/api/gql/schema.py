@@ -112,6 +112,8 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_image,
+    admin_images,
     image_v2,
     images_v2,
 )
@@ -261,6 +263,8 @@ class Query:
     admin_domain_usage_buckets = admin_domain_usage_buckets
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
+    admin_images = admin_images
+    admin_image = admin_image
     # Resource Group Scoped APIs
     rg_domain_fair_share = rg_domain_fair_share
     rg_domain_fair_shares = rg_domain_fair_shares

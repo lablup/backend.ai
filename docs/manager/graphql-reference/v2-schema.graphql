@@ -3801,6 +3801,29 @@ type Query {
   adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 
   """
+  Added in 26.2.0.
+  
+  Query images with optional filtering, ordering, and pagination (admin only).
+  
+  Returns container images available in the system. Images are container
+  specifications that define runtime environments for compute sessions.
+  
+  Use filters to narrow down results by status, name, or architecture.
+  Supports both cursor-based and offset-based pagination.
+  """
+  adminImages(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image by its ID (admin only).
+  
+  Returns detailed information about the image including its identity,
+  metadata, resource requirements, and permission settings.
+  """
+  adminImage(id: ID!): ImageV2
+
+  """
   Added in 26.2.0. Get domain fair share data within resource group scope.
   """
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare!
@@ -3924,7 +3947,7 @@ type Query {
   Returns detailed information about the image including its identity,
   metadata, resource requirements, and permission settings.
   """
-  imageV2(id: ID!): ImageV2
+  imageV2(id: ID!): ImageV2 @deprecated(reason: "Use admin_image instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.2.0.
@@ -3937,7 +3960,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  imagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+  imagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @deprecated(reason: "Use admin_images instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.
