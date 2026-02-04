@@ -97,6 +97,21 @@ BEP documents define architectural decisions, API designs, and implementation st
 * Avoid replicating legacy patterns when writing new codes
   - Stick to the user prompts about the new code patterns
 
+### Pattern Discovery and Consistency
+
+* **Explore before implementing**: Always read and understand existing code patterns before starting new work
+  - Search for similar features or components in the codebase
+  - Identify established patterns for naming, structure, and implementation
+  - Read related README files for architectural context
+* **Follow established conventions**: Match existing patterns for consistency
+  - Use similar class/function structures
+  - Follow existing naming conventions
+  - Replicate error handling patterns
+  - Maintain consistent import styles
+* **Avoid legacy anti-patterns**: While following structure, don't replicate known issues
+  - Legacy patterns should be clearly distinguishable
+  - Prefer modern patterns over legacy when creating new code
+
 ### Working with Long Contexts
 
 * Store and consult the user request, your analysis and plans in `.claude/tasks/{job-slug}.md`
@@ -120,6 +135,24 @@ BEP documents define architectural decisions, API designs, and implementation st
 * **Structured Logging**: Use `ai.backend.logging.BraceStyleAdapter` for consistent logging
 * **Configuration**: Use Pydantic models for validation and serilization for configurations and DTOs
 * **Error Handling**: Comprehensive exception handling with proper logging
+
+### Code Quality Tools
+
+* **Avoid suppressing linter and type checker errors**
+  - Do NOT use `# noqa` comments to suppress linter warnings
+  - Do NOT use `# type: ignore` comments to suppress type checker errors
+  - Instead, fix the root cause of the error by:
+    - Restructuring code to avoid the issue
+    - Moving imports to top-level when possible
+    - Adding proper type annotations
+    - Refactoring to eliminate circular dependencies
+  - Only use suppression comments as a last resort with clear justification in code review
+
+* **Fix all quality issues discovered during development**
+  - When lint, type check, or test errors are discovered, fix them immediately
+  - This applies even if the errors are unrelated to your current work
+  - Do not skip or ignore quality issues with the reasoning "it's not part of my change"
+  - Maintaining codebase quality is a shared responsibility
 
 ### Directory Conventions
 
