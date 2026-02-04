@@ -6,16 +6,17 @@ Contains Scope dataclasses for search operations and entity-based result types.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -65,13 +66,22 @@ class DomainFairShareSearchScope(SearchScope):
         return inner
 
     @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> list[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
                 column=ScalingGroupRow.name,
                 value=self.resource_group,
                 error=ScalingGroupNotFound(self.resource_group),
+            ),
+        ]
+
+    @property
+    def authentication_checks(self) -> list[ScopeId]:
+        return [
+            ScopeId(
+                scope_type=ScopeType.RESOURCE_GROUP,
+                scope_id=self.resource_group,
             ),
         ]
 
@@ -103,7 +113,7 @@ class ProjectFairShareSearchScope(SearchScope):
         return inner
 
     @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> list[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
@@ -115,6 +125,19 @@ class ProjectFairShareSearchScope(SearchScope):
                 column=DomainRow.name,
                 value=self.domain_name,
                 error=DomainNotFound(self.domain_name),
+            ),
+        ]
+
+    @property
+    def authentication_checks(self) -> list[ScopeId]:
+        return [
+            ScopeId(
+                scope_type=ScopeType.RESOURCE_GROUP,
+                scope_id=self.resource_group,
+            ),
+            ScopeId(
+                scope_type=ScopeType.DOMAIN,
+                scope_id=self.domain_name,
             ),
         ]
 
@@ -153,7 +176,7 @@ class UserFairShareSearchScope(SearchScope):
     @property
     def existence_checks(
         self,
-    ) -> Sequence[ExistenceCheck[str] | ExistenceCheck[uuid.UUID]]:
+    ) -> list[ExistenceCheck[str] | ExistenceCheck[uuid.UUID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
@@ -170,6 +193,23 @@ class UserFairShareSearchScope(SearchScope):
                 column=GroupRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+    @property
+    def authentication_checks(self) -> list[ScopeId]:
+        return [
+            ScopeId(
+                scope_type=ScopeType.RESOURCE_GROUP,
+                scope_id=self.resource_group,
+            ),
+            ScopeId(
+                scope_type=ScopeType.DOMAIN,
+                scope_id=self.domain_name,
+            ),
+            ScopeId(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(self.project_id),
             ),
         ]
 

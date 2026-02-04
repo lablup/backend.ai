@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.data.permission.id import ScopeId, ObjectId
+from ai.backend.manager.data.permission.types import OperationType, EntityType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -38,26 +42,47 @@ class ExistenceCheck[T]:
     """The error to raise if the entity doesn't exist."""
 
 
-class SearchScope(ABC):
+class ActionScope(ABC):
+    """Abstract base class for search scope.
+
+    Scope defines required parameters for entity-based search queries.
+    Defines existence checks for validation.
+    """
+
+    @property
+    @abstractmethod
+    def existence_checks(self) -> list[ExistenceCheck]:
+        """Return existence checks for scope validation.
+
+        All checks are validated in a single query before the main query executes.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def target(self) -> ScopeId:
+        """
+        Return the target ScopeId for the scope."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        """
+        Return additional target ScopeIds for the scope."""
+        raise NotImplementedError
+
+
+class SearchScope(ActionScope):
     """Abstract base class for search scope.
 
     Scope defines required parameters for entity-based search queries.
     It converts to a QueryCondition that can be added to BatchQuerier conditions.
-    Optionally defines existence checks for validation.
     """
 
     @abstractmethod
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        """Return existence checks for scope validation.
-
-        All checks are validated in a single query before the main query executes.
-        """
         raise NotImplementedError
 
 
@@ -67,3 +92,19 @@ type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.Col
 type CursorConditionFactory = Callable[[str], QueryCondition]
 
 TRow = TypeVar("TRow", bound="Row[Any]")
+
+
+@dataclass
+class ScopeValidationArgs:
+    user_id: UUID
+    action_scope: ActionScope
+    operation: OperationType
+    entity_type: EntityType
+
+
+@dataclass
+class EntityValidationArgs:
+    user_id: UUID
+    action_scope: ActionScope
+    operation: OperationType
+    entity_id: ObjectId

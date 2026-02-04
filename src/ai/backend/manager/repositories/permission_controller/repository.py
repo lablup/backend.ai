@@ -29,7 +29,9 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
+    OperationType,
     ScopeData,
+    EntityType,
     ScopeListResult,
     ScopeType,
 )
@@ -41,6 +43,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import EntityValidationArgs, ScopeValidationArgs
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -315,3 +318,17 @@ class PermissionControllerRepository:
             EntityListResult with matching entities.
         """
         return await self._db_source.search_entities_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def validate_action(
+        self,
+        args: ScopeValidationArgs,
+    ) -> None:
+        await self._db_source.validate_action(args)
+
+    @permission_controller_repository_resilience.apply()
+    async def validate_action_single_entity(
+        self,
+        args: EntityValidationArgs,
+    ) -> None:
+        await self._db_source.validate_action_single_entity(args)
