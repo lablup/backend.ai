@@ -170,13 +170,13 @@ class UpdateUserV2Input:
 
 
 @strawberry.input(
-    name="DeleteUsersInput",
+    name="DeleteUsersV2Input",
     description=(
         "Added in 26.2.0. Input for soft-deleting multiple users. "
         "Soft delete changes user status to DELETED but preserves data."
     ),
 )
-class DeleteUsersInput:
+class DeleteUsersV2Input:
     """Input for soft-deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to soft-delete.")
@@ -186,26 +186,26 @@ class DeleteUsersInput:
 
 
 @strawberry.input(
-    name="PurgeUserInput",
+    name="PurgeUserV2Input",
     description=(
         "Added in 26.2.0. Input for permanently deleting a user and all associated data. "
         "This action is irreversible."
     ),
 )
-class PurgeUserInput:
+class PurgeUserV2Input:
     """Input for permanently deleting a single user."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to purge.")
 
 
 @strawberry.input(
-    name="PurgeUsersInput",
+    name="PurgeUsersV2Input",
     description=(
         "Added in 26.2.0. Input for permanently deleting multiple users. "
         "This action is irreversible."
     ),
 )
-class PurgeUsersInput:
+class PurgeUsersV2Input:
     """Input for permanently deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to purge.")
