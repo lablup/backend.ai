@@ -63,6 +63,11 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     PermissionGroupCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.types import (
+    ObjectPermissionSearchScope,
+    PermissionGroupSearchScope,
+    ScopedPermissionSearchScope,
+)
 
 
 @dataclass
@@ -848,6 +853,7 @@ class PermissionDBSource:
     async def search_permission_groups(
         self,
         querier: BatchQuerier,
+        scope: PermissionGroupSearchScope | None = None,
     ) -> PermissionGroupListResult:
         """Searches permission groups (scopes) with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -857,6 +863,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
+                scope,
             )
 
             items = [row.PermissionGroupRow.to_data() for row in result.rows]
@@ -871,6 +878,7 @@ class PermissionDBSource:
     async def search_scoped_permissions(
         self,
         querier: BatchQuerier,
+        scope: ScopedPermissionSearchScope | None = None,
     ) -> ScopedPermissionListResult:
         """Searches scoped permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -880,6 +888,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
+                scope,
             )
 
             items = [row.PermissionRow.to_data() for row in result.rows]
@@ -894,6 +903,7 @@ class PermissionDBSource:
     async def search_object_permissions(
         self,
         querier: BatchQuerier,
+        scope: ObjectPermissionSearchScope | None = None,
     ) -> ObjectPermissionListResult:
         """Searches object permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -903,6 +913,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
+                scope,
             )
 
             items = [row.ObjectPermissionRow.to_data() for row in result.rows]

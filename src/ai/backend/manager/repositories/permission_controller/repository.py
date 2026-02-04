@@ -51,6 +51,11 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.types import (
+    ObjectPermissionSearchScope,
+    PermissionGroupSearchScope,
+    ScopedPermissionSearchScope,
+)
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
@@ -255,25 +260,28 @@ class PermissionControllerRepository:
     async def search_permission_groups(
         self,
         querier: BatchQuerier,
+        scope: PermissionGroupSearchScope | None = None,
     ) -> PermissionGroupListResult:
         """Searches permission groups (scopes) with pagination and filtering."""
-        return await self._db_source.search_permission_groups(querier=querier)
+        return await self._db_source.search_permission_groups(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_scoped_permissions(
         self,
         querier: BatchQuerier,
+        scope: ScopedPermissionSearchScope | None = None,
     ) -> ScopedPermissionListResult:
         """Searches scoped permissions with pagination and filtering."""
-        return await self._db_source.search_scoped_permissions(querier=querier)
+        return await self._db_source.search_scoped_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_object_permissions(
         self,
         querier: BatchQuerier,
+        scope: ObjectPermissionSearchScope | None = None,
     ) -> ObjectPermissionListResult:
         """Searches object permissions with pagination and filtering."""
-        return await self._db_source.search_object_permissions(querier=querier)
+        return await self._db_source.search_object_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
