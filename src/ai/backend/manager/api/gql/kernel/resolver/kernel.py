@@ -14,17 +14,21 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
+@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID. (admin only)")  # type: ignore[misc]
 async def admin_kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> KernelV2GQL | None:
+    check_admin_only()
     return await fetch_kernel(info, KernelId(id))
 
 
-@strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")  # type: ignore[misc]
+@strawberry.field(
+    description="Added in 26.2.0. Query kernels with pagination and filtering. (admin only)"
+)  # type: ignore[misc]
 async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
     filter: KernelFilterGQL | None = None,
@@ -36,6 +40,7 @@ async def admin_kernels_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> KernelConnectionV2GQL:
+    check_admin_only()
     return await fetch_kernels(
         info,
         filter=filter,
