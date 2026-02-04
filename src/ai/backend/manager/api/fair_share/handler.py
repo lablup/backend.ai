@@ -14,6 +14,12 @@ from aiohttp import web
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.fair_share import (
+    BulkUpsertDomainFairShareWeightRequest,
+    BulkUpsertDomainFairShareWeightResponse,
+    BulkUpsertProjectFairShareWeightRequest,
+    BulkUpsertProjectFairShareWeightResponse,
+    BulkUpsertUserFairShareWeightRequest,
+    BulkUpsertUserFairShareWeightResponse,
     GetDomainFairSharePathParam,
     GetDomainFairShareResponse,
     GetProjectFairSharePathParam,
@@ -73,9 +79,14 @@ from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
 )
 from ai.backend.manager.services.fair_share.actions import (
+    BulkUpsertDomainFairShareWeightAction,
+    BulkUpsertProjectFairShareWeightAction,
+    BulkUpsertUserFairShareWeightAction,
+    DomainWeightInput,
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
+    ProjectWeightInput,
     SearchDomainFairSharesAction,
     SearchProjectFairSharesAction,
     SearchRGDomainFairSharesAction,
@@ -85,6 +96,7 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertDomainFairShareWeightAction,
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
+    UserWeightInput,
 )
 from ai.backend.manager.services.resource_usage.actions import (
     SearchDomainUsageBucketsAction,
@@ -666,6 +678,111 @@ class FairShareAPIHandler:
         resp = UpsertUserFairShareWeightResponse(item=item)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    # Bulk Upsert Domain Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def bulk_upsert_domain_fair_share_weight(
+        self,
+        body: BodyParam[BulkUpsertDomainFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Bulk upsert domain fair share weights."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Convert DTO inputs to action inputs
+        inputs = [
+            DomainWeightInput(
+                domain_name=entry.domain_name,
+                weight=entry.weight,
+            )
+            for entry in body.parsed.inputs
+        ]
+
+        action_result = (
+            await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
+                BulkUpsertDomainFairShareWeightAction(
+                    resource_group=body.parsed.resource_group,
+                    inputs=inputs,
+                )
+            )
+        )
+
+        resp = BulkUpsertDomainFairShareWeightResponse(upserted_count=action_result.upserted_count)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Bulk Upsert Project Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def bulk_upsert_project_fair_share_weight(
+        self,
+        body: BodyParam[BulkUpsertProjectFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Bulk upsert project fair share weights."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Convert DTO inputs to action inputs
+        inputs = [
+            ProjectWeightInput(
+                project_id=entry.project_id,
+                domain_name=entry.domain_name,
+                weight=entry.weight,
+            )
+            for entry in body.parsed.inputs
+        ]
+
+        action_result = (
+            await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
+                BulkUpsertProjectFairShareWeightAction(
+                    resource_group=body.parsed.resource_group,
+                    inputs=inputs,
+                )
+            )
+        )
+
+        resp = BulkUpsertProjectFairShareWeightResponse(upserted_count=action_result.upserted_count)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # Bulk Upsert User Fair Share Weight
+
+    @auth_required_for_method
+    @api_handler
+    async def bulk_upsert_user_fair_share_weight(
+        self,
+        body: BodyParam[BulkUpsertUserFairShareWeightRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Bulk upsert user fair share weights."""
+        self._check_superadmin()
+        processors = processors_ctx.processors
+
+        # Convert DTO inputs to action inputs
+        inputs = [
+            UserWeightInput(
+                user_uuid=entry.user_uuid,
+                project_id=entry.project_id,
+                domain_name=entry.domain_name,
+                weight=entry.weight,
+            )
+            for entry in body.parsed.inputs
+        ]
+
+        action_result = (
+            await processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
+                BulkUpsertUserFairShareWeightAction(
+                    resource_group=body.parsed.resource_group,
+                    inputs=inputs,
+                )
+            )
+        )
+
+        resp = BulkUpsertUserFairShareWeightResponse(upserted_count=action_result.upserted_count)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
     # Update Resource Group Fair Share Spec
 
     @auth_required_for_method
@@ -934,6 +1051,29 @@ def create_app(
             "PUT",
             "/users/{resource_group}/{project_id}/{user_uuid}/weight",
             api_handler.upsert_user_fair_share_weight,
+        )
+    )
+
+    # Bulk upsert weight routes
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/domains/bulk-upsert-weight",
+            api_handler.bulk_upsert_domain_fair_share_weight,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/projects/bulk-upsert-weight",
+            api_handler.bulk_upsert_project_fair_share_weight,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/users/bulk-upsert-weight",
+            api_handler.bulk_upsert_user_fair_share_weight,
         )
     )
 

@@ -22,16 +22,19 @@ __all__ = (
     "GetDomainFairShareResponse",
     "SearchDomainFairSharesResponse",
     "UpsertDomainFairShareWeightResponse",
+    "BulkUpsertDomainFairShareWeightResponse",
     # Project Fair Share
     "ProjectFairShareDTO",
     "GetProjectFairShareResponse",
     "SearchProjectFairSharesResponse",
     "UpsertProjectFairShareWeightResponse",
+    "BulkUpsertProjectFairShareWeightResponse",
     # User Fair Share
     "UserFairShareDTO",
     "GetUserFairShareResponse",
     "SearchUserFairSharesResponse",
     "UpsertUserFairShareWeightResponse",
+    "BulkUpsertUserFairShareWeightResponse",
     # Domain Usage Bucket
     "UsageBucketMetadataDTO",
     "DomainUsageBucketDTO",
@@ -340,6 +343,27 @@ class UpsertUserFairShareWeightResponse(BaseResponseModel):
     """Response for upserting user fair share weight."""
 
     item: UserFairShareDTO = Field(description="Updated user fair share data")
+
+
+# Bulk Upsert Weight Responses
+
+
+class BulkUpsertDomainFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting domain fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
+
+
+class BulkUpsertProjectFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting project fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
+
+
+class BulkUpsertUserFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting user fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
 
 
 # Resource Group Fair Share Spec

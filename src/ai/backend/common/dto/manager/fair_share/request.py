@@ -58,6 +58,13 @@ __all__ = (
     "UpsertDomainFairShareWeightRequest",
     "UpsertProjectFairShareWeightRequest",
     "UpsertUserFairShareWeightRequest",
+    # Bulk Upsert Weight Requests
+    "DomainWeightEntryInput",
+    "BulkUpsertDomainFairShareWeightRequest",
+    "ProjectWeightEntryInput",
+    "BulkUpsertProjectFairShareWeightRequest",
+    "UserWeightEntryInput",
+    "BulkUpsertUserFairShareWeightRequest",
     # Update Spec Requests
     "ResourceWeightEntryInput",
     "UpdateResourceGroupFairShareSpecRequest",
@@ -367,3 +374,51 @@ class UpdateResourceGroupFairShareSpecRequest(BaseRequestModel):
             "Leave the entire list null to keep all existing values."
         ),
     )
+
+
+# Bulk Upsert Weight Input Types
+
+
+class DomainWeightEntryInput(BaseRequestModel):
+    """Single domain weight entry for bulk upsert."""
+
+    domain_name: str = Field(description="Domain name")
+    weight: Decimal | None = Field(description="Fair share weight (null for default)")
+
+
+class BulkUpsertDomainFairShareWeightRequest(BaseRequestModel):
+    """Request to bulk upsert domain fair share weights."""
+
+    resource_group: str = Field(description="Scaling group name")
+    inputs: list[DomainWeightEntryInput] = Field(description="List of domain weights to upsert")
+
+
+class ProjectWeightEntryInput(BaseRequestModel):
+    """Single project weight entry for bulk upsert."""
+
+    project_id: UUID = Field(description="Project ID")
+    domain_name: str = Field(description="Domain name for context")
+    weight: Decimal | None = Field(description="Fair share weight (null for default)")
+
+
+class BulkUpsertProjectFairShareWeightRequest(BaseRequestModel):
+    """Request to bulk upsert project fair share weights."""
+
+    resource_group: str = Field(description="Scaling group name")
+    inputs: list[ProjectWeightEntryInput] = Field(description="List of project weights to upsert")
+
+
+class UserWeightEntryInput(BaseRequestModel):
+    """Single user weight entry for bulk upsert."""
+
+    user_uuid: UUID = Field(description="User UUID")
+    project_id: UUID = Field(description="Project ID")
+    domain_name: str = Field(description="Domain name for context")
+    weight: Decimal | None = Field(description="Fair share weight (null for default)")
+
+
+class BulkUpsertUserFairShareWeightRequest(BaseRequestModel):
+    """Request to bulk upsert user fair share weights."""
+
+    resource_group: str = Field(description="Scaling group name")
+    inputs: list[UserWeightEntryInput] = Field(description="List of user weights to upsert")
