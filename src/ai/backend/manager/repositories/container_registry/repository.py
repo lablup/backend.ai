@@ -5,6 +5,7 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -13,9 +14,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.errors.image import (
-    ContainerRegistryNotFound,
-)
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
@@ -23,8 +22,10 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
     handle_allowed_groups_update,
@@ -54,6 +55,23 @@ class ContainerRegistryRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def create_registry(
+        self,
+        creator: Creator[ContainerRegistryRow],
+    ) -> ContainerRegistryData:
+        spec = cast(ContainerRegistryCreatorSpec, creator.spec)
+        async with self._db.begin_session() as session:
+            creator_result = await execute_creator(session, creator)
+            container_registry_row: ContainerRegistryRow = creator_result.row
+
+            if spec.has_allowed_groups:
+                allowed_groups = cast(AllowedGroupsModel, spec.allowed_groups)
+                await handle_allowed_groups_update(
+                    session, container_registry_row.id, allowed_groups
+                )
+
+            return container_registry_row.to_dataclass()
 
     async def modify_registry(
         self,
