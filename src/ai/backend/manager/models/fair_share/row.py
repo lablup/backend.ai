@@ -20,6 +20,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairShareSpec,
     ProjectFairShareData,
@@ -211,32 +212,44 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
         """Convert to DomainFairShareData.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL)
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
         return DomainFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=self.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=self.total_decayed_usage,
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
         )
 
 
@@ -400,33 +413,45 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
         """Convert to ProjectFairShareData.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL)
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
         return ProjectFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=self.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=self.total_decayed_usage,
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
         )
 
 
@@ -620,33 +645,45 @@ class UserFairShareRow(Base):  # type: ignore[misc]
         """Convert to UserFairShareData.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL)
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
         return UserFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=self.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=self.total_decayed_usage,
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
             scheduling_rank=self.scheduling_rank,
         )

@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.errors.fair_share import FairShareNotFoundError
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
@@ -20,7 +20,7 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -31,7 +31,12 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
@@ -73,6 +78,7 @@ class TestFairShareRepository:
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
                 ScalingGroupRow,
+                ScalingGroupForDomainRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -80,6 +86,8 @@ class TestFairShareRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ScalingGroupForProjectRow,
+                AssocGroupUserRow,
                 AgentRow,
                 ImageRow,
                 SessionRow,
@@ -121,6 +129,7 @@ class TestFairShareRepository:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group: str,
     ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -135,6 +144,12 @@ class TestFairShareRepository:
                 allowed_docker_registries=[],
             )
             db_sess.add(domain)
+            await db_sess.flush()
+
+            # Associate domain with scaling group
+            db_sess.add(
+                ScalingGroupForDomainRow(scaling_group=test_scaling_group, domain=domain_name)
+            )
             await db_sess.commit()
 
         return domain_name
@@ -143,6 +158,7 @@ class TestFairShareRepository:
     async def test_project_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group: str,
         test_domain_name: str,
     ) -> uuid.UUID:
         """Create test project (group) and return its ID"""
@@ -169,6 +185,12 @@ class TestFairShareRepository:
                 resource_policy=policy_name,
             )
             db_sess.add(group)
+            await db_sess.flush()
+
+            # Associate project with scaling group
+            db_sess.add(
+                ScalingGroupForProjectRow(scaling_group=test_scaling_group, group=project_id)
+            )
             await db_sess.commit()
 
         return project_id
@@ -178,6 +200,7 @@ class TestFairShareRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_project_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
         user_uuid = uuid.uuid4()
@@ -215,6 +238,10 @@ class TestFairShareRepository:
                 resource_policy=policy_name,
             )
             db_sess.add(user)
+            await db_sess.flush()
+
+            # Associate user with project
+            db_sess.add(AssocGroupUserRow(group_id=test_project_id, user_id=user_uuid))
             await db_sess.commit()
 
         return user_uuid
@@ -249,11 +276,11 @@ class TestFairShareRepository:
 
         assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
-        assert result.spec.weight == Decimal("2.0")
-        assert result.calculation_snapshot.fair_share_factor == Decimal(
+        assert result.data.spec.weight == Decimal("2.0")
+        assert result.data.calculation_snapshot.fair_share_factor == Decimal(
             "1.0"
         )  # Default initial value
-        assert result.calculation_snapshot.total_decayed_usage == ResourceSlot()
+        assert result.data.calculation_snapshot.total_decayed_usage == ResourceSlot()
 
     @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_insert(
@@ -277,8 +304,8 @@ class TestFairShareRepository:
 
         assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
-        assert result.spec.weight == Decimal("1.5")
-        assert result.calculation_snapshot.fair_share_factor == Decimal("1.0")
+        assert result.data.spec.weight == Decimal("1.5")
+        assert result.data.calculation_snapshot.fair_share_factor == Decimal("1.0")
 
     @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_update(
@@ -312,10 +339,10 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_domain_fair_share(upserter2)
 
         # weight is a spec value, only set on INSERT, not updated on conflict
-        assert result.spec.weight == Decimal("1.0")
+        assert result.data.spec.weight == Decimal("1.0")
         # Calculated values should be updated
-        assert result.calculation_snapshot.fair_share_factor == Decimal("0.75")
-        assert result.calculation_snapshot.normalized_usage == Decimal("0.5")
+        assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.75")
+        assert result.data.calculation_snapshot.normalized_usage == Decimal("0.5")
 
     @pytest.mark.asyncio
     async def test_get_domain_fair_share(
@@ -343,15 +370,15 @@ class TestFairShareRepository:
 
         assert result.resource_group == test_scaling_group
         assert result.domain_name == test_domain_name
-        assert result.spec.weight == Decimal("1.5")
+        assert result.data.spec.weight == Decimal("1.5")
 
     @pytest.mark.asyncio
     async def test_get_domain_fair_share_not_found(
         self,
         fair_share_repository: FairShareRepository,
     ) -> None:
-        """Test getting non-existent domain fair share raises FairShareNotFoundError"""
-        with pytest.raises(FairShareNotFoundError):
+        """Test getting non-existent domain fair share raises DomainNotFound"""
+        with pytest.raises(DomainNotFound):
             await fair_share_repository.get_domain_fair_share(
                 resource_group="non-existent-sg",
                 domain_name="non-existent-domain",
@@ -428,7 +455,7 @@ class TestFairShareRepository:
         assert result.resource_group == test_scaling_group
         assert result.project_id == test_project_id
         assert result.domain_name == test_domain_name
-        assert result.spec.weight == Decimal("1.5")
+        assert result.data.spec.weight == Decimal("1.5")
 
     @pytest.mark.asyncio
     async def test_upsert_project_fair_share(
@@ -452,8 +479,8 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_project_fair_share(upserter)
 
         assert result.project_id == test_project_id
-        assert result.spec.weight == Decimal("2.0")
-        assert result.calculation_snapshot.fair_share_factor == Decimal("0.8")
+        assert result.data.spec.weight == Decimal("2.0")
+        assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.8")
 
     @pytest.mark.asyncio
     async def test_get_project_fair_share(
@@ -507,7 +534,7 @@ class TestFairShareRepository:
         assert result.resource_group == test_scaling_group
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
-        assert result.spec.weight == Decimal("1.2")
+        assert result.data.spec.weight == Decimal("1.2")
 
     @pytest.mark.asyncio
     async def test_upsert_user_fair_share(
@@ -533,8 +560,8 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_user_fair_share(upserter)
 
         assert result.user_uuid == test_user_uuid
-        assert result.spec.weight == Decimal("1.5")
-        assert result.calculation_snapshot.fair_share_factor == Decimal("0.9")
+        assert result.data.spec.weight == Decimal("1.5")
+        assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.9")
 
     @pytest.mark.asyncio
     async def test_get_user_fair_share(

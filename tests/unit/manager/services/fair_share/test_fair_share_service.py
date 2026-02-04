@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -13,6 +14,7 @@ from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairShareSpec,
     ProjectFairShareData,
@@ -20,17 +22,16 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareData,
     UserFairShareSearchResult,
 )
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareEntityItem,
     DomainFairShareEntitySearchResult,
     DomainFairShareSearchScope,
-    ProjectFairShareEntityItem,
     ProjectFairShareEntitySearchResult,
     ProjectFairShareSearchScope,
-    UserFairShareEntityItem,
     UserFairShareEntitySearchResult,
     UserFairShareSearchScope,
 )
@@ -70,7 +71,6 @@ class TestGetDomainFairShare:
     ) -> None:
         """Should call repository with correct parameters."""
         expected_data = MagicMock(spec=DomainFairShareData)
-        expected_data.id = uuid.uuid4()
         mock_repository.get_domain_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetDomainFairShareAction(
@@ -85,6 +85,139 @@ class TestGetDomainFairShare:
             domain_name="test-domain",
         )
         assert result.data == expected_data
+
+    @pytest.mark.asyncio
+    async def test_get_domain_fair_share_returns_default_when_not_found_but_exists(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When record not found but domain exists, repository returns default values."""
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository now creates and returns complete default data internally
+        default_data = DomainFairShareData(
+            resource_group="default",
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),  # Repository sets default_weight here
+                    half_life_days=7,
+                    lookback_days=60,
+                    decay_unit_days=2,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("0.5")}),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,  # No metadata for default-generated records
+                use_default=True,  # True for default-generated records
+            ),
+        )
+        mock_repository.get_domain_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetDomainFairShareAction(
+            resource_group="default",
+            domain_name="test-domain",
+        )
+
+        result = await service.get_domain_fair_share(action)
+
+        # Service should just return the result from repository
+        assert result.data == default_data
+        assert result.data.data.spec.weight == Decimal("2.0")  # Repository sets default_weight
+        assert result.data.data.use_default is True
+
+    @pytest.mark.asyncio
+    async def test_get_domain_fair_share_raises_entity_not_found_when_entity_missing(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When domain doesn't exist, repository should raise DomainNotFound."""
+        # Repository raises DomainNotFound directly when domain doesn't exist
+        mock_repository.get_domain_fair_share = AsyncMock(
+            side_effect=DomainNotFound("Domain not found: nonexistent-domain")
+        )
+
+        action = GetDomainFairShareAction(
+            resource_group="default",
+            domain_name="nonexistent-domain",
+        )
+
+        with pytest.raises(DomainNotFound):
+            await service.get_domain_fair_share(action)
+
+    @pytest.mark.asyncio
+    async def test_get_domain_fair_share_uses_scaling_group_spec_for_default(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Default values from repository should reflect custom scaling group spec settings."""
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository creates default data using custom scaling group spec
+        custom_spec = FairShareScalingGroupSpec(
+            default_weight=Decimal("3.5"),
+            half_life_days=10,
+            lookback_days=90,
+            decay_unit_days=3,
+            resource_weights=ResourceSlot({"cpu": Decimal("2.0"), "mem": Decimal("1.5")}),
+        )
+
+        default_data = DomainFairShareData(
+            resource_group="default",
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=custom_spec.default_weight,
+                    half_life_days=custom_spec.half_life_days,
+                    lookback_days=custom_spec.lookback_days,
+                    decay_unit_days=custom_spec.decay_unit_days,
+                    resource_weights=custom_spec.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=True,
+            ),
+        )
+        mock_repository.get_domain_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetDomainFairShareAction(
+            resource_group="default",
+            domain_name="test-domain",
+        )
+
+        result = await service.get_domain_fair_share(action)
+
+        # Verify default uses custom scaling group spec values
+        assert result.data.data.spec.half_life_days == 10
+        assert result.data.data.spec.lookback_days == 90
+        assert result.data.data.spec.decay_unit_days == 3
+        assert result.data.data.spec.resource_weights == ResourceSlot({
+            "cpu": Decimal("2.0"),
+            "mem": Decimal("1.5"),
+        })
+        assert result.data.data.spec.weight == Decimal("3.5")
 
 
 class TestSearchDomainFairShares:
@@ -161,7 +294,6 @@ class TestGetProjectFairShare:
         """Should call repository with correct parameters."""
         project_id = uuid.uuid4()
         expected_data = MagicMock(spec=ProjectFairShareData)
-        expected_data.id = uuid.uuid4()
         mock_repository.get_project_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetProjectFairShareAction(
@@ -176,6 +308,145 @@ class TestGetProjectFairShare:
             project_id=project_id,
         )
         assert result.data == expected_data
+
+    @pytest.mark.asyncio
+    async def test_get_project_fair_share_returns_default_when_not_found_but_exists(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When record not found but project exists, repository returns default values."""
+        project_id = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository now creates and returns complete default data internally
+        default_data = ProjectFairShareData(
+            resource_group="default",
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=7,
+                    lookback_days=60,
+                    decay_unit_days=2,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("0.5")}),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=True,
+            ),
+        )
+        mock_repository.get_project_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetProjectFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+        )
+
+        result = await service.get_project_fair_share(action)
+
+        # Service should just return the result from repository
+        assert result.data == default_data
+        assert result.data.data.spec.weight == Decimal("2.0")
+        assert result.data.data.use_default is True
+        assert result.data.domain_name == "test-domain"
+
+    @pytest.mark.asyncio
+    async def test_get_project_fair_share_raises_entity_not_found_when_entity_missing(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When project doesn't exist, repository should raise ProjectNotFound."""
+        project_id = uuid.uuid4()
+        # Repository raises ProjectNotFound directly when project doesn't exist
+        mock_repository.get_project_fair_share = AsyncMock(
+            side_effect=ProjectNotFound(f"Project not found: {project_id}")
+        )
+
+        action = GetProjectFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+        )
+
+        with pytest.raises(ProjectNotFound):
+            await service.get_project_fair_share(action)
+
+    @pytest.mark.asyncio
+    async def test_get_project_fair_share_uses_scaling_group_spec_for_default(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Default values from repository should reflect custom scaling group spec settings."""
+        project_id = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository creates default data using custom scaling group spec
+        custom_spec = FairShareScalingGroupSpec(
+            default_weight=Decimal("3.5"),
+            half_life_days=10,
+            lookback_days=90,
+            decay_unit_days=3,
+            resource_weights=ResourceSlot({"cpu": Decimal("2.0"), "mem": Decimal("1.5")}),
+        )
+
+        default_data = ProjectFairShareData(
+            resource_group="default",
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=custom_spec.default_weight,
+                    half_life_days=custom_spec.half_life_days,
+                    lookback_days=custom_spec.lookback_days,
+                    decay_unit_days=custom_spec.decay_unit_days,
+                    resource_weights=custom_spec.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=True,
+            ),
+        )
+        mock_repository.get_project_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetProjectFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+        )
+
+        result = await service.get_project_fair_share(action)
+
+        # Verify default uses custom scaling group spec values
+        assert result.data.data.spec.half_life_days == 10
+        assert result.data.data.spec.lookback_days == 90
+        assert result.data.data.spec.decay_unit_days == 3
+        assert result.data.data.spec.resource_weights == ResourceSlot({
+            "cpu": Decimal("2.0"),
+            "mem": Decimal("1.5"),
+        })
+        assert result.data.data.spec.weight == Decimal("3.5")
 
 
 class TestSearchProjectFairShares:
@@ -253,7 +524,6 @@ class TestGetUserFairShare:
         project_id = uuid.uuid4()
         user_uuid = uuid.uuid4()
         expected_data = MagicMock(spec=UserFairShareData)
-        expected_data.id = uuid.uuid4()
         mock_repository.get_user_fair_share = AsyncMock(return_value=expected_data)
 
         action = GetUserFairShareAction(
@@ -270,6 +540,156 @@ class TestGetUserFairShare:
             user_uuid=user_uuid,
         )
         assert result.data == expected_data
+
+    @pytest.mark.asyncio
+    async def test_get_user_fair_share_returns_default_when_not_found_but_exists(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When record not found but user exists in project, repository returns default values."""
+        project_id = uuid.uuid4()
+        user_uuid = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository now creates and returns complete default data internally
+        default_data = UserFairShareData(
+            resource_group="default",
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=7,
+                    lookback_days=60,
+                    decay_unit_days=2,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("0.5")}),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=True,
+            ),
+            scheduling_rank=None,
+        )
+        mock_repository.get_user_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetUserFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+            user_uuid=user_uuid,
+        )
+
+        result = await service.get_user_fair_share(action)
+
+        # Service should just return the result from repository
+        assert result.data == default_data
+        assert result.data.data.spec.weight == Decimal("2.0")
+        assert result.data.data.use_default is True
+        assert result.data.domain_name == "test-domain"
+        assert result.data.scheduling_rank is None
+
+    @pytest.mark.asyncio
+    async def test_get_user_fair_share_raises_entity_not_found_when_entity_missing(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """When user doesn't exist in project, repository should raise UserNotFound."""
+        project_id = uuid.uuid4()
+        user_uuid = uuid.uuid4()
+        # Repository raises UserNotFound directly when user doesn't exist in project
+        mock_repository.get_user_fair_share = AsyncMock(
+            side_effect=UserNotFound(f"User not found in project: {project_id}, {user_uuid}")
+        )
+
+        action = GetUserFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+            user_uuid=user_uuid,
+        )
+
+        with pytest.raises(UserNotFound):
+            await service.get_user_fair_share(action)
+
+    @pytest.mark.asyncio
+    async def test_get_user_fair_share_uses_scaling_group_spec_for_default(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Default values from repository should reflect custom scaling group spec settings."""
+        project_id = uuid.uuid4()
+        user_uuid = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        # Repository creates default data using custom scaling group spec
+        custom_spec = FairShareScalingGroupSpec(
+            default_weight=Decimal("3.5"),
+            half_life_days=10,
+            lookback_days=90,
+            decay_unit_days=3,
+            resource_weights=ResourceSlot({"cpu": Decimal("2.0"), "mem": Decimal("1.5")}),
+        )
+
+        default_data = UserFairShareData(
+            resource_group="default",
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=custom_spec.default_weight,
+                    half_life_days=custom_spec.half_life_days,
+                    lookback_days=custom_spec.lookback_days,
+                    decay_unit_days=custom_spec.decay_unit_days,
+                    resource_weights=custom_spec.resource_weights,
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=ResourceSlot({
+                        "cpu": Decimal("0.0"),
+                        "mem": Decimal("0.0"),
+                    }),
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=True,
+            ),
+            scheduling_rank=None,
+        )
+        mock_repository.get_user_fair_share = AsyncMock(return_value=default_data)
+
+        action = GetUserFairShareAction(
+            resource_group="default",
+            project_id=project_id,
+            user_uuid=user_uuid,
+        )
+
+        result = await service.get_user_fair_share(action)
+
+        # Verify default uses custom scaling group spec values
+        assert result.data.data.spec.half_life_days == 10
+        assert result.data.data.spec.lookback_days == 90
+        assert result.data.data.spec.decay_unit_days == 3
+        assert result.data.data.spec.resource_weights == ResourceSlot({
+            "cpu": Decimal("2.0"),
+            "mem": Decimal("1.5"),
+        })
+        assert result.data.data.spec.weight == Decimal("3.5")
 
 
 class TestSearchUserFairShares:
@@ -344,54 +764,52 @@ class TestSearchDomainFairShareEntities:
         mock_repository: MagicMock,
     ) -> None:
         """Include domains both with and without fair share records."""
+        now = datetime.now(UTC)
         # Mock domain with record
         domain_with_record = DomainFairShareData(
-            id=uuid.uuid4(),
             resource_group="default",
             domain_name="domain-with-record",
-            spec=FairShareSpec(
-                weight=Decimal("2.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=FairShareMetadata(created_at=now, updated_at=now),
+                use_default=False,
             ),
-            calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
-            metadata=MagicMock(spec=FairShareMetadata),
-            default_weight=Decimal("1.0"),
         )
 
-        # Mock entity items (one with details, one without)
-        entity_items = [
-            DomainFairShareEntityItem(
-                resource_group="default",
-                domain_name="domain-with-record",
-                details=domain_with_record,
+        # Mock default domain (without record in DB, created by Repository)
+        domain_without_record = DomainFairShareData(
+            resource_group="default",
+            domain_name="domain-without-record",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("1.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=None,
+                use_default=True,
             ),
-            DomainFairShareEntityItem(
-                resource_group="default",
-                domain_name="domain-without-record",
-                details=None,  # No record
-            ),
-        ]
+        )
 
+        # Repository now returns Data objects directly
         entity_result = DomainFairShareEntitySearchResult(
-            items=entity_items,
+            items=[domain_with_record, domain_without_record],
             total_count=2,
             has_next_page=False,
             has_previous_page=False,
         )
 
-        mock_repository.search_domain_fair_share_entities = AsyncMock(return_value=entity_result)
-        mock_repository.get_scaling_group_fair_share_spec = AsyncMock(
-            return_value=FairShareScalingGroupSpec(
-                default_weight=Decimal("1.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            )
-        )
+        mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
         scope = DomainFairShareSearchScope(resource_group="default")
         querier = BatchQuerier(
@@ -406,43 +824,44 @@ class TestSearchDomainFairShareEntities:
         assert result.total_count == 2
         assert len(result.items) == 2
 
-        # One with persisted record (non-zero UUID)
-        assert any(item.id != uuid.UUID(int=0) for item in result.items)
-        # One with default (sentinel UUID)
-        assert any(item.id == uuid.UUID(int=0) for item in result.items)
+        # One with persisted record (use_default=False)
+        assert any(item.data.use_default is False for item in result.items)
+        # One with default (use_default=True)
+        assert any(item.data.use_default is True for item in result.items)
 
     @pytest.mark.asyncio
-    async def test_default_has_weight_none(
+    async def test_default_uses_scaling_group_default_weight(
         self,
         service: FairShareService,
         mock_repository: MagicMock,
     ) -> None:
-        """Default values have weight=None."""
-        entity_items = [
-            DomainFairShareEntityItem(
-                resource_group="default",
-                domain_name="domain-without-record",
-                details=None,  # No record
+        """Default values use scaling group's default_weight."""
+        # Repository creates default with weight set to default_weight
+        default_domain = DomainFairShareData(
+            resource_group="default",
+            domain_name="domain-without-record",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("1.0"),  # Repository sets default_weight here
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=None,
+                use_default=True,
             ),
-        ]
+        )
 
         entity_result = DomainFairShareEntitySearchResult(
-            items=entity_items,
+            items=[default_domain],
             total_count=1,
             has_next_page=False,
             has_previous_page=False,
         )
 
-        mock_repository.search_domain_fair_share_entities = AsyncMock(return_value=entity_result)
-        mock_repository.get_scaling_group_fair_share_spec = AsyncMock(
-            return_value=FairShareScalingGroupSpec(
-                default_weight=Decimal("1.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            )
-        )
+        mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
         scope = DomainFairShareSearchScope(resource_group="default")
         querier = BatchQuerier(
@@ -453,9 +872,10 @@ class TestSearchDomainFairShareEntities:
         action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
         result = await service.search_rg_domain_fair_shares(action)
 
-        # Domain without record (id=0)
-        default_domain = [item for item in result.items if item.id == uuid.UUID(int=0)][0]
-        assert default_domain.spec.weight is None
+        # Domain without record has weight set to default_weight
+        default = result.items[0]
+        assert default.data.spec.weight == Decimal("1.0")
+        assert default.data.use_default is True
 
     @pytest.mark.asyncio
     async def test_default_matches_scaling_group_spec(
@@ -464,21 +884,6 @@ class TestSearchDomainFairShareEntities:
         mock_repository: MagicMock,
     ) -> None:
         """Default values match scaling group settings."""
-        entity_items = [
-            DomainFairShareEntityItem(
-                resource_group="default",
-                domain_name="domain-without-record",
-                details=None,
-            ),
-        ]
-
-        entity_result = DomainFairShareEntitySearchResult(
-            items=entity_items,
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
         # Custom scaling group spec
         custom_spec = FairShareScalingGroupSpec(
             default_weight=Decimal("2.5"),
@@ -488,8 +893,31 @@ class TestSearchDomainFairShareEntities:
             resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("0.5")}),
         )
 
-        mock_repository.search_domain_fair_share_entities = AsyncMock(return_value=entity_result)
-        mock_repository.get_scaling_group_fair_share_spec = AsyncMock(return_value=custom_spec)
+        default_domain = DomainFairShareData(
+            resource_group="default",
+            domain_name="domain-without-record",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=custom_spec.default_weight,
+                    half_life_days=custom_spec.half_life_days,
+                    lookback_days=custom_spec.lookback_days,
+                    decay_unit_days=custom_spec.decay_unit_days,
+                    resource_weights=custom_spec.resource_weights,
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=None,
+                use_default=True,
+            ),
+        )
+
+        entity_result = DomainFairShareEntitySearchResult(
+            items=[default_domain],
+            total_count=1,
+            has_next_page=False,
+            has_previous_page=False,
+        )
+
+        mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
         scope = DomainFairShareSearchScope(resource_group="default")
         querier = BatchQuerier(
@@ -500,16 +928,16 @@ class TestSearchDomainFairShareEntities:
         action = SearchRGDomainFairSharesAction(scope=scope, querier=querier)
         result = await service.search_rg_domain_fair_shares(action)
 
-        default_domain = result.items[0]
+        default = result.items[0]
         # Verify defaults use scaling group spec
-        assert default_domain.spec.half_life_days == 7
-        assert default_domain.spec.lookback_days == 60
-        assert default_domain.spec.decay_unit_days == 2
-        assert default_domain.spec.resource_weights == ResourceSlot({
+        assert default.data.spec.half_life_days == 7
+        assert default.data.spec.lookback_days == 60
+        assert default.data.spec.decay_unit_days == 2
+        assert default.data.spec.resource_weights == ResourceSlot({
             "cpu": Decimal("1.0"),
             "mem": Decimal("0.5"),
         })
-        assert default_domain.default_weight == Decimal("2.5")
+        assert default.data.spec.weight == Decimal("2.5")
 
 
 class TestSearchProjectFairShareEntities:
@@ -522,58 +950,55 @@ class TestSearchProjectFairShareEntities:
         """Include projects both with and without fair share records."""
         project_id_with_record = uuid.uuid4()
         project_id_without_record = uuid.uuid4()
+        now = datetime.now(UTC)
 
         # Mock project with record
         project_with_record = ProjectFairShareData(
-            id=uuid.uuid4(),
             resource_group="default",
             project_id=project_id_with_record,
             domain_name="test-domain",
-            spec=FairShareSpec(
-                weight=Decimal("2.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=FairShareMetadata(created_at=now, updated_at=now),
+                use_default=False,
             ),
-            calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
-            metadata=MagicMock(spec=FairShareMetadata),
-            default_weight=Decimal("1.0"),
         )
 
-        # Mock entity items
-        entity_items = [
-            ProjectFairShareEntityItem(
-                resource_group="default",
-                project_id=project_id_with_record,
-                domain_name="test-domain",
-                details=project_with_record,
+        # Mock default project
+        project_without_record = ProjectFairShareData(
+            resource_group="default",
+            project_id=project_id_without_record,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("1.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=None,
+                use_default=True,
             ),
-            ProjectFairShareEntityItem(
-                resource_group="default",
-                project_id=project_id_without_record,
-                domain_name="test-domain",
-                details=None,
-            ),
-        ]
+        )
 
+        # Repository returns Data objects directly
         entity_result = ProjectFairShareEntitySearchResult(
-            items=entity_items,
+            items=[project_with_record, project_without_record],
             total_count=2,
             has_next_page=False,
             has_previous_page=False,
         )
 
-        mock_repository.search_project_fair_share_entities = AsyncMock(return_value=entity_result)
-        mock_repository.get_scaling_group_fair_share_spec = AsyncMock(
-            return_value=FairShareScalingGroupSpec(
-                default_weight=Decimal("1.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            )
-        )
+        mock_repository.search_rg_project_fair_shares = AsyncMock(return_value=entity_result)
 
         scope = ProjectFairShareSearchScope(resource_group="default", domain_name="test-domain")
         querier = BatchQuerier(
@@ -586,8 +1011,8 @@ class TestSearchProjectFairShareEntities:
 
         assert result.total_count == 2
         assert len(result.items) == 2
-        assert any(item.id != uuid.UUID(int=0) for item in result.items)
-        assert any(item.id == uuid.UUID(int=0) for item in result.items)
+        assert any(item.data.use_default is False for item in result.items)
+        assert any(item.data.use_default is True for item in result.items)
 
 
 class TestSearchUserFairShareEntities:
@@ -601,62 +1026,59 @@ class TestSearchUserFairShareEntities:
         user_uuid_with_record = uuid.uuid4()
         user_uuid_without_record = uuid.uuid4()
         project_id = uuid.uuid4()
+        now = datetime.now(UTC)
 
         # Mock user with record
         user_with_record = UserFairShareData(
-            id=uuid.uuid4(),
             resource_group="default",
             user_uuid=user_uuid_with_record,
             project_id=project_id,
             domain_name="test-domain",
-            spec=FairShareSpec(
-                weight=Decimal("2.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=FairShareMetadata(created_at=now, updated_at=now),
+                use_default=False,
             ),
-            calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
-            metadata=MagicMock(spec=FairShareMetadata),
-            default_weight=Decimal("1.0"),
             scheduling_rank=None,
         )
 
-        # Mock entity items
-        entity_items = [
-            UserFairShareEntityItem(
-                resource_group="default",
-                user_uuid=user_uuid_with_record,
-                project_id=project_id,
-                domain_name="test-domain",
-                details=user_with_record,
+        # Mock default user
+        user_without_record = UserFairShareData(
+            resource_group="default",
+            user_uuid=user_uuid_without_record,
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("1.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
+                ),
+                calculation_snapshot=MagicMock(spec=FairShareCalculationSnapshot),
+                metadata=None,
+                use_default=True,
             ),
-            UserFairShareEntityItem(
-                resource_group="default",
-                user_uuid=user_uuid_without_record,
-                project_id=project_id,
-                domain_name="test-domain",
-                details=None,
-            ),
-        ]
+            scheduling_rank=None,
+        )
 
+        # Repository returns Data objects directly
         entity_result = UserFairShareEntitySearchResult(
-            items=entity_items,
+            items=[user_with_record, user_without_record],
             total_count=2,
             has_next_page=False,
             has_previous_page=False,
         )
 
-        mock_repository.search_user_fair_share_entities = AsyncMock(return_value=entity_result)
-        mock_repository.get_scaling_group_fair_share_spec = AsyncMock(
-            return_value=FairShareScalingGroupSpec(
-                default_weight=Decimal("1.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            )
-        )
+        mock_repository.search_rg_user_fair_shares = AsyncMock(return_value=entity_result)
 
         scope = UserFairShareSearchScope(
             resource_group="default",
@@ -673,5 +1095,5 @@ class TestSearchUserFairShareEntities:
 
         assert result.total_count == 2
         assert len(result.items) == 2
-        assert any(item.id != uuid.UUID(int=0) for item in result.items)
-        assert any(item.id == uuid.UUID(int=0) for item in result.items)
+        assert any(item.data.use_default is False for item in result.items)
+        assert any(item.data.use_default is True for item in result.items)

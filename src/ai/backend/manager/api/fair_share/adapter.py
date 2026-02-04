@@ -6,6 +6,8 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+import uuid
+
 from ai.backend.common.dto.manager.fair_share import (
     DomainFairShareDTO,
     DomainFairShareFilter,
@@ -139,16 +141,29 @@ class FairShareAdapter:
 
     def convert_domain_fair_share_to_dto(self, data: DomainFairShareData) -> DomainFairShareDTO:
         """Convert DomainFairShareData to DTO."""
+
+        # Generate deterministic ID from resource_group:domain_name
+        id_str = f"{data.resource_group}:{data.domain_name}"
+        generated_id = uuid.uuid5(uuid.NAMESPACE_DNS, id_str)
+
         return DomainFairShareDTO(
-            id=data.id,
+            id=generated_id,
             resource_group=data.resource_group,
             domain_name=data.domain_name,
-            spec=self._convert_spec_to_dto(data.spec),
+            spec=self._convert_spec_to_dto(data.data.spec),
             calculation_snapshot=self._convert_calculation_snapshot_to_dto(
-                data.calculation_snapshot
+                data.data.calculation_snapshot
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
     # Project Fair Share
@@ -207,17 +222,30 @@ class FairShareAdapter:
 
     def convert_project_fair_share_to_dto(self, data: ProjectFairShareData) -> ProjectFairShareDTO:
         """Convert ProjectFairShareData to DTO."""
+
+        # Generate deterministic ID from resource_group:project_id
+        id_str = f"{data.resource_group}:{data.project_id}"
+        generated_id = uuid.uuid5(uuid.NAMESPACE_DNS, id_str)
+
         return ProjectFairShareDTO(
-            id=data.id,
+            id=generated_id,
             resource_group=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=self._convert_spec_to_dto(data.spec),
+            spec=self._convert_spec_to_dto(data.data.spec),
             calculation_snapshot=self._convert_calculation_snapshot_to_dto(
-                data.calculation_snapshot
+                data.data.calculation_snapshot
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
     # User Fair Share
@@ -272,18 +300,31 @@ class FairShareAdapter:
 
     def convert_user_fair_share_to_dto(self, data: UserFairShareData) -> UserFairShareDTO:
         """Convert UserFairShareData to DTO."""
+
+        # Generate deterministic ID from resource_group:user_uuid:project_id
+        id_str = f"{data.resource_group}:{data.user_uuid}:{data.project_id}"
+        generated_id = uuid.uuid5(uuid.NAMESPACE_DNS, id_str)
+
         return UserFairShareDTO(
-            id=data.id,
+            id=generated_id,
             resource_group=data.resource_group,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=self._convert_spec_to_dto(data.spec),
+            spec=self._convert_spec_to_dto(data.data.spec),
             calculation_snapshot=self._convert_calculation_snapshot_to_dto(
-                data.calculation_snapshot
+                data.data.calculation_snapshot
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
     # Domain Usage Bucket

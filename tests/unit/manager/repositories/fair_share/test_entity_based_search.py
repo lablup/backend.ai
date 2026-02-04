@@ -1,8 +1,8 @@
 """
 Tests for entity-based fair share search with Scope pattern.
 
-Tests that domains/projects/users are returned even without fair share records.
-When no record exists, `details` field should be None.
+Tests that domains/projects/users are returned with complete fair share data.
+When no record exists, default values are generated with use_default=True.
 
 Scope pattern:
 - Scope provides required filters (resource_group) converted to query conditions
@@ -15,11 +15,13 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -87,6 +89,7 @@ class TestSearchDomainFairSharesEntityBased:
                 GroupRow,
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -152,6 +155,7 @@ class TestSearchDomainFairSharesEntityBased:
                 spec=DomainFairShareCreatorSpec(
                     resource_group=scaling_group,
                     domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
                 )
             )
         )
@@ -288,6 +292,7 @@ class TestSearchDomainFairSharesEntityBased:
                     spec=DomainFairShareCreatorSpec(
                         resource_group=scaling_group,
                         domain_name=name,
+                        weight=Decimal("2.0"),  # Explicit weight for use_default=False
                     )
                 )
             )
@@ -309,7 +314,7 @@ class TestSearchDomainFairSharesEntityBased:
         )
 
         with pytest.raises(ScalingGroupNotFound):
-            await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+            await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
     # ==================== Empty Result Tests ====================
 
@@ -327,7 +332,7 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0
@@ -341,7 +346,7 @@ class TestSearchDomainFairSharesEntityBased:
         scaling_group: str,
         domain_with_record: str,
     ) -> None:
-        """Domain with fair share record should have details populated."""
+        """Domain with fair share record should have complete details with use_default=False."""
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -349,13 +354,17 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].domain_name == domain_with_record
         assert result.items[0].resource_group == scaling_group
-        assert result.items[0].details is not None
+        # Details always present
+        # From DB record (not default)
+        assert result.items[0].data.use_default is False
+        # Has metadata from DB
+        assert result.items[0].data.metadata is not None
 
     @pytest.mark.asyncio
     async def test_returns_domain_without_record(
@@ -364,7 +373,7 @@ class TestSearchDomainFairSharesEntityBased:
         scaling_group: str,
         domain_without_record: str,
     ) -> None:
-        """Domain without fair share record should have details as None."""
+        """Domain without fair share record should have default values with use_default=True."""
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -372,13 +381,17 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].domain_name == domain_without_record
         assert result.items[0].resource_group == scaling_group
-        assert result.items[0].details is None
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
 
     @pytest.mark.asyncio
     async def test_mixed_domains_with_and_without_records(
@@ -388,7 +401,7 @@ class TestSearchDomainFairSharesEntityBased:
         domain_with_record: str,
         domain_without_record: str,
     ) -> None:
-        """Search should return both domains with and without records."""
+        """Search should return both domains with complete data (record vs default)."""
         scope = DomainFairShareSearchScope(resource_group=scaling_group)
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -396,7 +409,7 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 2
         assert len(result.items) == 2
@@ -404,8 +417,16 @@ class TestSearchDomainFairSharesEntityBased:
         result_domains = {d.domain_name: d for d in result.items}
         assert domain_with_record in result_domains
         assert domain_without_record in result_domains
-        assert result_domains[domain_with_record].details is not None
-        assert result_domains[domain_without_record].details is None
+
+        # Both have details
+
+        # Different use_default values
+        assert result_domains[domain_with_record].data.use_default is False
+        assert result_domains[domain_without_record].data.use_default is True
+
+        # Different metadata presence
+        assert result_domains[domain_with_record].data.metadata is not None
+        assert result_domains[domain_without_record].data.metadata is None
 
     @pytest.mark.asyncio
     async def test_filters_by_resource_group_in_scope(
@@ -422,7 +443,7 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -443,7 +464,7 @@ class TestSearchDomainFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_domain_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -473,6 +494,7 @@ class TestSearchProjectFairSharesEntityBased:
                 GroupRow,
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -574,6 +596,7 @@ class TestSearchProjectFairSharesEntityBased:
                     resource_group=scaling_group,
                     project_id=project_id,
                     domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
                 )
             )
         )
@@ -635,7 +658,7 @@ class TestSearchProjectFairSharesEntityBased:
         )
 
         with pytest.raises(ScalingGroupNotFound):
-            await fair_share_repository.search_project_fair_share_entities(scope, querier)
+            await fair_share_repository.search_rg_project_fair_shares(scope, querier)
 
     # ==================== Success Cases ====================
 
@@ -658,13 +681,12 @@ class TestSearchProjectFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_project_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].project_id == project_with_record
         assert result.items[0].resource_group == scaling_group
-        assert result.items[0].details is not None
 
     @pytest.mark.asyncio
     async def test_returns_project_without_record(
@@ -674,7 +696,7 @@ class TestSearchProjectFairSharesEntityBased:
         domain_name: str,
         project_without_record: uuid.UUID,
     ) -> None:
-        """Project without fair share record should have details as None."""
+        """Project without fair share record should have default values with use_default=True."""
         scope = ProjectFairShareSearchScope(
             resource_group=scaling_group,
             domain_name=domain_name,
@@ -685,13 +707,17 @@ class TestSearchProjectFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_project_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].project_id == project_without_record
         assert result.items[0].resource_group == scaling_group
-        assert result.items[0].details is None
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
 
     @pytest.mark.asyncio
     async def test_mixed_projects_with_and_without_records(
@@ -713,7 +739,7 @@ class TestSearchProjectFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_project_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
 
         assert result.total_count == 2
         assert len(result.items) == 2
@@ -721,8 +747,10 @@ class TestSearchProjectFairSharesEntityBased:
         result_projects = {p.project_id: p for p in result.items}
         assert project_with_record in result_projects
         assert project_without_record in result_projects
-        assert result_projects[project_with_record].details is not None
-        assert result_projects[project_without_record].details is None
+        # Project with record: has DB data
+        # Project without record: has default-generated data
+        assert result_projects[project_without_record].data.use_default is True
+        assert result_projects[project_without_record].data.metadata is None
 
 
 class TestSearchUserFairSharesEntityBased:
@@ -748,6 +776,7 @@ class TestSearchUserFairSharesEntityBased:
                 GroupRow,
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
@@ -931,6 +960,7 @@ class TestSearchUserFairSharesEntityBased:
                     user_uuid=user_uuid,
                     project_id=project_id,
                     domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
                 )
             )
         )
@@ -969,7 +999,7 @@ class TestSearchUserFairSharesEntityBased:
         )
 
         with pytest.raises(ScalingGroupNotFound):
-            await fair_share_repository.search_user_fair_share_entities(scope, querier)
+            await fair_share_repository.search_rg_user_fair_shares(scope, querier)
 
     # ==================== Success Cases ====================
 
@@ -995,14 +1025,13 @@ class TestSearchUserFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_user_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].user_uuid == user_with_record
         assert result.items[0].resource_group == scaling_group
         assert result.items[0].project_id == project_id
-        assert result.items[0].details is not None
 
     @pytest.mark.asyncio
     async def test_returns_user_without_record(
@@ -1013,7 +1042,7 @@ class TestSearchUserFairSharesEntityBased:
         project_id: uuid.UUID,
         user_without_record: uuid.UUID,
     ) -> None:
-        """User without fair share record should have details as None."""
+        """User without fair share record should have default values with use_default=True."""
 
         scope = UserFairShareSearchScope(
             resource_group=scaling_group,
@@ -1026,14 +1055,18 @@ class TestSearchUserFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_user_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
         assert result.items[0].user_uuid == user_without_record
         assert result.items[0].resource_group == scaling_group
         assert result.items[0].project_id == project_id
-        assert result.items[0].details is None
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
 
     @pytest.mark.asyncio
     async def test_mixed_users_with_and_without_records(
@@ -1058,7 +1091,7 @@ class TestSearchUserFairSharesEntityBased:
             orders=[],
         )
 
-        result = await fair_share_repository.search_user_fair_share_entities(scope, querier)
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
 
         assert result.total_count == 2
         assert len(result.items) == 2
@@ -1066,5 +1099,7 @@ class TestSearchUserFairSharesEntityBased:
         result_users = {u.user_uuid: u for u in result.items}
         assert user_with_record in result_users
         assert user_without_record in result_users
-        assert result_users[user_with_record].details is not None
-        assert result_users[user_without_record].details is None
+        # User with record: has DB data
+        # User without record: has default-generated data
+        assert result_users[user_without_record].data.use_default is True
+        assert result_users[user_without_record].data.metadata is None
