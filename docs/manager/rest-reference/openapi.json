@@ -6646,6 +6646,192 @@
         "title": "UpsertUserFairShareWeightRequest",
         "type": "object"
       },
+      "DomainWeightEntryInput": {
+        "description": "Single domain weight entry for bulk upsert.",
+        "properties": {
+          "domain_name": {
+            "description": "Domain name",
+            "title": "Domain Name",
+            "type": "string"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fair share weight (null for default)",
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "domain_name",
+          "weight"
+        ],
+        "title": "DomainWeightEntryInput",
+        "type": "object"
+      },
+      "BulkUpsertDomainFairShareWeightRequest": {
+        "description": "Request to bulk upsert domain fair share weights.",
+        "properties": {
+          "resource_group": {
+            "description": "Scaling group name",
+            "title": "Resource Group",
+            "type": "string"
+          },
+          "inputs": {
+            "description": "List of domain weights to upsert",
+            "items": {
+              "$ref": "#/components/schemas/DomainWeightEntryInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resource_group",
+          "inputs"
+        ],
+        "title": "BulkUpsertDomainFairShareWeightRequest",
+        "type": "object"
+      },
+      "ProjectWeightEntryInput": {
+        "description": "Single project weight entry for bulk upsert.",
+        "properties": {
+          "project_id": {
+            "description": "Project ID",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "domain_name": {
+            "description": "Domain name for context",
+            "title": "Domain Name",
+            "type": "string"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fair share weight (null for default)",
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "project_id",
+          "domain_name",
+          "weight"
+        ],
+        "title": "ProjectWeightEntryInput",
+        "type": "object"
+      },
+      "BulkUpsertProjectFairShareWeightRequest": {
+        "description": "Request to bulk upsert project fair share weights.",
+        "properties": {
+          "resource_group": {
+            "description": "Scaling group name",
+            "title": "Resource Group",
+            "type": "string"
+          },
+          "inputs": {
+            "description": "List of project weights to upsert",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWeightEntryInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resource_group",
+          "inputs"
+        ],
+        "title": "BulkUpsertProjectFairShareWeightRequest",
+        "type": "object"
+      },
+      "UserWeightEntryInput": {
+        "description": "Single user weight entry for bulk upsert.",
+        "properties": {
+          "user_uuid": {
+            "description": "User UUID",
+            "format": "uuid",
+            "title": "User Uuid",
+            "type": "string"
+          },
+          "project_id": {
+            "description": "Project ID",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "domain_name": {
+            "description": "Domain name for context",
+            "title": "Domain Name",
+            "type": "string"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fair share weight (null for default)",
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "user_uuid",
+          "project_id",
+          "domain_name",
+          "weight"
+        ],
+        "title": "UserWeightEntryInput",
+        "type": "object"
+      },
+      "BulkUpsertUserFairShareWeightRequest": {
+        "description": "Request to bulk upsert user fair share weights.",
+        "properties": {
+          "resource_group": {
+            "description": "Scaling group name",
+            "title": "Resource Group",
+            "type": "string"
+          },
+          "inputs": {
+            "description": "List of user weights to upsert",
+            "items": {
+              "$ref": "#/components/schemas/UserWeightEntryInput"
+            },
+            "title": "Inputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resource_group",
+          "inputs"
+        ],
+        "title": "BulkUpsertUserFairShareWeightRequest",
+        "type": "object"
+      },
       "ResourceWeightEntryInput": {
         "description": "A single resource weight entry for fair share calculation.\n\nSet weight to null to remove the resource type weight (revert to default).",
         "properties": {
@@ -17965,6 +18151,93 @@
           }
         ],
         "description": "Upsert user fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/domains/bulk-upsert-weight": {
+      "post": {
+        "operationId": "fair-share.bulk_upsert_domain_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertDomainFairShareWeightRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bulk upsert domain fair share weights.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/projects/bulk-upsert-weight": {
+      "post": {
+        "operationId": "fair-share.bulk_upsert_project_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertProjectFairShareWeightRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bulk upsert project fair share weights.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/users/bulk-upsert-weight": {
+      "post": {
+        "operationId": "fair-share.bulk_upsert_user_fair_share_weight",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertUserFairShareWeightRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bulk upsert user fair share weights.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/fair-share/resource-groups/{resource_group}/spec": {
