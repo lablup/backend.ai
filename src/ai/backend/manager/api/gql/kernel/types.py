@@ -18,13 +18,18 @@ from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
+
+from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ServicePortEntryGQL,
     ServicePortsGQL,
 )
+from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
+from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -404,7 +409,7 @@ class KernelV2GQL(Node):
     session: KernelSessionInfoGQL = strawberry.field(
         description="Information about the session this kernel belongs to."
     )
-    user: KernelUserInfoGQL = strawberry.field(description="User and ownership information.")
+    user_info: KernelUserInfoGQL = strawberry.field(description="User and ownership information.")
     network: KernelNetworkInfoGQL = strawberry.field(
         description="Network configuration and exposed ports."
     )
@@ -417,6 +422,30 @@ class KernelV2GQL(Node):
     lifecycle: KernelLifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The agent running this kernel."
+    )
+    async def agent(self) -> AgentV2GQL | None:
+        raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The user who owns this kernel."
+    )
+    async def user(self) -> UserV2GQL | None:
+        raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The project this kernel belongs to."
+    )
+    async def project(self) -> ProjectV2GQL | None:
+        raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The domain this kernel belongs to."
+    )
+    async def domain(self) -> DomainV2GQL | None:
+        raise NotImplementedError
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
@@ -454,7 +483,7 @@ class KernelV2GQL(Node):
                 name=kernel_info.session.name,
                 session_type=SessionTypes(kernel_info.session.session_type),
             ),
-            user=KernelUserInfoGQL(
+            user_info=KernelUserInfoGQL(
                 user_id=kernel_info.user_permission.user_uuid,
                 access_key=kernel_info.user_permission.access_key,
                 domain_name=kernel_info.user_permission.domain_name,

@@ -3665,6 +3665,26 @@ input DomainUserV2Scope
 }
 
 """
+Added in 26.2.0. Domain entity with structured field groups. Formerly DomainNode. Provides comprehensive domain information organized into logical categories: basic_info (identity), registry (container registries), and lifecycle (status/timestamps). All fields use typed structures instead of JSON scalars. Resource allocation and storage permissions are provided through separate dedicated APIs.
+"""
+type DomainV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY, key: "id")
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Basic domain information including name and description."""
+  basicInfo: DomainBasicInfo!
+
+  """Container registry configuration."""
+  registry: DomainRegistryInfo!
+
+  """Lifecycle information including activation status and timestamps."""
+  lifecycle: DomainLifecycleInfo!
+}
+
+"""
 Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
 """
 input DomainWeightInputItem
@@ -5068,7 +5088,7 @@ type KernelV2 implements Node
   session: KernelSessionInfo!
 
   """User and ownership information."""
-  user: KernelUserInfo!
+  userInfo: KernelUserInfo!
 
   """Network configuration and exposed ports."""
   network: KernelNetworkInfo!
@@ -5081,6 +5101,18 @@ type KernelV2 implements Node
 
   """Lifecycle status and timestamps."""
   lifecycle: KernelLifecycleInfo!
+
+  """Added in 26.2.0. The agent running this kernel."""
+  agent: AgentV2
+
+  """Added in 26.2.0. The user who owns this kernel."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this kernel belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The domain this kernel belongs to."""
+  domain: DomainV2
 }
 
 """An edge in a connection."""
@@ -7362,13 +7394,6 @@ enum ProjectFairShareOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-input ProjectFairShareScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter fair shares by."""
-  resourceGroup: String!
-}
-
 """
 Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
 """
@@ -7444,25 +7469,6 @@ enum ProjectTypeV2
 {
   GENERAL @join__enumValue(graph: STRAWBERRY)
   MODEL_STORE @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
-Added in 26.2.0. Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input ProjectTypeV2EnumFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """Exact match for project type."""
-  equals: ProjectTypeV2 = null
-
-  """Match any of the provided types."""
-  in: [ProjectTypeV2!] = null
-
-  """Exclude exact type match."""
-  notEquals: ProjectTypeV2 = null
-
-  """Exclude any of the provided types."""
-  notIn: [ProjectTypeV2!] = null
 }
 
 """
@@ -7647,120 +7653,6 @@ type ProjectV2 implements Node
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: ProjectLifecycleInfo!
-
-  """
-  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
-  """
-  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
-
-  """
-  Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
-  """
-  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
-}
-
-"""
-Added in 26.2.0. Paginated connection for project records. Provides relay-style cursor-based pagination for efficient traversal of project data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
-"""
-type ProjectV2Connection
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ProjectV2Edge!]!
-
-  """Total number of project records matching the query criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ProjectV2Edge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ProjectV2!
-}
-
-"""
-Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input ProjectV2Filter
-  @join__type(graph: STRAWBERRY)
-{
-  """Filter by project ID (UUID). Supports equals and 'in' operations."""
-  id: UUIDFilter = null
-
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  domainName: StringFilter = null
-
-  """
-  Filter by project type. Supports equals, in, not_equals, and not_in operations.
-  """
-  type: ProjectTypeV2EnumFilter = null
-
-  """
-  Filter by active status. True for active projects, False for inactive projects.
-  """
-  isActive: Boolean = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """
-  Filter by last modification timestamp. Supports before, after, and between operations.
-  """
-  modifiedAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [ProjectV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [ProjectV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [ProjectV2Filter!] = null
-}
-
-"""
-Added in 26.2.0. Specifies ordering for project query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input ProjectV2OrderBy
-  @join__type(graph: STRAWBERRY)
-{
-  """The field to order by. See ProjectV2OrderField for available options."""
-  field: ProjectV2OrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically.
-"""
-enum ProjectV2OrderField
-  @join__type(graph: STRAWBERRY)
-{
-  CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
-  NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -11765,6 +11657,37 @@ type ValidateNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
   message: String!
+}
+
+"""
+Added in 26.2.0. Storage host permission configuration. Defines what operations are allowed for a specific storage host.
+"""
+type VFolderHostPermissionEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Storage host identifier (e.g., 'default', 'storage-01')."""
+  host: String!
+
+  """
+  List of permissions granted for this host. See VFolderHostPermissionV2 enum for available permissions.
+  """
+  permissions: [VFolderHostPermissionV2!]!
+}
+
+"""
+Added in 26.2.0. Atomic permissions for virtual folders on a storage host.
+"""
+enum VFolderHostPermissionV2
+  @join__type(graph: STRAWBERRY)
+{
+  CREATE_VFOLDER @join__enumValue(graph: STRAWBERRY)
+  MODIFY_VFOLDER @join__enumValue(graph: STRAWBERRY)
+  DELETE_VFOLDER @join__enumValue(graph: STRAWBERRY)
+  MOUNT_IN_SESSION @join__enumValue(graph: STRAWBERRY)
+  UPLOAD_FILE @join__enumValue(graph: STRAWBERRY)
+  DOWNLOAD_FILE @join__enumValue(graph: STRAWBERRY)
+  INVITE_OTHERS @join__enumValue(graph: STRAWBERRY)
+  SET_USER_PERM @join__enumValue(graph: STRAWBERRY)
 }
 
 """
