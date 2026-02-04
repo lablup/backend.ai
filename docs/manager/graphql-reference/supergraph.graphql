@@ -1964,6 +1964,18 @@ type ContainerRegistryNode implements Node
   allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
+"""
+Added in 26.2.0.
+
+Scope for querying images within a specific container registry.
+"""
+input ContainerRegistryScope
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the container registry to scope the query to."""
+  registryId: UUID!
+}
+
 """Added in 25.3.0."""
 scalar ContainerRegistryScopeField
   @join__type(graph: GRAPHENE)
@@ -7825,6 +7837,16 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image by its ID.
+  
+  Returns detailed information about the image including its identity,
+  metadata, resource requirements, and permission settings.
+  """
+  imageV2(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
@@ -7887,6 +7909,19 @@ type Query
   adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.2.0.
+  
+  Query images with optional filtering, ordering, and pagination (admin only).
+  
+  Returns container images available in the system. Images are container
+  specifications that define runtime environments for compute sessions.
+  
+  Use filters to narrow down results by status, name, or architecture.
+  Supports both cursor-based and offset-based pagination.
+  """
+  adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Get domain fair share data within resource group scope.
   """
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY)
@@ -7922,6 +7957,18 @@ type Query
   Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
   """
   rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Query images within a specific container registry with optional filtering,
+  ordering, and pagination.
+  
+  Returns container images that belong to the specified registry.
+  Use filters to narrow down results by status, name, or architecture.
+  Supports both cursor-based and offset-based pagination.
+  """
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -8001,29 +8048,6 @@ type Query
 
   """List route history (superadmin only)"""
   routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.2.0.
-  
-  Retrieve a specific image by its ID.
-  
-  Returns detailed information about the image including its identity,
-  metadata, resource requirements, and permission settings.
-  """
-  imageV2(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0.
-  
-  Query images with optional filtering, ordering, and pagination.
-  
-  Returns container images available in the system. Images are container
-  specifications that define runtime environments for compute sessions.
-  
-  Use filters to narrow down results by status, name, or architecture.
-  Supports both cursor-based and offset-based pagination.
-  """
-  imagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.

@@ -112,8 +112,9 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_images_v2,
+    container_registry_images_v2,
     image_v2,
-    images_v2,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -242,6 +243,7 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
+    image_v2 = image_v2
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_session_scheduling_histories = admin_session_scheduling_histories
@@ -261,6 +263,7 @@ class Query:
     admin_domain_usage_buckets = admin_domain_usage_buckets
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
+    admin_images_v2 = admin_images_v2
     # Resource Group Scoped APIs
     rg_domain_fair_share = rg_domain_fair_share
     rg_domain_fair_shares = rg_domain_fair_shares
@@ -271,6 +274,8 @@ class Query:
     rg_domain_usage_buckets = rg_domain_usage_buckets
     rg_project_usage_buckets = rg_project_usage_buckets
     rg_user_usage_buckets = rg_user_usage_buckets
+    # Container Registry Scoped APIs
+    container_registry_images_v2 = container_registry_images_v2
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config
@@ -295,8 +300,6 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
-    image_v2 = image_v2
-    images_v2 = images_v2
     # User V2 APIs
     admin_user_v2 = admin_user_v2
     admin_users = admin_users
