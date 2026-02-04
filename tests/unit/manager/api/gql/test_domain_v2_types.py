@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
-import pytest
+from datetime import UTC, datetime
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.gql.domain_v2.types import (
-    DomainBasicInfoGQL,
-    DomainLifecycleInfoGQL,
-    DomainRegistryInfoGQL,
     DomainV2GQL,
 )
 from ai.backend.manager.data.domain.types import DomainData
@@ -25,8 +20,8 @@ class TestDomainV2GQL:
             name="test-domain",
             description="Test domain description",
             is_active=True,
-            created_at=datetime(2024, 1, 1, 12, 0, 0),
-            modified_at=datetime(2024, 1, 2, 12, 0, 0),
+            created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
+            modified_at=datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC),
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
             allowed_docker_registries=["docker.io", "ghcr.io"],
@@ -46,8 +41,8 @@ class TestDomainV2GQL:
 
         # Verify lifecycle
         assert domain_gql.lifecycle.is_active is True
-        assert domain_gql.lifecycle.created_at == datetime(2024, 1, 1, 12, 0, 0)
-        assert domain_gql.lifecycle.modified_at == datetime(2024, 1, 2, 12, 0, 0)
+        assert domain_gql.lifecycle.created_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+        assert domain_gql.lifecycle.modified_at == datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC)
 
     def test_from_data_primary_key_is_name(self) -> None:
         """Test that id field contains domain name, not UUID."""
@@ -55,8 +50,8 @@ class TestDomainV2GQL:
             name="my-domain",
             description=None,
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
             allowed_docker_registries=[],
@@ -75,8 +70,8 @@ class TestDomainV2GQL:
             name="test",
             description=None,
             is_active=True,
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
             allowed_docker_registries=[],
@@ -93,8 +88,8 @@ class TestDomainV2GQL:
             name="minimal-domain",
             description=None,  # None description
             is_active=False,  # Inactive domain
-            created_at=datetime.now(),
-            modified_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            modified_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
             allowed_docker_registries=[],

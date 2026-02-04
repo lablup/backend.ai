@@ -31,7 +31,7 @@ class CreateUserV2Payload:
 
 
 @strawberry.type(
-    name="BulkCreateUsersPayload",
+    name="BulkCreateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
 class BulkCreateUsersPayload:
@@ -58,7 +58,7 @@ class UpdateUserV2Payload:
 
 
 @strawberry.type(
-    name="DeleteUserPayload",
+    name="DeleteUserV2Payload",
     description="Added in 26.2.0. Payload for single user soft-delete mutation.",
 )
 class DeleteUserPayload:
@@ -68,7 +68,7 @@ class DeleteUserPayload:
 
 
 @strawberry.type(
-    name="DeleteUsersPayload",
+    name="DeleteUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
 )
 class DeleteUsersPayload:
@@ -81,7 +81,7 @@ class DeleteUsersPayload:
 
 
 @strawberry.type(
-    name="PurgeUserPayload",
+    name="PurgeUserV2Payload",
     description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
 )
 class PurgeUserPayload:
@@ -91,7 +91,7 @@ class PurgeUserPayload:
 
 
 @strawberry.type(
-    name="PurgeUsersPayload",
+    name="PurgeUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
 )
 class PurgeUsersPayload:

@@ -895,7 +895,7 @@ input BulkCreateUserV2Input {
 }
 
 """Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersPayload {
+type BulkCreateUsersV2Payload {
   """Number of users successfully created."""
   createdCount: Int!
 
@@ -1485,15 +1485,9 @@ type DeleteUserConfigPayload {
 }
 
 """Added in 26.2.0. Payload for single user soft-delete mutation."""
-type DeleteUserPayload {
+type DeleteUserV2Payload {
   """Whether the deletion was successful."""
   success: Boolean!
-}
-
-"""Added in 26.2.0. Payload for bulk user soft-delete mutation."""
-type DeleteUsersPayload {
-  """Number of users successfully soft-deleted."""
-  deletedCount: Int!
 }
 
 """
@@ -1502,6 +1496,12 @@ Added in 26.2.0. Input for soft-deleting multiple users. Soft delete changes use
 input DeleteUsersV2Input {
   """List of user UUIDs to soft-delete."""
   userIds: [UUID!]!
+}
+
+"""Added in 26.2.0. Payload for bulk user soft-delete mutation."""
+type DeleteUsersV2Payload {
+  """Number of users successfully soft-deleted."""
+  deletedCount: Int!
 }
 
 """Added in 25.16.0. Input for deleting VFS storage"""
@@ -1876,7 +1876,7 @@ input DomainUsageBucketOrderBy {
 """
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
-input DomainUserScope {
+input DomainUserV2Scope {
   """
   Domain name to scope the user query. Only users belonging to this domain will be returned.
   """
@@ -3105,7 +3105,7 @@ type Mutation {
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersPayload!
+  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
   Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
@@ -3120,22 +3120,22 @@ type Mutation {
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
   """
-  adminDeleteUser(userId: UUID!): DeleteUserPayload!
+  adminDeleteUser(userId: UUID!): DeleteUserV2Payload!
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
   """
-  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersPayload!
+  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
   """
-  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserPayload!
+  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload!
 
   """
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
-  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersPayload!
+  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 }
 
 """An object with a Globally Unique ID"""
@@ -3556,7 +3556,7 @@ input ProjectUsageBucketOrderBy {
 """
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
-input ProjectUserScope {
+input ProjectUserV2Scope {
   """
   Project UUID to scope the user query. Only users who are members of this project will be returned.
   """
@@ -3579,12 +3579,6 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
-"""Added in 26.2.0. Payload for single user permanent deletion mutation."""
-type PurgeUserPayload {
-  """Whether the purge was successful."""
-  success: Boolean!
-}
-
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
@@ -3593,13 +3587,10 @@ input PurgeUserV2Input {
   userId: UUID!
 }
 
-"""Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersPayload {
-  """Number of users successfully purged."""
-  purgedCount: Int!
-
-  """List of user UUIDs that failed to purge, if any."""
-  failedUserIds: [UUID!]!
+"""Added in 26.2.0. Payload for single user permanent deletion mutation."""
+type PurgeUserV2Payload {
+  """Whether the purge was successful."""
+  success: Boolean!
 }
 
 """
@@ -3608,6 +3599,15 @@ Added in 26.2.0. Input for permanently deleting multiple users. This action is i
 input PurgeUsersV2Input {
   """List of user UUIDs to purge."""
   userIds: [UUID!]!
+}
+
+"""Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
+type PurgeUsersV2Payload {
+  """Number of users successfully purged."""
+  purgedCount: Int!
+
+  """List of user UUIDs that failed to purge, if any."""
+  failedUserIds: [UUID!]!
 }
 
 type Query {
@@ -3947,12 +3947,12 @@ type Query {
   """
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
-  domainUsers(scope: DomainUserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  domainUsers(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
   """
-  projectUsers(scope: ProjectUserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  projectUsers(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
@@ -5326,43 +5326,6 @@ enum UsageBucketOrderField {
 }
 
 """
-Added in 26.2.0. Basic user profile information. Contains identity and descriptive fields for the user account.
-"""
-type UserBasicInfo {
-  """
-  Unique username for login. May be null if only email-based login is used.
-  """
-  username: String
-
-  """User's email address. Used for login and notifications."""
-  email: String!
-
-  """User's full display name."""
-  fullName: String
-
-  """Optional description or notes about the user."""
-  description: String
-}
-
-"""
-Added in 26.2.0. Container execution settings for the user. Defines UID/GID mappings for containers created by this user.
-"""
-type UserContainerSettings {
-  """
-  User ID (UID) to use inside containers. If null, system default is used.
-  """
-  containerUid: Int
-
-  """
-  Primary group ID (GID) to use inside containers. If null, system default is used.
-  """
-  containerMainGid: Int
-
-  """Additional supplementary group IDs for container processes."""
-  containerGids: [Int!]
-}
-
-"""
 Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.
 """
 type UserFairShare implements Node {
@@ -5483,26 +5446,19 @@ extend type UserNode @key(fields: "id") {
 }
 
 """
-Added in 26.2.0. User's organizational context and permissions. Contains domain membership, role, and resource policy information.
+Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
 """
-type UserOrganizationInfo {
-  """Name of the domain this user belongs to."""
-  domainName: String
-
-  """User's role determining access permissions. See UserRoleV2 enum."""
-  role: UserRoleV2
-
-  """Name of the user resource policy applied to this user."""
-  resourcePolicy: String!
-
-  """Primary API access key for this user."""
-  mainAccessKey: String
+enum UserRoleV2 {
+  USER
+  ADMIN
+  SUPERADMIN
+  MONITOR
 }
 
 """
 Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
 """
-input UserRoleEnumFilter {
+input UserRoleV2EnumFilter {
   """Exact match for user role."""
   equals: UserRoleV2 = null
 
@@ -5517,40 +5473,19 @@ input UserRoleEnumFilter {
 }
 
 """
-Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
+Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
-enum UserRoleV2 {
-  USER
-  ADMIN
-  SUPERADMIN
-  MONITOR
-}
-
-"""
-Added in 26.2.0. User security settings and authentication configuration. Contains IP restrictions, TOTP settings, and privilege flags.
-"""
-type UserSecurityInfo {
-  """
-  List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses. Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1').
-  """
-  allowedClientIp: [String!]
-
-  """
-  Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled.
-  """
-  totpActivated: Boolean
-
-  """Timestamp when TOTP was activated."""
-  totpActivatedAt: DateTime
-
-  """Whether this user can create sudo (privileged) sessions."""
-  sudoSessionEnabled: Boolean!
+enum UserStatusV2 {
+  ACTIVE
+  INACTIVE
+  DELETED
+  BEFORE_VERIFICATION
 }
 
 """
 Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
 """
-input UserStatusEnumFilter {
+input UserStatusV2EnumFilter {
   """Exact match for user status."""
   equals: UserStatusV2 = null
 
@@ -5562,34 +5497,6 @@ input UserStatusEnumFilter {
 
   """Exclude any of the provided statuses."""
   notIn: [UserStatusV2!] = null
-}
-
-"""
-Added in 26.2.0. User account status information. Contains current status and password-related flags.
-"""
-type UserStatusInfo {
-  """
-  Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field.
-  """
-  status: UserStatusV2!
-
-  """
-  Additional information about the current status, such as reason for deactivation.
-  """
-  statusInfo: String
-
-  """If true, user must change password on next login."""
-  needPasswordChange: Boolean
-}
-
-"""
-Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
-"""
-enum UserStatusV2 {
-  ACTIVE
-  INACTIVE
-  DELETED
-  BEFORE_VERIFICATION
 }
 
 """
@@ -5709,22 +5616,41 @@ type UserV2 implements Node @key(fields: "id") {
   id: ID!
 
   """Basic profile information including username, email, and display name."""
-  basicInfo: UserBasicInfo!
+  basicInfo: UserV2BasicInfo!
 
   """Account status and password-related flags."""
-  status: UserStatusInfo!
+  status: UserV2StatusInfo!
 
   """Organizational context including domain, role, and resource policy."""
-  organization: UserOrganizationInfo!
+  organization: UserV2OrganizationInfo!
 
   """Security settings including IP restrictions and TOTP configuration."""
-  security: UserSecurityInfo!
+  security: UserV2SecurityInfo!
 
   """Container execution settings including UID/GID mappings."""
-  container: UserContainerSettings!
+  container: UserV2ContainerSettings!
 
   """Creation and modification timestamps."""
   timestamps: EntityTimestamps!
+}
+
+"""
+Added in 26.2.0. Basic user profile information. Contains identity and descriptive fields for the user account.
+"""
+type UserV2BasicInfo {
+  """
+  Unique username for login. May be null if only email-based login is used.
+  """
+  username: String
+
+  """User's email address. Used for login and notifications."""
+  email: String!
+
+  """User's full display name."""
+  fullName: String
+
+  """Optional description or notes about the user."""
+  description: String
 }
 
 """
@@ -5739,6 +5665,24 @@ type UserV2Connection {
 
   """Total number of user records matching the query criteria."""
   count: Int!
+}
+
+"""
+Added in 26.2.0. Container execution settings for the user. Defines UID/GID mappings for containers created by this user.
+"""
+type UserV2ContainerSettings {
+  """
+  User ID (UID) to use inside containers. If null, system default is used.
+  """
+  containerUid: Int
+
+  """
+  Primary group ID (GID) to use inside containers. If null, system default is used.
+  """
+  containerMainGid: Int
+
+  """Additional supplementary group IDs for container processes."""
+  containerGids: [Int!]
 }
 
 """An edge in a connection."""
@@ -5770,7 +5714,7 @@ input UserV2Filter {
   """
   Filter by account status. Supports equals, in, not_equals, and not_in operations.
   """
-  status: UserStatusEnumFilter = null
+  status: UserStatusV2EnumFilter = null
 
   """
   Filter by domain name. Supports equals, contains, startsWith, and endsWith.
@@ -5780,7 +5724,7 @@ input UserV2Filter {
   """
   Filter by user role. Supports equals, in, not_equals, and not_in operations.
   """
-  role: UserRoleEnumFilter = null
+  role: UserRoleV2EnumFilter = null
 
   """
   Filter by creation timestamp. Supports before, after, and between operations.
@@ -5821,6 +5765,62 @@ enum UserV2OrderField {
   USERNAME
   EMAIL
   STATUS
+}
+
+"""
+Added in 26.2.0. User's organizational context and permissions. Contains domain membership, role, and resource policy information.
+"""
+type UserV2OrganizationInfo {
+  """Name of the domain this user belongs to."""
+  domainName: String
+
+  """User's role determining access permissions. See UserRoleV2 enum."""
+  role: UserRoleV2
+
+  """Name of the user resource policy applied to this user."""
+  resourcePolicy: String!
+
+  """Primary API access key for this user."""
+  mainAccessKey: String
+}
+
+"""
+Added in 26.2.0. User security settings and authentication configuration. Contains IP restrictions, TOTP settings, and privilege flags.
+"""
+type UserV2SecurityInfo {
+  """
+  List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses. Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1').
+  """
+  allowedClientIp: [String!]
+
+  """
+  Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled.
+  """
+  totpActivated: Boolean
+
+  """Timestamp when TOTP was activated."""
+  totpActivatedAt: DateTime
+
+  """Whether this user can create sudo (privileged) sessions."""
+  sudoSessionEnabled: Boolean!
+}
+
+"""
+Added in 26.2.0. User account status information. Contains current status and password-related flags.
+"""
+type UserV2StatusInfo {
+  """
+  Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field.
+  """
+  status: UserStatusV2!
+
+  """
+  Additional information about the current status, such as reason for deactivation.
+  """
+  statusInfo: String
+
+  """If true, user must change password on next login."""
+  needPasswordChange: Boolean
 }
 
 """
