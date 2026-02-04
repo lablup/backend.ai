@@ -11,11 +11,6 @@ from dataclasses import dataclass
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.fair_share import (
-    DomainFairShareData,
-    ProjectFairShareData,
-    UserFairShareData,
-)
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -35,14 +30,6 @@ __all__ = (
     "DomainFairShareSearchScope",
     "ProjectFairShareSearchScope",
     "UserFairShareSearchScope",
-    # Entity-based result items
-    "DomainFairShareEntityItem",
-    "ProjectFairShareEntityItem",
-    "UserFairShareEntityItem",
-    # Entity-based search results
-    "DomainFairShareEntitySearchResult",
-    "ProjectFairShareEntitySearchResult",
-    "UserFairShareEntitySearchResult",
 )
 
 
@@ -176,135 +163,3 @@ class UserFairShareSearchScope(SearchScope):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
-
-
-# ==================== Entity-based Search Result Items ====================
-
-
-@dataclass(frozen=True)
-class DomainFairShareEntityItem:
-    """Entity-based search result item for domain fair share.
-
-    Represents a domain that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this domain is associated with."""
-
-    domain_name: str
-    """The name of the domain."""
-
-    details: DomainFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
-@dataclass(frozen=True)
-class ProjectFairShareEntityItem:
-    """Entity-based search result item for project fair share.
-
-    Represents a project that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this project is associated with."""
-
-    project_id: uuid.UUID
-    """The UUID of the project."""
-
-    domain_name: str
-    """The domain this project belongs to."""
-
-    details: ProjectFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
-@dataclass(frozen=True)
-class UserFairShareEntityItem:
-    """Entity-based search result item for user fair share.
-
-    Represents a user that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this user is associated with."""
-
-    user_uuid: uuid.UUID
-    """The UUID of the user."""
-
-    project_id: uuid.UUID
-    """The project this user belongs to (for this resource group)."""
-
-    domain_name: str
-    """The domain this user belongs to."""
-
-    details: UserFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
-# ==================== Entity-based Search Results ====================
-
-
-@dataclass(frozen=True)
-class DomainFairShareEntitySearchResult:
-    """Search result for entity-based domain fair share query.
-
-    Contains domains associated with a resource group,
-    regardless of whether they have fair share records.
-    """
-
-    items: list[DomainFairShareEntityItem]
-    """List of domain fair share items."""
-
-    total_count: int
-    """Total number of items matching the query (before pagination)."""
-
-    has_next_page: bool
-    """Whether there are more items after the current page."""
-
-    has_previous_page: bool
-    """Whether there are items before the current page."""
-
-
-@dataclass(frozen=True)
-class ProjectFairShareEntitySearchResult:
-    """Search result for entity-based project fair share query.
-
-    Contains projects associated with a resource group,
-    regardless of whether they have fair share records.
-    """
-
-    items: list[ProjectFairShareEntityItem]
-    """List of project fair share items."""
-
-    total_count: int
-    """Total number of items matching the query (before pagination)."""
-
-    has_next_page: bool
-    """Whether there are more items after the current page."""
-
-    has_previous_page: bool
-    """Whether there are items before the current page."""
-
-
-@dataclass(frozen=True)
-class UserFairShareEntitySearchResult:
-    """Search result for entity-based user fair share query.
-
-    Contains users associated with a resource group,
-    regardless of whether they have fair share records.
-    """
-
-    items: list[UserFairShareEntityItem]
-    """List of user fair share items."""
-
-    total_count: int
-    """Total number of items matching the query (before pagination)."""
-
-    has_next_page: bool
-    """Whether there are more items after the current page."""
-
-    has_previous_page: bool
-    """Whether there are items before the current page."""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
@@ -16,7 +16,10 @@ from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationContext,
+    FairShareCalculationSnapshot,
+    FairShareMetadata,
     FairSharesByLevel,
+    FairShareSpec,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
@@ -59,14 +62,8 @@ from ai.backend.manager.repositories.base import (
     execute_upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareEntityItem,
-    DomainFairShareEntitySearchResult,
     DomainFairShareSearchScope,
-    ProjectFairShareEntityItem,
-    ProjectFairShareEntitySearchResult,
     ProjectFairShareSearchScope,
-    UserFairShareEntityItem,
-    UserFairShareEntitySearchResult,
     UserFairShareSearchScope,
 )
 
@@ -98,7 +95,8 @@ class FairShareDBSource:
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     async def upsert_domain_fair_share(
         self,
@@ -112,7 +110,8 @@ class FairShareDBSource:
                 index_elements=["resource_group", "domain_name"],
             )
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     async def get_domain_fair_share(
         self,
@@ -138,7 +137,8 @@ class FairShareDBSource:
                     f"Domain fair share not found: resource_group={resource_group}, domain_name={domain_name}"
                 )
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, resource_group)
+            return row.to_data(spec.default_weight, available_slots)
 
     async def search_domain_fair_shares(
         self,
@@ -149,14 +149,18 @@ class FairShareDBSource:
             query = sa.select(DomainFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.DomainFairShareRow.resource_group for row in result.rows}
             specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            capacities = {
+                rg: await self._fetch_cluster_capacity(db_sess, rg) for rg in resource_groups
+            }
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.DomainFairShareRow.to_data(
-                    specs[row.DomainFairShareRow.resource_group].default_weight
+                    specs[row.DomainFairShareRow.resource_group].default_weight,
+                    capacities[row.DomainFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -167,22 +171,22 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_domain_fair_share_entities(
+    async def search_domain_fair_shares_by_scope(
         self,
         scope: DomainFairShareSearchScope,
         querier: BatchQuerier,
-    ) -> DomainFairShareEntitySearchResult:
-        """Search domain entities with their fair share records.
+    ) -> DomainFairShareSearchResult:
+        """Search domain fair shares within a scope.
 
         This method returns all domains associated with a resource group,
-        regardless of whether they have fair share records.
+        creating default fair share data for domains without records.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            DomainFairShareEntitySearchResult with domain entities and their optional fair share details.
+            DomainFairShareSearchResult with complete fair share data for all domains.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query: domains associated with resource_group LEFT JOIN fair_share
@@ -204,38 +208,85 @@ class FairShareDBSource:
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec and available_slots
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_cluster_capacity(db_sess, scope.resource_group)
 
             items = [
-                self._build_domain_entity_item(
+                self._build_domain_fair_share_data(
                     resource_group=row.scaling_group,
                     domain_name=row.domain,
                     fair_share_row=row.DomainFairShareRow,
-                    default_weight=spec.default_weight,
+                    scaling_group_spec=spec,
+                    available_slots=available_slots,
                 )
                 for row in result.rows
             ]
 
-            return DomainFairShareEntitySearchResult(
+            return DomainFairShareSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_domain_entity_item(
+    def _create_default_domain_fair_share_data(
+        self,
+        resource_group: str,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> DomainFairShareData:
+        """Create default domain fair share data when no record exists."""
+
+        now = datetime.now(UTC)
+        today = now.date()
+        lookback_start = today - timedelta(days=scaling_group_spec.lookback_days)
+
+        return DomainFairShareData(
+            id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
+            resource_group=resource_group,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlot(),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=lookback_start,
+                lookback_end=today,
+                last_calculated_at=now,
+            ),
+            metadata=FairShareMetadata(
+                created_at=now,
+                updated_at=now,
+            ),
+            default_weight=scaling_group_spec.default_weight,
+            uses_default_resources=[],  # All weights from spec (no merging needed for defaults)
+        )
+
+    def _build_domain_fair_share_data(
         self,
         resource_group: str,
         domain_name: str,
         fair_share_row: DomainFairShareRow | None,
-        default_weight: Decimal,
-    ) -> DomainFairShareEntityItem:
-        """Build domain entity item from query result."""
-        return DomainFairShareEntityItem(
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: ResourceSlot,
+    ) -> DomainFairShareData:
+        """Build domain fair share data from query result."""
+        if fair_share_row is not None:
+            return fair_share_row.to_data(
+                scaling_group_spec.default_weight,
+                available_slots,
+            )
+        return self._create_default_domain_fair_share_data(
             resource_group=resource_group,
             domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+            scaling_group_spec=scaling_group_spec,
         )
 
     # ==================== Project Fair Share ====================
@@ -248,7 +299,8 @@ class FairShareDBSource:
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     async def upsert_project_fair_share(
         self,
@@ -262,7 +314,8 @@ class FairShareDBSource:
                 index_elements=["resource_group", "project_id"],
             )
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     async def get_project_fair_share(
         self,
@@ -288,7 +341,8 @@ class FairShareDBSource:
                     f"Project fair share not found: resource_group={resource_group}, project_id={project_id}"
                 )
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, resource_group)
+            return row.to_data(spec.default_weight, available_slots)
 
     async def search_project_fair_shares(
         self,
@@ -299,14 +353,18 @@ class FairShareDBSource:
             query = sa.select(ProjectFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.ProjectFairShareRow.resource_group for row in result.rows}
             specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            capacities = {
+                rg: await self._fetch_cluster_capacity(db_sess, rg) for rg in resource_groups
+            }
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.ProjectFairShareRow.to_data(
-                    specs[row.ProjectFairShareRow.resource_group].default_weight
+                    specs[row.ProjectFairShareRow.resource_group].default_weight,
+                    capacities[row.ProjectFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -317,22 +375,22 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_project_fair_share_entities(
+    async def search_project_fair_shares_by_scope(
         self,
         scope: ProjectFairShareSearchScope,
         querier: BatchQuerier,
-    ) -> ProjectFairShareEntitySearchResult:
-        """Search project entities with their fair share records.
+    ) -> ProjectFairShareSearchResult:
+        """Search project fair shares within a scope.
 
         This method returns all projects associated with a resource group,
-        regardless of whether they have fair share records.
+        creating default fair share data for projects without records.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            ProjectFairShareEntitySearchResult with project entities and their optional fair share details.
+            ProjectFairShareSearchResult with complete fair share data for all projects.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query: projects associated with resource_group LEFT JOIN fair_share
@@ -358,41 +416,90 @@ class FairShareDBSource:
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec and available_slots
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_cluster_capacity(db_sess, scope.resource_group)
 
             items = [
-                self._build_project_entity_item(
+                self._build_project_fair_share_data(
                     resource_group=row.scaling_group,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
                     fair_share_row=row.ProjectFairShareRow,
-                    default_weight=spec.default_weight,
+                    scaling_group_spec=spec,
+                    available_slots=available_slots,
                 )
                 for row in result.rows
             ]
 
-            return ProjectFairShareEntitySearchResult(
+            return ProjectFairShareSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_project_entity_item(
+    def _create_default_project_fair_share_data(
+        self,
+        resource_group: str,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> ProjectFairShareData:
+        """Create default project fair share data when no record exists."""
+
+        now = datetime.now(UTC)
+        today = now.date()
+        lookback_start = today - timedelta(days=scaling_group_spec.lookback_days)
+
+        return ProjectFairShareData(
+            id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
+            resource_group=resource_group,
+            project_id=project_id,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlot(),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=lookback_start,
+                lookback_end=today,
+                last_calculated_at=now,
+            ),
+            metadata=FairShareMetadata(
+                created_at=now,
+                updated_at=now,
+            ),
+            default_weight=scaling_group_spec.default_weight,
+            uses_default_resources=[],  # All weights from spec (no merging needed for defaults)
+        )
+
+    def _build_project_fair_share_data(
         self,
         resource_group: str,
         project_id: uuid.UUID,
         domain_name: str,
         fair_share_row: ProjectFairShareRow | None,
-        default_weight: Decimal,
-    ) -> ProjectFairShareEntityItem:
-        """Build project entity item from query result."""
-        return ProjectFairShareEntityItem(
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: ResourceSlot,
+    ) -> ProjectFairShareData:
+        """Build project fair share data from query result."""
+        if fair_share_row is not None:
+            return fair_share_row.to_data(
+                scaling_group_spec.default_weight,
+                available_slots,
+            )
+        return self._create_default_project_fair_share_data(
             resource_group=resource_group,
             project_id=project_id,
             domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+            scaling_group_spec=scaling_group_spec,
         )
 
     # ==================== User Fair Share ====================
@@ -405,7 +512,8 @@ class FairShareDBSource:
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     async def upsert_user_fair_share(
         self,
@@ -419,7 +527,8 @@ class FairShareDBSource:
                 index_elements=["resource_group", "user_uuid", "project_id"],
             )
             spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, result.row.resource_group)
+            return result.row.to_data(spec.default_weight, available_slots)
 
     # ==================== Bulk Upsert Operations ====================
 
@@ -507,7 +616,8 @@ class FairShareDBSource:
                     f"project_id={project_id}, user_uuid={user_uuid}"
                 )
             spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+            available_slots = await self._fetch_cluster_capacity(db_sess, resource_group)
+            return row.to_data(spec.default_weight, available_slots)
 
     async def get_user_project_info(
         self,
@@ -586,14 +696,18 @@ class FairShareDBSource:
             query = sa.select(UserFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.UserFairShareRow.resource_group for row in result.rows}
             specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            capacities = {
+                rg: await self._fetch_cluster_capacity(db_sess, rg) for rg in resource_groups
+            }
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.UserFairShareRow.to_data(
-                    specs[row.UserFairShareRow.resource_group].default_weight
+                    specs[row.UserFairShareRow.resource_group].default_weight,
+                    capacities[row.UserFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -604,22 +718,22 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_user_fair_share_entities(
+    async def search_user_fair_shares_by_scope(
         self,
         scope: UserFairShareSearchScope,
         querier: BatchQuerier,
-    ) -> UserFairShareEntitySearchResult:
-        """Search user entities with their fair share records.
+    ) -> UserFairShareSearchResult:
+        """Search user fair shares within a scope.
 
         This method returns all users associated with a resource group (via project membership),
-        regardless of whether they have fair share records.
+        creating default fair share data for users without records.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            UserFairShareEntitySearchResult with user entities and their optional fair share details.
+            UserFairShareSearchResult with complete fair share data for all users.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query:
@@ -651,44 +765,96 @@ class FairShareDBSource:
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec and available_slots
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_cluster_capacity(db_sess, scope.resource_group)
 
             items = [
-                self._build_user_entity_item(
+                self._build_user_fair_share_data(
                     resource_group=row.scaling_group,
                     user_uuid=row.user_uuid,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
                     fair_share_row=row.UserFairShareRow,
-                    default_weight=spec.default_weight,
+                    scaling_group_spec=spec,
+                    available_slots=available_slots,
                 )
                 for row in result.rows
             ]
 
-            return UserFairShareEntitySearchResult(
+            return UserFairShareSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_user_entity_item(
+    def _create_default_user_fair_share_data(
+        self,
+        resource_group: str,
+        user_uuid: uuid.UUID,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+    ) -> UserFairShareData:
+        """Create default user fair share data when no record exists."""
+
+        now = datetime.now(UTC)
+        today = now.date()
+        lookback_start = today - timedelta(days=scaling_group_spec.lookback_days)
+
+        return UserFairShareData(
+            id=uuid.UUID(int=0),  # Sentinel UUID for non-persisted record
+            resource_group=resource_group,
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name=domain_name,
+            spec=FairShareSpec(
+                weight=None,
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlot(),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=lookback_start,
+                lookback_end=today,
+                last_calculated_at=now,
+            ),
+            metadata=FairShareMetadata(
+                created_at=now,
+                updated_at=now,
+            ),
+            default_weight=scaling_group_spec.default_weight,
+            uses_default_resources=[],  # All weights from spec (no merging needed for defaults)
+            scheduling_rank=None,  # No rank calculated yet
+        )
+
+    def _build_user_fair_share_data(
         self,
         resource_group: str,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
         domain_name: str,
         fair_share_row: UserFairShareRow | None,
-        default_weight: Decimal,
-    ) -> UserFairShareEntityItem:
-        """Build user entity item from query result."""
-        return UserFairShareEntityItem(
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: ResourceSlot,
+    ) -> UserFairShareData:
+        """Build user fair share data from query result."""
+        if fair_share_row is not None:
+            return fair_share_row.to_data(
+                scaling_group_spec.default_weight,
+                available_slots,
+            )
+        return self._create_default_user_fair_share_data(
             resource_group=resource_group,
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+            scaling_group_spec=scaling_group_spec,
         )
 
     async def get_user_scheduling_ranks_batch(
@@ -1071,13 +1237,17 @@ class FairShareDBSource:
         default_weight: Decimal,
     ) -> FairSharesByLevel:
         """Fetch all fair share records for a resource group."""
+        # Fetch available_slots once for all conversions
+        available_slots = await self._fetch_cluster_capacity(db_sess, scaling_group)
+
         # Get domain fair shares
         domain_query = sa.select(DomainFairShareRow).where(
             DomainFairShareRow.resource_group == scaling_group
         )
         domain_result = await db_sess.execute(domain_query)
         domain_fair_shares = {
-            row.domain_name: row.to_data(default_weight) for row in domain_result.scalars()
+            row.domain_name: row.to_data(default_weight, available_slots)
+            for row in domain_result.scalars()
         }
 
         # Get project fair shares
@@ -1086,7 +1256,8 @@ class FairShareDBSource:
         )
         project_result = await db_sess.execute(project_query)
         project_fair_shares = {
-            row.project_id: row.to_data(default_weight) for row in project_result.scalars()
+            row.project_id: row.to_data(default_weight, available_slots)
+            for row in project_result.scalars()
         }
 
         # Get user fair shares
@@ -1095,7 +1266,9 @@ class FairShareDBSource:
         )
         user_result = await db_sess.execute(user_query)
         user_fair_shares = {
-            UserProjectKey(row.user_uuid, row.project_id): row.to_data(default_weight)
+            UserProjectKey(row.user_uuid, row.project_id): row.to_data(
+                default_weight, available_slots
+            )
             for row in user_result.scalars()
         }
 

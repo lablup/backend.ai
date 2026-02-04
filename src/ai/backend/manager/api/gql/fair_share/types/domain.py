@@ -108,7 +108,11 @@ class DomainFairShareGQL(Node):
             id=ID(str(data.id)),
             resource_group=data.resource_group,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
+            spec=FairShareSpecGQL.from_spec(
+                data.spec,
+                data.default_weight,
+                data.uses_default_resources,
+            ),
             calculation_snapshot=FairShareCalculationSnapshotGQL(
                 fair_share_factor=data.calculation_snapshot.fair_share_factor,
                 total_decayed_usage=ResourceSlotGQL.from_resource_slot(
