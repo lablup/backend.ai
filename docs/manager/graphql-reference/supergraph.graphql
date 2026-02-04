@@ -7816,6 +7816,16 @@ type Query
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image by its ID.
+  
+  Returns detailed information about the image including its identity,
+  metadata, resource requirements, and permission settings.
+  """
+  imageV2(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
@@ -7888,17 +7898,7 @@ type Query
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImages(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0.
-  
-  Retrieve a specific image by its ID (admin only).
-  
-  Returns detailed information about the image including its identity,
-  metadata, resource requirements, and permission settings.
-  """
-  adminImage(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
+  adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
@@ -7947,7 +7947,7 @@ type Query
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImages(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")

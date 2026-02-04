@@ -40,7 +40,7 @@ from .types import (
     Supports both cursor-based and offset-based pagination.
     """)
 )
-async def admin_images(
+async def admin_images_v2(
     info: Info[StrawberryGQLContext],
     filter: ImageFilterGQL | None = None,
     order_by: list[ImageOrderByGQL] | None = None,
@@ -69,14 +69,13 @@ async def admin_images(
     description=dedent_strip("""
     Added in 26.2.0.
 
-    Retrieve a specific image by its ID (admin only).
+    Retrieve a specific image by its ID.
 
     Returns detailed information about the image including its identity,
     metadata, resource requirements, and permission settings.
     """)
 )
-async def admin_image(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
-    check_admin_only()
+async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
     return await fetch_image(info, ImageID(UUID(id)))
 
 
@@ -92,7 +91,7 @@ async def admin_image(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | 
     Supports both cursor-based and offset-based pagination.
     """)
 )
-async def container_registry_images(
+async def container_registry_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ContainerRegistryScopeGQL,
     filter: ImageFilterGQL | None = None,

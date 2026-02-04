@@ -7,9 +7,9 @@ See BEP-1038 for detailed specifications.
 
 from .fetcher import fetch_image, fetch_images
 from .resolver import (
-    admin_image,
-    admin_images,
-    container_registry_images,
+    admin_images_v2,
+    container_registry_images_v2,
+    image_v2,
 )
 from .types import (
     ContainerRegistryScopeGQL,
@@ -56,7 +56,7 @@ __all__ = [
     "fetch_images",
     "fetch_image",
     # Resolver fields
-    "admin_images",
-    "admin_image",
-    "container_registry_images",
+    "admin_images_v2",
+    "image_v2",
+    "container_registry_images_v2",
 ]
