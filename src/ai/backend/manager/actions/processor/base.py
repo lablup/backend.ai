@@ -129,3 +129,49 @@ class ActionProcessor[TAction: BaseAction, TActionResult: BaseActionResult]:
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         return await self._run(action)
+
+
+class ActionProcessorFactory:
+    _monitors: Sequence[ActionMonitor] | None
+    _validators: Sequence[ActionValidator] | None
+    _default_excluded_monitors: set[type[ActionMonitor]] | None
+    _default_excluded_validators: set[type[ActionValidator]] | None
+
+    def __init__(
+        self,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[ActionValidator] | None = None,
+        default_excluded_monitors: set[type[ActionMonitor]] | None = None,
+        default_excluded_validators: set[type[ActionValidator]] | None = None,
+    ) -> None:
+        self._monitors = monitors
+        self._validators = validators
+        self._default_excluded_monitors = default_excluded_monitors
+        self._default_excluded_validators = default_excluded_validators
+
+    def build_action_processor[TAction: BaseAction, TActionResult: BaseActionResult](
+        self,
+        func: Callable[[TAction], Awaitable[TActionResult]],
+        additional_excluded_monitors: set[type[ActionMonitor]] | None = None,
+        additional_excluded_validators: set[type[ActionValidator]] | None = None,
+    ) -> ActionProcessor[TAction, TActionResult]:
+        excluded_monitor_types = self._default_excluded_monitors or set()
+        if additional_excluded_monitors:
+            excluded_monitor_types = excluded_monitor_types | additional_excluded_monitors
+
+        monitors = []
+        if self._monitors:
+            for monitor in self._monitors:
+                if type(monitor) not in excluded_monitor_types:
+                    monitors.append(monitor)
+
+        excluded_validator_types = self._default_excluded_validators or set()
+        if additional_excluded_validators:
+            excluded_validator_types = excluded_validator_types | additional_excluded_validators
+
+        validators = []
+        if self._validators:
+            for validator in self._validators:
+                if type(validator) not in excluded_validator_types:
+                    validators.append(validator)
+        return ActionProcessor(func, monitors, validators)
