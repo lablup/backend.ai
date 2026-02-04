@@ -20,6 +20,38 @@ Repositories Layer (repositories/)  ← Data access and transaction management
 Database Models (models/)
 ```
 
+## Standard Operations
+
+Services implement 6 standard operations:
+
+1. **create** - Create new entity
+2. **get** - Retrieve single entity
+3. **search** - Query with filters
+4. **update** - Update entity
+5. **delete** - Delete entity
+6. **purge** - Permanently remove entity
+
+**Batch operations:**
+- `batch_update` - Update multiple entities
+- `batch_delete` - Delete multiple entities
+- `batch_purge` - Permanently remove multiple entities
+
+**Method naming (no prefix):**
+```python
+# Service methods accept Actions and return ActionResults
+await service.create_user(action: CreateUserAction)
+await service.user(action: GetUserAction)  # getter uses entity name
+await service.search_users(action: SearchUsersAction)
+await service.update_user(action: UpdateUserAction)
+await service.delete_user(action: DeleteUserAction)
+await service.purge_user(action: PurgeUserAction)
+await service.batch_update_users(action: BatchUpdateUsersAction)
+await service.batch_delete_users(action: BatchDeleteUsersAction)
+await service.batch_purge_users(action: BatchPurgeUsersAction)
+```
+
+**See:** `/service-guide` skill for detailed implementation patterns.
+
 ## Key Responsibilities
 
 ### 1. Business Logic Implementation
@@ -573,6 +605,391 @@ async def handle(self, id: str) -> None:
     """Unclear intent"""
     ...
 ```
+
+## Implementation Guide
+
+This section provides practical guidance for implementing new services following Backend.AI patterns.
+
+**For comprehensive step-by-step instructions, see the `/service-guide` skill.**
+
+### Quick Start Checklist
+
+When creating a new service:
+
+1. ✅ Define operations enum in `types.py`
+2. ✅ Create `actions/base.py` with base action classes
+3. ✅ Implement concrete actions in `actions/{operation}.py`
+4. ✅ Define service protocol in `service.py`
+5. ✅ Implement service methods
+6. ✅ Create processor package in `processors.py`
+7. ✅ Write tests with mocked repositories (see `/tdd-guide`)
+8. ✅ Integrate with API handlers (see `/api-guide`)
+
+### Directory Structure
+
+Services follow a standardized structure:
+
+```
+services/{domain}/
+├── __init__.py
+├── types.py                # Domain types and operation enums
+├── service.py              # Service protocol and implementation
+├── processors.py           # Processor package for orchestration
+└── actions/
+    ├── __init__.py
+    ├── base.py            # Base action/result classes
+    ├── create.py          # Create operation
+    ├── update.py          # Update operation
+    └── delete.py          # Delete operation
+```
+
+**Example**: See `services/storage_namespace/` for complete implementation.
+
+### Actions File Structure
+
+#### Base Actions (`actions/base.py`)
+
+Define abstract base classes for all actions in the domain:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from ..types import StorageNamespaceOperation
+
+if TYPE_CHECKING:
+    from ai.backend.manager.types import StorageNamespaceId
+
+
+@dataclass(frozen=True)
+class StorageNamespaceAction:
+    """Base class for storage namespace actions."""
+
+    def entity_id(self) -> str:
+        """Return unique identifier for the entity being acted upon."""
+        raise NotImplementedError
+
+    def operation_type(self) -> StorageNamespaceOperation:
+        """Return the type of operation being performed."""
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class StorageNamespaceActionResult:
+    """Base class for storage namespace action results."""
+
+    def entity_id(self) -> str:
+        """Return unique identifier for the entity that was acted upon."""
+        raise NotImplementedError
+```
+
+**Key Requirements:**
+- Actions are immutable (`frozen=True`)
+- Implement `entity_id()` for tracking
+- Implement `operation_type()` for categorization
+- Use `TYPE_CHECKING` for type-only imports
+
+#### Concrete Actions (`actions/create.py`, etc.)
+
+Each operation gets its own file:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from .base import StorageNamespaceAction, StorageNamespaceActionResult
+from ..types import StorageNamespaceOperation
+
+if TYPE_CHECKING:
+    from ai.backend.common.types import BinarySize
+    from ai.backend.manager.types import StorageNamespaceId
+
+
+@dataclass(frozen=True)
+class CreateStorageNamespaceAction(StorageNamespaceAction):
+    """Action to create a new storage namespace."""
+
+    name: str
+    sgroup_name: str
+    domain_name: str
+    usage_mode: UsageMode
+    permission: Permission
+    resource_limit: BinarySize | None = None
+
+    def entity_id(self) -> str:
+        return self.name
+
+    def operation_type(self) -> StorageNamespaceOperation:
+        return StorageNamespaceOperation.CREATE
+
+
+@dataclass(frozen=True)
+class CreateStorageNamespaceActionResult(StorageNamespaceActionResult):
+    """Result of creating a storage namespace."""
+
+    namespace_id: StorageNamespaceId
+
+    def entity_id(self) -> str:
+        return str(self.namespace_id)
+```
+
+**Naming Conventions:**
+- Action: `{Verb}{Entity}Action` (e.g., `CreateStorageNamespaceAction`)
+- Result: `{ActionName}Result` (e.g., `CreateStorageNamespaceActionResult`)
+- Operation enum: `{VERB}` (e.g., `StorageNamespaceOperation.CREATE`)
+
+### Processors Pattern
+
+Processors orchestrate action execution with hooks, metrics, and middleware:
+
+```python
+from ai.backend.manager.services.processors import (
+    AbstractProcessorPackage,
+    ActionProcessor,
+)
+
+
+class StorageNamespaceProcessorPackage(AbstractProcessorPackage):
+    """Processor package for storage namespace operations."""
+
+    def __init__(
+        self,
+        service: StorageNamespaceServiceProtocol,
+    ) -> None:
+        self._service = service
+        self._create_processor = ActionProcessor[
+            CreateStorageNamespaceAction,
+            CreateStorageNamespaceActionResult,
+        ](
+            action_name="create_storage_namespace",
+            handler=service.create_storage_namespace,
+        )
+
+    @property
+    def create_storage_namespace(
+        self,
+    ) -> ActionProcessor[
+        CreateStorageNamespaceAction,
+        CreateStorageNamespaceActionResult,
+    ]:
+        return self._create_processor
+```
+
+**Key Components:**
+- **ProcessorPackage**: Container for all domain processors
+- **ActionProcessor**: Wraps service method with:
+  - Pre/post hook execution
+  - Metrics collection
+  - Error handling
+  - Logging
+- **Property Pattern**: Expose processors as properties for clean API
+
+### Service Implementation Workflow
+
+#### 1. Define Service Protocol
+
+```python
+from typing import Protocol
+
+
+class StorageNamespaceServiceProtocol(Protocol):
+    """Protocol defining storage namespace service interface."""
+
+    async def create_storage_namespace(
+        self,
+        action: CreateStorageNamespaceAction,
+    ) -> CreateStorageNamespaceActionResult:
+        """Create a new storage namespace."""
+        ...
+```
+
+#### 2. Implement Service Methods
+
+```python
+class StorageNamespaceService:
+    """Service for storage namespace operations."""
+
+    def __init__(
+        self,
+        repository: StorageNamespaceRepository,
+    ) -> None:
+        self._repository = repository
+
+    async def create_storage_namespace(
+        self,
+        action: CreateStorageNamespaceAction,
+    ) -> CreateStorageNamespaceActionResult:
+        """Create a new storage namespace.
+
+        Args:
+            action: Action containing namespace creation parameters
+
+        Returns:
+            Result containing created namespace ID
+
+        Raises:
+            StorageNamespaceAlreadyExists: If namespace with same name exists
+            InvalidStorageNamespace: If namespace parameters are invalid
+        """
+        # 1. Validate action parameters
+        if not action.name:
+            raise InvalidStorageNamespace("Namespace name cannot be empty")
+
+        # 2. Check business rules
+        existing = await self._repository.get_by_name(action.name)
+        if existing:
+            raise StorageNamespaceAlreadyExists(
+                f"Namespace '{action.name}' already exists"
+            )
+
+        # 3. Create entity via repository
+        namespace_id = await self._repository.create(
+            name=action.name,
+            sgroup_name=action.sgroup_name,
+            domain_name=action.domain_name,
+            usage_mode=action.usage_mode,
+            permission=action.permission,
+            resource_limit=action.resource_limit,
+        )
+
+        # 4. Return result
+        return CreateStorageNamespaceActionResult(namespace_id=namespace_id)
+```
+
+**Method Structure:**
+1. **Validate**: Check action parameters
+2. **Business Logic**: Apply domain rules
+3. **Repository Calls**: Coordinate data access
+4. **Return Result**: Create ActionResult
+
+### Repository Integration
+
+Services coordinate with repositories for data access:
+
+```python
+class DomainService:
+    def __init__(
+        self,
+        domain_repository: DomainRepository,
+        user_repository: UserRepository,
+        group_repository: GroupRepository,
+    ) -> None:
+        self._domain_repo = domain_repository
+        self._user_repo = user_repository
+        self._group_repo = group_repository
+
+    async def create_domain_with_admin(
+        self,
+        action: CreateDomainWithAdminAction,
+    ) -> CreateDomainWithAdminActionResult:
+        # Coordinate multiple repositories
+        domain_id = await self._domain_repo.create(action.domain_name)
+        user_id = await self._user_repo.create(
+            username=action.admin_username,
+            domain_id=domain_id,
+        )
+        await self._group_repo.add_user_to_group(
+            user_id=user_id,
+            group_name=f"{action.domain_name}-admins",
+        )
+
+        return CreateDomainWithAdminActionResult(
+            domain_id=domain_id,
+            admin_user_id=user_id,
+        )
+```
+
+**See `/repository-guide` for repository implementation patterns.**
+
+### Action Naming Conventions
+
+Follow these patterns for consistency:
+
+**Create Operations:**
+```python
+CreateStorageNamespaceAction / CreateStorageNamespaceActionResult
+StorageNamespaceOperation.CREATE
+```
+
+**Update Operations:**
+```python
+UpdateStorageNamespaceAction / UpdateStorageNamespaceActionResult
+StorageNamespaceOperation.UPDATE
+```
+
+**Delete Operations:**
+```python
+DeleteStorageNamespaceAction / DeleteStorageNamespaceActionResult
+StorageNamespaceOperation.DELETE
+```
+
+**Domain-Specific Operations:**
+```python
+ArchiveStorageNamespaceAction / ArchiveStorageNamespaceActionResult
+StorageNamespaceOperation.ARCHIVE
+```
+
+### Testing Services
+
+**Critical Rule**: Service tests MUST NOT use real database. Mock repositories instead.
+
+```python
+from unittest.mock import AsyncMock, Mock
+import pytest
+
+
+@pytest.fixture
+def database_engine() -> None:
+    """Raise error if service test tries to use database."""
+    raise RuntimeError(
+        "Service tests must not use database. "
+        "Mock repositories instead."
+    )
+
+
+@pytest.fixture
+def mock_repository() -> Mock:
+    """Mock repository for testing."""
+    repo = Mock()
+    repo.get_by_name = AsyncMock(return_value=None)
+    repo.create = AsyncMock(return_value=StorageNamespaceId("test-id"))
+    return repo
+
+
+@pytest.fixture
+def service(mock_repository: Mock) -> StorageNamespaceService:
+    """Service instance with mocked repository."""
+    return StorageNamespaceService(repository=mock_repository)
+
+
+async def test_create_storage_namespace_success(
+    service: StorageNamespaceService,
+    mock_repository: Mock,
+) -> None:
+    """Test successful namespace creation."""
+    # Given
+    action = CreateStorageNamespaceAction(
+        name="test-namespace",
+        sgroup_name="default",
+        domain_name="default",
+        usage_mode=UsageMode.GENERAL,
+        permission=Permission.RW,
+    )
+
+    # When
+    result = await service.create_storage_namespace(action)
+
+    # Then
+    assert result.namespace_id == StorageNamespaceId("test-id")
+    mock_repository.get_by_name.assert_called_once_with("test-namespace")
+    mock_repository.create.assert_called_once()
+```
+
+**See `/tdd-guide` for complete test-driven development workflow.**
 
 ## Service-Specific Documentation
 

@@ -1,0 +1,202 @@
+# Database Migration Step-by-Step Guide
+
+## Pre-Migration Checklist
+
+- [ ] Check current database status with /db-status
+- [ ] Verify no diverged heads exist
+- [ ] Ensure database connection is available
+- [ ] Review migration files for correctness
+- [ ] Backup database (for production/important environments)
+
+## Upgrade Process
+
+### Step 1: Check Current Status
+```bash
+/db-status --component=<component>
+```
+
+Expected output:
+- Current revision
+- Head revision
+- Number of pending migrations
+
+### Step 2: Review Pending Migrations (Optional)
+```bash
+./py -m alembic -c <config> history --verbose
+```
+
+Look for migrations between current and head.
+
+### Step 3: Apply Migrations
+```bash
+/db-migrate --component=<component>
+```
+
+Monitor output for:
+- Migration names being applied
+- Any warnings or errors
+- Final success message
+
+### Step 4: Verify Success
+```bash
+/db-status --component=<component>
+```
+
+Expected: Database should be at head revision
+
+### Step 5: Test Application
+- Restart affected services
+- Verify key functionality
+- Check logs for migration-related errors
+
+## Downgrade Process (Rollback)
+
+### Step 1: Determine Target Revision
+```bash
+./py -m alembic -c <config> history
+```
+
+Identify the revision to rollback to.
+
+### Step 2: Backup Database
+```bash
+# Create backup before downgrade
+# (Use your database-specific backup tool)
+```
+
+### Step 3: Execute Downgrade
+```bash
+/db-migrate --direction=downgrade --target=<revision_id>
+```
+
+Or rollback one migration:
+```bash
+/db-migrate --direction=downgrade --target=-1
+```
+
+### Step 4: Verify State
+```bash
+/db-status
+```
+
+### Step 5: Restart Services
+Restart affected Backend.AI components.
+
+## Common Issues and Solutions
+
+### Issue: Multiple Heads
+**Symptom:** Error about diverged heads
+
+**Solution:**
+1. Run /db-status to confirm
+2. Use /db-rebase to resolve
+3. Retry migration
+
+### Issue: Foreign Key Constraint
+**Symptom:** Constraint violation during migration
+
+**Solution:**
+1. Check migration file for data migration logic
+2. Manually fix data integrity
+3. Consider modifying migration
+4. Rollback if necessary: /db-migrate --direction=downgrade --target=-1
+
+### Issue: Connection Failed
+**Symptom:** Cannot connect to database
+
+**Solution:**
+1. Check database is running: docker ps | grep postgres
+2. Verify configuration
+3. Start infrastructure: ./scripts/run-dev.sh
+
+### Issue: Migration File Missing
+**Symptom:** Cannot find migration file
+
+**Solution:**
+1. Pull latest code: git pull
+2. Check correct branch
+3. Verify migration was committed
+
+## Component-Specific Notes
+
+### Manager Database (alembic.ini)
+- Most frequently updated
+- Contains core domain models
+- Changes may affect all other components
+
+### Account Manager Database (alembic-accountmgr.ini)
+- User and account data
+- Less frequent updates
+- Critical for authentication
+
+### App Proxy Database (alembic-appproxy.ini)
+- Proxy routing and session data
+- Independent from main database
+- Can be migrated separately
+
+## Safety Guidelines
+
+### DO:
+✅ Check status before migrating
+✅ Review migration files
+✅ Test on development first
+✅ Backup production databases
+✅ Verify both upgrade and downgrade work
+✅ Keep migrations small and focused
+
+### DON'T:
+❌ Skip status checks
+❌ Ignore migration errors
+❌ Test downgrade on production first
+❌ Modify migrations after committing
+❌ Create migrations with breaking changes without versioning
+❌ Forget to restart affected services
+
+## Emergency Rollback
+
+If migration causes critical issues:
+
+1. **Immediate rollback:**
+   ```bash
+   /db-migrate --direction=downgrade --target=-1
+   ```
+
+2. **Verify rollback:**
+   ```bash
+   /db-status
+   ```
+
+3. **Restart services:**
+   ```bash
+   /cli-executor --component=mgr --subcommand=start-server
+   ```
+
+4. **Investigate issue:**
+   - Review migration file
+   - Check application logs
+   - Test in development environment
+
+5. **Fix and retry:**
+   - Modify migration if needed
+   - Test thoroughly
+   - Reapply migration
+
+## Automation Notes
+
+For CI/CD pipelines:
+
+```bash
+# Check for pending migrations
+./backend.ai mgr dbschema show
+
+# Apply migrations automatically
+./py -m alembic upgrade head
+
+# Verify success
+./backend.ai mgr dbschema show
+```
+
+Ensure pipeline fails if:
+- Multiple heads detected
+- Migration fails
+- Database connection unavailable
