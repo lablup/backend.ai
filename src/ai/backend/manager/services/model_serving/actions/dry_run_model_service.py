@@ -18,9 +18,10 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class DryRunModelServiceAction(ModelServiceAction):
     service_name: str
     replicas: int
+    # image and architecture can be None when using Service Definition to determine these
     image: str | None
-    runtime_variant: RuntimeVariant
     architecture: str | None
+    runtime_variant: RuntimeVariant
     group_name: str
     domain_name: str
     cluster_size: int
