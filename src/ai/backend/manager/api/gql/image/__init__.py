@@ -6,8 +6,14 @@ See BEP-1038 for detailed specifications.
 """
 
 from .fetcher import fetch_image, fetch_images
-from .resolver import admin_image, admin_images
+from .resolver import (
+    admin_image,
+    admin_images,
+    container_registry_image,
+    container_registry_images,
+)
 from .types import (
+    ContainerRegistryScopeGQL,
     ImageConnectionV2GQL,
     ImageEdgeGQL,
     ImageFilterGQL,
@@ -43,13 +49,16 @@ __all__ = [
     "ImageV2GQL",
     "ImageEdgeGQL",
     "ImageConnectionV2GQL",
-    # Filter and OrderBy Types
+    # Filter, OrderBy, and Scope Types
     "ImageFilterGQL",
     "ImageOrderByGQL",
+    "ContainerRegistryScopeGQL",
     # Fetcher functions
     "fetch_images",
     "fetch_image",
     # Resolver fields
     "admin_images",
     "admin_image",
+    "container_registry_images",
+    "container_registry_image",
 ]

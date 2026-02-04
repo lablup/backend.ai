@@ -114,6 +114,8 @@ from .huggingface_registry import (
 from .image import (
     admin_image,
     admin_images,
+    container_registry_image,
+    container_registry_images,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -273,6 +275,9 @@ class Query:
     rg_domain_usage_buckets = rg_domain_usage_buckets
     rg_project_usage_buckets = rg_project_usage_buckets
     rg_user_usage_buckets = rg_user_usage_buckets
+    # Container Registry Scoped APIs
+    container_registry_images = container_registry_images
+    container_registry_image = container_registry_image
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config

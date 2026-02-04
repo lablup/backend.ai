@@ -403,6 +403,20 @@ class ImageConnectionV2GQL(Connection[ImageV2GQL]):
 
 
 @strawberry.input(
+    name="ContainerRegistryScope",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Scope for querying images within a specific container registry.
+    """),
+)
+class ContainerRegistryScopeGQL:
+    registry_id: uuid.UUID = strawberry.field(
+        description="UUID of the container registry to scope the query to."
+    )
+
+
+@strawberry.input(
     description=dedent_strip("""
     Added in 26.2.0.
 
