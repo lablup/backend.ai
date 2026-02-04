@@ -10,7 +10,7 @@ from .enums import UserRoleEnum, UserStatusEnum
 
 
 @strawberry.type(
-    name="UserBasicInfo",
+    name="UserV2BasicInfo",
     description=(
         "Added in 26.2.0. Basic user profile information. "
         "Contains identity and descriptive fields for the user account."
@@ -32,7 +32,7 @@ class UserBasicInfoGQL:
 
 
 @strawberry.type(
-    name="UserStatusInfo",
+    name="UserV2StatusInfo",
     description=(
         "Added in 26.2.0. User account status information. "
         "Contains current status and password-related flags."
@@ -56,7 +56,7 @@ class UserStatusInfoGQL:
 
 
 @strawberry.type(
-    name="UserOrganizationInfo",
+    name="UserV2OrganizationInfo",
     description=(
         "Added in 26.2.0. User's organizational context and permissions. "
         "Contains domain membership, role, and resource policy information."
@@ -80,7 +80,7 @@ class UserOrganizationInfoGQL:
 
 
 @strawberry.type(
-    name="UserSecurityInfo",
+    name="UserV2SecurityInfo",
     description=(
         "Added in 26.2.0. User security settings and authentication configuration. "
         "Contains IP restrictions, TOTP settings, and privilege flags."
@@ -108,7 +108,7 @@ class UserSecurityInfoGQL:
 
 
 @strawberry.type(
-    name="UserContainerSettings",
+    name="UserV2ContainerSettings",
     description=(
         "Added in 26.2.0. Container execution settings for the user. "
         "Defines UID/GID mappings for containers created by this user."

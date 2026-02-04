@@ -21,7 +21,7 @@ from .enums import UserRoleEnum, UserStatusEnum
 
 
 @strawberry.input(
-    name="UserStatusEnumFilter",
+    name="UserStatusV2EnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserStatusEnum fields. "
         "Supports equals, in, not_equals, and not_in operations."
@@ -50,7 +50,7 @@ class UserStatusEnumFilter:
 
 
 @strawberry.input(
-    name="UserRoleEnumFilter",
+    name="UserRoleV2EnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserRoleEnum fields. "
         "Supports equals, in, not_equals, and not_in operations."
