@@ -2758,6 +2758,9 @@ type KernelV2 implements Node {
 
   """Added in 26.2.0. The domain this kernel belongs to."""
   domain: DomainV2
+
+  """Added in 26.2.0. The resource group this kernel is assigned to."""
+  resourceGroup: ResourceGroup
 }
 
 """An edge in a connection."""

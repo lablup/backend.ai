@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.common.types import (
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -445,6 +446,12 @@ class KernelV2GQL(Node):
         description="Added in 26.2.0. The domain this kernel belongs to."
     )
     async def domain(self) -> DomainV2GQL | None:
+        raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The resource group this kernel is assigned to."
+    )
+    async def resource_group(self) -> ResourceGroupGQL | None:
         raise NotImplementedError
 
     @classmethod
