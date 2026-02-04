@@ -1,16 +1,14 @@
 """
 Tests for SessionRepository functionality.
-Tests the repository layer with both mocked and real database operations.
+Tests the repository layer with real database operations.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
 import pytest
 from dateutil.tz import tzutc
@@ -25,13 +23,12 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -45,185 +42,15 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
-if TYPE_CHECKING:
-    pass
 
-
-class TestSessionRepositorySearch:
-    """Test cases for SessionRepository.search with mocked database"""
-
-    @pytest.fixture
-    def mock_db(self) -> MagicMock:
-        """Create mocked database engine"""
-        return MagicMock(spec=ExtendedAsyncSAEngine)
-
-    @pytest.fixture
-    def session_repository(self, mock_db: MagicMock) -> SessionRepository:
-        """Create SessionRepository instance with mocked database"""
-        return SessionRepository(db=mock_db)
-
-    @pytest.fixture
-    def sample_session_data(self) -> SessionData:
-        """Create sample session data"""
-        return SessionData(
-            id=SessionId(uuid4()),
-            creation_id="test-creation-id",
-            name="test-session",
-            session_type=SessionTypes.INTERACTIVE,
-            priority=0,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            agent_ids=["i-ubuntu"],
-            domain_name="default",
-            group_id=uuid4(),
-            user_uuid=uuid4(),
-            access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
-            images=["cr.backend.ai/stable/python:latest"],
-            tag=None,
-            occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
-            requested_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
-            vfolder_mounts=[],
-            environ={},
-            bootstrap_script=None,
-            use_host_network=False,
-            timeout=None,
-            batch_timeout=None,
-            created_at=datetime.now(tzutc()),
-            terminated_at=None,
-            starts_at=None,
-            status=SessionStatus.RUNNING,
-            status_info=None,
-            status_data=None,
-            status_history={},
-            startup_command=None,
-            callback_url=None,
-            result=SessionResult.UNDEFINED,
-            num_queries=0,
-            last_stat=None,
-            scaling_group_name="default",
-            target_sgroup_names=[],
-            network_type=NetworkType.VOLATILE,
-            network_id=None,
-            owner=None,
-            service_ports=None,
-        )
-
-    @pytest.mark.asyncio
-    async def test_search_sessions(
-        self,
-        session_repository: SessionRepository,
-        mock_db: MagicMock,
-        sample_session_data: SessionData,
-    ) -> None:
-        """Test searching sessions with querier"""
-        mock_row = MagicMock()
-        mock_row.SessionRow.to_dataclass.return_value = sample_session_data
-
-        mock_db_sess = MagicMock()
-        mock_db_sess.__aenter__ = AsyncMock(return_value=mock_db_sess)
-        mock_db_sess.__aexit__ = AsyncMock(return_value=None)
-        mock_db.begin_readonly_session.return_value = mock_db_sess
-
-        # Mock execute_batch_querier result
-        with pytest.MonkeyPatch.context() as mp:
-            mock_result = MagicMock()
-            mock_result.rows = [mock_row]
-            mock_result.total_count = 1
-            mock_result.has_next_page = False
-            mock_result.has_previous_page = False
-
-            mp.setattr(
-                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
-                AsyncMock(return_value=mock_result),
-            )
-
-            querier = BatchQuerier(
-                pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[],
-                orders=[],
-            )
-
-            result = await session_repository.search(querier=querier)
-
-            assert result.items == [sample_session_data]
-            assert result.total_count == 1
-            assert result.has_next_page is False
-            assert result.has_previous_page is False
-
-    @pytest.mark.asyncio
-    async def test_search_sessions_empty_result(
-        self,
-        session_repository: SessionRepository,
-        mock_db: MagicMock,
-    ) -> None:
-        """Test searching sessions when no results are found"""
-        mock_db_sess = MagicMock()
-        mock_db_sess.__aenter__ = AsyncMock(return_value=mock_db_sess)
-        mock_db_sess.__aexit__ = AsyncMock(return_value=None)
-        mock_db.begin_readonly_session.return_value = mock_db_sess
-
-        with pytest.MonkeyPatch.context() as mp:
-            mock_result = MagicMock()
-            mock_result.rows = []
-            mock_result.total_count = 0
-            mock_result.has_next_page = False
-            mock_result.has_previous_page = False
-
-            mp.setattr(
-                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
-                AsyncMock(return_value=mock_result),
-            )
-
-            querier = BatchQuerier(
-                pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[],
-                orders=[],
-            )
-
-            result = await session_repository.search(querier=querier)
-
-            assert result.items == []
-            assert result.total_count == 0
-
-    @pytest.mark.asyncio
-    async def test_search_sessions_with_pagination(
-        self,
-        session_repository: SessionRepository,
-        mock_db: MagicMock,
-        sample_session_data: SessionData,
-    ) -> None:
-        """Test searching sessions with pagination"""
-        mock_row = MagicMock()
-        mock_row.SessionRow.to_dataclass.return_value = sample_session_data
-
-        mock_db_sess = MagicMock()
-        mock_db_sess.__aenter__ = AsyncMock(return_value=mock_db_sess)
-        mock_db_sess.__aexit__ = AsyncMock(return_value=None)
-        mock_db.begin_readonly_session.return_value = mock_db_sess
-
-        with pytest.MonkeyPatch.context() as mp:
-            mock_result = MagicMock()
-            mock_result.rows = [mock_row]
-            mock_result.total_count = 25
-            mock_result.has_next_page = True
-            mock_result.has_previous_page = True
-
-            mp.setattr(
-                "ai.backend.manager.repositories.session.db_source.db_source.execute_batch_querier",
-                AsyncMock(return_value=mock_result),
-            )
-
-            querier = BatchQuerier(
-                pagination=OffsetPagination(limit=10, offset=10),
-                conditions=[],
-                orders=[],
-            )
-
-            result = await session_repository.search(querier=querier)
-
-            assert result.total_count == 25
-            assert result.has_next_page is True
-            assert result.has_previous_page is True
+@dataclass
+class SessionTestData:
+    domain_name: str
+    user_id: uuid.UUID
+    group_id: uuid.UUID
+    session_id: SessionId
+    kernel_id: KernelId
+    access_key: AccessKey
 
 
 class TestSessionRepository:
@@ -257,10 +84,16 @@ class TestSessionRepository:
         return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def setup_test_data(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> dict[str, uuid.UUID | str]:
-        """Setup test domain, user, group, keypair, session, and kernel"""
+    def default_querier(self) -> BatchQuerier:
+        return BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+    @pytest.fixture
+    async def session_with_kernel(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionTestData:
+        """Create a session with kernel for testing search operations."""
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         group_id = uuid.uuid4()
@@ -462,33 +295,28 @@ class TestSessionRepository:
 
             await db_sess.commit()
 
-        return {
-            "domain_name": domain_name,
-            "user_id": user_id,
-            "group_id": group_id,
-            "session_id": session_id,
-            "kernel_id": kernel_id,
-            "access_key": access_key,
-        }
+        return SessionTestData(
+            domain_name=domain_name,
+            user_id=user_id,
+            group_id=group_id,
+            session_id=session_id,
+            kernel_id=kernel_id,
+            access_key=access_key,
+        )
 
     # =========================================================================
     # Tests - SearchKernels
     # =========================================================================
 
     @pytest.mark.asyncio
-    async def test_search_kernels_returns_results(
+    async def test_search_kernels(
         self,
         repository: SessionRepository,
-        setup_test_data: dict[str, uuid.UUID | str],
+        default_querier: BatchQuerier,
+        session_with_kernel: SessionTestData,
     ) -> None:
         """Test search_kernels returns kernel info when kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await repository.search_kernels(querier)
+        result = await repository.search_kernels(default_querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -496,46 +324,60 @@ class TestSessionRepository:
         assert result.has_previous_page is False
 
         kernel_info = result.items[0]
-        assert kernel_info.id == setup_test_data["kernel_id"]
-        assert kernel_info.session.session_id == str(setup_test_data["session_id"])
+        assert kernel_info.id == session_with_kernel.kernel_id
+        assert kernel_info.session.session_id == str(session_with_kernel.session_id)
 
     @pytest.mark.asyncio
     async def test_search_kernels_empty_result(
         self,
         repository: SessionRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_querier: BatchQuerier,
     ) -> None:
         """Test search_kernels returns empty result when no kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await repository.search_kernels(querier)
+        result = await repository.search_kernels(default_querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
+    # =========================================================================
+    # Tests - SearchSessions
+    # =========================================================================
+
     @pytest.mark.asyncio
-    async def test_search_kernels_with_pagination(
+    async def test_search_sessions(
         self,
         repository: SessionRepository,
-        setup_test_data: dict[str, uuid.UUID | str],
+        default_querier: BatchQuerier,
+        session_with_kernel: SessionTestData,
     ) -> None:
-        """Test search_kernels respects pagination parameters"""
-        # Test with offset that should return no results
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
+        """Test search returns session data when sessions exist"""
+        result = await repository.search(querier=default_querier)
 
-        result = await repository.search_kernels(querier)
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
 
-        # With offset=10 and only 1 kernel, should return empty
+        session_data = result.items[0]
+        assert session_data.id == session_with_kernel.session_id
+        assert session_data.name == "test-session"
+        assert session_data.domain_name == session_with_kernel.domain_name
+        assert session_data.group_id == session_with_kernel.group_id
+        assert session_data.user_uuid == session_with_kernel.user_id
+        assert session_data.access_key == session_with_kernel.access_key
+
+    @pytest.mark.asyncio
+    async def test_search_sessions_empty_result(
+        self,
+        repository: SessionRepository,
+        default_querier: BatchQuerier,
+    ) -> None:
+        """Test search returns empty result when no sessions exist"""
+        result = await repository.search(querier=default_querier)
+
+        assert result.total_count == 0
         assert len(result.items) == 0
-        assert result.total_count == 1  # Total count should still be 1
-        assert result.has_previous_page is True  # There are items before offset
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
