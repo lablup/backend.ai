@@ -369,7 +369,7 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 
         validator.validate()
 
-        def value_or_none(val: Any) -> Any:
+        def value_or_none(val: Any) -> Any | None:
             return None if val is Undefined else val
 
         action = CreateContainerRegistryAction(
