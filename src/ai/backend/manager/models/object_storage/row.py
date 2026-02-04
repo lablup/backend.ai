@@ -16,6 +16,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )
@@ -41,7 +42,7 @@ def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
 
 
 def _get_object_storage_meta_join_cond():
-    from .artifact_storages import ArtifactStorageRow
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
     return ObjectStorageRow.id == foreign(ArtifactStorageRow.storage_id)
 
@@ -93,7 +94,7 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_namespace_join_cond,
     )
-    meta = relationship(
+    meta: Mapped[ArtifactStorageRow | None] = relationship(
         "ArtifactStorageRow",
         back_populates="object_storages",
         primaryjoin=_get_object_storage_meta_join_cond,
@@ -116,15 +117,14 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
         return self.__str__()
 
     def to_dataclass(self) -> ObjectStorageData:
-        try:
-            return ObjectStorageData(
-                id=self.id,
-                name=self.meta.name,
-                host=self.host,
-                access_key=self.access_key,
-                secret_key=self.secret_key,
-                endpoint=self.endpoint,
-                region=self.region,
-            )
-        except Exception:
+        if self.meta is None:
             raise RelationNotLoadedError()
+        return ObjectStorageData(
+            id=self.id,
+            name=self.meta.name,
+            host=self.host,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            endpoint=self.endpoint,
+            region=self.region,
+        )

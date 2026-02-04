@@ -17,6 +17,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )
@@ -35,7 +36,7 @@ def _get_vfs_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
 
 
 def _get_vfs_storage_meta_join_cond():
-    from .artifact_storages import ArtifactStorageRow
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
     return VFSStorageRow.id == foreign(ArtifactStorageRow.storage_id)
 
@@ -63,7 +64,7 @@ class VFSStorageRow(Base):  # type: ignore[misc]
             overlaps="association_artifacts_storages_rows,object_storage_row",
         )
     )
-    meta = relationship(
+    meta: Mapped[ArtifactStorageRow | None] = relationship(
         "ArtifactStorageRow",
         back_populates="vfs_storages",
         primaryjoin=_get_vfs_storage_meta_join_cond,
@@ -78,12 +79,11 @@ class VFSStorageRow(Base):  # type: ignore[misc]
         return self.__str__()
 
     def to_dataclass(self) -> VFSStorageData:
-        try:
-            return VFSStorageData(
-                id=self.id,
-                name=self.meta.name,
-                host=self.host,
-                base_path=Path(self.base_path),
-            )
-        except Exception:
+        if self.meta is None:
             raise RelationNotLoadedError()
+        return VFSStorageData(
+            id=self.id,
+            name=self.meta.name,
+            host=self.host,
+            base_path=Path(self.base_path),
+        )
