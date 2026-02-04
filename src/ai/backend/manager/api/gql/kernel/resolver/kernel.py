@@ -17,12 +17,11 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID. (admin only)")  # type: ignore[misc]
-async def admin_kernel_v2(
+@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
+async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> KernelV2GQL | None:
-    check_admin_only()
     return await fetch_kernel(info, KernelId(id))
 
 
