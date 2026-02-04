@@ -7,7 +7,10 @@ from aiohttp import web
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.fair_share.fetcher import fetch_domain_fair_shares
+from ai.backend.manager.api.gql.fair_share.fetcher import (
+    fetch_domain_fair_shares,
+    fetch_rg_domain_fair_shares,
+)
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertDomainFairShareWeightInput,
     BulkUpsertDomainFairShareWeightPayload,
@@ -20,6 +23,9 @@ from ai.backend.manager.api.gql.fair_share.types import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareSearchScope,
+)
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     DomainWeightInput,
@@ -35,7 +41,7 @@ async def admin_domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group: str,
     domain_name: str,
-) -> DomainFairShareGQL | None:
+) -> DomainFairShareGQL:
     """Get a single domain fair share record (admin only)."""
     check_admin_only()
 
@@ -82,25 +88,27 @@ async def admin_domain_fair_shares(
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. Get domain fair share data within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. Get domain fair share data within resource group scope."
 )
 async def rg_domain_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
     domain_name: str,
-) -> DomainFairShareGQL | None:
+) -> DomainFairShareGQL:
     """Get a single domain fair share record within resource group scope."""
-    raise NotImplementedError("rg_domain_fair_share is not yet implemented")
+    processors = info.context.processors
+    action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
+        GetDomainFairShareAction(
+            resource_group=scope.resource_group,
+            domain_name=domain_name,
+        )
+    )
+
+    return DomainFairShareGQL.from_dataclass(action_result.data)
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. List domain fair shares within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. List domain fair shares within resource group scope."
 )
 async def rg_domain_fair_shares(
     info: Info[StrawberryGQLContext],
@@ -115,7 +123,19 @@ async def rg_domain_fair_shares(
     offset: int | None = None,
 ) -> DomainFairShareConnection:
     """Search domain fair shares within resource group scope."""
-    raise NotImplementedError("rg_domain_fair_shares is not yet implemented")
+    repo_scope = DomainFairShareSearchScope(resource_group=scope.resource_group)
+    return await fetch_rg_domain_fair_shares(
+        info=info,
+        scope=repo_scope,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 # Legacy APIs (deprecated)
@@ -132,7 +152,7 @@ async def domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group: str,
     domain_name: str,
-) -> DomainFairShareGQL | None:
+) -> DomainFairShareGQL:
     """Get a single domain fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:

@@ -9,7 +9,10 @@ from aiohttp import web
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.fair_share.fetcher import fetch_user_fair_shares
+from ai.backend.manager.api.gql.fair_share.fetcher import (
+    fetch_rg_user_fair_shares,
+    fetch_user_fair_shares,
+)
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertUserFairShareWeightInput,
     BulkUpsertUserFairShareWeightPayload,
@@ -22,6 +25,9 @@ from ai.backend.manager.api.gql.fair_share.types import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupUserScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.repositories.fair_share.types import (
+    UserFairShareSearchScope,
+)
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertUserFairShareWeightAction,
     GetUserFairShareAction,
@@ -38,7 +44,7 @@ async def admin_user_fair_share(
     resource_group: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL | None:
+) -> UserFairShareGQL:
     """Get a single user fair share record (admin only)."""
     check_admin_only()
 
@@ -86,25 +92,28 @@ async def admin_user_fair_shares(
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. Get user fair share data within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. Get user fair share data within resource group scope."
 )
 async def rg_user_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL | None:
+) -> UserFairShareGQL:
     """Get a single user fair share record within resource group scope."""
-    raise NotImplementedError("rg_user_fair_share is not yet implemented")
+    processors = info.context.processors
+    action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+        GetUserFairShareAction(
+            resource_group=scope.resource_group,
+            project_id=uuid.UUID(scope.project_id),
+            user_uuid=user_uuid,
+        )
+    )
+
+    return UserFairShareGQL.from_dataclass(action_result.data)
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. List user fair shares within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. List user fair shares within resource group scope."
 )
 async def rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
@@ -119,7 +128,23 @@ async def rg_user_fair_shares(
     offset: int | None = None,
 ) -> UserFairShareConnection:
     """Search user fair shares within resource group scope."""
-    raise NotImplementedError("rg_user_fair_shares is not yet implemented")
+    repo_scope = UserFairShareSearchScope(
+        resource_group=scope.resource_group,
+        domain_name=scope.domain_name,
+        project_id=uuid.UUID(scope.project_id),
+    )
+    return await fetch_rg_user_fair_shares(
+        info=info,
+        scope=repo_scope,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 # Legacy APIs (deprecated)
@@ -137,7 +162,7 @@ async def user_fair_share(
     resource_group: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL | None:
+) -> UserFairShareGQL:
     """Get a single user fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:

@@ -29,6 +29,14 @@ __all__ = (
     "GetDomainFairSharePathParam",
     "GetProjectFairSharePathParam",
     "GetUserFairSharePathParam",
+    # Path parameters - RG Scoped Get
+    "RGDomainFairSharePathParam",
+    "RGProjectFairSharePathParam",
+    "RGUserFairSharePathParam",
+    # Path parameters - RG Scoped Search
+    "RGDomainFairShareSearchPathParam",
+    "RGProjectFairShareSearchPathParam",
+    "RGUserFairShareSearchPathParam",
     # Path parameters - Upsert Weight
     "UpsertDomainFairShareWeightPathParam",
     "UpsertProjectFairShareWeightPathParam",
@@ -79,6 +87,54 @@ class GetUserFairSharePathParam(BaseRequestModel):
     resource_group: str = Field(description="Scaling group name")
     project_id: UUID = Field(description="Project ID")
     user_uuid: UUID = Field(description="User UUID")
+
+
+# RG-Scoped Path Parameters
+
+
+class RGDomainFairSharePathParam(BaseRequestModel):
+    """Path parameters for RG-scoped domain fair share get."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+
+
+class RGProjectFairSharePathParam(BaseRequestModel):
+    """Path parameters for RG-scoped project fair share get."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+    project_id: UUID = Field(description="Project ID")
+
+
+class RGUserFairSharePathParam(BaseRequestModel):
+    """Path parameters for RG-scoped user fair share get."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+    project_id: UUID = Field(description="Project ID")
+    user_uuid: UUID = Field(description="User UUID")
+
+
+class RGDomainFairShareSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped domain fair share search."""
+
+    resource_group: str = Field(description="Scaling group name")
+
+
+class RGProjectFairShareSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped project fair share search."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+
+
+class RGUserFairShareSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped user fair share search."""
+
+    resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+    project_id: UUID = Field(description="Project ID")
 
 
 # Get Requests (deprecated, use PathParam models above)

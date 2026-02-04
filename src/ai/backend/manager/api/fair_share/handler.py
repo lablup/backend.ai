@@ -24,6 +24,12 @@ from ai.backend.common.dto.manager.fair_share import (
     GetUserFairShareResponse,
     PaginationInfo,
     ResourceGroupFairShareSpecItemDTO,
+    RGDomainFairSharePathParam,
+    RGDomainFairShareSearchPathParam,
+    RGProjectFairSharePathParam,
+    RGProjectFairShareSearchPathParam,
+    RGUserFairSharePathParam,
+    RGUserFairShareSearchPathParam,
     SearchDomainFairSharesRequest,
     SearchDomainFairSharesResponse,
     SearchDomainUsageBucketsRequest,
@@ -58,6 +64,11 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
 )
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareSearchScope,
+    ProjectFairShareSearchScope,
+    UserFairShareSearchScope,
+)
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
 )
@@ -67,6 +78,9 @@ from ai.backend.manager.services.fair_share.actions import (
     GetUserFairShareAction,
     SearchDomainFairSharesAction,
     SearchProjectFairSharesAction,
+    SearchRGDomainFairSharesAction,
+    SearchRGProjectFairSharesAction,
+    SearchRGUserFairSharesAction,
     SearchUserFairSharesAction,
     UpsertDomainFairShareWeightAction,
     UpsertProjectFairShareWeightAction,
@@ -386,6 +400,187 @@ class FairShareAPIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    # RG-Scoped Domain Fair Share
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_get_domain_fair_share(
+        self,
+        path: PathParam[RGDomainFairSharePathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Get a single domain fair share within RG scope."""
+        processors = processors_ctx.processors
+
+        action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
+            GetDomainFairShareAction(
+                resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
+            )
+        )
+
+        item = None
+        if action_result.data is not None:
+            item = self._adapter.convert_domain_fair_share_to_dto(action_result.data)
+
+        resp = GetDomainFairShareResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_domain_fair_shares(
+        self,
+        path: PathParam[RGDomainFairShareSearchPathParam],
+        body: BodyParam[SearchDomainFairSharesRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search domain fair shares within RG scope."""
+        processors = processors_ctx.processors
+
+        querier = self._adapter.build_domain_fair_share_querier(body.parsed)
+        scope = DomainFairShareSearchScope(resource_group=path.parsed.resource_group)
+
+        action_result = await processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
+            SearchRGDomainFairSharesAction(
+                scope=scope,
+                querier=querier,
+            )
+        )
+
+        resp = SearchDomainFairSharesResponse(
+            items=[
+                self._adapter.convert_domain_fair_share_to_dto(fs) for fs in action_result.items
+            ],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # RG-Scoped Project Fair Share
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_get_project_fair_share(
+        self,
+        path: PathParam[RGProjectFairSharePathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Get a single project fair share within RG scope."""
+        processors = processors_ctx.processors
+
+        action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+            GetProjectFairShareAction(
+                resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
+            )
+        )
+
+        item = None
+        if action_result.data is not None:
+            item = self._adapter.convert_project_fair_share_to_dto(action_result.data)
+
+        resp = GetProjectFairShareResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_project_fair_shares(
+        self,
+        path: PathParam[RGProjectFairShareSearchPathParam],
+        body: BodyParam[SearchProjectFairSharesRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search project fair shares within RG scope."""
+        processors = processors_ctx.processors
+
+        querier = self._adapter.build_project_fair_share_querier(body.parsed)
+        scope = ProjectFairShareSearchScope(
+            resource_group=path.parsed.resource_group,
+            domain_name=path.parsed.domain_name,
+        )
+
+        action_result = await processors.fair_share.search_rg_project_fair_shares.wait_for_complete(
+            SearchRGProjectFairSharesAction(
+                scope=scope,
+                querier=querier,
+            )
+        )
+
+        resp = SearchProjectFairSharesResponse(
+            items=[
+                self._adapter.convert_project_fair_share_to_dto(fs) for fs in action_result.items
+            ],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # RG-Scoped User Fair Share
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_get_user_fair_share(
+        self,
+        path: PathParam[RGUserFairSharePathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Get a single user fair share within RG scope."""
+        processors = processors_ctx.processors
+
+        action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+            GetUserFairShareAction(
+                resource_group=path.parsed.resource_group,
+                project_id=path.parsed.project_id,
+                user_uuid=path.parsed.user_uuid,
+            )
+        )
+
+        item = None
+        if action_result.data is not None:
+            item = self._adapter.convert_user_fair_share_to_dto(action_result.data)
+
+        resp = GetUserFairShareResponse(item=item)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_user_fair_shares(
+        self,
+        path: PathParam[RGUserFairShareSearchPathParam],
+        body: BodyParam[SearchUserFairSharesRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search user fair shares within RG scope."""
+        processors = processors_ctx.processors
+
+        querier = self._adapter.build_user_fair_share_querier(body.parsed)
+        scope = UserFairShareSearchScope(
+            resource_group=path.parsed.resource_group,
+            domain_name=path.parsed.domain_name,
+            project_id=path.parsed.project_id,
+        )
+
+        action_result = await processors.fair_share.search_rg_user_fair_shares.wait_for_complete(
+            SearchRGUserFairSharesAction(
+                scope=scope,
+                querier=querier,
+            )
+        )
+
+        resp = SearchUserFairSharesResponse(
+            items=[self._adapter.convert_user_fair_share_to_dto(fs) for fs in action_result.items],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
     # Upsert Domain Fair Share Weight
 
     @auth_required_for_method
@@ -668,6 +863,54 @@ def create_app(
             "POST",
             "/usage-buckets/users/search",
             api_handler.search_user_usage_buckets,
+        )
+    )
+
+    # RG-scoped domain fair share routes
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/rg/{resource_group}/domains/{domain_name}",
+            api_handler.rg_get_domain_fair_share,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/domains/search",
+            api_handler.rg_search_domain_fair_shares,
+        )
+    )
+
+    # RG-scoped project fair share routes
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/rg/{resource_group}/domains/{domain_name}/projects/{project_id}",
+            api_handler.rg_get_project_fair_share,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/domains/{domain_name}/projects/search",
+            api_handler.rg_search_project_fair_shares,
+        )
+    )
+
+    # RG-scoped user fair share routes
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/users/{user_uuid}",
+            api_handler.rg_get_user_fair_share,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/users/search",
+            api_handler.rg_search_user_fair_shares,
         )
     )
 
