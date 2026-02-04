@@ -1016,7 +1016,6 @@ class KernelRow(Base):  # type: ignore[misc]
                 registry=self.registry,
                 tag=self.tag,
                 architecture=self.architecture,
-                image_id=self.image_row.id if self.image_row else None,
             ),
             network=NetworkConfig(
                 kernel_host=self.kernel_host,

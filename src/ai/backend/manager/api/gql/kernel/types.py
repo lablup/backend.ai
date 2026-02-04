@@ -10,12 +10,11 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import ImageID, SessionResult, SessionTypes
+from ai.backend.common.types import SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
-from ai.backend.manager.api.gql.image.types import ImageV2GQL
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -25,7 +24,7 @@ from ai.backend.manager.api.gql.common.types import (
     ServicePortsGQL,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -397,9 +396,6 @@ class KernelV2GQL(Node):
     id: NodeID[str]
 
     # Inlined fields (from single-element types)
-    image_id: UUID | None = strawberry.field(
-        description="The UUID of the container image used by this kernel."
-    )
     startup_command: str | None = strawberry.field(
         description="Startup command executed when the kernel starts."
     )
@@ -421,16 +417,6 @@ class KernelV2GQL(Node):
     lifecycle: KernelLifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
     )
-
-    @strawberry.field(description="The container image used by this kernel.")  # type: ignore[misc]
-    async def image(self, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
-        """Resolve the image for this kernel."""
-        if self.image_id is None:
-            return None
-        image_data = await info.context.data_loaders.image_loader.load(ImageID(self.image_id))
-        if image_data is None:
-            return None
-        return ImageV2GQL.from_data(image_data)
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
@@ -461,7 +447,6 @@ class KernelV2GQL(Node):
 
         return cls(
             id=ID(str(kernel_info.id)),
-            image_id=kernel_info.image.image_id,
             startup_command=kernel_info.runtime.startup_command,
             session=KernelSessionInfoGQL(
                 session_id=UUID(kernel_info.session.session_id),

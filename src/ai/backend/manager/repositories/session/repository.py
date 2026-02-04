@@ -284,7 +284,7 @@ class SessionRepository:
             KernelListResult with items, total count, and pagination info
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow).options(selectinload(KernelRow.image_row))
+            query = sa.select(KernelRow)
 
             result = await execute_batch_querier(
                 db_sess,

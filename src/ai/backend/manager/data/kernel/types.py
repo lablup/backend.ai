@@ -211,7 +211,6 @@ class ImageInfo:
     registry: str | None
     tag: str | None
     architecture: str | None
-    image_id: UUID | None = None
 
 
 @dataclass

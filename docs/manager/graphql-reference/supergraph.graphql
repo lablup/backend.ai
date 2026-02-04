@@ -5061,9 +5061,6 @@ type KernelV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """The UUID of the container image used by this kernel."""
-  imageId: UUID
-
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -5084,9 +5081,6 @@ type KernelV2 implements Node
 
   """Lifecycle status and timestamps."""
   lifecycle: KernelLifecycleInfo!
-
-  """The container image used by this kernel."""
-  image: ImageV2
 }
 
 """An edge in a connection."""
