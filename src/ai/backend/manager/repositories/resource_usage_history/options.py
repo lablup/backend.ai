@@ -111,6 +111,61 @@ class DomainUsageBucketConditions:
         return inner
 
     @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end > after
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
@@ -196,6 +251,61 @@ class ProjectUsageBucketConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end > after
 
         return inner
 
@@ -292,6 +402,61 @@ class UserUsageBucketConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end > after
 
         return inner
 

@@ -10,6 +10,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import (
+    DateFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -186,6 +187,12 @@ class ProjectUsageBucketFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
+    period_start: DateFilter | None = strawberry.field(
+        default=None, description="Filter by usage measurement period start date."
+    )
+    period_end: DateFilter | None = strawberry.field(
+        default=None, description="Filter by usage measurement period end date."
+    )
 
     AND: list[ProjectUsageBucketFilter] | None = strawberry.field(
         default=None,
@@ -245,6 +252,26 @@ class ProjectUsageBucketFilter(GQLFilter):
             )
             if dn_condition:
                 conditions.append(dn_condition)
+
+        if self.period_start:
+            ps_condition = self.period_start.build_query_condition(
+                before_factory=ProjectUsageBucketConditions.by_period_start_before,
+                after_factory=ProjectUsageBucketConditions.by_period_start_after,
+                equals_factory=ProjectUsageBucketConditions.by_period_start,
+                not_equals_factory=ProjectUsageBucketConditions.by_period_start_not_equals,
+            )
+            if ps_condition:
+                conditions.append(ps_condition)
+
+        if self.period_end:
+            pe_condition = self.period_end.build_query_condition(
+                before_factory=ProjectUsageBucketConditions.by_period_end_before,
+                after_factory=ProjectUsageBucketConditions.by_period_end_after,
+                equals_factory=ProjectUsageBucketConditions.by_period_end,
+                not_equals_factory=ProjectUsageBucketConditions.by_period_end_not_equals,
+            )
+            if pe_condition:
+                conditions.append(pe_condition)
 
         if self.AND:
             for sub_filter in self.AND:

@@ -34,12 +34,15 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketData,
     DomainUsageBucketSearchResult,
+    DomainUsageBucketSearchScope,
     KernelUsageRecordData,
     KernelUsageRecordSearchResult,
     ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
+    ProjectUsageBucketSearchScope,
     UserUsageBucketData,
     UserUsageBucketSearchResult,
+    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -254,11 +257,12 @@ class ResourceUsageHistoryDBSource:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: DomainUsageBucketSearchScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DomainUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier)
+            result = await execute_batch_querier(db_sess, query, querier, scope)
             items = [
                 DomainUsageBucketData.from_row(row.DomainUsageBucketRow) for row in result.rows
             ]
@@ -296,11 +300,12 @@ class ResourceUsageHistoryDBSource:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: ProjectUsageBucketSearchScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ProjectUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier)
+            result = await execute_batch_querier(db_sess, query, querier, scope)
             items = [
                 ProjectUsageBucketData.from_row(row.ProjectUsageBucketRow) for row in result.rows
             ]
@@ -338,11 +343,12 @@ class ResourceUsageHistoryDBSource:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: UserUsageBucketSearchScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(UserUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier)
+            result = await execute_batch_querier(db_sess, query, querier, scope)
             items = [UserUsageBucketData.from_row(row.UserUsageBucketRow) for row in result.rows]
             return UserUsageBucketSearchResult(
                 items=items,

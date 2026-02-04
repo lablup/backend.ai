@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
@@ -303,6 +303,44 @@ class DateTimeFilter:
             QueryCondition if any filter field is set, None otherwise
         """
         if self.equals and equals_factory:
+            return equals_factory(self.equals)
+        if self.before:
+            return before_factory(self.before)
+        if self.after:
+            return after_factory(self.after)
+        return None
+
+
+@strawberry.input
+class DateFilter:
+    """Filter for date fields (not datetime)."""
+
+    before: date | None = None
+    after: date | None = None
+    equals: date | None = None
+    not_equals: date | None = None
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[date], QueryCondition],
+        after_factory: Callable[[date], QueryCondition],
+        equals_factory: Callable[[date], QueryCondition],
+        not_equals_factory: Callable[[date], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build query condition using factory callables.
+
+        Args:
+            before_factory: Factory function for < comparison
+            after_factory: Factory function for > comparison
+            equals_factory: Factory function for = comparison
+            not_equals_factory: Factory function for != comparison
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.not_equals:
+            return not_equals_factory(self.not_equals)
+        if self.equals:
             return equals_factory(self.equals)
         if self.before:
             return before_factory(self.before)

@@ -21,12 +21,15 @@ from .repository import ResourceUsageHistoryRepository
 from .types import (
     DomainUsageBucketData,
     DomainUsageBucketSearchResult,
+    DomainUsageBucketSearchScope,
     KernelUsageRecordData,
     KernelUsageRecordSearchResult,
     ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
+    ProjectUsageBucketSearchScope,
     UserUsageBucketData,
     UserUsageBucketSearchResult,
+    UserUsageBucketSearchScope,
 )
 from .upserters import (
     DomainUsageBucketUpserterSpec,
@@ -48,6 +51,10 @@ __all__ = (
     "DomainUsageBucketSearchResult",
     "ProjectUsageBucketSearchResult",
     "UserUsageBucketSearchResult",
+    # Search scope types
+    "DomainUsageBucketSearchScope",
+    "ProjectUsageBucketSearchScope",
+    "UserUsageBucketSearchScope",
     # Creator specs
     "KernelUsageRecordCreatorSpec",
     "DomainUsageBucketCreatorSpec",
