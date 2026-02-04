@@ -165,6 +165,13 @@ class PrometheusClient:
     _client_pool: ClientPool
     _client_key: ClientKey
 
+    def __init__(self, args: PrometheusClientArgs, client_pool: ClientPool) -> None:
+        self._client_pool = client_pool
+        self._client_key = ClientKey(endpoint=str(args.endpoint), domain="prometheus")
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        return self._client_pool.load_client_session(self._client_key)
+
     # ── Public API ──────────────────────────────────────────────────
     async def query_utilization(
         self,
@@ -193,31 +200,10 @@ class PrometheusClient:
     def _build_group_by(self, labels: list[str]) -> str: ...
 
     # ── Private: HTTP Transport ─────────────────────────────────────
-
-    def __init__(
-        self,
-        args: PrometheusClientArgs,
-        client_pool: ClientPool,  # Injected dependency
-    ) -> None:
-        self._client_pool = client_pool
-        self._endpoint = args.endpoint
-        self._client_key = ClientKey(
-            endpoint=str(args.endpoint),
-            domain="prometheus",
-        )
-
-    def _get_session(self) -> aiohttp.ClientSession:
-        # Reuses existing session or creates new one per ClientKey
-        return self._client_pool.load_client_session(self._client_key)
-
     async def _query_range(self, query, time_range): ...
     async def _query_label_values(self, label_name, metric_match=None): ...
-    async def _post(self, path, *, data=None, request_timeout=None):
-        session = self._get_session()  # Connection reuse
-        async with session.post(self._endpoint / path, data=data) as response: ...
+    async def _post(self, path, *, data=None, request_timeout=None): ...
     async def _get(self, path, *, params=None, request_timeout=None): ...
-        session = self._get_session()  # Connection reuse
-        async with session.post(self._endpoint / path, data=data) as response: ...
 ```
 
 ### Simplified Service Layer
