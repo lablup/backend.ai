@@ -34,8 +34,14 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
+from ai.backend.common.dto.storage.request import (
+    ArchiveDownloadTokenData,
+    CreateArchiveDownloadSessionRequest,
+    FileDeleteAsyncRequest,
+    TokenOperationType,
+)
 from ai.backend.common.dto.storage.response import (
+    CreateArchiveDownloadSessionResponse,
     FileDeleteAsyncResponse,
     VFolderCloneResponse,
     VFolderDeleteResponse,
@@ -79,7 +85,6 @@ from ai.backend.storage.errors import (
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ai.backend.storage.services.file_stream.zip import ArchiveDownloadTokenData
 from ai.backend.storage.types import QuotaConfig, VFolderID
 from ai.backend.storage.utils import check_params, log_manager_api_entry
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
@@ -1088,44 +1093,33 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
-async def create_archive_download_session(request: web.Request) -> web.Response:
-    class Params(TypedDict):
-        volume: str
-        vfid: VFolderID
-        files: list[str]
+class ArchiveDownloadHandler:
+    """Handler for archive download session operations."""
 
-    async with cast(
-        AbstractAsyncContextManager[Params],
-        check_params(
-            request,
-            t.Dict(
-                {
-                    t.Key("volume"): t.String(),
-                    t.Key("vfid"): tx.VFolderID(),
-                    t.Key("files"): t.List(t.String, min_length=1),
-                },
-            ),
-        ),
-    ) as params:
-        await log_manager_api_entry(log, "create_archive_download_session", params)
-        ctx: RootContext = request.app["ctx"]
+    @api_handler
+    async def create_session(
+        self,
+        body: BodyParam[CreateArchiveDownloadSessionRequest],
+        ctx: StorageRootCtx,
+    ) -> APIResponse:
+        """Create a JWT token for archive download session."""
+        await log_manager_api_entry(log, "create_archive_download_session", body.parsed)
         token_payload = ArchiveDownloadTokenData(
-            operation="download",
-            volume=params["volume"],
-            vfolder_id=params["vfid"],
-            files=params["files"],
+            operation=TokenOperationType.DOWNLOAD,
+            volume=body.parsed.volume,
+            vfolder_id=body.parsed.vfid,
+            files=body.parsed.files,
         )
         payload = token_payload.model_dump(mode="json")
-        payload["exp"] = datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire
+        payload["exp"] = datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire
         token = jwt.encode(
             payload,
-            ctx.local_config.storage_proxy.secret,
+            ctx.root_ctx.local_config.storage_proxy.secret,
             algorithm="HS256",
         )
-        return web.json_response(
-            {
-                "token": token,
-            },
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=CreateArchiveDownloadSessionResponse(token=token),
         )
 
 
@@ -1309,6 +1303,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
 
     # Initialize handlers
     file_operation_handler = FileOperationHandler()
+    archive_download_handler = ArchiveDownloadHandler()
 
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/health", check_health)
@@ -1337,7 +1332,9 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
-    app.router.add_route("POST", "/folder/file/download-archive", create_archive_download_session)
+    app.router.add_route(
+        "POST", "/folder/file/download-archive", archive_download_handler.create_session
+    )
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
     app.router.add_route(
