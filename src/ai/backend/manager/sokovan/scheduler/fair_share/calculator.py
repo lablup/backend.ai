@@ -183,7 +183,7 @@ class FairShareFactorCalculator:
         for domain_name, usage in decayed_usages["domain"].items():
             weight = default_weight
             if domain_name in fair_shares.domain:
-                spec_weight = fair_shares.domain[domain_name].spec.weight
+                spec_weight = fair_shares.domain[domain_name].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
 
@@ -209,7 +209,7 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if project_id in fair_shares.project:
-                spec_weight = fair_shares.project[project_id].spec.weight
+                spec_weight = fair_shares.project[project_id].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.project[project_id].domain_name
@@ -237,7 +237,7 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if user_key in fair_shares.user:
-                spec_weight = fair_shares.user[user_key].spec.weight
+                spec_weight = fair_shares.user[user_key].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.user[user_key].domain_name
@@ -369,7 +369,7 @@ class FairShareFactorCalculator:
             ResourceSlot with weights for each resource type
         """
         if fair_share_data is not None:
-            spec_weights = fair_share_data.spec.resource_weights
+            spec_weights = fair_share_data.data.spec.resource_weights
             if spec_weights and len(spec_weights) > 0:
                 return spec_weights
         return default_weights

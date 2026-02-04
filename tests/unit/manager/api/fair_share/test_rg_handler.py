@@ -18,6 +18,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairShareSpec,
     ProjectFairShareData,
@@ -35,90 +36,93 @@ from ai.backend.manager.services.fair_share.actions import (
 def create_domain_fair_share_data() -> DomainFairShareData:
     """Create domain fair share data for testing."""
     return DomainFairShareData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
         resource_group="default",
         domain_name="test-domain",
-        spec=FairShareSpec(
-            weight=Decimal("2.0"),
-            half_life_days=14,
-            lookback_days=30,
-            decay_unit_days=1,
-            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+        data=FairShareData(
+            spec=FairShareSpec(
+                weight=Decimal("2.0"),
+                half_life_days=14,
+                lookback_days=30,
+                decay_unit_days=1,
+                resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("0.5"),
+                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                normalized_usage=Decimal("100.0"),
+                lookback_start=date(2024, 1, 1),
+                lookback_end=date(2024, 1, 31),
+                last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            metadata=FairShareMetadata(
+                created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+                updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            use_default=False,
         ),
-        calculation_snapshot=FairShareCalculationSnapshot(
-            fair_share_factor=Decimal("0.5"),
-            total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
-            normalized_usage=Decimal("100.0"),
-            lookback_start=date(2024, 1, 1),
-            lookback_end=date(2024, 1, 31),
-            last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        metadata=FairShareMetadata(
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        default_weight=Decimal("1.0"),
     )
 
 
 def create_project_fair_share_data() -> ProjectFairShareData:
     """Create project fair share data for testing."""
     return ProjectFairShareData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
         resource_group="default",
         project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         domain_name="test-domain",
-        spec=FairShareSpec(
-            weight=Decimal("2.0"),
-            half_life_days=14,
-            lookback_days=30,
-            decay_unit_days=1,
-            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+        data=FairShareData(
+            spec=FairShareSpec(
+                weight=Decimal("2.0"),
+                half_life_days=14,
+                lookback_days=30,
+                decay_unit_days=1,
+                resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("0.5"),
+                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                normalized_usage=Decimal("100.0"),
+                lookback_start=date(2024, 1, 1),
+                lookback_end=date(2024, 1, 31),
+                last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            metadata=FairShareMetadata(
+                created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+                updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            use_default=False,
         ),
-        calculation_snapshot=FairShareCalculationSnapshot(
-            fair_share_factor=Decimal("0.5"),
-            total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
-            normalized_usage=Decimal("100.0"),
-            lookback_start=date(2024, 1, 1),
-            lookback_end=date(2024, 1, 31),
-            last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        metadata=FairShareMetadata(
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        default_weight=Decimal("1.0"),
     )
 
 
 def create_user_fair_share_data() -> UserFairShareData:
     """Create user fair share data for testing."""
     return UserFairShareData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
         resource_group="default",
         user_uuid=UUID("11111111-2222-3333-4444-555555555555"),
         project_id=UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         domain_name="test-domain",
-        spec=FairShareSpec(
-            weight=Decimal("2.0"),
-            half_life_days=14,
-            lookback_days=30,
-            decay_unit_days=1,
-            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+        data=FairShareData(
+            spec=FairShareSpec(
+                weight=Decimal("2.0"),
+                half_life_days=14,
+                lookback_days=30,
+                decay_unit_days=1,
+                resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot(
+                fair_share_factor=Decimal("0.5"),
+                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                normalized_usage=Decimal("100.0"),
+                lookback_start=date(2024, 1, 1),
+                lookback_end=date(2024, 1, 31),
+                last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            metadata=FairShareMetadata(
+                created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+                updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+            ),
+            use_default=False,
         ),
-        calculation_snapshot=FairShareCalculationSnapshot(
-            fair_share_factor=Decimal("0.5"),
-            total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
-            normalized_usage=Decimal("100.0"),
-            lookback_start=date(2024, 1, 1),
-            lookback_end=date(2024, 1, 31),
-            last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        metadata=FairShareMetadata(
-            created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-            updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-        ),
-        default_weight=Decimal("1.0"),
         scheduling_rank=None,
     )
 

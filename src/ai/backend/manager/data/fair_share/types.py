@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from ai.backend.common.types import ResourceSlot
@@ -34,9 +34,9 @@ class FairShareSpec:
     These values determine how fair share factor is computed.
     """
 
-    weight: Decimal | None
+    weight: Decimal
     """Base weight for this entity (higher weight = higher priority).
-    None means use resource group's default_weight."""
+    This is always set - either explicitly or from resource group's default_weight."""
 
     half_life_days: int
     """Half-life for exponential decay in days."""
@@ -76,6 +76,38 @@ class FairShareCalculationSnapshot:
     last_calculated_at: datetime
     """Timestamp when this calculation was performed."""
 
+    @classmethod
+    def create_default(
+        cls,
+        lookback_days: int,
+        available_slots: ResourceSlot,
+        now: datetime,
+    ) -> FairShareCalculationSnapshot:
+        """Create default snapshot with zero usage.
+
+        Args:
+            lookback_days: Number of days to look back for calculation
+            available_slots: Scaling group's available slots (for resource keys)
+            now: Current datetime for lookback window calculation
+
+        Returns:
+            FairShareCalculationSnapshot with zero usage and default values
+        """
+        today = now.date()
+        lookback_start = today - timedelta(days=lookback_days)
+
+        # Initialize total_decayed_usage with zeros based on available_slots keys
+        zero_usage = ResourceSlot({key: Decimal("0.0") for key in available_slots})
+
+        return cls(
+            fair_share_factor=Decimal("1.0"),  # No usage history
+            total_decayed_usage=zero_usage,  # Zero values with correct keys
+            normalized_usage=Decimal("0.0"),
+            lookback_start=lookback_start,
+            lookback_end=today,
+            last_calculated_at=now,
+        )
+
 
 @dataclass(frozen=True)
 class FairShareMetadata:
@@ -86,48 +118,53 @@ class FairShareMetadata:
 
 
 @dataclass(frozen=True)
+class FairShareData:
+    """Fair share calculation data (reusable across Domain/Project/User)."""
+
+    spec: FairShareSpec
+    """Specification parameters for fair share calculation."""
+
+    calculation_snapshot: FairShareCalculationSnapshot
+    """Snapshot of the most recent fair share calculation."""
+
+    metadata: FairShareMetadata | None
+    """Audit metadata. None for default-generated records."""
+
+    use_default: bool
+    """True if this record uses default weight (generated from scaling group defaults)."""
+
+
+@dataclass(frozen=True)
 class DomainFairShareData:
     """Domain-level fair share data."""
 
-    id: uuid.UUID
     resource_group: str
     domain_name: str
-    spec: FairShareSpec
-    calculation_snapshot: FairShareCalculationSnapshot
-    metadata: FairShareMetadata
-    default_weight: Decimal
-    """Resource group's default weight for entities without explicit weight."""
+    data: FairShareData
+    """Nested fair share data structure."""
 
 
 @dataclass(frozen=True)
 class ProjectFairShareData:
     """Project-level fair share data."""
 
-    id: uuid.UUID
     resource_group: str
     project_id: uuid.UUID
     domain_name: str
-    spec: FairShareSpec
-    calculation_snapshot: FairShareCalculationSnapshot
-    metadata: FairShareMetadata
-    default_weight: Decimal
-    """Resource group's default weight for entities without explicit weight."""
+    data: FairShareData
+    """Nested fair share data structure."""
 
 
 @dataclass(frozen=True)
 class UserFairShareData:
     """User-level fair share data."""
 
-    id: uuid.UUID
     resource_group: str
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
-    spec: FairShareSpec
-    calculation_snapshot: FairShareCalculationSnapshot
-    metadata: FairShareMetadata
-    default_weight: Decimal
-    """Resource group's default weight for entities without explicit weight."""
+    data: FairShareData
+    """Nested fair share data structure."""
     scheduling_rank: int | None = None
     """Computed scheduling priority rank. Lower value = higher priority.
     None means rank calculation has not been performed yet."""

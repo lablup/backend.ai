@@ -62,25 +62,38 @@ class UserFairShareGQL(Node):
 
     @classmethod
     def from_dataclass(cls, data: UserFairShareData) -> UserFairShareGQL:
+        """Convert UserFairShareData to GraphQL type.
+
+        No async needed - Repository provides complete data.
+        Note: metadata can be None for default-generated records.
+        """
         return cls(
-            id=ID(str(data.id)),
+            id=ID(f"{data.resource_group}:{data.project_id}:{data.user_uuid}"),
             resource_group=data.resource_group,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
+            spec=FairShareSpecGQL.from_spec(data.data.spec, data.data.use_default),
             calculation_snapshot=FairShareCalculationSnapshotGQL(
-                fair_share_factor=data.calculation_snapshot.fair_share_factor,
+                fair_share_factor=data.data.calculation_snapshot.fair_share_factor,
                 total_decayed_usage=ResourceSlotGQL.from_resource_slot(
-                    data.calculation_snapshot.total_decayed_usage
+                    data.data.calculation_snapshot.total_decayed_usage
                 ),
-                normalized_usage=data.calculation_snapshot.normalized_usage,
-                lookback_start=data.calculation_snapshot.lookback_start,
-                lookback_end=data.calculation_snapshot.lookback_end,
-                last_calculated_at=data.calculation_snapshot.last_calculated_at,
+                normalized_usage=data.data.calculation_snapshot.normalized_usage,
+                lookback_start=data.data.calculation_snapshot.lookback_start,
+                lookback_end=data.data.calculation_snapshot.lookback_end,
+                last_calculated_at=data.data.calculation_snapshot.last_calculated_at,
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
 

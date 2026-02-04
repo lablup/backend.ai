@@ -20,6 +20,7 @@ from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationContext,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairSharesByLevel,
     FairShareSpec,
@@ -507,38 +508,42 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={
                     project_id: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_id,
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 user={
                     user_key: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_uuid,
                         project_id=project_id,
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     )
                 },
             ),
@@ -631,13 +636,14 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("0.5")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("0.5")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={},
@@ -657,13 +663,14 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("2.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("2.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={},
@@ -874,68 +881,76 @@ class TestIntegrationScenarios:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_a: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                     domain_b: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                 },
                 project={
                     project_a: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_a,
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                     project_b: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_b,
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                 },
                 user={
                     user_a: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_a.user_uuid,
                         project_id=project_a,
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     ),
                     user_b: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_b.user_uuid,
                         project_id=project_b,
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     ),
                 },
             ),

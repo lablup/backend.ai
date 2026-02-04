@@ -16,13 +16,10 @@ from .options import (
 from .repositories import FairShareRepositories
 from .repository import FairShareRepository
 from .types import (
-    DomainFairShareEntityItem,
     DomainFairShareEntitySearchResult,
     DomainFairShareSearchScope,
-    ProjectFairShareEntityItem,
     ProjectFairShareEntitySearchResult,
     ProjectFairShareSearchScope,
-    UserFairShareEntityItem,
     UserFairShareEntitySearchResult,
     UserFairShareSearchScope,
 )
@@ -63,10 +60,7 @@ __all__ = (
     "DomainFairShareSearchScope",
     "ProjectFairShareSearchScope",
     "UserFairShareSearchScope",
-    # Entity-based result types
-    "DomainFairShareEntityItem",
-    "ProjectFairShareEntityItem",
-    "UserFairShareEntityItem",
+    # Entity-based search results
     "DomainFairShareEntitySearchResult",
     "ProjectFairShareEntitySearchResult",
     "UserFairShareEntitySearchResult",

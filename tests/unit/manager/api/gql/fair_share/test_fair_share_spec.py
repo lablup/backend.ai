@@ -35,10 +35,10 @@ class TestFairShareSpecGQLWeight:
         )
 
     @pytest.fixture
-    def spec_with_null_weight(self) -> FairShareSpec:
-        """FairShareSpec with null weight (uses default)."""
+    def spec_with_default_weight(self, default_weight: Decimal) -> FairShareSpec:
+        """FairShareSpec using default weight (Repository set it from default_weight)."""
         return FairShareSpec(
-            weight=None,
+            weight=default_weight,  # Repository already set this to default_weight
             half_life_days=14,
             lookback_days=30,
             decay_unit_days=2,
@@ -48,24 +48,22 @@ class TestFairShareSpecGQLWeight:
     def test_uses_explicit_weight_when_set(
         self,
         spec_with_explicit_weight: FairShareSpec,
-        default_weight: Decimal,
     ) -> None:
         """Test that explicit weight is used when set."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, default_weight)
+        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, use_default=False)
 
         # Then
         assert gql.weight == Decimal("2.5")
         assert gql.uses_default is False
 
-    def test_uses_default_weight_when_null(
+    def test_uses_default_weight(
         self,
-        spec_with_null_weight: FairShareSpec,
-        default_weight: Decimal,
+        spec_with_default_weight: FairShareSpec,
     ) -> None:
-        """Test that default weight is used when spec weight is null."""
+        """Test that default weight flag is set when using defaults."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_null_weight, default_weight)
+        gql = FairShareSpecGQL.from_spec(spec_with_default_weight, use_default=True)
 
         # Then
         assert gql.weight == Decimal("3.0")  # default_weight fixture value
@@ -73,7 +71,6 @@ class TestFairShareSpecGQLWeight:
 
     def test_uses_default_false_when_weight_equals_default(
         self,
-        default_weight: Decimal,
     ) -> None:
         """Test that uses_default is False even if explicit weight equals default."""
         # Given - explicit weight that happens to equal default
@@ -86,7 +83,7 @@ class TestFairShareSpecGQLWeight:
         )
 
         # When
-        gql = FairShareSpecGQL.from_spec(spec, default_weight)
+        gql = FairShareSpecGQL.from_spec(spec, use_default=False)
 
         # Then
         assert gql.weight == Decimal("3.0")
@@ -95,11 +92,10 @@ class TestFairShareSpecGQLWeight:
     def test_preserves_other_spec_fields(
         self,
         spec_with_explicit_weight: FairShareSpec,
-        default_weight: Decimal,
     ) -> None:
         """Test that other spec fields are correctly converted."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, default_weight)
+        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, use_default=False)
 
         # Then
         assert gql.half_life_days == 14

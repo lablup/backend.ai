@@ -10,6 +10,7 @@ from typing import Self
 import strawberry
 
 from ai.backend.manager.data.fair_share.types import FairShareSpec
+from ai.backend.manager.errors.fair_share import FairShareError
 
 
 @strawberry.type(
@@ -149,22 +150,26 @@ class FairShareSpecGQL:
     )
 
     @classmethod
-    def from_spec(cls, spec: FairShareSpec, default_weight: Decimal) -> Self:
+    def from_spec(cls, spec: FairShareSpec, use_default: bool) -> Self:
         """Convert from data layer FairShareSpec to GQL type.
 
+        No DB queries - all data comes from Repository layer.
+        Repository ensures spec.weight is always set (either explicit or default_weight).
+
         Args:
-            spec: The fair share spec from data layer.
-            default_weight: The default weight from the resource group's fair share spec.
+            spec: FairShareSpec with weight already resolved
+            use_default: Whether this spec uses default values (from FairShareData)
 
         Returns:
             FairShareSpecGQL with effective weight and uses_default flag.
         """
-        uses_default = spec.weight is None
-        effective_weight = default_weight if spec.weight is None else spec.weight
+        # spec.weight is never None here - Repository sets it to default_weight if needed
+        if spec.weight is None:
+            raise FairShareError("Repository must set spec.weight")
 
         return cls(
-            weight=effective_weight,
-            uses_default=uses_default,
+            weight=spec.weight,
+            uses_default=use_default,
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
