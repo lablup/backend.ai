@@ -160,6 +160,7 @@ from .reservoir_registry import (
 )
 from .resource_group import (
     admin_resource_groups,
+    admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
     resource_groups,
     update_resource_group_fair_share_spec,
@@ -388,6 +389,7 @@ class Mutation:
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group - Admin APIs
     admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
+    admin_update_resource_group = admin_update_resource_group
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # User V2 APIs

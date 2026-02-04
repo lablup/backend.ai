@@ -53,6 +53,8 @@ __all__ = (
     "SchedulerTypeGQL",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupFairShareSpecPayload",
+    "UpdateResourceGroupInput",
+    "UpdateResourceGroupPayload",
 )
 
 
@@ -468,4 +470,68 @@ class UpdateResourceGroupFairShareSpecPayload:
 
     resource_group: ResourceGroupGQL = strawberry.field(
         description="The updated resource group with new fair share configuration."
+    )
+
+
+@strawberry.input(
+    name="UpdateResourceGroupInput",
+    description=(
+        "Added in 26.2.0. Resource group configuration update input. "
+        "All fields are optional - only provided fields will be updated. "
+        "Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation)."
+    ),
+)
+class UpdateResourceGroupInput:
+    """Input for updating resource group configuration. All fields optional for partial update."""
+
+    resource_group: str = strawberry.field(description="Name of the resource group to update.")
+
+    # Status fields (ScalingGroupStatusUpdaterSpec)
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Whether the resource group is active. Leave null to keep existing value.",
+    )
+    is_public: bool | None = strawberry.field(
+        default=None,
+        description="Whether the resource group is public. Leave null to keep existing value.",
+    )
+
+    # Metadata fields (ScalingGroupMetadataUpdaterSpec)
+    description: str | None = strawberry.field(
+        default=None,
+        description="Human-readable description. Leave null to keep existing value.",
+    )
+
+    # Network config fields (ScalingGroupNetworkConfigUpdaterSpec)
+    app_proxy_addr: str | None = strawberry.field(
+        default=None,
+        description="App proxy address. Leave null to keep existing value.",
+    )
+    appproxy_api_token: str | None = strawberry.field(
+        default=None,
+        description="App proxy API token. Leave null to keep existing value.",
+    )
+    use_host_network: bool | None = strawberry.field(
+        default=None,
+        description="Whether to use host network mode. Leave null to keep existing value.",
+    )
+
+    # Scheduler config fields (ScalingGroupSchedulerConfigUpdaterSpec)
+    scheduler_type: SchedulerTypeGQL | None = strawberry.field(
+        default=None,
+        description=(
+            "Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value."
+        ),
+    )
+
+
+@strawberry.type(
+    name="UpdateResourceGroupPayload",
+    description="Added in 26.2.0. Payload for resource group update mutation.",
+)
+class UpdateResourceGroupPayload:
+    """Payload for resource group update mutation."""
+
+    resource_group: ResourceGroupGQL = strawberry.field(
+        description="The updated resource group with new configuration."
     )
