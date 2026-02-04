@@ -1,8 +1,9 @@
 import uuid
 from collections.abc import Mapping
+from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -533,4 +534,39 @@ class GetVerificationResultReq(BaseRequestModel):
 
     artifact_revision_id: uuid.UUID = Field(
         description="The artifact revision ID to get verification result."
+    )
+
+
+# Client-facing API token operation types
+class TokenOperationType(StrEnum):
+    DOWNLOAD = "download"
+    UPLOAD = "upload"
+
+
+# Client-facing API request models for download archive endpoint
+class ArchiveDownloadTokenData(BaseModel):
+    """Pydantic model for validating the JWT payload of archive download tokens."""
+
+    operation: TokenOperationType
+    volume: str
+    vfolder_id: VFolderIDField
+    files: list[str] = Field(min_length=1)
+
+    model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+
+class ArchiveDownloadQueryParams(BaseRequestModel):
+    """Pydantic model for archive download endpoint query parameters."""
+
+    token: str = Field(description="JWT token containing download authorization")
+
+
+class CreateArchiveDownloadSessionRequest(BaseRequestModel):
+    """Request for creating an archive download session (JWT token generation)."""
+
+    volume: str = Field(description="Volume name where the vfolder is located")
+    vfid: VFolderIDField = Field(description="Virtual folder ID")
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths to include in the archive",
     )

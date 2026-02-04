@@ -10,30 +10,17 @@ from __future__ import annotations
 
 import asyncio
 import os
-import urllib.parse
 from collections.abc import AsyncIterator
 from pathlib import Path, PurePosixPath
-from typing import Literal, override
+from typing import override
 
 import janus
 import zipstream
-from aiohttp import hdrs, web
-from pydantic import BaseModel, Field
 
-from ai.backend.common.type_adapters.vfolder import VFolderIDField
 from ai.backend.common.types import StreamReader
 from ai.backend.storage.types import SENTINEL, Sentinel
 
 DEFAULT_INFLIGHT_CHUNKS = 8
-
-
-class ArchiveDownloadTokenData(BaseModel):
-    """Pydantic model for validating the JWT payload of archive download tokens."""
-
-    operation: Literal["download"]
-    volume: str
-    vfolder_id: VFolderIDField
-    files: list[str] = Field(min_length=1)
 
 
 class ZipArchiveStreamReader(StreamReader):
@@ -108,29 +95,3 @@ class ZipArchiveStreamReader(StreamReader):
     @override
     def content_type(self) -> str | None:
         return "application/zip"
-
-
-async def stream_archive_response(
-    request: web.Request,
-    reader: StreamReader,
-    filename: str,
-) -> web.StreamResponse:
-    """Stream a StreamReader's output as an HTTP attachment response.
-
-    This helper is format-agnostic: it works with any StreamReader (ZIP, tar, etc.).
-    """
-    ascii_filename = filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
-    encoded_filename = urllib.parse.quote(filename, encoding="utf-8")
-    response = web.StreamResponse(
-        headers={
-            hdrs.CONTENT_TYPE: reader.content_type() or "application/octet-stream",
-            hdrs.CONTENT_DISPOSITION: " ".join([
-                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
-                f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
-            ]),
-        },
-    )
-    await response.prepare(request)
-    async for chunk in reader.read():
-        await response.write(chunk)
-    return response
