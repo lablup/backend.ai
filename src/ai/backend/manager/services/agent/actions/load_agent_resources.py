@@ -20,7 +20,7 @@ class LoadAgentResourcesAction(AgentAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "load_agent_resources"
+        return "get"
 
     @override
     def entity_id(self) -> str | None:
