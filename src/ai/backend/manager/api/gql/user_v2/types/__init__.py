@@ -15,9 +15,9 @@ from .filters import (
 from .inputs import (
     BulkCreateUserV2Input,
     CreateUserV2Input,
-    DeleteUsersInput,
-    PurgeUserInput,
-    PurgeUsersInput,
+    DeleteUsersV2Input,
+    PurgeUsersV2Input,
+    PurgeUserV2Input,
     UpdateUserV2Input,
 )
 from .nested import (
@@ -76,9 +76,9 @@ __all__ = [
     "CreateUserV2Input",
     "BulkCreateUserV2Input",
     "UpdateUserV2Input",
-    "DeleteUsersInput",
-    "PurgeUserInput",
-    "PurgeUsersInput",
+    "DeleteUsersV2Input",
+    "PurgeUserV2Input",
+    "PurgeUsersV2Input",
     # Payloads
     "CreateUserV2Payload",
     "BulkCreateUsersPayload",

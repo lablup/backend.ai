@@ -3,20 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from decimal import Decimal
-
-import pytest
+from datetime import UTC, datetime
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission, VFolderHostPermissionMap
 from ai.backend.manager.api.gql.project_v2.types import (
-    ProjectBasicInfoGQL,
-    ProjectLifecycleInfoGQL,
-    ProjectOrganizationInfoGQL,
-    ProjectStorageInfoGQL,
     ProjectTypeEnum,
     ProjectV2GQL,
-    VFolderHostPermissionEntryGQL,
     VFolderHostPermissionEnum,
 )
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -33,8 +25,8 @@ class TestProjectV2GQL:
             name="test-project",
             description="Test project description",
             is_active=True,
-            created_at=datetime(2024, 1, 1, 12, 0, 0),
-            modified_at=datetime(2024, 1, 2, 12, 0, 0),
+            created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
+            modified_at=datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC),
             integration_id="integration-123",
             domain_name="default",
             total_resource_slots=ResourceSlot(),
@@ -60,8 +52,8 @@ class TestProjectV2GQL:
 
         # Verify lifecycle
         assert project_gql.lifecycle.is_active is True
-        assert project_gql.lifecycle.created_at == datetime(2024, 1, 1, 12, 0, 0)
-        assert project_gql.lifecycle.modified_at == datetime(2024, 1, 2, 12, 0, 0)
+        assert project_gql.lifecycle.created_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+        assert project_gql.lifecycle.modified_at == datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC)
 
     def test_from_data_project_type_conversion(self) -> None:
         """Test ProjectType to ProjectTypeEnum conversion."""
@@ -123,20 +115,18 @@ class TestProjectV2GQL:
             integration_id=None,
             domain_name="default",
             total_resource_slots=ResourceSlot(),
-            allowed_vfolder_hosts=VFolderHostPermissionMap(
-                {
-                    "default": {
-                        VFolderHostPermission.CREATE,
-                        VFolderHostPermission.MODIFY,
-                        VFolderHostPermission.DELETE,
-                    },
-                    "storage-01": {
-                        VFolderHostPermission.CREATE,
-                        VFolderHostPermission.UPLOAD_FILE,
-                        VFolderHostPermission.DOWNLOAD_FILE,
-                    },
-                }
-            ),
+            allowed_vfolder_hosts=VFolderHostPermissionMap({
+                "default": {
+                    VFolderHostPermission.CREATE,
+                    VFolderHostPermission.MODIFY,
+                    VFolderHostPermission.DELETE,
+                },
+                "storage-01": {
+                    VFolderHostPermission.CREATE,
+                    VFolderHostPermission.UPLOAD_FILE,
+                    VFolderHostPermission.DOWNLOAD_FILE,
+                },
+            }),
             dotfiles=b"",
             resource_policy="default",
             type=ProjectType.GENERAL,

@@ -14,12 +14,12 @@ from ai.backend.manager.api.gql.user_v2.types import (
     CreateUserV2Input,
     CreateUserV2Payload,
     DeleteUserPayload,
-    DeleteUsersInput,
     DeleteUsersPayload,
-    PurgeUserInput,
+    DeleteUsersV2Input,
     PurgeUserPayload,
-    PurgeUsersInput,
     PurgeUsersPayload,
+    PurgeUsersV2Input,
+    PurgeUserV2Input,
     UpdateUserV2Input,
     UpdateUserV2Payload,
 )
@@ -174,7 +174,7 @@ async def admin_delete_user(
 )  # type: ignore[misc]
 async def admin_delete_users(
     info: Info[StrawberryGQLContext],
-    input: DeleteUsersInput,
+    input: DeleteUsersV2Input,
 ) -> DeleteUsersPayload:
     """Soft-delete multiple users.
 
@@ -203,7 +203,7 @@ async def admin_delete_users(
 )  # type: ignore[misc]
 async def admin_purge_user(
     info: Info[StrawberryGQLContext],
-    input: PurgeUserInput,
+    input: PurgeUserV2Input,
 ) -> PurgeUserPayload:
     """Permanently delete a single user.
 
@@ -229,7 +229,7 @@ async def admin_purge_user(
 )  # type: ignore[misc]
 async def admin_purge_users(
     info: Info[StrawberryGQLContext],
-    input: PurgeUsersInput,
+    input: PurgeUsersV2Input,
 ) -> PurgeUsersPayload:
     """Permanently delete multiple users.
 
