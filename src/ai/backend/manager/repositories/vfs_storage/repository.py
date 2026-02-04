@@ -5,6 +5,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.artifact_storages.types import (
+    ArtifactStorageCreatorMeta,
+    ArtifactStorageModifierMeta,
+)
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
@@ -47,12 +51,18 @@ class VFSStorageRepository:
         return await self._db_source.get_by_id(storage_id)
 
     @vfs_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[VFSStorageRow]) -> VFSStorageData:
-        return await self._db_source.create(creator)
+    async def create(
+        self, creator: Creator[VFSStorageRow], meta: ArtifactStorageCreatorMeta
+    ) -> VFSStorageData:
+        return await self._db_source.create(creator, meta)
 
     @vfs_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[VFSStorageRow]) -> VFSStorageData:
-        return await self._db_source.update(updater)
+    async def update(
+        self,
+        updater: Updater[VFSStorageRow],
+        meta: ArtifactStorageModifierMeta,
+    ) -> VFSStorageData:
+        return await self._db_source.update(updater, meta)
 
     @vfs_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

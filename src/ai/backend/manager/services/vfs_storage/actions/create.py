@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorMeta
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -11,6 +12,7 @@ from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageActio
 @dataclass
 class CreateVFSStorageAction(VFSStorageAction):
     creator: Creator[VFSStorageRow]
+    meta: ArtifactStorageCreatorMeta
 
     @override
     def entity_id(self) -> str | None:

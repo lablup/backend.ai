@@ -41,7 +41,7 @@ def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-def _get_object_storage_meta_join_cond():
+def _get_object_storage_meta_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
     return ObjectStorageRow.id == foreign(ArtifactStorageRow.storage_id)

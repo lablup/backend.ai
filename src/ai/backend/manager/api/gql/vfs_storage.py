@@ -8,6 +8,10 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.artifact_storages.types import (
+    ArtifactStorageCreatorMeta,
+    ArtifactStorageModifierMeta,
+)
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -99,11 +103,13 @@ class CreateVFSStorageInput:
     def to_creator(self) -> Creator[VFSStorageRow]:
         return Creator(
             spec=VFSStorageCreatorSpec(
-                name=self.name,
                 host=self.host,
                 base_path=self.base_path,
             )
         )
+
+    def to_creator_meta(self) -> ArtifactStorageCreatorMeta:
+        return ArtifactStorageCreatorMeta(name=self.name)
 
 
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
@@ -115,11 +121,15 @@ class UpdateVFSStorageInput:
 
     def to_updater(self) -> Updater[VFSStorageRow]:
         spec = VFSStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             base_path=OptionalState[str].from_graphql(self.base_path),
         )
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
+
+    def to_modifier_meta(self) -> ArtifactStorageModifierMeta:
+        return ArtifactStorageModifierMeta(
+            name=OptionalState[str].from_graphql(self.name),
+        )
 
 
 @strawberry.input(description="Added in 25.16.0. Input for deleting VFS storage")
@@ -153,6 +163,7 @@ async def create_vfs_storage(
     action_result = await processors.vfs_storage.create.wait_for_complete(
         CreateVFSStorageAction(
             creator=input.to_creator(),
+            meta=input.to_creator_meta(),
         )
     )
 
@@ -170,6 +181,7 @@ async def update_vfs_storage(
     action_result = await processors.vfs_storage.update.wait_for_complete(
         UpdateVFSStorageAction(
             updater=input.to_updater(),
+            meta=input.to_modifier_meta(),
         )
     )
 

@@ -9,6 +9,10 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.data.artifact_storages.types import (
+    ArtifactStorageCreatorMeta,
+    ArtifactStorageModifierMeta,
+)
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -151,7 +155,6 @@ class CreateObjectStorageInput:
     def to_creator(self) -> Creator[ObjectStorageRow]:
         return Creator(
             spec=ObjectStorageCreatorSpec(
-                name=self.name,
                 host=self.host,
                 access_key=self.access_key,
                 secret_key=self.secret_key,
@@ -159,6 +162,9 @@ class CreateObjectStorageInput:
                 region=self.region,
             )
         )
+
+    def to_creator_meta(self) -> ArtifactStorageCreatorMeta:
+        return ArtifactStorageCreatorMeta(name=self.name)
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -173,7 +179,6 @@ class UpdateObjectStorageInput:
 
     def to_updater(self) -> Updater[ObjectStorageRow]:
         spec = ObjectStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
             host=OptionalState[str].from_graphql(self.host),
             access_key=OptionalState[str].from_graphql(self.access_key),
             secret_key=OptionalState[str].from_graphql(self.secret_key),
@@ -181,6 +186,11 @@ class UpdateObjectStorageInput:
             region=OptionalState[str].from_graphql(self.region),
         )
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
+
+    def to_modifier_meta(self) -> ArtifactStorageModifierMeta:
+        return ArtifactStorageModifierMeta(
+            name=OptionalState[str].from_graphql(self.name),
+        )
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -236,6 +246,7 @@ async def create_object_storage(
     action_result = await processors.object_storage.create.wait_for_complete(
         CreateObjectStorageAction(
             creator=input.to_creator(),
+            meta=input.to_creator_meta(),
         )
     )
 
@@ -253,6 +264,7 @@ async def update_object_storage(
     action_result = await processors.object_storage.update.wait_for_complete(
         UpdateObjectStorageAction(
             updater=input.to_updater(),
+            meta=input.to_modifier_meta(),
         )
     )
 

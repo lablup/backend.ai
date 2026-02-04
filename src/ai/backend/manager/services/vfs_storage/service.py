@@ -45,7 +45,7 @@ class VFSStorageService:
         Create a new VFS storage.
         """
         log.info("Creating VFS storage with data: {}", action.creator)
-        storage_data = await self._vfs_storage_repository.create(action.creator)
+        storage_data = await self._vfs_storage_repository.create(action.creator, action.meta)
         return CreateVFSStorageActionResult(result=storage_data)
 
     async def update(self, action: UpdateVFSStorageAction) -> UpdateVFSStorageActionResult:
@@ -53,7 +53,7 @@ class VFSStorageService:
         Update an existing VFS storage.
         """
         log.info("Updating VFS storage with id: {}", action.updater.pk_value)
-        storage_data = await self._vfs_storage_repository.update(action.updater)
+        storage_data = await self._vfs_storage_repository.update(action.updater, action.meta)
         return UpdateVFSStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteVFSStorageAction) -> DeleteVFSStorageActionResult:

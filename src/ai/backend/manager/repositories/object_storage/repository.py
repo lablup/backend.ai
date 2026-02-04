@@ -7,6 +7,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.artifact_storages.types import (
+    ArtifactStorageCreatorMeta,
+    ArtifactStorageModifierMeta,
+)
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,12 +57,18 @@ class ObjectStorageRepository:
         return await self._db_source.get_by_namespace_id(storage_namespace_id)
 
     @object_storage_repository_resilience.apply()
-    async def create(self, creator: Creator[ObjectStorageRow]) -> ObjectStorageData:
-        return await self._db_source.create(creator)
+    async def create(
+        self, creator: Creator[ObjectStorageRow], meta: ArtifactStorageCreatorMeta
+    ) -> ObjectStorageData:
+        return await self._db_source.create(creator, meta)
 
     @object_storage_repository_resilience.apply()
-    async def update(self, updater: Updater[ObjectStorageRow]) -> ObjectStorageData:
-        return await self._db_source.update(updater)
+    async def update(
+        self,
+        updater: Updater[ObjectStorageRow],
+        meta: ArtifactStorageModifierMeta,
+    ) -> ObjectStorageData:
+        return await self._db_source.update(updater, meta)
 
     @object_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

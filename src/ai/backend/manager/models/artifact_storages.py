@@ -23,13 +23,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ArtifactStorageRow",)
 
 
-def _get_object_storage_join_condition():
+def _get_object_storage_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.object_storage import ObjectStorageRow
 
     return ObjectStorageRow.id == foreign(ArtifactStorageRow.storage_id)
 
 
-def _get_vfs_storage_join_condition():
+def _get_vfs_storage_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
     return VFSStorageRow.id == foreign(ArtifactStorageRow.storage_id)

@@ -35,7 +35,7 @@ def _get_vfs_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-def _get_vfs_storage_meta_join_cond():
+def _get_vfs_storage_meta_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
     return VFSStorageRow.id == foreign(ArtifactStorageRow.storage_id)
