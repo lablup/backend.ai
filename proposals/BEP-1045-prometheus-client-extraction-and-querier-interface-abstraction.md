@@ -238,15 +238,6 @@ class ContainerUtilizationMetricService:
 - **No external impact**: These methods were only used by `ContainerUtilizationMetricService`
 - **Service API unchanged**: `ContainerUtilizationMetricService.query_metric()` signature preserved
 
-### Breaking Changes
-
-| Change | Impact | Migration |
-|--------|--------|-----------|
-| `query_range()` → `query_utilization()` | Internal only | Automatic via this PR |
-| `query_label_values()` → `fetch_available_container_metrics()` | Internal only | Automatic via this PR |
-| `client_pool` now required | Test fixtures | Update fixtures to provide `ClientPool` |
-| `base.py` deleted | None | HTTP logic merged into `client.py` |
-
 ### Removed Types
 
 The following types were removed from `services/metric/types.py`:
