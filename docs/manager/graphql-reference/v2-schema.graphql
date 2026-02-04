@@ -3093,6 +3093,11 @@ type Mutation {
   adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
 
   """
+  Added in 26.2.0. Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).
+  """
+  adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload!
+
+  """
   Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -5096,6 +5101,47 @@ Added in 26.1.0. Payload for resource group fair share spec update mutation.
 """
 type UpdateResourceGroupFairShareSpecPayload {
   """The updated resource group with new fair share configuration."""
+  resourceGroup: ResourceGroup!
+}
+
+"""
+Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).
+"""
+input UpdateResourceGroupInput {
+  """Name of the resource group to update."""
+  resourceGroup: String!
+
+  """
+  Whether the resource group is active. Leave null to keep existing value.
+  """
+  isActive: Boolean = null
+
+  """
+  Whether the resource group is public. Leave null to keep existing value.
+  """
+  isPublic: Boolean = null
+
+  """Human-readable description. Leave null to keep existing value."""
+  description: String = null
+
+  """App proxy address. Leave null to keep existing value."""
+  appProxyAddr: String = null
+
+  """App proxy API token. Leave null to keep existing value."""
+  appproxyApiToken: String = null
+
+  """Whether to use host network mode. Leave null to keep existing value."""
+  useHostNetwork: Boolean = null
+
+  """
+  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
+  """
+  schedulerType: SchedulerType = null
+}
+
+"""Added in 26.2.0. Payload for resource group update mutation."""
+type UpdateResourceGroupPayload {
+  """The updated resource group with new configuration."""
   resourceGroup: ResourceGroup!
 }
 
