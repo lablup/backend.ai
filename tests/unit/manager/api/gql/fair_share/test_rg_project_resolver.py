@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope
 from ai.backend.manager.data.fair_share import (
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairShareSpec,
     ProjectFairShareData,
@@ -37,30 +38,31 @@ class TestRGProjectFairShare:
     def project_fair_share_data(self, project_id: UUID) -> ProjectFairShareData:
         """Project fair share data for existing record."""
         return ProjectFairShareData(
-            id=UUID("12345678-1234-5678-1234-567812345678"),
             resource_group="default",
             project_id=project_id,
             domain_name="test-domain",
-            spec=FairShareSpec(
-                weight=Decimal("2.0"),
-                half_life_days=14,
-                lookback_days=30,
-                decay_unit_days=1,
-                resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.0"),
+                    half_life_days=14,
+                    lookback_days=30,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("0.5"),
+                    total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                    normalized_usage=Decimal("100.0"),
+                    lookback_start=date(2024, 1, 1),
+                    lookback_end=date(2024, 1, 31),
+                    last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+                ),
+                metadata=FairShareMetadata(
+                    created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
+                    updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
+                ),
+                use_default=False,
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=Decimal("0.5"),
-                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
-                normalized_usage=Decimal("100.0"),
-                lookback_start=date(2024, 1, 1),
-                lookback_end=date(2024, 1, 31),
-                last_calculated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-            ),
-            metadata=FairShareMetadata(
-                created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
-                updated_at=datetime(2024, 1, 31, 12, 0, 0, tzinfo=UTC),
-            ),
-            default_weight=Decimal("1.0"),
         )
 
     @pytest.fixture
