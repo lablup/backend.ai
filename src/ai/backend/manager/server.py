@@ -817,11 +817,12 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.config_provider.config.otel.enabled:
         meta = root_ctx.sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=root_ctx.config_provider.config.otel.log_level,
             endpoint=root_ctx.config_provider.config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
     try:

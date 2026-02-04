@@ -18,18 +18,21 @@ from ai.backend.logging.formatter import CustomJsonFormatter
 
 @dataclass
 class OpenTelemetrySpec:
-    service_id: uuid.UUID
     service_name: str
     service_version: str
     log_level: str
     endpoint: str
+    service_instance_id: uuid.UUID
+    service_instance_name: str
 
     def to_resource(self) -> Resource:
-        return Resource.create({
+        attributes = {
             "service.name": self.service_name,
-            "service.id": str(self.service_id),
             "service.version": self.service_version,
-        })
+            "service.instance.id": str(self.service_instance_id),
+            "service.instance.name": self.service_instance_name,
+        }
+        return Resource.create(attributes)
 
 
 def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpec) -> None:

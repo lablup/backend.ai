@@ -11,6 +11,7 @@ import ssl
 import sys
 import time
 import traceback
+import uuid
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -25,7 +26,6 @@ from functools import partial
 from pathlib import Path
 from pprint import pprint
 from typing import Any, cast
-from uuid import uuid4
 
 import aiohttp
 import aiohttp_cors
@@ -909,12 +909,14 @@ async def webapp_ctx(
 @asynccontextmanager
 async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerator[None]:
     if config.otel.enabled:
+        instance_name = f"webserver-{socket.gethostname()}"
         otel_spec = OpenTelemetrySpec(
-            service_id=uuid4(),
             service_name="webserver",
             service_version=__version__,
             log_level=config.otel.log_level,
             endpoint=config.otel.endpoint,
+            service_instance_id=uuid.uuid4(),
+            service_instance_name=instance_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
     yield
