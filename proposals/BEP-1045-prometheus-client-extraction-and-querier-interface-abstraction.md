@@ -162,20 +162,13 @@ class ContainerMetricQuerier(UtilizationMetricQuerier):
 ```python
 class PrometheusClient:
 
-    _client_pool: ClientPool
+    _client_pool: ClientPool # Using client pool
     _client_key: ClientKey
-
-    def __init__(self, args: PrometheusClientArgs, client_pool: ClientPool) -> None:
-        self._client_pool = client_pool
-        self._client_key = ClientKey(endpoint=str(args.endpoint), domain="prometheus")
-
-    def _get_session(self) -> aiohttp.ClientSession:
-        return self._client_pool.load_client_session(self._client_key)
 
     # ── Public API ──────────────────────────────────────────────────
     async def query_utilization(
         self,
-        querier: UtilizationMetricQuerier,  # Abstract type
+        querier: UtilizationMetricQuerier,
         time_range: QueryTimeRange,
         *,
         rate_interval: str = "5m",
@@ -184,10 +177,7 @@ class PrometheusClient:
         match querier.query_strategy():
             case QueryStrategy.RATE:
                 return await self._query_rate(querier, time_range, rate_interval)
-            case QueryStrategy.RATE_NORMALIZED:
-                return await self._query_rate(querier, time_range, rate_interval, normalize=True)
-            case QueryStrategy.GAUGE:
-                return await self._query_gauge(querier, time_range)
+            ...
 
     async def query_available_container_metrics(self) -> list[str]:
         """Fetch list of available container metric names."""
@@ -196,12 +186,8 @@ class PrometheusClient:
     # ── Private: Query Building ─────────────────────────────────────
     async def _query_gauge(self, querier, time_range): ...
     async def _query_rate(self, querier, time_range, interval, *, normalize=False): ...
-    def _build_label_selector(self, labels: dict[str, str]) -> str: ...
-    def _build_group_by(self, labels: list[str]) -> str: ...
 
     # ── Private: HTTP Transport ─────────────────────────────────────
-    async def _query_range(self, query, time_range): ...
-    async def _query_label_values(self, label_name, metric_match=None): ...
     async def _post(self, path, *, data=None, request_timeout=None): ...
     async def _get(self, path, *, params=None, request_timeout=None): ...
 ```
@@ -256,22 +242,7 @@ class NodeMetricQuerier(UtilizationMetricQuerier):
     metric_name: str
     node_id: str
 
-    @override
-    def name(self) -> str:
-        return "backendai_node_utilization"
-
-    @override
-    def labels(self) -> dict[str, str]:
-        return {"node_id": self.node_id, "metric_name": self.metric_name}
-
-    @override
-    def group_by_labels(self) -> list[str]:
-        return ["node_id"]
-
-    @override
-    def query_strategy(self) -> QueryStrategy:
-        # Node metrics might all be gauges
-        return QueryStrategy.GAUGE
+    ...
 
 # Usage - client unchanged
 result = await prometheus_client.query_utilization(
