@@ -30,7 +30,11 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
+from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.group.row import (
+    AssocGroupUserRow,
+    GroupRow,
+)
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
@@ -54,6 +58,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.purgers import (
@@ -62,6 +67,11 @@ from ai.backend.manager.repositories.group.purgers import (
     GroupKernelBatchPurgerSpec,
     GroupSessionBatchPurgerSpec,
     SessionByIdsBatchPurgerSpec,
+)
+from ai.backend.manager.repositories.group.types import (
+    DomainProjectSearchScope,
+    GroupSearchResult,
+    UserProjectSearchScope,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
@@ -548,4 +558,108 @@ class GroupDBSource:
         if session_ids:
             await execute_batch_purger(
                 session, BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
+            )
+
+    async def get_project(self, project_id: UUID) -> GroupData:
+        """Get a single project by UUID.
+
+        Args:
+            project_id: UUID of the project.
+
+        Returns:
+            GroupData for the project.
+
+        Raises:
+            ProjectNotFound: If project does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(sa.select(GroupRow).where(GroupRow.id == project_id))
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ProjectNotFound(f"Project {project_id} not found")
+            return row.to_data()
+
+    async def search_projects(
+        self,
+        querier: BatchQuerier,
+    ) -> GroupSearchResult:
+        """Search all projects (admin only).
+
+        Args:
+            querier: Contains conditions, orders, and pagination.
+
+        Returns:
+            GroupSearchResult with items, total_count, and pagination flags.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+
+            items = [row.GroupRow.to_data() for row in result.rows]
+
+            return GroupSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_projects_by_domain(
+        self,
+        scope: DomainProjectSearchScope,
+        querier: BatchQuerier,
+    ) -> GroupSearchResult:
+        """Search projects within a domain.
+
+        Args:
+            scope: DomainProjectSearchScope defining the domain to search within.
+            querier: Contains conditions, orders, and pagination.
+
+        Returns:
+            GroupSearchResult with items, total_count, and pagination flags.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(GroupRow)
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            items = [row.GroupRow.to_data() for row in result.rows]
+
+            return GroupSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_projects_by_user(
+        self,
+        scope: UserProjectSearchScope,
+        querier: BatchQuerier,
+    ) -> GroupSearchResult:
+        """Search projects a user is member of.
+
+        Joins with association_groups_users to find user's projects.
+
+        Args:
+            scope: UserProjectSearchScope defining the user to search for.
+            querier: Contains conditions, orders, and pagination.
+
+        Returns:
+            GroupSearchResult with items, total_count, and pagination flags.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(GroupRow)
+                .select_from(GroupRow)
+                .join(AssocGroupUserRow, GroupRow.id == AssocGroupUserRow.group_id)
+            )
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+
+            items = [row.GroupRow.to_data() for row in result.rows]
+
+            return GroupSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

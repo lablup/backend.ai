@@ -37,6 +37,14 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.search_projects import (
+    GetProjectAction,
+    GetProjectActionResult,
+    SearchProjectsAction,
+    SearchProjectsActionResult,
+    SearchProjectsByDomainAction,
+    SearchProjectsByUserAction,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -151,3 +159,79 @@ class GroupService:
         result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
         log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
         return UsagePerPeriodActionResult(result=result)
+
+    async def search_projects(self, action: SearchProjectsAction) -> SearchProjectsActionResult:
+        """Search all projects (admin only - no scope filter).
+
+        Args:
+            action: SearchProjectsAction with querier.
+
+        Returns:
+            SearchProjectsActionResult with items and pagination info.
+        """
+        result = await self._group_repository.search_projects(querier=action.querier)
+        return SearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_projects_by_domain(
+        self, action: SearchProjectsByDomainAction
+    ) -> SearchProjectsActionResult:
+        """Search projects within a domain.
+
+        Scope validation (domain existence) is done in repository layer.
+
+        Args:
+            action: SearchProjectsByDomainAction with scope and querier.
+
+        Returns:
+            SearchProjectsActionResult with domain-scoped items.
+        """
+        result = await self._group_repository.search_projects_by_domain(
+            action.scope, action.querier
+        )
+        return SearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_projects_by_user(
+        self, action: SearchProjectsByUserAction
+    ) -> SearchProjectsActionResult:
+        """Search projects a user is member of.
+
+        Filters by association_groups_users table.
+
+        Args:
+            action: SearchProjectsByUserAction with scope and querier.
+
+        Returns:
+            SearchProjectsActionResult with user's projects.
+        """
+        result = await self._group_repository.search_projects_by_user(action.scope, action.querier)
+        return SearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
+        """Get a single project by UUID.
+
+        Args:
+            action: GetProjectAction with project_id.
+
+        Returns:
+            GetProjectActionResult with project data.
+
+        Raises:
+            ProjectNotFound: If project does not exist.
+        """
+        data = await self._group_repository.get_project(action.project_id)
+        return GetProjectActionResult(data=data)
