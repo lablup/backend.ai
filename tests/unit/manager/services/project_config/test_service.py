@@ -92,7 +92,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         action = CreateDotfileAction(
             project_id_or_name=project_id,
             domain_name=domain_name,
@@ -116,7 +116,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         action = CreateDotfileAction(
             project_id_or_name=project_id,
             domain_name=domain_name,
@@ -138,7 +138,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
@@ -163,7 +163,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed("Dotfile creation limit reached")
         action = CreateDotfileAction(
             project_id_or_name=project_id,
@@ -186,7 +186,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileAlreadyExists
         action = CreateDotfileAction(
             project_id_or_name=project_id,
@@ -209,7 +209,7 @@ class TestCreateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.add_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
@@ -236,7 +236,7 @@ class TestListDotfiles:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_user.return_value = resolved_project
         expected_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"},
             {"path": ".zshrc", "perm": "644", "data": "# zsh"},
@@ -261,7 +261,7 @@ class TestListDotfiles:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_user.return_value = resolved_project
         mock_repo.get_dotfiles.return_value = ProjectDotfilesResult(
             dotfiles=[], leftover_space=64000
         )
@@ -283,7 +283,7 @@ class TestGetDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_user.return_value = resolved_project
         existing_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"},
             {"path": ".zshrc", "perm": "644", "data": "# zsh"},
@@ -310,7 +310,7 @@ class TestGetDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_user.return_value = resolved_project
         existing_dotfiles: list[GroupDotfile] = [
             {"path": ".bashrc", "perm": "644", "data": "# bash"}
         ]
@@ -336,7 +336,7 @@ class TestUpdateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         action = UpdateDotfileAction(
             project_id_or_name=project_id,
             domain_name=domain_name,
@@ -360,7 +360,7 @@ class TestUpdateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.modify_dotfile.side_effect = DotfileNotFound
         action = UpdateDotfileAction(
             project_id_or_name=project_id,
@@ -383,7 +383,7 @@ class TestUpdateDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.modify_dotfile.side_effect = DotfileCreationFailed(
             "No leftover space for dotfile storage"
         )
@@ -410,7 +410,7 @@ class TestDeleteDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         action = DeleteDotfileAction(
             project_id_or_name=project_id, domain_name=domain_name, path=".bashrc"
         )
@@ -430,7 +430,7 @@ class TestDeleteDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.remove_dotfile.side_effect = DotfileNotFound
         action = DeleteDotfileAction(
             project_id_or_name=project_id, domain_name=domain_name, path=".zshrc"
@@ -449,7 +449,7 @@ class TestDeleteDotfile:
         resolved_project: ResolvedProject,
         user_context: UserData,
     ) -> None:
-        mock_repo.resolve_project.return_value = resolved_project
+        mock_repo.resolve_project_for_admin.return_value = resolved_project
         mock_repo.remove_dotfile.side_effect = DotfileNotFound
         action = DeleteDotfileAction(
             project_id_or_name=project_id, domain_name=domain_name, path=".bashrc"

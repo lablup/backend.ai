@@ -66,6 +66,34 @@ class ProjectConfigRepository:
         return await self._db_source.resolve_project(domain_name, project_id_or_name)
 
     @project_config_repository_resilience.apply()
+    async def resolve_project_for_admin(
+        self,
+        user_domain: str,
+        is_superadmin: bool,
+        domain_name: str | None,
+        project_id_or_name: uuid.UUID | str,
+    ) -> ResolvedProject:
+        """Resolve project for admin operations with permission check."""
+        return await self._db_source.resolve_project_for_admin(
+            user_domain, is_superadmin, domain_name, project_id_or_name
+        )
+
+    @project_config_repository_resilience.apply()
+    async def resolve_project_for_user(
+        self,
+        user_id: uuid.UUID,
+        user_domain: str,
+        is_admin: bool,
+        is_superadmin: bool,
+        domain_name: str | None,
+        project_id_or_name: uuid.UUID | str,
+    ) -> ResolvedProject:
+        """Resolve project for user operations with permission check."""
+        return await self._db_source.resolve_project_for_user(
+            user_id, user_domain, is_admin, is_superadmin, domain_name, project_id_or_name
+        )
+
+    @project_config_repository_resilience.apply()
     async def get_dotfiles(self, project_id: uuid.UUID) -> ProjectDotfilesResult:
         """
         Get dotfiles for a project.
