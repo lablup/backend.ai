@@ -601,7 +601,7 @@ class VFolderService:
             )
 
         allowed_vfolder_hosts = await self._vfolder_repository.get_allowed_vfolder_hosts(
-            action.requester_user_uuid, source_vfolder_data.group
+            action.requester_user_uuid, None
         )
 
         # Check host permissions using the user's actual resource policy
