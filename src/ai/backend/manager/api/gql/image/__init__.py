@@ -6,7 +6,7 @@ See BEP-1038 for detailed specifications.
 """
 
 from .fetcher import fetch_image, fetch_images
-from .resolver import admin_image, admin_images, image_v2, images_v2
+from .resolver import admin_image, admin_images
 from .types import (
     ImageConnectionV2GQL,
     ImageEdgeGQL,
@@ -52,6 +52,4 @@ __all__ = [
     # Resolver fields
     "admin_images",
     "admin_image",
-    "images_v2",
-    "image_v2",
 ]

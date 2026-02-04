@@ -114,8 +114,6 @@ from .huggingface_registry import (
 from .image import (
     admin_image,
     admin_images,
-    image_v2,
-    images_v2,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -299,8 +297,6 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
-    image_v2 = image_v2
-    images_v2 = images_v2
     # User V2 APIs
     admin_user_v2 = admin_user_v2
     admin_users = admin_users
