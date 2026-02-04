@@ -84,14 +84,6 @@ class TestSessionRepository:
         return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
-    def default_querier(self) -> BatchQuerier:
-        return BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-    @pytest.fixture
     async def session_with_kernel(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionTestData:
         """Create a session with kernel for testing search operations."""
         domain_name = "test-domain"
@@ -312,11 +304,15 @@ class TestSessionRepository:
     async def test_search_kernels(
         self,
         repository: SessionRepository,
-        default_querier: BatchQuerier,
         session_with_kernel: SessionTestData,
     ) -> None:
         """Test search_kernels returns kernel info when kernels exist"""
-        result = await repository.search_kernels(default_querier)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_kernels(querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -331,10 +327,14 @@ class TestSessionRepository:
     async def test_search_kernels_empty_result(
         self,
         repository: SessionRepository,
-        default_querier: BatchQuerier,
     ) -> None:
         """Test search_kernels returns empty result when no kernels exist"""
-        result = await repository.search_kernels(default_querier)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_kernels(querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0
@@ -349,11 +349,15 @@ class TestSessionRepository:
     async def test_search_sessions(
         self,
         repository: SessionRepository,
-        default_querier: BatchQuerier,
         session_with_kernel: SessionTestData,
     ) -> None:
         """Test search returns session data when sessions exist"""
-        result = await repository.search(querier=default_querier)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search(querier=querier)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -372,10 +376,14 @@ class TestSessionRepository:
     async def test_search_sessions_empty_result(
         self,
         repository: SessionRepository,
-        default_querier: BatchQuerier,
     ) -> None:
         """Test search returns empty result when no sessions exist"""
-        result = await repository.search(querier=default_querier)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search(querier=querier)
 
         assert result.total_count == 0
         assert len(result.items) == 0
