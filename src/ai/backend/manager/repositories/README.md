@@ -18,6 +18,39 @@ Database Models (models/)
 Database
 ```
 
+## Standard Operations
+
+Repositories implement 6 standard operations:
+
+1. **create** - Create new entity
+2. **get** - Retrieve single entity by ID
+3. **search** - Query with filters and pagination
+4. **update** - Update existing entity
+5. **delete** - Soft delete (status change)
+6. **purge** - Hard delete (permanent removal)
+
+**Batch operations:**
+- `batch_update` - Update multiple entities
+- `batch_delete` - Soft delete multiple entities
+- `batch_purge` - Hard delete multiple entities
+
+**Method naming (no prefix):**
+```python
+await repository.create(data)
+await repository.entity(id, scope=None)  # get operation uses entity name
+await repository.search(scope, filters, pagination)
+await repository.update(id, data)
+await repository.delete(id)
+await repository.purge(id)
+await repository.batch_update(ids, data)
+await repository.batch_delete(ids)
+await repository.batch_purge(ids)
+```
+
+**Note:** Getter methods use entity name (e.g., `user(id)`, `session(id)`) instead of `get_entity(id)`.
+
+**See:** `/repository-guide` skill for detailed implementation patterns.
+
 ## Service Integration
 
 Repositories are called from the Services Layer to perform data access operations.
@@ -25,7 +58,7 @@ Repositories are called from the Services Layer to perform data access operation
 **Key Principles**:
 - Services do not create transactions (delegate to Repository)
 - Repository instances are dependency-injected when Services are created
-- Public method naming: `get_*()`, `find_*()`, `list_*()`, `create_*()`, `update_*()`, `delete_*()`, `count_*()`
+- Public methods use standard operations (create, {entity}, search, update, delete, purge)
 
 ## Architecture Diagram
 

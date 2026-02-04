@@ -1,0 +1,664 @@
+# CLI Executor Troubleshooting Guide
+
+## Common Issues and Solutions
+
+### Infrastructure Issues
+
+#### 1. Docker Daemon Not Running
+
+**Symptoms:**
+```
+Error: Cannot connect to the Docker daemon
+Error: Docker socket not accessible
+```
+
+**Diagnosis:**
+```bash
+docker ps  # Should show running containers
+```
+
+**Solutions:**
+
+**macOS/Windows:**
+1. Start Docker Desktop application
+2. Wait for Docker icon to show "running" status
+3. Verify: `docker ps`
+
+**Linux:**
+```bash
+# Check Docker service status
+sudo systemctl status docker
+
+# Start Docker service
+sudo systemctl start docker
+
+# Enable Docker to start on boot
+sudo systemctl enable docker
+```
+
+**Permission issues:**
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Log out and back in for group changes to take effect
+# Or start new shell: newgrp docker
+
+# Verify: docker ps (should work without sudo)
+```
+
+---
+
+#### 2. PostgreSQL Not Running
+
+**Symptoms:**
+```
+Error: Connection refused to localhost:5432
+Error: FATAL: the database system is not accepting connections
+```
+
+**Diagnosis:**
+```bash
+# Check PostgreSQL container
+docker ps | grep postgres
+
+# Check PostgreSQL logs
+docker logs backend-ai-halfstack-db
+```
+
+**Solutions:**
+
+**Start infrastructure:**
+```bash
+./scripts/run-dev.sh
+```
+
+**Manual PostgreSQL start:**
+```bash
+docker run -d \
+  --name backend-ai-halfstack-db \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=develove \
+  -e POSTGRES_DB=backend \
+  postgres:13
+```
+
+**Connection issues:**
+- Check PostgreSQL is listening on correct port
+- Verify credentials in config
+- Check firewall/security settings
+
+---
+
+#### 3. Redis Not Running
+
+**Symptoms:**
+```
+Error: Connection refused to localhost:6379
+Error: Error connecting to Redis
+```
+
+**Diagnosis:**
+```bash
+# Check Redis container
+docker ps | grep redis
+
+# Test Redis connection
+redis-cli ping  # Should return PONG
+```
+
+**Solutions:**
+
+**Start infrastructure:**
+```bash
+./scripts/run-dev.sh
+```
+
+**Manual Redis start:**
+```bash
+docker run -d \
+  --name backend-ai-halfstack-redis \
+  -p 6379:6379 \
+  redis:latest
+```
+
+**Connection test:**
+```bash
+# Should return PONG
+redis-cli ping
+```
+
+---
+
+#### 4. etcd Not Running (Manager only)
+
+**Symptoms:**
+```
+Error: Connection refused to localhost:2379
+Error: Failed to connect to etcd
+```
+
+**Diagnosis:**
+```bash
+# Check etcd container
+docker ps | grep etcd
+
+# Check etcd health
+curl http://localhost:2379/health
+```
+
+**Solutions:**
+
+**Start infrastructure:**
+```bash
+./scripts/run-dev.sh
+```
+
+**Manual etcd start:**
+```bash
+docker run -d \
+  --name backend-ai-halfstack-etcd \
+  -p 2379:2379 \
+  -e ALLOW_NONE_AUTHENTICATION=yes \
+  quay.io/coreos/etcd:v3.5.0
+```
+
+---
+
+### Configuration Issues
+
+#### 5. Missing Configuration File
+
+**Symptoms:**
+```
+Error: Configuration file not found
+Error: Cannot open config at configs/manager.toml
+```
+
+**Solutions:**
+
+**Create from sample:**
+```bash
+# Manager
+cp configs/manager.sample.toml configs/manager.toml
+
+# Agent
+cp configs/agent.sample.toml configs/agent.toml
+
+# Storage Proxy
+cp configs/storage-proxy.sample.toml configs/storage-proxy.toml
+
+# Web Server
+cp configs/web.sample.toml configs/web.toml
+
+# App Proxy Coordinator
+cp configs/app-proxy-coordinator.sample.toml configs/app-proxy-coordinator.toml
+
+# App Proxy Worker
+cp configs/app-proxy-worker.sample.toml configs/app-proxy-worker.toml
+```
+
+**Verify config:**
+```bash
+# Check config syntax
+cat configs/manager.toml
+```
+
+---
+
+#### 6. Invalid Configuration
+
+**Symptoms:**
+```
+Error: Configuration validation failed
+Error: Invalid value for 'db.host'
+Error: Missing required field 'etcd.namespace'
+```
+
+**Solutions:**
+
+1. **Check syntax:**
+   - Ensure valid TOML format
+   - Check quotes, brackets, indentation
+   - Verify no trailing commas
+
+2. **Compare with sample:**
+   ```bash
+   diff configs/manager.toml configs/manager.sample.toml
+   ```
+
+3. **Validate required fields:**
+   - Database connection (host, port, user, password, dbname)
+   - Redis connection (host, port)
+   - etcd connection (for Manager)
+
+4. **Check types:**
+   - Strings need quotes: `host = "localhost"`
+   - Numbers don't: `port = 5432`
+   - Booleans: `debug = true`
+
+---
+
+### Database Issues
+
+#### 7. Database Migrations Pending
+
+**Symptoms:**
+```
+Warning: Database migrations pending
+Error: Relation does not exist
+Error: Column not found
+```
+
+**Diagnosis:**
+```bash
+# Check migration status
+/db-status
+```
+
+**Solutions:**
+
+```bash
+# Apply pending migrations
+/db-migrate
+
+# Verify success
+/db-status
+```
+
+**For specific component:**
+```bash
+/db-status --component=appproxy
+/db-migrate --component=appproxy
+```
+
+---
+
+#### 8. Database Connection Failed
+
+**Symptoms:**
+```
+Error: Connection refused to database
+Error: Authentication failed for user
+Error: Database does not exist
+```
+
+**Diagnosis:**
+```bash
+# Check PostgreSQL running
+docker ps | grep postgres
+
+# Test connection manually
+psql -h localhost -U postgres -d backend
+```
+
+**Solutions:**
+
+1. **Verify database is running:**
+   ```bash
+   ./scripts/run-dev.sh
+   ```
+
+2. **Check credentials:**
+   - Host: `localhost`
+   - Port: `5432`
+   - User: `postgres`
+   - Password: `develove`
+   - Database: `backend`
+
+3. **Create database if missing:**
+   ```bash
+   psql -h localhost -U postgres -c "CREATE DATABASE backend;"
+   ```
+
+4. **Run migrations:**
+   ```bash
+   /db-migrate
+   ```
+
+---
+
+#### 9. Multiple Heads Error
+
+**Symptoms:**
+```
+Error: Multiple heads detected
+Error: Only a single head is supported
+```
+
+**Diagnosis:**
+```bash
+# Check migration status
+/db-status
+
+# Show heads
+./py -m alembic heads
+```
+
+**Solutions:**
+
+```bash
+# Resolve diverged heads
+/db-rebase
+
+# Verify single head
+./py -m alembic heads
+```
+
+See `/db-rebase` skill documentation for details.
+
+---
+
+### Permission Issues
+
+#### 10. GPU Access Denied (Agent only)
+
+**Symptoms:**
+```
+Error: Cannot access GPU devices
+Error: Permission denied: /dev/nvidia0
+Error: nvidia-smi not found
+```
+
+**Diagnosis:**
+```bash
+# Check NVIDIA drivers
+nvidia-smi
+
+# Check Docker GPU access
+docker run --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
+
+**Solutions:**
+
+1. **Install NVIDIA drivers:**
+   - Download from NVIDIA website
+   - Or use package manager: `sudo apt install nvidia-driver-XXX`
+
+2. **Install nvidia-docker:**
+   ```bash
+   # Add repository
+   distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+     sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+   # Install
+   sudo apt-get update
+   sudo apt-get install -y nvidia-docker2
+
+   # Restart Docker
+   sudo systemctl restart docker
+   ```
+
+3. **Verify GPU access:**
+   ```bash
+   docker run --gpus all nvidia/cuda:11.0-base nvidia-smi
+   ```
+
+---
+
+#### 11. File Permission Denied
+
+**Symptoms:**
+```
+Error: Permission denied: /var/log/backend.ai/
+Error: Cannot write to file
+```
+
+**Solutions:**
+
+1. **Create directory with permissions:**
+   ```bash
+   sudo mkdir -p /var/log/backend.ai
+   sudo chown $USER:$USER /var/log/backend.ai
+   ```
+
+2. **Or use alternative location:**
+   - Edit config to use user-writable directory
+   - Example: `~/.local/share/backend.ai/logs/`
+
+---
+
+### Dependency Issues
+
+#### 12. Manager Not Accessible (Agent, Storage, Web)
+
+**Symptoms:**
+```
+Error: Cannot connect to Manager
+Error: Connection refused to localhost:8081
+```
+
+**Diagnosis:**
+```bash
+# Check Manager health
+/cli-executor --component=mgr --subcommand=health
+
+# Or manually
+curl http://localhost:8081/health
+```
+
+**Solutions:**
+
+1. **Start Manager:**
+   ```bash
+   /cli-executor --component=mgr --subcommand=start-server
+   ```
+
+2. **Check Manager logs:**
+   - Look for startup errors
+   - Verify Manager bound to correct port
+
+3. **Verify endpoint in component config:**
+   ```toml
+   [manager]
+   endpoint = "http://localhost:8081"
+   ```
+
+---
+
+#### 13. Coordinator Not Accessible (App Proxy Worker)
+
+**Symptoms:**
+```
+Error: Cannot connect to Coordinator
+Error: Connection refused to localhost:6010
+```
+
+**Solutions:**
+
+1. **Check Coordinator status:**
+   ```bash
+   /cli-executor --component=app-proxy-coordinator --subcommand=health
+   ```
+
+2. **Start Coordinator:**
+   ```bash
+   /cli-executor --component=app-proxy-coordinator --subcommand=start-server
+   ```
+
+3. **Verify endpoint in Worker config:**
+   ```toml
+   [coordinator]
+   endpoint = "http://localhost:6010"
+   ```
+
+---
+
+### Port Conflicts
+
+#### 14. Port Already in Use
+
+**Symptoms:**
+```
+Error: Address already in use
+Error: Bind failed: port 8081 already in use
+```
+
+**Diagnosis:**
+```bash
+# Check what's using the port (example: 8081)
+sudo lsof -i :8081
+# Or
+sudo netstat -tulpn | grep 8081
+```
+
+**Solutions:**
+
+1. **Stop conflicting process:**
+   ```bash
+   # Find process ID
+   sudo lsof -i :8081
+
+   # Kill process
+   kill <PID>
+   ```
+
+2. **Change port in config:**
+   ```toml
+   [service]
+   port = 8082  # Use different port
+   ```
+
+3. **Common Backend.AI ports:**
+   - Manager: 8081
+   - Agent: varies (not exposed)
+   - Storage: 6021
+   - Web: 8080
+   - App Proxy Coordinator: 6010
+   - App Proxy Worker: varies (not exposed)
+
+---
+
+### Startup Issues
+
+#### 15. Component Won't Start
+
+**General troubleshooting steps:**
+
+1. **Check pre-flight requirements:**
+   ```bash
+   /cli-executor --component=<component>
+   ```
+
+2. **Review logs:**
+   - Check terminal output for errors
+   - Look for specific error messages
+
+3. **Verify infrastructure:**
+   ```bash
+   docker ps  # Check containers
+   /db-status  # Check database
+   ```
+
+4. **Check configuration:**
+   - Verify config file exists
+   - Check for syntax errors
+   - Validate required fields
+
+5. **Try manual commands:**
+   ```bash
+   ./backend.ai <component> health
+   ./backend.ai <component> start-server
+   ```
+
+6. **Check dependencies:**
+   - Manager must be running for Agent, Storage, Web
+   - Coordinator must be running for Worker
+
+---
+
+### Debugging Tips
+
+#### Enable Debug Logging
+
+**In configuration:**
+```toml
+[logging]
+level = "DEBUG"
+```
+
+**Or environment variable:**
+```bash
+export BACKEND_LOG_LEVEL=DEBUG
+./backend.ai mgr start-server
+```
+
+#### Check Logs
+
+**Component logs:**
+- Check terminal output when starting
+- Look for ERROR or WARNING messages
+
+**Container logs:**
+```bash
+docker logs backend-ai-halfstack-db
+docker logs backend-ai-halfstack-redis
+docker logs backend-ai-halfstack-etcd
+```
+
+#### Test Connections
+
+**PostgreSQL:**
+```bash
+psql -h localhost -U postgres -d backend
+```
+
+**Redis:**
+```bash
+redis-cli ping
+```
+
+**etcd:**
+```bash
+curl http://localhost:2379/health
+```
+
+**Manager API:**
+```bash
+curl http://localhost:8081/health
+```
+
+---
+
+## Quick Diagnostics Checklist
+
+When component won't start, check:
+
+- [ ] Docker daemon running: `docker ps`
+- [ ] PostgreSQL running (if needed): `docker ps | grep postgres`
+- [ ] Redis running: `docker ps | grep redis`
+- [ ] etcd running (Manager only): `docker ps | grep etcd`
+- [ ] Configuration file exists: `ls configs/<component>.toml`
+- [ ] Database migrations up-to-date: `/db-status`
+- [ ] No port conflicts: `sudo lsof -i :<port>`
+- [ ] Dependencies running (Manager for Agent/Storage/Web)
+- [ ] Correct permissions (GPU for Agent, log directories)
+- [ ] No firewall blocking connections
+
+---
+
+## Getting Help
+
+If issues persist:
+
+1. **Check documentation:**
+   - Component README: `src/ai/backend/<component>/README.md`
+   - Configuration guide: `docs/config/`
+   - Development guide: `docs/dev/`
+
+2. **Search issues:**
+   - GitHub Issues: https://github.com/lablup/backend.ai/issues
+
+3. **Ask for help:**
+   - Slack: Backend.AI Slack workspace
+   - Email: devops@lablup.com
+
+**When asking for help, provide:**
+- Component name and command used
+- Full error message
+- Configuration (sanitize secrets)
+- Infrastructure status (`docker ps`, `/db-status`)
+- Logs (relevant portions)
+- Environment (OS, Docker version, etc.)
