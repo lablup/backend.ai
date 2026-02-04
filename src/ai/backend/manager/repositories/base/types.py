@@ -42,10 +42,10 @@ class ExistenceCheck[T]:
 
 
 class TargetScope(ABC):
-    """Abstract base class for action scope used in permission validation.
+    """Defines the target scope of a permission check.
 
-    Defines the target scope, prerequisite scopes, and existence checks
-    required to validate a user's permission for a given action.
+    Subclasses specify the primary scope (target), any additional scopes
+    that must also pass (prerequisite_scopes), and entity existence checks.
     """
 
     @property
@@ -60,7 +60,7 @@ class TargetScope(ABC):
     @property
     @abstractmethod
     def target(self) -> ScopeId:
-        """The primary scope whose parent chain is resolved for permission checks."""
+        """The primary scope for permission checks."""
         raise NotImplementedError
 
     @property
