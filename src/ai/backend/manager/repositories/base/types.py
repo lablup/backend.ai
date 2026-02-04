@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
+from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
-from ai.backend.manager.data.permission.id import ScopeId, ObjectId
-from ai.backend.manager.data.permission.types import OperationType, EntityType
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, OperationType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -43,10 +42,10 @@ class ExistenceCheck[T]:
 
 
 class ActionScope(ABC):
-    """Abstract base class for search scope.
+    """Abstract base class for action scope used in permission validation.
 
-    Scope defines required parameters for entity-based search queries.
-    Defines existence checks for validation.
+    Defines the target scope, prerequisite scopes, and existence checks
+    required to validate a user's permission for a given action.
     """
 
     @property
@@ -61,15 +60,13 @@ class ActionScope(ABC):
     @property
     @abstractmethod
     def target(self) -> ScopeId:
-        """
-        Return the target ScopeId for the scope."""
+        """The primary scope whose parent chain is resolved for permission checks."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def prerequisite_scopes(self) -> set[ScopeId]:
-        """
-        Return additional target ScopeIds for the scope."""
+        """Scopes that must each independently satisfy the permission check (AND logic)."""
         raise NotImplementedError
 
 

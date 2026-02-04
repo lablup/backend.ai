@@ -29,9 +29,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    OperationType,
     ScopeData,
-    EntityType,
     ScopeListResult,
     ScopeType,
 )

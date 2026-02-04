@@ -30,7 +30,6 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     ScopeData,
     ScopeListResult,
@@ -1052,38 +1051,16 @@ class PermissionDBSource:
         db_sess: SASession,
         args: ScopeValidationArgs,
     ) -> None:
-        """Check user permission with scope chain resolution.
+        """Check scoped permission using recursive scope chain resolution.
 
-        Uses a RECURSIVE CTE to resolve the target scope's parent chain
-        from ``association_scopes_entities``.  The user must have the required
-        permission in **any** scope within the resolved chain (OR logic).
-
-        For each prerequisite scope an exact scope match is required – the user
-        must independently hold the permission in **every** prerequisite scope
-        (AND logic).
-
-        Global scope is excluded from chain resolution.
-
-        Args:
-            db_sess: Database session.
-            args: The scope validation arguments.
-
-        Raises:
-            NotEnoughPermission: If the user does not have sufficient permissions.
+        Resolves the target scope's parent chain via ``association_scopes_entities``
+        (OR — any scope in the chain) and validates each prerequisite scope by
+        exact match (AND).  Global scope is excluded from chain resolution.
         """
         target = args.action_scope.target
         prerequisite_scopes = args.action_scope.prerequisite_scopes
 
-        # ------------------------------------------------------------------
-        # 1. Build RECURSIVE CTE to resolve the target scope's parent chain.
-        #
-        # Starting from the target scope, we walk up via
-        # ``association_scopes_entities`` where an entity (child scope) is
-        # contained in a parent scope.  ``entity_type`` (EntityType) and
-        # ``scope_type`` (ScopeType) share the same string values for
-        # domain / project / user, so a text-level cast enables the join.
-        # Global scope is excluded from the chain.
-        # ------------------------------------------------------------------
+        # Recursive CTE: walk from target scope up to parent scopes.
         ase_table = AssociationScopesEntitiesRow.__table__
 
         base_query = sa.select(
@@ -1104,10 +1081,7 @@ class PermissionDBSource:
         )
         scope_chain = scope_chain.union_all(recursive_query)
 
-        # ------------------------------------------------------------------
-        # 2. Build the common permission join path.
-        #    user_roles → roles → permission_groups → permissions
-        # ------------------------------------------------------------------
+        # Common join: user_roles → roles → permission_groups → permissions
         permission_join = (
             sa.join(UserRoleRow, RoleRow, UserRoleRow.role_id == RoleRow.id)
             .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
@@ -1121,9 +1095,7 @@ class PermissionDBSource:
             PermissionRow.operation == args.operation,
         )
 
-        # ------------------------------------------------------------------
-        # 3. Target scope chain check (OR): permission in ANY scope in chain.
-        # ------------------------------------------------------------------
+        # Target scope chain check (OR)
         target_check = (
             sa.select(sa.literal(1))
             .select_from(permission_join)
@@ -1133,18 +1105,14 @@ class PermissionDBSource:
                     sa.tuple_(
                         sa.cast(PermissionGroupRow.scope_type, sa.Text),
                         sa.cast(PermissionGroupRow.scope_id, sa.Text),
-                    ).in_(
-                        sa.select(scope_chain.c.scope_type, scope_chain.c.scope_id)
-                    ),
+                    ).in_(sa.select(scope_chain.c.scope_type, scope_chain.c.scope_id)),
                 )
             )
             .exists()
             .label("target_check")
         )
 
-        # ------------------------------------------------------------------
-        # 4. Prerequisite scope checks (AND): exact match per scope.
-        # ------------------------------------------------------------------
+        # Prerequisite scope checks (AND)
         prereq_labels: list[sa.Label[bool]] = []
         prereq_scopes_list = sorted(prerequisite_scopes, key=lambda s: s.to_str())
         for i, prereq in enumerate(prereq_scopes_list):
@@ -1163,9 +1131,7 @@ class PermissionDBSource:
             )
             prereq_labels.append(prereq_check)
 
-        # ------------------------------------------------------------------
-        # 5. Execute all checks in a single query.
-        # ------------------------------------------------------------------
+        # Single query execution
         result = await db_sess.execute(sa.select(target_check, *prereq_labels))
         row = result.mappings().one()
 
@@ -1189,36 +1155,21 @@ class PermissionDBSource:
         db_sess: SASession,
         args: EntityValidationArgs,
     ) -> None:
-        """Check user permission on a specific entity with scope chain resolution.
+        """Check permission on a specific entity using scope chain and object permission.
 
-        Combines scope chain resolution (from the target scope) with
-        instance-level Object Permission checks.  The user is granted access
-        if **either** of the following is true:
-
-        1. **Scoped access** – the user holds the required type-level
-           permission (``entity_type + operation``) in *any* scope within the
-           target's resolved chain **and** in *every* prerequisite scope.
-        2. **Object access** – the user holds a direct Object Permission on
-           the specific entity instance (``entity_type + entity_id``).
-           Prerequisite scopes are **not** required for this path because
-           Object Permission represents an explicit instance-level grant.
+        Access is granted if either:
+        - **Scoped**: type-level permission in the target's scope chain (OR) with
+          all prerequisite scopes satisfied (AND), or
+        - **Object**: direct Object Permission on the entity instance
+          (prerequisite scopes not required).
 
         Global scope is excluded from chain resolution.
-
-        Args:
-            db_sess: Database session.
-            args: The entity validation arguments.
-
-        Raises:
-            NotEnoughPermission: If the user does not have sufficient permissions.
         """
         target = args.action_scope.target
         prerequisite_scopes = args.action_scope.prerequisite_scopes
         entity_type = args.entity_id.entity_type
 
-        # ------------------------------------------------------------------
-        # 1. Build RECURSIVE CTE for the target scope's parent chain.
-        # ------------------------------------------------------------------
+        # Recursive CTE: walk from target scope up to parent scopes.
         ase_table = AssociationScopesEntitiesRow.__table__
 
         base_query = sa.select(
@@ -1239,10 +1190,7 @@ class PermissionDBSource:
         )
         scope_chain = scope_chain.union_all(recursive_query)
 
-        # ------------------------------------------------------------------
-        # 2. Common permission join path.
-        #    user_roles → roles → permission_groups → permissions
-        # ------------------------------------------------------------------
+        # Common join: user_roles → roles → permission_groups → permissions
         permission_join = (
             sa.join(UserRoleRow, RoleRow, UserRoleRow.role_id == RoleRow.id)
             .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
@@ -1256,9 +1204,7 @@ class PermissionDBSource:
             PermissionRow.operation == args.operation,
         )
 
-        # ------------------------------------------------------------------
-        # 3. Scoped permission check: type-level permission in scope chain.
-        # ------------------------------------------------------------------
+        # Scoped permission check (target scope chain, OR)
         scoped_check = (
             sa.select(sa.literal(1))
             .select_from(permission_join)
@@ -1268,24 +1214,20 @@ class PermissionDBSource:
                     sa.tuple_(
                         sa.cast(PermissionGroupRow.scope_type, sa.Text),
                         sa.cast(PermissionGroupRow.scope_id, sa.Text),
-                    ).in_(
-                        sa.select(scope_chain.c.scope_type, scope_chain.c.scope_id)
-                    ),
+                    ).in_(sa.select(scope_chain.c.scope_type, scope_chain.c.scope_id)),
                 )
             )
             .exists()
             .label("scoped_check")
         )
 
-        # ------------------------------------------------------------------
-        # 4. Object permission check: direct grant on the entity instance.
-        #    user_roles → roles → object_permissions
-        # ------------------------------------------------------------------
+        # Object permission check (direct grant on entity instance)
         object_check = (
             sa.select(sa.literal(1))
             .select_from(
-                sa.join(UserRoleRow, RoleRow, UserRoleRow.role_id == RoleRow.id)
-                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
+                sa.join(UserRoleRow, RoleRow, UserRoleRow.role_id == RoleRow.id).join(
+                    ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id
+                )
             )
             .where(
                 sa.and_(
@@ -1300,9 +1242,7 @@ class PermissionDBSource:
             .label("object_check")
         )
 
-        # ------------------------------------------------------------------
-        # 5. Prerequisite scope checks (AND): exact match per scope.
-        # ------------------------------------------------------------------
+        # Prerequisite scope checks (AND)
         prereq_labels: list[sa.Label[bool]] = []
         prereq_scopes_list = sorted(prerequisite_scopes, key=lambda s: s.to_str())
         for i, prereq in enumerate(prereq_scopes_list):
@@ -1321,12 +1261,8 @@ class PermissionDBSource:
             )
             prereq_labels.append(prereq_check)
 
-        # ------------------------------------------------------------------
-        # 6. Execute all checks in a single query.
-        # ------------------------------------------------------------------
-        result = await db_sess.execute(
-            sa.select(scoped_check, object_check, *prereq_labels)
-        )
+        # Single query execution
+        result = await db_sess.execute(sa.select(scoped_check, object_check, *prereq_labels))
         row = result.mappings().one()
 
         has_object_access = bool(row["object_check"])
