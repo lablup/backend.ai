@@ -296,6 +296,10 @@ class PermissionControllerRepository:
                 return await self._db_source.search_project_scopes(querier)
             case ScopeType.USER:
                 return await self._db_source.search_user_scopes(querier)
+            case _:
+                raise NotImplementedError(
+                    "This function will be deprecated and new repository functions will be implemented for each scope"
+                )
 
     @permission_controller_repository_resilience.apply()
     async def search_entities(

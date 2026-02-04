@@ -47,6 +47,10 @@ class ScopeAdapter(BaseFilterAdapter):
                 return self._build_project_scope_querier(request)
             case ScopeType.USER:
                 return self._build_user_scope_querier(request)
+            case _:
+                raise NotImplementedError(
+                    "This adapter will be deprecated and search handlers will be implemented for each scope type"
+                )
 
     def _build_domain_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier for domain scopes from search request."""
