@@ -6,20 +6,28 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.scheduling_history.types import (
+    DeploymentHistorySearchScope,
+)
 
 from .base import SchedulingHistoryAction
 
 
 @dataclass
-class SearchDeploymentHistoryAction(SchedulingHistoryAction):
-    """Action to search deployment history (admin API)."""
+class SearchDeploymentScopedHistoryAction(SchedulingHistoryAction):
+    """Action to search deployment history within a deployment scope.
 
+    This is the scoped version used by entity-scoped APIs.
+    Scope is required and specifies which deployment to query history for.
+    """
+
+    scope: DeploymentHistorySearchScope
     querier: BatchQuerier
 
     @override
     @classmethod
     def entity_type(cls) -> str:
-        return "deployment:history"
+        return "deployment:scoped-history"
 
     @override
     @classmethod
@@ -28,12 +36,12 @@ class SearchDeploymentHistoryAction(SchedulingHistoryAction):
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return str(self.scope.deployment_id)
 
 
 @dataclass
-class SearchDeploymentHistoryActionResult(BaseActionResult):
-    """Result of searching deployment history."""
+class SearchDeploymentScopedHistoryActionResult(BaseActionResult):
+    """Result of searching deployment history within scope."""
 
     histories: list[DeploymentHistoryData]
     total_count: int
