@@ -12,7 +12,6 @@ Node references are placed directly on `KernelV2GQL`:
 
 | Node Field | Type |
 |------------|------|
-| `image_node` | `ImageNode \| None` |
 | `session_node` | `SessionNode \| None` |
 | `user_node` | `UserNode \| None` |
 | `keypair_node` | `KeypairNode \| None` |
@@ -29,17 +28,6 @@ ID fields are included in sub-info types:
 | `KernelSessionInfoGQL` | `session_id: uuid.UUID` |
 | `KernelUserInfoGQL` | `user_id`, `access_key`, `domain_name`, `group_id` |
 | `KernelResourceInfoGQL` | `agent_id`, `resource_group_name` |
-
-> **Note**: `image_id` is inlined directly on `KernelV2GQL` (single-element type removed)
-
----
-
-## Image Types (Defer to ImageNode)
-
-**Action**: `image_id` field is inlined directly on `KernelV2GQL`. Defer `image_node: ImageNode` connection.
-
-**Future additions** (on `KernelV2GQL`):
-- `image_node: ImageNode | None`
 
 ---
 
@@ -120,7 +108,6 @@ class KernelSessionInfoGQL:
 
 | PR | Node Field on `KernelV2GQL` |
 |----|-------------------------|
-| ImageNode PR | `image_node: ImageNode` |
 | SessionNode PR | `session_node: SessionNode` |
 | UserNode PR | `user_node: UserNode` |
 | KeypairNode PR | `keypair_node: KeypairNode` |
