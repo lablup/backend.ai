@@ -37,12 +37,15 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
+from ai.backend.manager.repositories.domain.db_source import DomainDBSource
 from ai.backend.manager.repositories.domain.purgers import (
     DomainBatchPurgerSpec,
     DomainKernelBatchPurgerSpec,
 )
+from ai.backend.manager.repositories.domain.types import DomainSearchResult
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 domain_repository_resilience = Resilience(
@@ -63,10 +66,12 @@ domain_repository_resilience = Resilience(
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
     _role_manager: RoleManager
+    _db_source: DomainDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._role_manager = RoleManager()
+        self._db_source = DomainDBSource(db)
 
     @domain_repository_resilience.apply()
     async def create_domain(self, creator: Creator[DomainRow]) -> DomainData:
@@ -372,3 +377,32 @@ class DomainRepository:
             raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
             )
+
+    # ==================== V2 Repository Methods ====================
+
+    @domain_repository_resilience.apply()
+    async def get_domain(self, domain_name: str) -> DomainData:
+        """Get a single domain by name.
+
+        Args:
+            domain_name: The name of the domain to retrieve.
+
+        Returns:
+            DomainData for the domain.
+
+        Raises:
+            DomainNotFound: If the domain does not exist.
+        """
+        return await self._db_source.get_domain(domain_name)
+
+    @domain_repository_resilience.apply()
+    async def search_domains(self, querier: BatchQuerier) -> DomainSearchResult:
+        """Search all domains with pagination and filters.
+
+        Args:
+            querier: Contains conditions, orders, and pagination.
+
+        Returns:
+            DomainSearchResult with items, total_count, and pagination flags.
+        """
+        return await self._db_source.search_domains(querier)
