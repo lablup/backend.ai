@@ -14,7 +14,7 @@ import uuid
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, InsufficientPrivilege
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.repositories.project_config.repository import ProjectConfigRepository
@@ -66,16 +66,12 @@ class ProjectConfigService:
         if user is None:
             raise InsufficientPrivilege("Authentication required")
 
-        project = await self._project_config_repository.resolve_project(
-            domain_name, project_id_or_name
+        project = await self._project_config_repository.resolve_project_for_admin(
+            user.domain_name,
+            user.is_superadmin,
+            domain_name,
+            project_id_or_name,
         )
-
-        if not user.is_superadmin:
-            if user.domain_name != project.domain_name:
-                raise InsufficientPrivilege(
-                    "Admins cannot modify project dotfiles of other domains"
-                )
-
         return project.id
 
     async def _resolve_project_for_user(
@@ -92,29 +88,14 @@ class ProjectConfigService:
         if user is None:
             raise InsufficientPrivilege("Authentication required")
 
-        project = await self._project_config_repository.resolve_project(
-            domain_name, project_id_or_name
+        project = await self._project_config_repository.resolve_project_for_user(
+            user.user_id,
+            user.domain_name,
+            user.is_admin,
+            user.is_superadmin,
+            domain_name,
+            project_id_or_name,
         )
-
-        if user.is_superadmin:
-            return project.id
-
-        if user.is_admin:
-            if user.domain_name != project.domain_name:
-                raise InsufficientPrivilege(
-                    "Domain admins cannot access project dotfiles of other domains"
-                )
-            return project.id
-
-        # Regular user: check if they are a member of the project
-        is_member = await self._project_config_repository.check_user_in_project(
-            user.user_id, project.id
-        )
-        if not is_member:
-            raise GroupMembershipNotFoundError(
-                "User cannot access project dotfiles of non-member projects"
-            )
-
         return project.id
 
     async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
