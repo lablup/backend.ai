@@ -8542,12 +8542,12 @@ type Query
   """
   rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @join__field(graph: STRAWBERRY)
 
-  """
+"""
   Added in 26.2.0.
-  
+
   Query images within a specific container registry with optional filtering,
   ordering, and pagination.
-  
+
   Returns container images that belong to the specified registry.
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
@@ -8562,6 +8562,12 @@ type Query
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query a single kernel by ID."""
+  adminKernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query kernels with pagination and filtering."""
+  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -8626,12 +8632,6 @@ type Query
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.2.0. Query a single kernel by ID."""
-  kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
-
-  """Added in 26.2.0. Query kernels with pagination and filtering."""
-  kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route @join__field(graph: STRAWBERRY)

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .kernel import kernel_v2, kernels_v2
+from .kernel import admin_kernel_v2, admin_kernels_v2
 
 __all__ = [
-    "kernel_v2",
-    "kernels_v2",
+    "admin_kernel_v2",
+    "admin_kernels_v2",
 ]

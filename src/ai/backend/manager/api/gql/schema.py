@@ -121,7 +121,7 @@ from .image import (
     container_registry_images_v2,
     image_v2,
 )
-from .kernel.resolver import kernel_v2, kernels_v2
+from .kernel.resolver import admin_kernel_v2, admin_kernels_v2
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -289,12 +289,14 @@ class Query:
     rg_domain_usage_buckets = rg_domain_usage_buckets
     rg_project_usage_buckets = rg_project_usage_buckets
     rg_user_usage_buckets = rg_user_usage_buckets
-    # Container Registry Scoped APIs
+# Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    admin_kernel_v2 = admin_kernel_v2
+    admin_kernels_v2 = admin_kernels_v2
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config
@@ -314,8 +316,6 @@ class Query:
     default_artifact_registry = default_artifact_registry
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
-    kernel_v2 = kernel_v2
-    kernels_v2 = kernels_v2
     route = route
     routes = routes
     session_scheduling_histories = session_scheduling_histories

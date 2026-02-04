@@ -17,7 +17,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
-async def kernel_v2(
+async def admin_kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> KernelV2GQL | None:
@@ -25,7 +25,7 @@ async def kernel_v2(
 
 
 @strawberry.field(description="Added in 26.2.0. Query kernels with pagination and filtering.")  # type: ignore[misc]
-async def kernels_v2(
+async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
     filter: KernelFilterGQL | None = None,
     order_by: list[KernelOrderByGQL] | None = None,
