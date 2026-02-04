@@ -19,7 +19,7 @@ class CreateContainerRegistryAction(ContainerRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create_container_registry"
+        return "create"
 
 
 @dataclass
