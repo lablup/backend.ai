@@ -2633,6 +2633,8 @@ enum KernelOrderField {
   CREATED_AT
   TERMINATED_AT
   STATUS
+  CLUSTER_MODE
+  CLUSTER_HOSTNAME
 }
 
 """Added in 26.2.0. Resource allocation information for a kernel."""

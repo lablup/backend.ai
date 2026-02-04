@@ -140,6 +140,8 @@ class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     TERMINATED_AT = "terminated_at"
     STATUS = "status"
+    CLUSTER_MODE = "cluster_mode"
+    CLUSTER_HOSTNAME = "cluster_hostname"
 
 
 @strawberry.input(
@@ -227,6 +229,10 @@ class KernelOrderByGQL(GQLOrderBy):
                 return KernelOrders.terminated_at(ascending)
             case KernelOrderFieldGQL.STATUS:
                 return KernelOrders.status(ascending)
+            case KernelOrderFieldGQL.CLUSTER_MODE:
+                return KernelOrders.cluster_mode(ascending)
+            case KernelOrderFieldGQL.CLUSTER_HOSTNAME:
+                return KernelOrders.cluster_hostname(ascending)
             case _:
                 raise ValueError(f"Unhandled KernelOrderFieldGQL value: {self.field!r}")
 

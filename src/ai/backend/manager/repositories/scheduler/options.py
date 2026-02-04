@@ -391,6 +391,18 @@ class KernelOrders:
             return KernelRow.status.asc()
         return KernelRow.status.desc()
 
+    @staticmethod
+    def cluster_mode(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_mode.asc()
+        return KernelRow.cluster_mode.desc()
+
+    @staticmethod
+    def cluster_hostname(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_hostname.asc()
+        return KernelRow.cluster_hostname.desc()
+
 
 class UserConditions:
     """Query conditions for users."""

@@ -4956,6 +4956,8 @@ enum KernelOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   TERMINATED_AT @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_HOSTNAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.2.0. Resource allocation information for a kernel."""
