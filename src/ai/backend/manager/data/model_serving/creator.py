@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from pydantic import AnyUrl
 
@@ -18,13 +17,11 @@ from ai.backend.common.types import (
     ClusterMode,
     RuntimeVariant,
 )
+from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 from ai.backend.manager.data.model_serving.types import (
     ModelServicePrepareCtx,
     ServiceConfig,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 
 
 @dataclass

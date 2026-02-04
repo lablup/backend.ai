@@ -3,17 +3,15 @@ from __future__ import annotations
 import dataclasses
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from pydantic import AnyUrl
 
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 
 
 @dataclass
