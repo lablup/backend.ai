@@ -1094,12 +1094,19 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .clients.agent import AgentPool
+    from .clients.agent import AgentClientPool, AgentPoolSpec
     from .sokovan.scheduler.factory import create_default_scheduler
     from .sokovan.sokovan import SokovanOrchestrator
 
     # Create agent pool for scheduler
-    agent_pool = AgentPool(root_ctx.agent_cache)
+    agent_pool = AgentClientPool(
+        root_ctx.agent_cache,
+        AgentPoolSpec(
+            health_check_interval=30.0,
+            failure_threshold=3,
+            recovery_timeout=60.0,
+        ),
+    )
 
     # Create scheduler with default components
     scheduler = create_default_scheduler(
