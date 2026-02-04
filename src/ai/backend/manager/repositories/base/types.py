@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
+from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, OperationType
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -38,18 +41,12 @@ class ExistenceCheck[T]:
     """The error to raise if the entity doesn't exist."""
 
 
-class SearchScope(ABC):
-    """Abstract base class for search scope.
+class TargetScope(ABC):
+    """Abstract base class for action scope used in permission validation.
 
-    Scope defines required parameters for entity-based search queries.
-    It converts to a QueryCondition that can be added to BatchQuerier conditions.
-    Optionally defines existence checks for validation.
+    Defines the target scope, prerequisite scopes, and existence checks
+    required to validate a user's permission for a given action.
     """
-
-    @abstractmethod
-    def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition."""
-        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -60,6 +57,31 @@ class SearchScope(ABC):
         """
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def target(self) -> ScopeId:
+        """The primary scope whose parent chain is resolved for permission checks."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def prerequisite_scopes(self) -> Collection[ScopeId]:
+        """Scopes that must each independently satisfy the permission check (AND logic)."""
+        raise NotImplementedError
+
+
+class SearchScope(TargetScope):
+    """Abstract base class for search scope.
+
+    Scope defines required parameters for entity-based search queries.
+    It converts to a QueryCondition that can be added to BatchQuerier conditions.
+    """
+
+    @abstractmethod
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition."""
+        raise NotImplementedError
+
 
 type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.ColumnElement[Any]
 
@@ -67,3 +89,19 @@ type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.Col
 type CursorConditionFactory = Callable[[str], QueryCondition]
 
 TRow = TypeVar("TRow", bound="Row[Any]")
+
+
+@dataclass
+class ScopeValidationArgs:
+    user_id: UUID
+    action_scope: TargetScope
+    operation: OperationType
+    entity_type: EntityType
+
+
+@dataclass
+class EntityValidationArgs:
+    user_id: UUID
+    action_scope: TargetScope
+    operation: OperationType
+    entity_id: ObjectId

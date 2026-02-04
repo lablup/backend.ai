@@ -8,7 +8,9 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
@@ -51,6 +53,14 @@ class DomainProjectSearchScope(SearchScope):
         return inner
 
     @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.DOMAIN, self.domain_name)
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return set()
+
+    @property
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -84,6 +94,14 @@ class UserProjectSearchScope(SearchScope):
             return AssocGroupUserRow.user_id == user_uuid
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.USER, str(self.user_uuid))
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return set()
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:

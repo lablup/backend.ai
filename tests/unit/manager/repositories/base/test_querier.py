@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -18,6 +19,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -403,6 +405,14 @@ class MockSearchScope(SearchScope):
             return sa.literal(True)
 
         return inner
+
+    @property
+    def target(self) -> ScopeId:
+        return ScopeId(ScopeType.DOMAIN, "test-domain")
+
+    @property
+    def prerequisite_scopes(self) -> set[ScopeId]:
+        return set()
 
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
