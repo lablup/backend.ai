@@ -2540,6 +2540,15 @@ type CreateVFSStoragePayload
 scalar Date
   @join__type(graph: STRAWBERRY)
 
+input DateFilter
+  @join__type(graph: STRAWBERRY)
+{
+  before: Date = null
+  after: Date = null
+  equals: Date = null
+  notEquals: Date = null
+}
+
 """
 The `DateTime` scalar type represents a DateTime
 value as specified by
@@ -3498,6 +3507,12 @@ input DomainUsageBucketFilter
   Filter by domain name. This filters usage buckets for a specific domain. Supports equals, contains, startsWith, and endsWith operations.
   """
   domainName: StringFilter = null
+
+  """Filter by usage measurement period start date."""
+  periodStart: DateFilter = null
+
+  """Filter by usage measurement period end date."""
+  periodEnd: DateFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainUsageBucketFilter!] = null
@@ -7106,6 +7121,12 @@ input ProjectUsageBucketFilter
   """
   domainName: StringFilter = null
 
+  """Filter by usage measurement period start date."""
+  periodStart: DateFilter = null
+
+  """Filter by usage measurement period end date."""
+  periodEnd: DateFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectUsageBucketFilter!] = null
 
@@ -10534,6 +10555,12 @@ input UserUsageBucketFilter
   Filter by domain name. This filters usage buckets for users within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
   """
   domainName: StringFilter = null
+
+  """Filter by usage measurement period start date."""
+  periodStart: DateFilter = null
+
+  """Filter by usage measurement period end date."""
+  periodEnd: DateFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserUsageBucketFilter!] = null

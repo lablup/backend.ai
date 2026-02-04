@@ -10,6 +10,12 @@ from .actions import (
     SearchDomainUsageBucketsActionResult,
     SearchProjectUsageBucketsAction,
     SearchProjectUsageBucketsActionResult,
+    SearchScopedDomainUsageBucketsAction,
+    SearchScopedDomainUsageBucketsActionResult,
+    SearchScopedProjectUsageBucketsAction,
+    SearchScopedProjectUsageBucketsActionResult,
+    SearchScopedUserUsageBucketsAction,
+    SearchScopedUserUsageBucketsActionResult,
     SearchUserUsageBucketsAction,
     SearchUserUsageBucketsActionResult,
 )
@@ -76,6 +82,50 @@ class ResourceUsageService:
         )
         result = await self._repository.search_user_usage_buckets(querier)
         return SearchUserUsageBucketsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+        )
+
+    # Scoped Usage Bucket Searches
+
+    async def search_scoped_domain_usage_buckets(
+        self,
+        action: SearchScopedDomainUsageBucketsAction,
+    ) -> SearchScopedDomainUsageBucketsActionResult:
+        """Search domain usage buckets within scope."""
+        result = await self._repository.search_domain_usage_buckets(
+            action.querier,
+            action.scope,
+        )
+        return SearchScopedDomainUsageBucketsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+        )
+
+    async def search_scoped_project_usage_buckets(
+        self,
+        action: SearchScopedProjectUsageBucketsAction,
+    ) -> SearchScopedProjectUsageBucketsActionResult:
+        """Search project usage buckets within scope."""
+        result = await self._repository.search_project_usage_buckets(
+            action.querier,
+            action.scope,
+        )
+        return SearchScopedProjectUsageBucketsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+        )
+
+    async def search_scoped_user_usage_buckets(
+        self,
+        action: SearchScopedUserUsageBucketsAction,
+    ) -> SearchScopedUserUsageBucketsActionResult:
+        """Search user usage buckets within scope."""
+        result = await self._repository.search_user_usage_buckets(
+            action.querier,
+            action.scope,
+        )
+        return SearchScopedUserUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
         )

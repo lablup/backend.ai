@@ -88,3 +88,33 @@ class ResourceGroupUserScope:
     resource_group: str = strawberry.field(description="Resource group name to scope the operation")
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
     project_id: str = strawberry.field(description="Project ID to scope the operation")
+
+
+# Scope input types for Usage Bucket scoped APIs
+
+
+@strawberry.input(description="Domain scope for usage bucket queries")
+class DomainUsageBucketScope:
+    """Scope for domain-level usage bucket APIs."""
+
+    resource_group: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name to retrieve usage buckets for")
+
+
+@strawberry.input(description="Project scope for usage bucket queries")
+class ProjectUsageBucketScope:
+    """Scope for project-level usage bucket APIs."""
+
+    resource_group: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name")
+    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
+
+
+@strawberry.input(description="User scope for usage bucket queries")
+class UserUsageBucketScope:
+    """Scope for user-level usage bucket APIs."""
+
+    resource_group: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name")
+    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
+    user_uuid: str = strawberry.field(description="User UUID (will be converted to UUID)")

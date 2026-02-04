@@ -3,19 +3,27 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import TYPE_CHECKING
+from typing import Any
+
+import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_usage_history import (
-        DomainUsageBucketRow,
-        KernelUsageRecordRow,
-        ProjectUsageBucketRow,
-        UserUsageBucketRow,
-    )
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.resource_usage_history import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 
 @dataclass(frozen=True)
@@ -190,3 +198,135 @@ class UserUsageBucketSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+# SearchScope classes for scoped usage bucket APIs
+
+
+@dataclass(frozen=True)
+class DomainUsageBucketSearchScope(SearchScope):
+    """Scope for domain usage bucket queries."""
+
+    resource_group: str
+    domain_name: str
+
+    def to_condition(self) -> QueryCondition:
+        resource_group = self.resource_group
+        domain_name = self.domain_name
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                DomainUsageBucketRow.resource_group == resource_group,
+                DomainUsageBucketRow.domain_name == domain_name,
+            )
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class ProjectUsageBucketSearchScope(SearchScope):
+    """Scope for project usage bucket queries."""
+
+    resource_group: str
+    domain_name: str
+    project_id: uuid.UUID
+
+    def to_condition(self) -> QueryCondition:
+        resource_group = self.resource_group
+        domain_name = self.domain_name
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                ProjectUsageBucketRow.resource_group == resource_group,
+                ProjectUsageBucketRow.domain_name == domain_name,
+                ProjectUsageBucketRow.project_id == project_id,
+            )
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+            ExistenceCheck(
+                column=GroupRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserUsageBucketSearchScope(SearchScope):
+    """Scope for user usage bucket queries."""
+
+    resource_group: str
+    domain_name: str
+    project_id: uuid.UUID
+    user_uuid: uuid.UUID
+
+    def to_condition(self) -> QueryCondition:
+        resource_group = self.resource_group
+        domain_name = self.domain_name
+        project_id = self.project_id
+        user_uuid = self.user_uuid
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                UserUsageBucketRow.resource_group == resource_group,
+                UserUsageBucketRow.domain_name == domain_name,
+                UserUsageBucketRow.project_id == project_id,
+                UserUsageBucketRow.user_uuid == user_uuid,
+            )
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return [
+            ExistenceCheck(
+                column=ScalingGroupRow.name,
+                value=self.resource_group,
+                error=ScalingGroupNotFound(self.resource_group),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+            ExistenceCheck(
+                column=GroupRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
+            ),
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_uuid,
+                error=UserNotFound(extra_data={"user_uuid": str(self.user_uuid)}),
+            ),
+        ]

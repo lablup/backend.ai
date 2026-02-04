@@ -23,12 +23,15 @@ from .db_source import ResourceUsageHistoryDBSource
 from .types import (
     DomainUsageBucketData,
     DomainUsageBucketSearchResult,
+    DomainUsageBucketSearchScope,
     KernelUsageRecordData,
     KernelUsageRecordSearchResult,
     ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
+    ProjectUsageBucketSearchScope,
     UserUsageBucketData,
     UserUsageBucketSearchResult,
+    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -181,9 +184,10 @@ class ResourceUsageHistoryRepository:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: DomainUsageBucketSearchScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        return await self._db_source.search_domain_usage_buckets(querier)
+        return await self._db_source.search_domain_usage_buckets(querier, scope)
 
     # ==================== Project Usage Buckets ====================
 
@@ -207,9 +211,10 @@ class ResourceUsageHistoryRepository:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: ProjectUsageBucketSearchScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        return await self._db_source.search_project_usage_buckets(querier)
+        return await self._db_source.search_project_usage_buckets(querier, scope)
 
     # ==================== User Usage Buckets ====================
 
@@ -233,9 +238,10 @@ class ResourceUsageHistoryRepository:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: UserUsageBucketSearchScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        return await self._db_source.search_user_usage_buckets(querier)
+        return await self._db_source.search_user_usage_buckets(querier, scope)
 
     # ==================== Aggregation Queries ====================
 
