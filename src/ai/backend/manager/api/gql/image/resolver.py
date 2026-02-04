@@ -22,7 +22,6 @@ from .types import (
     ImageConnectionV2GQL,
     ImageFilterGQL,
     ImageOrderByGQL,
-    ImageStatusGQL,
     ImageV2GQL,
 )
 
@@ -53,9 +52,6 @@ async def admin_images(
     offset: int | None = None,
 ) -> ImageConnectionV2GQL:
     check_admin_only()
-    # Default filter to ALIVE status if not specified
-    if filter is None:
-        filter = ImageFilterGQL(status=[ImageStatusGQL.ALIVE])
     return await fetch_images(
         info,
         filter,
@@ -108,9 +104,6 @@ async def container_registry_images(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageConnectionV2GQL:
-    # Default filter to ALIVE status if not specified
-    if filter is None:
-        filter = ImageFilterGQL(status=[ImageStatusGQL.ALIVE])
     # Add registry scope as base condition
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
     return await fetch_images(
@@ -125,26 +118,3 @@ async def container_registry_images(
         offset,
         base_conditions=base_conditions,
     )
-
-
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Retrieve a specific image by its ID within a container registry scope.
-
-    Returns detailed information about the image including its identity,
-    metadata, resource requirements, and permission settings.
-    Returns null if the image does not belong to the specified registry.
-    """)
-)
-async def container_registry_image(
-    info: Info[StrawberryGQLContext],
-    scope: ContainerRegistryScopeGQL,
-    id: ID,
-) -> ImageV2GQL | None:
-    image = await fetch_image(info, ImageID(UUID(id)))
-    # Verify the image belongs to the specified registry
-    if image is None or image.registry_id != scope.registry_id:
-        return None
-    return image

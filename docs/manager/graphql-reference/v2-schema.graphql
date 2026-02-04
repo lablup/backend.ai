@@ -3882,17 +3882,6 @@ type Query {
   """
   containerRegistryImages(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
 
-  """
-  Added in 26.2.0.
-  
-  Retrieve a specific image by its ID within a container registry scope.
-  
-  Returns detailed information about the image including its identity,
-  metadata, resource requirements, and permission settings.
-  Returns null if the image does not belong to the specified registry.
-  """
-  containerRegistryImage(scope: ContainerRegistryScope!, id: ID!): ImageV2
-
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 

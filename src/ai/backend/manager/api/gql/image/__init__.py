@@ -9,7 +9,6 @@ from .fetcher import fetch_image, fetch_images
 from .resolver import (
     admin_image,
     admin_images,
-    container_registry_image,
     container_registry_images,
 )
 from .types import (
@@ -60,5 +59,4 @@ __all__ = [
     "admin_images",
     "admin_image",
     "container_registry_images",
-    "container_registry_image",
 ]
