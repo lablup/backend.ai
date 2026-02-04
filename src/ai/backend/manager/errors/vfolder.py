@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
@@ -56,7 +56,7 @@ class VFolderQuotaExceededError(BackendAIError, web.HTTPBadRequest):
             error_detail=ErrorDetail.BAD_REQUEST,
         )
 
-    def error_data(self) -> dict:
+    def error_data(self) -> dict[str, Any]:
         return {
             "vfolder_id": str(self.vfolder_id),
             "quota_scope_id": str(self.quota_scope_id),
