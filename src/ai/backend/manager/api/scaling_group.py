@@ -81,13 +81,14 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
         sgroup = sgroup_filtered[0]
 
         if not sgroup.wsproxy_addr:
-            wsproxy_version = "v1"  # raise error
-        else:
-            client = root_ctx.appproxy_client_pool.load_client(
-                sgroup.wsproxy_addr, sgroup.wsproxy_api_token or ""
-            )
-            status = await client.fetch_status()
-            wsproxy_version = status.get("api_version", "v1")
+            # if wsproxy_addr is not set, raise not found error(migrating from v1 behavior)
+            # It should be either 404 or 500 before wsproxy_addr is mandatory field.
+            raise ObjectNotFound(object_name="AppProxy address")
+        client = root_ctx.appproxy_client_pool.load_client(
+            sgroup.wsproxy_addr, sgroup.wsproxy_api_token or ""
+        )
+        status = await client.fetch_status()
+        wsproxy_version = status.api_version
 
         return web.json_response({
             "wsproxy_version": wsproxy_version,

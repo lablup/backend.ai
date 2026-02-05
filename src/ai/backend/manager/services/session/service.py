@@ -1260,8 +1260,8 @@ class SessionService:
             raise ServiceUnavailable("No coordinator configured for this resource group")
         client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
         wsproxy_status = await client.fetch_status()
-        if advertise_addr := wsproxy_status.get("advertise_address"):
-            wsproxy_advertise_addr = advertise_addr
+        if wsproxy_status.advertise_address:
+            wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
             wsproxy_advertise_addr = wsproxy_addr
 

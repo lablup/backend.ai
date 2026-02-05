@@ -7,6 +7,7 @@ from uuid import UUID
 
 import aiohttp
 
+from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -49,7 +50,7 @@ class AppProxyClientPool:
         client_session = self._client_pool.load_client_session(
             ClientKey(
                 endpoint=address,
-                domain="wsproxy",
+                domain="appproxy",
             )
         )
         return AppProxyClient(client_session, address, token)
@@ -69,26 +70,23 @@ class AppProxyClient:
         self._token = token
 
     @appproxy_client_resilience.apply()
-    async def fetch_status(self) -> dict[str, Any]:
+    async def fetch_status(self) -> AppProxyStatusResponse:
         try:
             async with self._client_session.get(
                 "/status",
                 headers={"Accept": "application/json"},
             ) as resp:
-                try:
-                    result: dict[str, Any] = await resp.json()
-                except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
-                    log.error(
-                        "Failed to parse app-proxy status response from {}: {}", self._address, e
-                    )
-                    raise AppProxyResponseError(
-                        extra_msg=f"Invalid response from AppProxy at {self._address}"
-                    ) from e
-                return result
+                data = await resp.json()
+                return AppProxyStatusResponse.model_validate(data)
         except aiohttp.ClientConnectorError as e:
             log.error("Failed to connect to app-proxy at {}: {}", self._address, e)
             raise AppProxyConnectionError(
                 extra_msg=f"Failed to connect to AppProxy at {self._address}"
+            ) from e
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+            log.error("Failed to parse app-proxy status response from {}: {}", self._address, e)
+            raise AppProxyResponseError(
+                extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e
 
     @appproxy_client_resilience.apply()
