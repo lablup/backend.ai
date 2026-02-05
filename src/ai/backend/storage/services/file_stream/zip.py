@@ -18,6 +18,7 @@ import janus
 import zipstream
 
 from ai.backend.common.types import StreamReader
+from ai.backend.storage.errors import UnsupportedFileTypeError
 from ai.backend.storage.types import SENTINEL, Sentinel
 
 DEFAULT_INFLIGHT_CHUNKS = 8
@@ -34,9 +35,11 @@ class ZipArchiveStreamReader(StreamReader):
     _zf: zipstream.ZipFile
 
     _base_path: Path
+    _filename: str
 
-    def __init__(self, base_path: Path) -> None:
+    def __init__(self, base_path: Path, filename: str = "archive.zip") -> None:
         self._base_path = base_path
+        self._filename = filename
         self._zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
 
     def add_entries(self, entries: list[Path]) -> None:
@@ -44,9 +47,15 @@ class ZipArchiveStreamReader(StreamReader):
 
         Each entry's archive name is derived from its path relative to base_path.
         Directories are walked recursively via os.walk. Symlinks and other
-        non-regular file types raise ValueError.
+        non-regular file types raise UnsupportedFileTypeError.
         """
         for file_path in entries:
+            # Check for symlinks first before is_file()/is_dir() which follow symlinks
+            if file_path.is_symlink():
+                raise UnsupportedFileTypeError(
+                    extra_msg=f"Unsupported file type: {file_path.relative_to(self._base_path)}"
+                )
+
             arcname = str(PurePosixPath(file_path.relative_to(self._base_path)))
             if file_path.is_file():
                 self._zf.write(file_path, arcname=arcname)
@@ -65,7 +74,9 @@ class ZipArchiveStreamReader(StreamReader):
                             arcname=str(Path(arcname) / rel_root),
                         )
             else:
-                raise ValueError(f"Unsupported file type: {file_path.relative_to(self._base_path)}")
+                raise UnsupportedFileTypeError(
+                    extra_msg=f"Unsupported file type: {file_path.relative_to(self._base_path)}"
+                )
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -95,3 +106,7 @@ class ZipArchiveStreamReader(StreamReader):
     @override
     def content_type(self) -> str | None:
         return "application/zip"
+
+    def filename(self) -> str:
+        """Return the filename for the archive download."""
+        return self._filename
