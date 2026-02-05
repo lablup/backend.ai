@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ai.backend.common.types import ResourceSlot
 
@@ -35,3 +36,8 @@ class FairShareScalingGroupSpec(BaseModel):
     If a resource type is not specified, default weight (1.0) is used.
     Example: ResourceSlot({"cpu": 1.0, "mem": 0.001, "cuda.device": 10.0})
     """
+
+    @field_serializer("resource_weights")
+    def serialize_resource_weights(self, value: ResourceSlot) -> dict[str, Any]:
+        """Serialize ResourceSlot to dict for JSON compatibility."""
+        return dict(value)
