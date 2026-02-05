@@ -15,6 +15,8 @@ from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
+    BulkCreateUserAction,
+    BulkCreateUserActionResult,
     CreateUserAction,
     CreateUserActionResult,
 )
@@ -86,6 +88,10 @@ class UserService:
         return CreateUserActionResult(
             data=user_data_result,
         )
+
+    async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
+        result = await self._user_repository.bulk_create_users_validated(action.items)
+        return BulkCreateUserActionResult(data=result)
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         user_data_result = await self._user_repository.update_user_validated(

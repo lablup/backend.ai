@@ -12,11 +12,11 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.types import (
+    UserFilterGQL,
+    UserOrderByGQL,
     UserV2Connection,
     UserV2Edge,
-    UserV2Filter,
     UserV2GQL,
-    UserV2OrderBy,
 )
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
@@ -73,8 +73,8 @@ async def fetch_user(
 
 async def fetch_admin_users(
     info: Info[StrawberryGQLContext],
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    filter: UserFilterGQL | None = None,
+    order_by: list[UserOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -141,9 +141,9 @@ async def fetch_admin_users(
 
 async def fetch_domain_users(
     info: Info[StrawberryGQLContext],
-    scope: DomainUserSearchScope,
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    domain_name: str,
+    filter: UserFilterGQL | None = None,
+    order_by: list[UserOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -155,7 +155,7 @@ async def fetch_domain_users(
 
     Args:
         info: Strawberry GraphQL context.
-        scope: Domain scope specifying which domain to query.
+        domain_name: Domain name to scope the query.
         filter: Optional additional filter criteria.
         order_by: Optional ordering specification.
         before: Cursor for backward pagination.
@@ -186,7 +186,8 @@ async def fetch_domain_users(
         base_conditions=None,
     )
 
-    # Execute via processor with domain scope
+    # Create scope and execute via processor
+    scope = DomainUserSearchScope(domain_name=domain_name)
     action_result = await processors.user.search_users_by_domain.wait_for_complete(
         SearchUsersByDomainAction(scope=scope, querier=querier)
     )
@@ -209,9 +210,9 @@ async def fetch_domain_users(
 
 async def fetch_project_users(
     info: Info[StrawberryGQLContext],
-    scope: ProjectUserSearchScope,
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    project_id: UUID,
+    filter: UserFilterGQL | None = None,
+    order_by: list[UserOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -223,7 +224,7 @@ async def fetch_project_users(
 
     Args:
         info: Strawberry GraphQL context.
-        scope: Project scope specifying which project to query.
+        project_id: Project UUID to scope the query.
         filter: Optional additional filter criteria.
         order_by: Optional ordering specification.
         before: Cursor for backward pagination.
@@ -254,7 +255,8 @@ async def fetch_project_users(
         base_conditions=None,
     )
 
-    # Execute via processor with project scope
+    # Create scope and execute via processor
+    scope = ProjectUserSearchScope(project_id=project_id)
     action_result = await processors.user.search_users_by_project.wait_for_complete(
         SearchUsersByProjectAction(scope=scope, querier=querier)
     )

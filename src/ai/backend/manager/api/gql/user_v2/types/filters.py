@@ -117,13 +117,13 @@ class UserProjectNestedFilter:
 
 
 @strawberry.input(
-    name="UserStatusV2EnumFilter",
+    name="UserStatusEnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserStatusEnum fields. "
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
-class UserStatusEnumFilter:
+class UserStatusEnumFilterGQL:
     """Filter for user status enum fields."""
 
     equals: UserStatusEnum | None = strawberry.field(
@@ -146,13 +146,13 @@ class UserStatusEnumFilter:
 
 
 @strawberry.input(
-    name="UserRoleV2EnumFilter",
+    name="UserRoleEnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserRoleEnum fields. "
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
-class UserRoleEnumFilter:
+class UserRoleEnumFilterGQL:
     """Filter for user role enum fields."""
 
     equals: UserRoleEnum | None = strawberry.field(
@@ -175,7 +175,7 @@ class UserRoleEnumFilter:
 
 
 @strawberry.input(
-    name="UserV2Filter",
+    name="UserFilter",
     description=(
         "Added in 26.2.0. Filter input for querying users. "
         "Supports filtering by UUID, username, email, status, domain, role, creation time, "
@@ -183,7 +183,7 @@ class UserRoleEnumFilter:
         "Multiple filters can be combined using AND, OR, and NOT logical operators."
     ),
 )
-class UserV2Filter(GQLFilter):
+class UserFilterGQL(GQLFilter):
     """Filter for user queries."""
 
     uuid: UUIDFilter | None = strawberry.field(
@@ -198,7 +198,7 @@ class UserV2Filter(GQLFilter):
         default=None,
         description="Filter by email address. Supports equals, contains, startsWith, and endsWith.",
     )
-    status: UserStatusEnumFilter | None = strawberry.field(
+    status: UserStatusEnumFilterGQL | None = strawberry.field(
         default=None,
         description="Filter by account status. Supports equals, in, not_equals, and not_in operations.",
     )
@@ -206,7 +206,7 @@ class UserV2Filter(GQLFilter):
         default=None,
         description="Filter by domain name. Supports equals, contains, startsWith, and endsWith.",
     )
-    role: UserRoleEnumFilter | None = strawberry.field(
+    role: UserRoleEnumFilterGQL | None = strawberry.field(
         default=None,
         description="Filter by user role. Supports equals, in, not_equals, and not_in operations.",
     )
@@ -229,15 +229,15 @@ class UserV2Filter(GQLFilter):
         ),
     )
 
-    AND: list[UserV2Filter] | None = strawberry.field(
+    AND: list[UserFilterGQL] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[UserV2Filter] | None = strawberry.field(
+    OR: list[UserFilterGQL] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[UserV2Filter] | None = strawberry.field(
+    NOT: list[UserFilterGQL] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
@@ -346,7 +346,7 @@ class UserV2Filter(GQLFilter):
 
 
 @strawberry.enum(
-    name="UserV2OrderField",
+    name="UserOrderField",
     description=(
         "Added in 26.2.0. Fields available for ordering user query results. "
         "CREATED_AT: Order by creation timestamp. "
@@ -358,7 +358,7 @@ class UserV2Filter(GQLFilter):
         "PROJECT_NAME: Order by project name (MIN aggregation)."
     ),
 )
-class UserV2OrderField(StrEnum):
+class UserOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
     USERNAME = "username"
@@ -369,18 +369,18 @@ class UserV2OrderField(StrEnum):
 
 
 @strawberry.input(
-    name="UserV2OrderBy",
+    name="UserOrderBy",
     description=(
         "Added in 26.2.0. Specifies ordering for user query results. "
         "Combine field selection with direction to sort results. "
         "Default direction is DESC (descending)."
     ),
 )
-class UserV2OrderBy(GQLOrderBy):
+class UserOrderByGQL(GQLOrderBy):
     """OrderBy for user queries."""
 
-    field: UserV2OrderField = strawberry.field(
-        description="The field to order by. See UserV2OrderField for available options."
+    field: UserOrderFieldGQL = strawberry.field(
+        description="The field to order by. See UserOrderField for available options."
     )
     direction: OrderDirection = strawberry.field(
         default=OrderDirection.DESC,
@@ -396,15 +396,15 @@ class UserV2OrderBy(GQLOrderBy):
         """
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case UserV2OrderField.CREATED_AT:
+            case UserOrderFieldGQL.CREATED_AT:
                 return UserOrders.created_at(ascending)
-            case UserV2OrderField.MODIFIED_AT:
+            case UserOrderFieldGQL.MODIFIED_AT:
                 return UserOrders.modified_at(ascending)
-            case UserV2OrderField.USERNAME:
+            case UserOrderFieldGQL.USERNAME:
                 return UserOrders.username(ascending)
-            case UserV2OrderField.EMAIL:
+            case UserOrderFieldGQL.EMAIL:
                 return UserOrders.email(ascending)
-            case UserV2OrderField.STATUS:
+            case UserOrderFieldGQL.STATUS:
                 return UserOrders.status(ascending)
             case UserV2OrderField.DOMAIN_NAME:
                 return UserOrders.by_domain_name(ascending)
@@ -413,12 +413,12 @@ class UserV2OrderBy(GQLOrderBy):
 
 
 @strawberry.input(
-    name="UserV2Scope",
+    name="UserScope",
     description=(
         "Added in 26.2.0. Scope for user queries to restrict results to a specific context."
     ),
 )
-class UserV2Scope:
+class UserScopeGQL:
     """Scope for user queries."""
 
     domain_name: str | None = strawberry.field(

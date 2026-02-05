@@ -8,13 +8,13 @@ import strawberry
 
 
 @strawberry.input(
-    name="DomainUserV2Scope",
+    name="DomainUserScope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific domain. "
         "Used to restrict user queries to a particular domain context."
     ),
 )
-class DomainUserScope:
+class DomainUserScopeGQL:
     """Scope for domain-level user queries."""
 
     domain_name: str = strawberry.field(
@@ -23,13 +23,13 @@ class DomainUserScope:
 
 
 @strawberry.input(
-    name="ProjectUserV2Scope",
+    name="ProjectUserScope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific project. "
         "Used to restrict user queries to members of a particular project."
     ),
 )
-class ProjectUserScope:
+class ProjectUserScopeGQL:
     """Scope for project-level user queries."""
 
     project_id: UUID = strawberry.field(

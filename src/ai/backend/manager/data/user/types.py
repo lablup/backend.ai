@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -19,6 +19,10 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.repositories.base.creator import BulkCreatorError
 
 
 class UserStatus(enum.StrEnum):
@@ -153,3 +157,24 @@ class UserSearchResult:
 
     has_previous_page: bool
     """Whether there are items before the current page."""
+
+
+@dataclass
+class BulkUserCreateResultData:
+    """Result of bulk user creation operation.
+
+    Attributes:
+        successes: Successfully created users
+        failures: Failed user creation attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully created users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user creations."""
+        return len(self.failures)
