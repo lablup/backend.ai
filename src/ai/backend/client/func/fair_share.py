@@ -7,6 +7,12 @@ from uuid import UUID
 
 from ai.backend.client.request import Request
 from ai.backend.common.dto.manager.fair_share import (
+    BulkUpsertDomainFairShareWeightRequest,
+    BulkUpsertDomainFairShareWeightResponse,
+    BulkUpsertProjectFairShareWeightRequest,
+    BulkUpsertProjectFairShareWeightResponse,
+    BulkUpsertUserFairShareWeightRequest,
+    BulkUpsertUserFairShareWeightResponse,
     GetDomainFairShareResponse,
     GetProjectFairShareResponse,
     GetResourceGroupFairShareSpecResponse,
@@ -14,11 +20,17 @@ from ai.backend.common.dto.manager.fair_share import (
     ResourceWeightEntryInput,
     SearchDomainFairSharesRequest,
     SearchDomainFairSharesResponse,
+    SearchDomainUsageBucketsRequest,
+    SearchDomainUsageBucketsResponse,
     SearchProjectFairSharesRequest,
     SearchProjectFairSharesResponse,
+    SearchProjectUsageBucketsRequest,
+    SearchProjectUsageBucketsResponse,
     SearchResourceGroupFairShareSpecsResponse,
     SearchUserFairSharesRequest,
     SearchUserFairSharesResponse,
+    SearchUserUsageBucketsRequest,
+    SearchUserUsageBucketsResponse,
     UpdateResourceGroupFairShareSpecResponse,
     UpsertDomainFairShareWeightResponse,
     UpsertProjectFairShareWeightResponse,
@@ -392,6 +404,127 @@ class FairShare(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return UpsertUserFairShareWeightResponse.model_validate(data)
+
+    # Bulk Upsert Weight Methods
+
+    @api_function
+    @classmethod
+    async def bulk_upsert_domain_fair_share_weight(
+        cls,
+        request: BulkUpsertDomainFairShareWeightRequest,
+    ) -> BulkUpsertDomainFairShareWeightResponse:
+        """
+        Bulk upsert domain fair share weights.
+
+        Creates new domain fair share records or updates weights of existing ones.
+        If weight is None for an entry, the resource group's default_weight will be used.
+
+        :param request: Bulk upsert domain weight request
+        :returns: Bulk upsert result with count
+        """
+        rqst = Request("POST", "/fair-share/domains/bulk-upsert-weight")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return BulkUpsertDomainFairShareWeightResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def bulk_upsert_project_fair_share_weight(
+        cls,
+        request: BulkUpsertProjectFairShareWeightRequest,
+    ) -> BulkUpsertProjectFairShareWeightResponse:
+        """
+        Bulk upsert project fair share weights.
+
+        Creates new project fair share records or updates weights of existing ones.
+        If weight is None for an entry, the resource group's default_weight will be used.
+
+        :param request: Bulk upsert project weight request
+        :returns: Bulk upsert result with count
+        """
+        rqst = Request("POST", "/fair-share/projects/bulk-upsert-weight")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return BulkUpsertProjectFairShareWeightResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def bulk_upsert_user_fair_share_weight(
+        cls,
+        request: BulkUpsertUserFairShareWeightRequest,
+    ) -> BulkUpsertUserFairShareWeightResponse:
+        """
+        Bulk upsert user fair share weights.
+
+        Creates new user fair share records or updates weights of existing ones.
+        If weight is None for an entry, the resource group's default_weight will be used.
+
+        :param request: Bulk upsert user weight request
+        :returns: Bulk upsert result with count
+        """
+        rqst = Request("POST", "/fair-share/users/bulk-upsert-weight")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return BulkUpsertUserFairShareWeightResponse.model_validate(data)
+
+    # Usage Bucket Search Methods
+
+    @api_function
+    @classmethod
+    async def search_domain_usage_buckets(
+        cls,
+        request: SearchDomainUsageBucketsRequest,
+    ) -> SearchDomainUsageBucketsResponse:
+        """
+        Search domain usage buckets.
+
+        :param request: Domain usage bucket search request
+        :returns: List of domain usage buckets
+        """
+        rqst = Request("POST", "/fair-share/usage-buckets/domains/search")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchDomainUsageBucketsResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def search_project_usage_buckets(
+        cls,
+        request: SearchProjectUsageBucketsRequest,
+    ) -> SearchProjectUsageBucketsResponse:
+        """
+        Search project usage buckets.
+
+        :param request: Project usage bucket search request
+        :returns: List of project usage buckets
+        """
+        rqst = Request("POST", "/fair-share/usage-buckets/projects/search")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchProjectUsageBucketsResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def search_user_usage_buckets(
+        cls,
+        request: SearchUserUsageBucketsRequest,
+    ) -> SearchUserUsageBucketsResponse:
+        """
+        Search user usage buckets.
+
+        :param request: User usage bucket search request
+        :returns: List of user usage buckets
+        """
+        rqst = Request("POST", "/fair-share/usage-buckets/users/search")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return SearchUserUsageBucketsResponse.model_validate(data)
 
     # Resource Group Fair Share Spec Methods
 
