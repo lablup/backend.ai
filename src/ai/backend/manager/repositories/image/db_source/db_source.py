@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from uuid import UUID
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -41,7 +38,6 @@ from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
-    rescan_images,
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

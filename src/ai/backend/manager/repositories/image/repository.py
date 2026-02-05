@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 from uuid import UUID
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.docker import ImageRef
