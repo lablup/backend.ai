@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share.row import _merge_resource_weights
 
@@ -16,26 +14,20 @@ class TestMergeResourceWeights:
     def test_all_explicit_weights(self) -> None:
         """Scenario 1.1: All resources have explicit weights configured."""
         # Given
-        row_weights = ResourceSlot(
-            {
-                "cpu": Decimal("2.0"),
-                "mem": Decimal("0.5"),
-                "cuda.device": Decimal("5.0"),
-            }
-        )
+        row_weights = ResourceSlot({
+            "cpu": Decimal("2.0"),
+            "mem": Decimal("0.5"),
+            "cuda.device": Decimal("5.0"),
+        })
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "cuda.device": Decimal("8"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "cuda.device": Decimal("8"),
+        })
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         assert merged["cpu"] == Decimal("2.0")
@@ -48,18 +40,14 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({"cuda.device": Decimal("5.0")})
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "cuda.device": Decimal("8"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "cuda.device": Decimal("8"),
+        })
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         assert merged["cpu"] == Decimal("1.0")  # Uses default_weight
@@ -75,9 +63,7 @@ class TestMergeResourceWeights:
         available_slots = ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000")})
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         assert merged["cpu"] == Decimal("1.0")
@@ -89,18 +75,14 @@ class TestMergeResourceWeights:
         # Given
         row_weights = ResourceSlot({})
         default_weight = Decimal("2.0")  # Different default
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "new.accelerator": Decimal("4"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "new.accelerator": Decimal("4"),
+        })
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         assert merged["cpu"] == Decimal("2.0")  # All use default_weight
@@ -116,9 +98,7 @@ class TestMergeResourceWeights:
         available_slots = ResourceSlot({})  # Empty cluster
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         assert merged == ResourceSlot({})
@@ -127,27 +107,21 @@ class TestMergeResourceWeights:
     def test_mixed_explicit_and_default_weights(self) -> None:
         """Test mixed scenario with multiple resource types."""
         # Given
-        row_weights = ResourceSlot(
-            {
-                "cuda.device": Decimal("10.0"),
-                "rocm.device": Decimal("8.0"),
-            }
-        )
+        row_weights = ResourceSlot({
+            "cuda.device": Decimal("10.0"),
+            "rocm.device": Decimal("8.0"),
+        })
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "cuda.device": Decimal("8"),
-                "cuda.shares": Decimal("4.0"),
-                "rocm.device": Decimal("8"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "cuda.device": Decimal("8"),
+            "cuda.shares": Decimal("4.0"),
+            "rocm.device": Decimal("8"),
+        })
 
         # When
-        merged, uses_default = _merge_resource_weights(
-            row_weights, default_weight, available_slots
-        )
+        merged, uses_default = _merge_resource_weights(row_weights, default_weight, available_slots)
 
         # Then
         # Explicit weights

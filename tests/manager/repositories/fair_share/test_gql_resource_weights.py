@@ -7,10 +7,8 @@ GraphQL types with the uses_default flag properly set.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-
-import pytest
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types.common import (
@@ -42,13 +40,11 @@ class TestFairShareSpecGQLConversion:
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
-            resource_weights=ResourceSlot(
-                {
-                    "cpu": Decimal("1.0"),
-                    "mem": Decimal("0.001"),
-                    "cuda.device": Decimal("5.0"),
-                }
-            ),
+            resource_weights=ResourceSlot({
+                "cpu": Decimal("1.0"),
+                "mem": Decimal("0.001"),
+                "cuda.device": Decimal("5.0"),
+            }),
         )
         use_default = False
         uses_default_resources = frozenset(["cpu", "mem"])
@@ -62,9 +58,7 @@ class TestFairShareSpecGQLConversion:
         assert len(gql_spec.resource_weights) == 3
 
         # Check each resource weight entry
-        weight_dict = {
-            entry.resource_type: entry for entry in gql_spec.resource_weights
-        }
+        weight_dict = {entry.resource_type: entry for entry in gql_spec.resource_weights}
 
         # cpu uses default
         assert weight_dict["cpu"].weight == Decimal("1.0")
@@ -86,15 +80,13 @@ class TestFairShareSpecGQLConversion:
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
-            resource_weights=ResourceSlot(
-                {
-                    "cpu": Decimal("2.0"),
-                    "mem": Decimal("0.5"),
-                }
-            ),
+            resource_weights=ResourceSlot({
+                "cpu": Decimal("2.0"),
+                "mem": Decimal("0.5"),
+            }),
         )
         use_default = False
-        uses_default_resources = frozenset()  # Empty - all explicit
+        uses_default_resources: frozenset[str] = frozenset()  # Empty - all explicit
 
         # When
         gql_spec = FairShareSpecGQL.from_spec(spec, use_default, uses_default_resources)
@@ -112,12 +104,10 @@ class TestFairShareSpecGQLConversion:
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
-            resource_weights=ResourceSlot(
-                {
-                    "cpu": Decimal("1.0"),
-                    "mem": Decimal("0.001"),
-                }
-            ),
+            resource_weights=ResourceSlot({
+                "cpu": Decimal("1.0"),
+                "mem": Decimal("0.001"),
+            }),
         )
         use_default = True
         uses_default_resources = frozenset(["cpu", "mem"])
@@ -148,20 +138,18 @@ class TestDomainFairShareGQLConversion:
                     half_life_days=7,
                     lookback_days=28,
                     decay_unit_days=1,
-                    resource_weights=ResourceSlot(
-                        {
-                            "cpu": Decimal("1.0"),
-                            "mem": Decimal("0.001"),
-                            "cuda.device": Decimal("10.0"),
-                        }
-                    ),
+                    resource_weights=ResourceSlot({
+                        "cpu": Decimal("1.0"),
+                        "mem": Decimal("0.001"),
+                        "cuda.device": Decimal("10.0"),
+                    }),
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
                     total_decayed_usage=ResourceSlot({}),
                     normalized_usage=Decimal("0.0"),
-                    lookback_start=date.today(),
-                    lookback_end=date.today(),
+                    lookback_start=datetime.now(UTC).date(),
+                    lookback_end=datetime.now(UTC).date(),
                     last_calculated_at=now,
                 ),
                 metadata=FairShareMetadata(created_at=now, updated_at=now),
@@ -204,19 +192,17 @@ class TestProjectFairShareGQLConversion:
                     half_life_days=7,
                     lookback_days=28,
                     decay_unit_days=1,
-                    resource_weights=ResourceSlot(
-                        {
-                            "cpu": Decimal("1.0"),
-                            "cuda.shares": Decimal("0.1"),
-                        }
-                    ),
+                    resource_weights=ResourceSlot({
+                        "cpu": Decimal("1.0"),
+                        "cuda.shares": Decimal("0.1"),
+                    }),
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
                     total_decayed_usage=ResourceSlot({}),
                     normalized_usage=Decimal("0.0"),
-                    lookback_start=date.today(),
-                    lookback_end=date.today(),
+                    lookback_start=datetime.now(UTC).date(),
+                    lookback_end=datetime.now(UTC).date(),
                     last_calculated_at=now,
                 ),
                 metadata=FairShareMetadata(created_at=now, updated_at=now),
@@ -257,19 +243,17 @@ class TestUserFairShareGQLConversion:
                     half_life_days=7,
                     lookback_days=28,
                     decay_unit_days=1,
-                    resource_weights=ResourceSlot(
-                        {
-                            "cpu": Decimal("1.0"),
-                            "mem": Decimal("0.001"),
-                        }
-                    ),
+                    resource_weights=ResourceSlot({
+                        "cpu": Decimal("1.0"),
+                        "mem": Decimal("0.001"),
+                    }),
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=Decimal("1.0"),
                     total_decayed_usage=ResourceSlot({}),
                     normalized_usage=Decimal("0.0"),
-                    lookback_start=date.today(),
-                    lookback_end=date.today(),
+                    lookback_start=datetime.now(UTC).date(),
+                    lookback_end=datetime.now(UTC).date(),
                     last_calculated_at=now,
                 ),
                 metadata=FairShareMetadata(created_at=now, updated_at=now),

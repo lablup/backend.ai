@@ -7,10 +7,8 @@ entity-specific weights and scaling group defaults.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-
-import pytest
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import FairShareData
@@ -37,8 +35,8 @@ class TestDomainFairShareRowToData:
             resource_weights=ResourceSlot({"cuda.device": Decimal("5.0")}),  # Partial
             normalized_usage=Decimal("0.0"),
             last_calculated_at=datetime.now(UTC),
-            lookback_start=date.today(),
-            lookback_end=date.today(),
+            lookback_start=datetime.now(UTC).date(),
+            lookback_end=datetime.now(UTC).date(),
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
@@ -47,13 +45,11 @@ class TestDomainFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "cuda.device": Decimal("8"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "cuda.device": Decimal("8"),
+        })
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -86,8 +82,8 @@ class TestDomainFairShareRowToData:
             resource_weights=ResourceSlot({}),  # Empty - all use defaults
             normalized_usage=Decimal("0.0"),
             last_calculated_at=datetime.now(UTC),
-            lookback_start=date.today(),
-            lookback_end=date.today(),
+            lookback_start=datetime.now(UTC).date(),
+            lookback_end=datetime.now(UTC).date(),
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
@@ -130,8 +126,8 @@ class TestProjectFairShareRowToData:
             resource_weights=ResourceSlot({"cuda.shares": Decimal("0.1")}),
             normalized_usage=Decimal("0.0"),
             last_calculated_at=datetime.now(UTC),
-            lookback_start=date.today(),
-            lookback_end=date.today(),
+            lookback_start=datetime.now(UTC).date(),
+            lookback_end=datetime.now(UTC).date(),
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
@@ -140,13 +136,11 @@ class TestProjectFairShareRowToData:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "mem": Decimal("1000"),
-                "cuda.shares": Decimal("4.0"),
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("1000"),
+            "cuda.shares": Decimal("4.0"),
+        })
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -176,8 +170,8 @@ class TestUserFairShareRowToData:
             resource_weights=ResourceSlot({}),  # All use defaults
             normalized_usage=Decimal("0.0"),
             last_calculated_at=datetime.now(UTC),
-            lookback_start=date.today(),
-            lookback_end=date.today(),
+            lookback_start=datetime.now(UTC).date(),
+            lookback_end=datetime.now(UTC).date(),
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
@@ -215,8 +209,8 @@ class TestResourceWeightMergingEdgeCases:
             resource_weights=ResourceSlot({}),
             normalized_usage=Decimal("0.0"),
             last_calculated_at=datetime.now(UTC),
-            lookback_start=date.today(),
-            lookback_end=date.today(),
+            lookback_start=datetime.now(UTC).date(),
+            lookback_end=datetime.now(UTC).date(),
             half_life_days=7,
             lookback_days=28,
             decay_unit_days=1,
@@ -225,12 +219,10 @@ class TestResourceWeightMergingEdgeCases:
         )
 
         default_weight = Decimal("1.0")
-        available_slots = ResourceSlot(
-            {
-                "cpu": Decimal("100"),
-                "new.accelerator": Decimal("4"),  # New resource type
-            }
-        )
+        available_slots = ResourceSlot({
+            "cpu": Decimal("100"),
+            "new.accelerator": Decimal("4"),  # New resource type
+        })
 
         # When
         result = row.to_data(default_weight, available_slots)
@@ -238,6 +230,4 @@ class TestResourceWeightMergingEdgeCases:
         # Then - all missing resources use default_weight
         assert result.data.spec.resource_weights["cpu"] == Decimal("1.0")
         assert result.data.spec.resource_weights["new.accelerator"] == Decimal("1.0")
-        assert result.data.uses_default_resources == frozenset(
-            ["cpu", "new.accelerator"]
-        )
+        assert result.data.uses_default_resources == frozenset(["cpu", "new.accelerator"])
