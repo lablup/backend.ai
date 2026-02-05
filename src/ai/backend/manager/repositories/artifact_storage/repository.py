@@ -20,7 +20,7 @@ artifact_storage_repository_resilience = Resilience(
         MetricPolicy(
             MetricArgs(
                 domain=DomainType.REPOSITORY,
-                layer=LayerType.OBJECT_STORAGE_REPOSITORY,  # Reuse object storage layer
+                layer=LayerType.ARTIFACT_STORAGE_REPOSITORY,
             )
         ),
         RetryPolicy(
