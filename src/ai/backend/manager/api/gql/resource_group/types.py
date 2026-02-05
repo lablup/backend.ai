@@ -15,6 +15,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
+    ResourceWeightEntryGQL,
     ResourceWeightEntryInputGQL,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -178,22 +179,42 @@ class FairShareScalingGroupSpecGQL:
             "Default is 1.0."
         )
     )
-    resource_weights: ResourceSlotGQL = strawberry.field(
+    resource_weights: list[ResourceWeightEntryGQL] = strawberry.field(
         description=(
-            "Weights for each resource type when calculating normalized usage. "
-            "If a resource type is not specified, default weight (1.0) is used."
+            "Added in 26.2.0. Weights for each resource type with default indicators. "
+            "All resource types from capacity are included. "
+            "Shows which resources use explicit vs default weights."
         )
     )
 
     @classmethod
-    def from_model(cls, spec: FairShareScalingGroupSpec) -> Self:
-        """Convert from Pydantic model to GQL type."""
+    def from_model(
+        cls,
+        spec: FairShareScalingGroupSpec,
+        uses_default_resources: frozenset[str],
+    ) -> Self:
+        """Convert from Pydantic model to GQL type.
+
+        Args:
+            spec: FairShareScalingGroupSpec with merged resource_weights
+            uses_default_resources: Set of resource types using default weight
+        """
+        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
+        weight_entries = [
+            ResourceWeightEntryGQL(
+                resource_type=resource_type,
+                weight=weight,
+                uses_default=resource_type in uses_default_resources,
+            )
+            for resource_type, weight in spec.resource_weights.items()
+        ]
+
         return cls(
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
             default_weight=spec.default_weight,
-            resource_weights=ResourceSlotGQL.from_resource_slot(spec.resource_weights),
+            resource_weights=weight_entries,
         )
 
 
@@ -258,12 +279,9 @@ class ResourceGroupGQL(Node):
             "Use scheduler.type to check if fair-share scheduling is enabled."
         )
     )
-    fair_share_spec: FairShareScalingGroupSpecGQL = strawberry.field(
-        description=(
-            "Added in 26.1.0. Fair share calculation configuration for this resource group. "
-            "Defines decay parameters and resource weights for fair share factor computation."
-        )
-    )
+
+    # Private field to store original fair share spec for lazy loading
+    _fair_share_spec_data: strawberry.Private[FairShareScalingGroupSpec]
 
     @classmethod
     def from_dataclass(cls, data: ScalingGroupData) -> Self:
@@ -285,8 +303,56 @@ class ResourceGroupGQL(Node):
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
             ),
-            fair_share_spec=FairShareScalingGroupSpecGQL.from_model(data.fair_share_spec),
+            _fair_share_spec_data=data.fair_share_spec,
         )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.1.0. Fair share calculation configuration for this resource group. "
+            "Defines decay parameters and resource weights for fair share factor computation. "
+            "Resource weights are merged with capacity and include default indicators."
+        )
+    )
+    async def fair_share_spec(
+        self, info: Info[StrawberryGQLContext, None]
+    ) -> FairShareScalingGroupSpecGQL:
+        """Get fair share spec with merged resource weights from capacity.
+
+        This is a lazy-loaded field that merges the resource group's fair share spec
+        with its current capacity to provide complete resource weight information.
+        """
+        from ai.backend.common.types import ResourceSlot
+
+        ctx = info.context
+
+        # Get capacity from resource info
+        action = GetResourceInfoAction(scaling_group=self.name)
+        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
+        capacity = result.resource_info.capacity
+
+        # Merge resource weights with capacity
+        merged = {}
+        uses_default = []
+
+        for resource_type in capacity.data.keys():
+            if resource_type in self._fair_share_spec_data.resource_weights.data:
+                merged[resource_type] = self._fair_share_spec_data.resource_weights.data[
+                    resource_type
+                ]
+            else:
+                merged[resource_type] = self._fair_share_spec_data.default_weight
+                uses_default.append(resource_type)
+
+        # Create merged spec
+        merged_spec = FairShareScalingGroupSpec(
+            half_life_days=self._fair_share_spec_data.half_life_days,
+            lookback_days=self._fair_share_spec_data.lookback_days,
+            decay_unit_days=self._fair_share_spec_data.decay_unit_days,
+            default_weight=self._fair_share_spec_data.default_weight,
+            resource_weights=ResourceSlot(merged),
+        )
+
+        return FairShareScalingGroupSpecGQL.from_model(merged_spec, frozenset(uses_default))
 
     @strawberry.field(  # type: ignore[misc]
         description=(
