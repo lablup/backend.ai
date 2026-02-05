@@ -186,7 +186,7 @@ class DeleteUsersInputGQL:
 
 
 @strawberry.input(
-    name="PurgeUserInput",
+    name="PurgeUserInputV2",
     description=(
         "Added in 26.2.0. Input for permanently deleting a user and all associated data. "
         "This action is irreversible."
