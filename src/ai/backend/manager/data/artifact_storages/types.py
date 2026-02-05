@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 
-class ArtifactStorageCreatorSpec(CreatorSpec["ArtifactStorageRow"]):
+class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
     """CreatorSpec for ArtifactStorageRow with deferred storage_id."""
 
     def __init__(self, name: str, storage_type: ArtifactStorageType) -> None:
@@ -36,7 +36,7 @@ class ArtifactStorageCreatorSpec(CreatorSpec["ArtifactStorageRow"]):
         )
 
 
-class ArtifactStorageUpdaterSpec(UpdaterSpec["ArtifactStorageRow"]):
+class ArtifactStorageUpdaterSpec(UpdaterSpec[ArtifactStorageRow]):
     """UpdaterSpec for ArtifactStorageRow.
 
     Note: This spec uses storage_id (the FK to ObjectStorageRow/VFSStorageRow) to find
