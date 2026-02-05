@@ -10,7 +10,7 @@ from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.permission.id import ScopeId as ScopeRef
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -37,7 +37,7 @@ class RBACEntityCreator[TRow: Base]:
     """
 
     spec: CreatorSpec[TRow]
-    scope_refs: Sequence[ScopeRef]
+    scope_refs: Sequence[ScopeId]
     entity_type: EntityType
 
 

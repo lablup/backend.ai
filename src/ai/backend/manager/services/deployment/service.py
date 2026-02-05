@@ -31,6 +31,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     RouteInfo,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
@@ -329,8 +330,7 @@ class DeploymentService:
         )
         creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
             spec=creator_spec,
-            scope_type=ScopeType.USER,
-            scope_id=str(metadata.created_user),
+            scope_refs=[ScopeId(scope_type=ScopeType.USER, scope_id=str(metadata.created_user))],
             entity_type=EntityType.MODEL_DEPLOYMENT,
         )
 
