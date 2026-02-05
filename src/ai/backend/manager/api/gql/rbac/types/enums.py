@@ -172,3 +172,12 @@ class ObjectPermissionOrderField(StrEnum):
     ENTITY_TYPE = "entity_type"
     ENTITY_ID = "entity_id"
     OPERATION = "operation"
+
+
+@strawberry.enum(
+    name="PermissionGroupOrderField",
+    description="Fields available for ordering permission group queries",
+)
+class PermissionGroupOrderField(StrEnum):
+    SCOPE_TYPE = "scope_type"
+    SCOPE_ID = "scope_id"

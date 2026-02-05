@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import override
 
 import strawberry
+from strawberry import ID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -14,9 +16,14 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.permission_controller.options import RoleConditions, RoleOrders
+from ai.backend.manager.repositories.permission_controller.options import (
+    PermissionGroupConditions,
+    PermissionGroupOrders,
+    RoleConditions,
+    RoleOrders,
+)
 
-from .enums import RoleOrderField, RoleSourceGQL
+from .enums import PermissionGroupOrderField, RoleOrderField, RoleSourceGQL, ScopeTypeGQL
 
 
 @strawberry.input(description="Filter for role source")
@@ -94,3 +101,76 @@ class RoleOrderBy(GQLOrderBy):
                 return RoleOrders.created_at(ascending)
             case RoleOrderField.UPDATED_AT:
                 return RoleOrders.updated_at(ascending)
+
+
+@strawberry.input(description="Filter for scope type in permission groups")
+class ScopeTypeFilter:
+    in_: list[ScopeTypeGQL] | None = strawberry.field(default=None, name="in")
+    equals: ScopeTypeGQL | None = None
+
+
+@strawberry.input(description="Filter options for permission group queries")
+class PermissionGroupFilter(GQLFilter):
+    role_id: ID | None = None
+    scope_type: ScopeTypeFilter | None = None
+
+    AND: list[PermissionGroupFilter] | None = None
+    OR: list[PermissionGroupFilter] | None = None
+    NOT: list[PermissionGroupFilter] | None = None
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter."""
+        field_conditions: list[QueryCondition] = []
+
+        # Apply role_id filter
+        if self.role_id:
+            field_conditions.append(PermissionGroupConditions.by_role_id(uuid.UUID(self.role_id)))
+
+        # Apply scope_type filter
+        if self.scope_type:
+            if self.scope_type.equals:
+                field_conditions.append(
+                    PermissionGroupConditions.by_scope_type(self.scope_type.equals.to_internal())
+                )
+            elif self.scope_type.in_:
+                # Multiple scope types - combine with OR
+                scope_conditions = [
+                    PermissionGroupConditions.by_scope_type(s.to_internal())
+                    for s in self.scope_type.in_
+                ]
+                field_conditions.append(combine_conditions_or(scope_conditions))
+
+        # Handle logical operators
+        if self.AND:
+            and_conditions = [cond for f in self.AND for cond in f.build_conditions()]
+            if and_conditions:
+                field_conditions.extend(and_conditions)
+
+        if self.OR:
+            or_conditions = [cond for f in self.OR for cond in f.build_conditions()]
+            if or_conditions:
+                field_conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions = [cond for f in self.NOT for cond in f.build_conditions()]
+            if not_conditions:
+                field_conditions.append(negate_conditions(not_conditions))
+
+        return field_conditions if field_conditions else []
+
+
+@strawberry.input(description="Ordering options for permission group queries")
+class PermissionGroupOrderBy(GQLOrderBy):
+    field: PermissionGroupOrderField
+    direction: OrderDirection = OrderDirection.ASC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case PermissionGroupOrderField.SCOPE_TYPE:
+                return PermissionGroupOrders.scope_type(ascending)
+            case PermissionGroupOrderField.SCOPE_ID:
+                return PermissionGroupOrders.scope_id(ascending)

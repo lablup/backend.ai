@@ -3,6 +3,9 @@
 Contains GraphQL query and mutation resolver functions for the RBAC module.
 """
 
+from .permission_group import (
+    admin_permission_groups,
+)
 from .role import (
     admin_create_role,
     admin_create_role_assignment,
@@ -19,6 +22,7 @@ __all__ = [
     # Query resolvers
     "admin_role",
     "admin_roles",
+    "admin_permission_groups",
     # Mutation resolvers
     "admin_create_role",
     "admin_update_role",

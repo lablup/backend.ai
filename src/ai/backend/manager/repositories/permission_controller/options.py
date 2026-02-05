@@ -621,6 +621,12 @@ class PermissionGroupOrders:
             return PermissionGroupRow.scope_type.asc()
         return PermissionGroupRow.scope_type.desc()
 
+    @staticmethod
+    def scope_id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionGroupRow.scope_id.asc()
+        return PermissionGroupRow.scope_id.desc()
+
 
 class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""

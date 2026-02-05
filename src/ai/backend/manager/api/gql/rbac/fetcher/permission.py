@@ -17,6 +17,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionGroup,
     PermissionGroupConnection,
     PermissionGroupEdge,
+    PermissionGroupFilter,
+    PermissionGroupOrderBy,
     ScopedPermission,
     ScopedPermissionConnection,
     ScopedPermissionEdge,
@@ -32,7 +34,6 @@ from ai.backend.manager.repositories.permission_controller.options import (
 )
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
-    PermissionGroupSearchScope,
     ScopedPermissionSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions import (
@@ -171,9 +172,10 @@ def get_permission_group_pagination_spec() -> PaginationSpec:
     )
 
 
-async def fetch_role_permission_groups(
+async def fetch_permission_groups(
     info: Info[StrawberryGQLContext],
-    role_id: UUID,
+    filter: PermissionGroupFilter | None = None,
+    order_by: list[PermissionGroupOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -181,10 +183,8 @@ async def fetch_role_permission_groups(
     limit: int | None = None,
     offset: int | None = None,
 ) -> PermissionGroupConnection:
-    """Fetch permission groups for a role with pagination."""
+    """Fetch permission groups with filtering and pagination."""
     processors = info.context.processors
-
-    scope = PermissionGroupSearchScope(role_id=role_id)
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -196,11 +196,13 @@ async def fetch_role_permission_groups(
             offset=offset,
         ),
         get_permission_group_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
     action_result = (
         await processors.permission_controller.search_permission_groups.wait_for_complete(
-            SearchPermissionGroupsAction(querier=querier, scope=scope)
+            SearchPermissionGroupsAction(querier=querier, scope=None)
         )
     )
 

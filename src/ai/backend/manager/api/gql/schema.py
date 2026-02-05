@@ -163,6 +163,18 @@ from .project_v2 import (
     project_domain_v2,
     project_v2,
 )
+from .rbac import (
+    admin_create_role,
+    admin_create_role_assignment,
+    admin_delete_role,
+    admin_delete_role_assignment,
+    admin_permission_groups,
+    admin_purge_role,
+    admin_role,
+    admin_roles,
+    admin_update_role,
+    admin_update_role_permissions,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -333,6 +345,10 @@ class Query:
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
     project_domain_v2 = project_domain_v2
+    # RBAC APIs
+    admin_role = admin_role
+    admin_roles = admin_roles
+    admin_permission_groups = admin_permission_groups
 
 
 @strawberry.type
@@ -431,6 +447,14 @@ class Mutation:
     admin_delete_users = admin_delete_users
     admin_purge_user = admin_purge_user
     admin_purge_users = admin_purge_users
+    # RBAC APIs
+    admin_create_role = admin_create_role
+    admin_update_role = admin_update_role
+    admin_delete_role = admin_delete_role
+    admin_purge_role = admin_purge_role
+    admin_update_role_permissions = admin_update_role_permissions
+    admin_create_role_assignment = admin_create_role_assignment
+    admin_delete_role_assignment = admin_delete_role_assignment
 
 
 @strawberry.type

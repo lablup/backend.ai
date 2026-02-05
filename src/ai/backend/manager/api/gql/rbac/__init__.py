@@ -14,6 +14,7 @@ from .resolver import (
     admin_create_role_assignment,
     admin_delete_role,
     admin_delete_role_assignment,
+    admin_permission_groups,
     admin_purge_role,
     admin_role,
     admin_roles,
@@ -25,6 +26,7 @@ __all__ = [
     # Query resolvers
     "admin_role",
     "admin_roles",
+    "admin_permission_groups",
     # Mutation resolvers
     "admin_create_role",
     "admin_update_role",
