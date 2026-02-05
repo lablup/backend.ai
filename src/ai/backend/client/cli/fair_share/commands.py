@@ -1259,3 +1259,277 @@ def rg_user_list_cmd(
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Domain Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-domain-usage")
+def rg_domain_usage() -> None:
+    """Domain usage buckets within resource group scope."""
+
+
+@rg_domain_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.option("--domain-name", type=str, default=None, help="Filter by domain name")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_domain_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List domain usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        DomainUsageBucketFilter,
+        DomainUsageBucketOrder,
+        DomainUsageBucketOrderField,
+        OrderDirection,
+        SearchDomainUsageBucketsRequest,
+    )
+    from ai.backend.common.dto.manager.query import StringFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if domain_name:
+                filter_cond = DomainUsageBucketFilter(
+                    domain_name=StringFilter(equals=domain_name),
+                )
+
+            order_spec = DomainUsageBucketOrder(
+                field=DomainUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchDomainUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_domain_usage_buckets(resource_group, request)
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No domain usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Project Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-project-usage")
+def rg_project_usage() -> None:
+    """Project usage buckets within resource group scope."""
+
+
+@rg_project_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.option("--project-id", type=str, default=None, help="Filter by project ID (UUID)")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_project_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List project usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        ProjectUsageBucketFilter,
+        ProjectUsageBucketOrder,
+        ProjectUsageBucketOrderField,
+        SearchProjectUsageBucketsRequest,
+    )
+    from ai.backend.common.dto.manager.query import UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if project_id:
+                filter_cond = ProjectUsageBucketFilter(
+                    project_id=UUIDFilter(equals=UUID(project_id)),
+                )
+
+            order_spec = ProjectUsageBucketOrder(
+                field=ProjectUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchProjectUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_project_usage_buckets(
+                resource_group, domain_name, request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No project usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"Project ID: {bucket.project_id}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped User Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-user-usage")
+def rg_user_usage() -> None:
+    """User usage buckets within resource group scope."""
+
+
+@rg_user_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.argument("project_id", type=str)
+@click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_user_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str,
+    user_uuid: str | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List user usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        SearchUserUsageBucketsRequest,
+        UserUsageBucketFilter,
+        UserUsageBucketOrder,
+        UserUsageBucketOrderField,
+    )
+    from ai.backend.common.dto.manager.query import UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if user_uuid:
+                filter_cond = UserUsageBucketFilter(
+                    user_uuid=UUIDFilter(equals=UUID(user_uuid)),
+                )
+
+            order_spec = UserUsageBucketOrder(
+                field=UserUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchUserUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_user_usage_buckets(
+                resource_group, domain_name, UUID(project_id), request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No user usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"User UUID: {bucket.user_uuid}")
+                    print(f"Project ID: {bucket.project_id}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
