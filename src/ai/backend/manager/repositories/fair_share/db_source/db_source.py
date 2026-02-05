@@ -99,7 +99,11 @@ class FairShareDBSource:
             result = await execute_creator(db_sess, creator)
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_domain_fair_share(
         self,
@@ -114,7 +118,11 @@ class FairShareDBSource:
             )
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def get_domain_fair_share(
         self,
@@ -152,17 +160,19 @@ class FairShareDBSource:
             fs_result = await db_sess.execute(fs_query)
             fs_row = fs_result.scalar_one_or_none()
 
-            # Step 3: Fetch scaling group row
+            # Step 3: Fetch scaling group row and available slots
             sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
 
-            # Step 4: Return existing record (with default_weight for NULL handling)
+            # Step 4: Return existing record (with merged resource weights)
             if fs_row is not None:
-                return fs_row.to_data(fair_share_spec.default_weight)
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
 
             # Step 5: Create default from scaling group spec
-            # Need available_slots to initialize ResourceSlot keys for client
-            available_slots = await self._fetch_available_slots(db_sess, resource_group)
             now = datetime.now(UTC)
             return self._create_default_domain_fair_share(
                 resource_group, domain_name, fair_share_spec, available_slots, now
@@ -271,8 +281,11 @@ class FairShareDBSource:
         or generated default values.
         """
         if fair_share_row is not None:
-            # Has record: convert
-            return fair_share_row.to_data(spec.default_weight)
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
         # No record: create default
         return self._create_default_domain_fair_share(
             resource_group, domain_name, spec, available_slots, now
@@ -289,7 +302,11 @@ class FairShareDBSource:
             result = await execute_creator(db_sess, creator)
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_project_fair_share(
         self,
@@ -304,7 +321,11 @@ class FairShareDBSource:
             )
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def get_project_fair_share(
         self,
@@ -349,17 +370,19 @@ class FairShareDBSource:
             fs_result = await db_sess.execute(fs_query)
             fs_row = fs_result.scalar_one_or_none()
 
-            # Step 3: Fetch scaling group row
+            # Step 3: Fetch scaling group row and available slots
             sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
 
-            # Step 4: Return existing record (with default_weight for NULL handling)
+            # Step 4: Return existing record (with merged resource weights)
             if fs_row is not None:
-                return fs_row.to_data(fair_share_spec.default_weight)
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
 
             # Step 5: Create default from scaling group spec
-            # Need available_slots to initialize ResourceSlot keys for client
-            available_slots = await self._fetch_available_slots(db_sess, resource_group)
             now = datetime.now(UTC)
             return self._create_default_project_fair_share(
                 resource_group, project_id, domain_name, fair_share_spec, available_slots, now
@@ -474,8 +497,11 @@ class FairShareDBSource:
         or generated default values.
         """
         if fair_share_row is not None:
-            # Has record: convert
-            return fair_share_row.to_data(spec.default_weight)
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
         # No record: create default
         return self._create_default_project_fair_share(
             resource_group, project_id, domain_name, spec, available_slots, now
@@ -492,7 +518,11 @@ class FairShareDBSource:
             result = await execute_creator(db_sess, creator)
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_user_fair_share(
         self,
@@ -507,7 +537,11 @@ class FairShareDBSource:
             )
             sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
-            return result.row.to_data(fair_share_spec.default_weight)
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     # ==================== Bulk Upsert Operations ====================
 
@@ -611,17 +645,19 @@ class FairShareDBSource:
             fs_result = await db_sess.execute(fs_query)
             fs_row = fs_result.scalar_one_or_none()
 
-            # Step 3: Fetch scaling group row
+            # Step 3: Fetch scaling group row and available slots
             sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
             fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
 
-            # Step 4: Return existing record (with default_weight for NULL handling)
+            # Step 4: Return existing record (with merged resource weights)
             if fs_row is not None:
-                return fs_row.to_data(fair_share_spec.default_weight)
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
+                )
 
             # Step 5: Create default from scaling group spec
-            # Need available_slots to initialize ResourceSlot keys for client
-            available_slots = await self._fetch_available_slots(db_sess, resource_group)
             now = datetime.now(UTC)
             return self._create_default_user_fair_share(
                 resource_group,
@@ -818,8 +854,11 @@ class FairShareDBSource:
         or generated default values.
         """
         if fair_share_row is not None:
-            # Has record: convert
-            return fair_share_row.to_data(spec.default_weight)
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
         # No record: create default
         return self._create_default_user_fair_share(
             resource_group, user_uuid, project_id, domain_name, spec, available_slots, now
@@ -1094,16 +1133,21 @@ class FairShareDBSource:
             lookback_start = today - timedelta(days=spec.lookback_days)
             lookback_end = today
 
-            # 2. Fetch fair shares
-            fair_shares = await self._fetch_fair_shares(db_sess, scaling_group, spec.default_weight)
+            # 2. Fetch cluster capacity (sum of ALIVE schedulable agents' available_slots)
+            cluster_capacity = await self._fetch_cluster_capacity(db_sess, scaling_group)
 
-            # 3. Fetch raw usage buckets (no decay applied)
+            # 3. Fetch fair shares with resource weights merged
+            fair_shares = await self._fetch_fair_shares(
+                db_sess,
+                scaling_group,
+                spec.default_weight,
+                cluster_capacity,
+            )
+
+            # 4. Fetch raw usage buckets (no decay applied)
             raw_usage_buckets = await self._fetch_raw_usage_buckets(
                 db_sess, scaling_group, lookback_start, lookback_end
             )
-
-            # 4. Fetch cluster capacity (sum of ALIVE schedulable agents' available_slots)
-            cluster_capacity = await self._fetch_cluster_capacity(db_sess, scaling_group)
 
         return FairShareCalculationContext(
             fair_shares=fair_shares,
@@ -1191,7 +1235,7 @@ class FairShareDBSource:
         """Create default FairShareData from scaling group spec.
 
         Used when entity exists but has no fair share record.
-        Always sets use_default=True.
+        Always sets use_default=True and all resources use default weights.
 
         Args:
             scaling_group_spec: Scaling group configuration
@@ -1211,6 +1255,7 @@ class FairShareDBSource:
             ),
             metadata=None,  # No metadata for default-generated records
             use_default=True,  # Explicitly mark as default
+            uses_default_resources=frozenset(available_slots.keys()),  # All resources use defaults
         )
 
     def _create_default_domain_fair_share(
@@ -1358,15 +1403,17 @@ class FairShareDBSource:
         db_sess: SASession,
         scaling_group: str,
         default_weight: Decimal,
+        available_slots: ResourceSlot,
     ) -> FairSharesByLevel:
-        """Fetch all fair share records for a resource group."""
+        """Fetch all fair share records for a resource group with merged resource weights."""
         # Get domain fair shares
         domain_query = sa.select(DomainFairShareRow).where(
             DomainFairShareRow.resource_group == scaling_group
         )
         domain_result = await db_sess.execute(domain_query)
         domain_fair_shares = {
-            row.domain_name: row.to_data(default_weight) for row in domain_result.scalars()
+            row.domain_name: row.to_data(default_weight, available_slots)
+            for row in domain_result.scalars()
         }
 
         # Get project fair shares
@@ -1375,7 +1422,8 @@ class FairShareDBSource:
         )
         project_result = await db_sess.execute(project_query)
         project_fair_shares = {
-            row.project_id: row.to_data(default_weight) for row in project_result.scalars()
+            row.project_id: row.to_data(default_weight, available_slots)
+            for row in project_result.scalars()
         }
 
         # Get user fair shares
@@ -1384,7 +1432,9 @@ class FairShareDBSource:
         )
         user_result = await db_sess.execute(user_query)
         user_fair_shares = {
-            UserProjectKey(row.user_uuid, row.project_id): row.to_data(default_weight)
+            UserProjectKey(row.user_uuid, row.project_id): row.to_data(
+                default_weight, available_slots
+            )
             for row in user_result.scalars()
         }
 
