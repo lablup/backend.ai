@@ -38,16 +38,11 @@ from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
 )
-from ai.backend.common.dto.storage.utils import build_attachment_headers
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
-from ai.backend.common.typed_validators import (
-    JWTExpiredError,
-    JWTValidationError,
-    PydanticJWTValidator,
-)
+from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
@@ -57,7 +52,11 @@ from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
 )
 from ai.backend.storage.types import SENTINEL
-from ai.backend.storage.utils import CheckParamSource, check_params
+from ai.backend.storage.utils import (
+    CheckParamSource,
+    build_attachment_headers,
+    check_params,
+)
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -485,13 +484,7 @@ class DownloadHandler:
         """Stream multiple files/directories as a ZIP archive."""
         secret = ctx.root_ctx.local_config.storage_proxy.secret
         validator = PydanticJWTValidator(secret=secret, model=ArchiveDownloadTokenData)
-
-        try:
-            token_data = validator.validate(query.parsed.token)
-        except JWTExpiredError as e:
-            raise web.HTTPUnauthorized(reason="Token expired") from e
-        except JWTValidationError as e:
-            raise web.HTTPUnauthorized(reason=str(e)) from e
+        token_data = validator.validate(query.parsed.token)
 
         async with ctx.root_ctx.get_volume(token_data.volume) as volume:
             vfolder_root = volume.sanitize_vfpath(token_data.vfolder_id)
