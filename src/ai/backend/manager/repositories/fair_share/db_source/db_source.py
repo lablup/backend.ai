@@ -187,14 +187,17 @@ class FairShareDBSource:
             query = sa.select(DomainFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.DomainFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.DomainFairShareRow.to_data(
-                    specs[row.DomainFairShareRow.resource_group].default_weight
+                    specs[row.DomainFairShareRow.resource_group].default_weight,
+                    capacities[row.DomainFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -397,14 +400,17 @@ class FairShareDBSource:
             query = sa.select(ProjectFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.ProjectFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.ProjectFairShareRow.to_data(
-                    specs[row.ProjectFairShareRow.resource_group].default_weight
+                    specs[row.ProjectFairShareRow.resource_group].default_weight,
+                    capacities[row.ProjectFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -746,21 +752,24 @@ class FairShareDBSource:
             query = sa.select(UserFairShareRow)
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.UserFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.UserFairShareRow.to_data(
-                    specs[row.UserFairShareRow.resource_group].default_weight
+                    specs[row.UserFairShareRow.resource_group].default_weight,
+                    capacities[row.UserFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
             return UserFairShareSearchResult(
                 items=items,
                 total_count=result.total_count,
-                has_next_page=result.has_next_page,
+                has_next_page=result.has_previous_page,
                 has_previous_page=result.has_previous_page,
             )
 
@@ -1397,6 +1406,44 @@ class FairShareDBSource:
                 total_capacity = total_capacity + slots
 
         return total_capacity
+
+    async def _fetch_cluster_capacities_batch(
+        self,
+        db_sess: SASession,
+        scaling_groups: Sequence[str],
+    ) -> dict[str, ResourceSlot]:
+        """Fetch total available slots for multiple scaling groups.
+
+        Args:
+            db_sess: Database session
+            scaling_groups: List of scaling group names
+
+        Returns:
+            Mapping from scaling group name to its cluster capacity (sum of available_slots)
+        """
+        if not scaling_groups:
+            return {}
+
+        # Query all agents in the given scaling groups
+        query = sa.select(
+            AgentRow.scaling_group,
+            AgentRow.available_slots,
+        ).where(
+            sa.and_(
+                AgentRow.scaling_group.in_(scaling_groups),
+                AgentRow.status == AgentStatus.ALIVE,
+                AgentRow.schedulable == sa.true(),
+            )
+        )
+        result = await db_sess.execute(query)
+
+        # Group by scaling_group and sum available_slots
+        capacities: dict[str, ResourceSlot] = {sg: ResourceSlot() for sg in scaling_groups}
+        for row in result:
+            if row.available_slots:
+                capacities[row.scaling_group] = capacities[row.scaling_group] + row.available_slots
+
+        return capacities
 
     async def _fetch_fair_shares(
         self,
