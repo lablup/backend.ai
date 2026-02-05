@@ -11,10 +11,8 @@ from __future__ import annotations
 import logging
 import uuid
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.repositories.project_config.repository import ProjectConfigRepository
@@ -62,13 +60,7 @@ class ProjectConfigService:
 
         Validates that admin has permission to modify the project's dotfiles.
         """
-        user = current_user()
-        if user is None:
-            raise InsufficientPrivilege("Authentication required")
-
         project = await self._project_config_repository.resolve_project_for_admin(
-            user.domain_name,
-            user.is_superadmin,
             domain_name,
             project_id_or_name,
         )
@@ -84,15 +76,7 @@ class ProjectConfigService:
 
         Validates that user has permission to access the project's dotfiles.
         """
-        user = current_user()
-        if user is None:
-            raise InsufficientPrivilege("Authentication required")
-
         project = await self._project_config_repository.resolve_project_for_user(
-            user.user_id,
-            user.domain_name,
-            user.is_admin,
-            user.is_superadmin,
             domain_name,
             project_id_or_name,
         )
