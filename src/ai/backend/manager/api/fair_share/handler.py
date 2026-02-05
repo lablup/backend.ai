@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.fair_share import (
     BulkUpsertProjectFairShareWeightResponse,
     BulkUpsertUserFairShareWeightRequest,
     BulkUpsertUserFairShareWeightResponse,
+    DomainUsageBucketFilter,
     GetDomainFairSharePathParam,
     GetDomainFairShareResponse,
     GetProjectFairSharePathParam,
@@ -29,13 +30,17 @@ from ai.backend.common.dto.manager.fair_share import (
     GetUserFairSharePathParam,
     GetUserFairShareResponse,
     PaginationInfo,
+    ProjectUsageBucketFilter,
     ResourceGroupFairShareSpecItemDTO,
     RGDomainFairSharePathParam,
     RGDomainFairShareSearchPathParam,
+    RGDomainUsageBucketSearchPathParam,
     RGProjectFairSharePathParam,
     RGProjectFairShareSearchPathParam,
+    RGProjectUsageBucketSearchPathParam,
     RGUserFairSharePathParam,
     RGUserFairShareSearchPathParam,
+    RGUserUsageBucketSearchPathParam,
     SearchDomainFairSharesRequest,
     SearchDomainFairSharesResponse,
     SearchDomainUsageBucketsRequest,
@@ -61,7 +66,9 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertUserFairShareWeightPathParam,
     UpsertUserFairShareWeightRequest,
     UpsertUserFairShareWeightResponse,
+    UserUsageBucketFilter,
 )
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.manager.api.auth import auth_required_for_method
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.api.types import CORSOptions, WebMiddleware
@@ -393,6 +400,188 @@ class FairShareAPIHandler:
         processors = processors_ctx.processors
 
         querier = self._adapter.build_user_usage_bucket_querier(body.parsed)
+
+        action_result = await processors.resource_usage.search_user_usage_buckets.wait_for_complete(
+            SearchUserUsageBucketsAction(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
+            )
+        )
+
+        resp = SearchUserUsageBucketsResponse(
+            items=[self._adapter.convert_user_usage_bucket_to_dto(b) for b in action_result.items],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # RG-Scoped Domain Usage Bucket
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_domain_usage_buckets(
+        self,
+        path: PathParam[RGDomainUsageBucketSearchPathParam],
+        body: BodyParam[SearchDomainUsageBucketsRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search domain usage buckets within resource group scope."""
+        processors = processors_ctx.processors
+
+        # Filter에 resource_group 강제 주입
+        filter = body.parsed.filter
+        if filter is None:
+            filter = DomainUsageBucketFilter(
+                resource_group=StringFilter(equals=path.parsed.resource_group)
+            )
+        else:
+            if filter.resource_group is None:
+                filter.resource_group = StringFilter(equals=path.parsed.resource_group)
+            elif filter.resource_group.equals != path.parsed.resource_group:
+                raise web.HTTPBadRequest(reason="Filter resource_group must match path parameter")
+
+        modified_request = SearchDomainUsageBucketsRequest(
+            filter=filter,
+            order=body.parsed.order,
+            limit=body.parsed.limit,
+            offset=body.parsed.offset,
+        )
+
+        querier = self._adapter.build_domain_usage_bucket_querier(modified_request)
+
+        action_result = (
+            await processors.resource_usage.search_domain_usage_buckets.wait_for_complete(
+                SearchDomainUsageBucketsAction(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                )
+            )
+        )
+
+        resp = SearchDomainUsageBucketsResponse(
+            items=[
+                self._adapter.convert_domain_usage_bucket_to_dto(b) for b in action_result.items
+            ],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # RG-Scoped Project Usage Bucket
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_project_usage_buckets(
+        self,
+        path: PathParam[RGProjectUsageBucketSearchPathParam],
+        body: BodyParam[SearchProjectUsageBucketsRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search project usage buckets within resource group and domain scope."""
+        processors = processors_ctx.processors
+
+        # Filter에 resource_group, domain_name 강제 주입
+        filter = body.parsed.filter
+        if filter is None:
+            filter = ProjectUsageBucketFilter(
+                resource_group=StringFilter(equals=path.parsed.resource_group),
+                domain_name=StringFilter(equals=path.parsed.domain_name),
+            )
+        else:
+            if filter.resource_group is None:
+                filter.resource_group = StringFilter(equals=path.parsed.resource_group)
+            elif filter.resource_group.equals != path.parsed.resource_group:
+                raise web.HTTPBadRequest(reason="Filter resource_group must match path parameter")
+
+            if filter.domain_name is None:
+                filter.domain_name = StringFilter(equals=path.parsed.domain_name)
+            elif filter.domain_name.equals != path.parsed.domain_name:
+                raise web.HTTPBadRequest(reason="Filter domain_name must match path parameter")
+
+        modified_request = SearchProjectUsageBucketsRequest(
+            filter=filter,
+            order=body.parsed.order,
+            limit=body.parsed.limit,
+            offset=body.parsed.offset,
+        )
+
+        querier = self._adapter.build_project_usage_bucket_querier(modified_request)
+
+        action_result = (
+            await processors.resource_usage.search_project_usage_buckets.wait_for_complete(
+                SearchProjectUsageBucketsAction(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                )
+            )
+        )
+
+        resp = SearchProjectUsageBucketsResponse(
+            items=[
+                self._adapter.convert_project_usage_bucket_to_dto(b) for b in action_result.items
+            ],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=body.parsed.offset,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    # RG-Scoped User Usage Bucket
+
+    @auth_required_for_method
+    @api_handler
+    async def rg_search_user_usage_buckets(
+        self,
+        path: PathParam[RGUserUsageBucketSearchPathParam],
+        body: BodyParam[SearchUserUsageBucketsRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search user usage buckets within resource group, domain, and project scope."""
+        processors = processors_ctx.processors
+
+        # Filter에 resource_group, domain_name, project_id 강제 주입
+        filter = body.parsed.filter
+        if filter is None:
+            filter = UserUsageBucketFilter(
+                resource_group=StringFilter(equals=path.parsed.resource_group),
+                domain_name=StringFilter(equals=path.parsed.domain_name),
+                project_id=UUIDFilter(equals=path.parsed.project_id),
+            )
+        else:
+            if filter.resource_group is None:
+                filter.resource_group = StringFilter(equals=path.parsed.resource_group)
+            elif filter.resource_group.equals != path.parsed.resource_group:
+                raise web.HTTPBadRequest(reason="Filter resource_group must match path parameter")
+
+            if filter.domain_name is None:
+                filter.domain_name = StringFilter(equals=path.parsed.domain_name)
+            elif filter.domain_name.equals != path.parsed.domain_name:
+                raise web.HTTPBadRequest(reason="Filter domain_name must match path parameter")
+
+            if filter.project_id is None:
+                filter.project_id = UUIDFilter(equals=path.parsed.project_id)
+            elif filter.project_id.equals != path.parsed.project_id:
+                raise web.HTTPBadRequest(reason="Filter project_id must match path parameter")
+
+        modified_request = SearchUserUsageBucketsRequest(
+            filter=filter,
+            order=body.parsed.order,
+            limit=body.parsed.limit,
+            offset=body.parsed.offset,
+        )
+
+        querier = self._adapter.build_user_usage_bucket_querier(modified_request)
 
         action_result = await processors.resource_usage.search_user_usage_buckets.wait_for_complete(
             SearchUserUsageBucketsAction(
@@ -980,6 +1169,29 @@ def create_app(
             "POST",
             "/usage-buckets/users/search",
             api_handler.search_user_usage_buckets,
+        )
+    )
+
+    # RG-scoped usage bucket routes
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/usage-buckets/domains/search",
+            api_handler.rg_search_domain_usage_buckets,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/domains/{domain_name}/usage-buckets/projects/search",
+            api_handler.rg_search_project_usage_buckets,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "POST",
+            "/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/usage-buckets/users/search",
+            api_handler.rg_search_user_usage_buckets,
         )
     )
 
