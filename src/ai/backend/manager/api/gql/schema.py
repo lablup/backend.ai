@@ -157,6 +157,12 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .project_v2 import (
+    admin_projects_v2,
+    domain_projects_v2,
+    project_domain_v2,
+    project_v2,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -322,6 +328,11 @@ class Query:
     domain_v2 = domain_v2
     admin_domains_v2 = admin_domains_v2
     rg_domains_v2 = rg_domains_v2
+    # Project V2 APIs
+    project_v2 = project_v2
+    admin_projects_v2 = admin_projects_v2
+    domain_projects_v2 = domain_projects_v2
+    project_domain_v2 = project_domain_v2
 
 
 @strawberry.type
