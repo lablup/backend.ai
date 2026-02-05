@@ -10318,6 +10318,18 @@ enum UserFairShareOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+input UserFairShareScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter fair shares by."""
+  resourceGroup: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
+}
+
 type UserGroup
   @join__type(graph: GRAPHENE)
 {
@@ -10662,6 +10674,16 @@ input UserUsageBucketOrderBy
   direction: OrderDirection! = DESC
 }
 
+input UserUsageScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter usage buckets by."""
+  resourceGroup: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
+}
+
 """Added in 25.6.0."""
 type UserUtilizationMetric
   @join__type(graph: GRAPHENE)
@@ -10719,6 +10741,16 @@ type UserV2 implements Node
 
   """Creation and modification timestamps."""
   timestamps: EntityTimestamps!
+
+  """
+  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """
+  Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 }
 
 """

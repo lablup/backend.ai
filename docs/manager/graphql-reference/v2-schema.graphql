@@ -5558,6 +5558,16 @@ enum UserFairShareOrderField {
   CREATED_AT
 }
 
+input UserFairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroup: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
+}
+
 extend type UserNode @key(fields: "id") {
   id: ID! @external
 }
@@ -5746,6 +5756,14 @@ input UserUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+input UserUsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroup: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
+}
+
 """
 Added in 26.2.0. User entity with structured field groups. Provides comprehensive user information organized into logical categories: basic_info (profile), status (account state), organization (permissions), security (auth settings), container (execution settings), and timestamps.
 """
@@ -5770,6 +5788,16 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Creation and modification timestamps."""
   timestamps: EntityTimestamps!
+
+  """
+  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """
+  Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 }
 
 """
