@@ -196,6 +196,30 @@ GraphQL Resolver → check_admin_only (if admin) → Processor → Service → R
 - `src/ai/backend/manager/api/gql/types.py` - Input types
 - `src/ai/backend/manager/api/gql/utils.py` - Utilities
 
+### Type System Rules
+
+**Strawberry Runtime Evaluation:**
+- Strawberry types are evaluated at runtime
+- NEVER use TYPE_CHECKING for Strawberry types (Connection, Filter, OrderBy, Input, Type)
+- ALWAYS import Strawberry types directly at module level
+- Only use TYPE_CHECKING for data layer types not used by Strawberry
+- If lazy import needed: use strawberry.lazy() or string-based forward references
+
+**Naming Convention:**
+- All GraphQL types MUST have `GQL` suffix (DomainGQL, DomainScopeGQL, DomainFilterGQL)
+- Distinguishes GraphQL types from data layer types
+- Applies to: @strawberry.type, @strawberry.input, @strawberry.enum classes
+
+**Scope vs Filter:**
+- Scope: Required context parameters (resource_group, domain_name, project_id)
+- Filter: Optional filtering conditions (name contains, status equals, created after)
+- NEVER put optional fields in Scope - use Filter instead
+- Scope fields must all be required (no default values, no Optional types)
+
+**See examples:**
+- `api/gql/domain_v2/types/node.py` - DomainV2GQL with fair_shares/usage_buckets
+- `api/gql/fair_share/types/*.py` - Scope and Filter patterns
+
 ### Scope Pattern
 
 **Input Types:**
