@@ -45,7 +45,7 @@ from ai.backend.manager.repositories.domain.purgers import (
     DomainBatchPurgerSpec,
     DomainKernelBatchPurgerSpec,
 )
-from ai.backend.manager.repositories.domain.types import DomainSearchResult
+from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 domain_repository_resilience = Resilience(
@@ -406,3 +406,19 @@ class DomainRepository:
             DomainSearchResult with items, total_count, and pagination flags.
         """
         return await self._db_source.search_domains(querier)
+
+    async def search_rg_domains(
+        self,
+        scope: DomainSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainSearchResult:
+        """Search domains within a resource group scope.
+
+        Args:
+            scope: DomainSearchScope containing resource_group filter.
+            querier: Contains additional conditions, orders, and pagination.
+
+        Returns:
+            DomainSearchResult with items, total_count, and pagination flags.
+        """
+        return await self._db_source.search_rg_domains(scope, querier)

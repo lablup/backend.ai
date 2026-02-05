@@ -35,6 +35,10 @@ from ai.backend.manager.services.domain.actions.search_domains import (
     SearchDomainsAction,
     SearchDomainsActionResult,
 )
+from ai.backend.manager.services.domain.actions.search_rg_domains import (
+    SearchRGDomainsAction,
+    SearchRGDomainsActionResult,
+)
 
 from .service import DomainService
 
@@ -48,6 +52,7 @@ class DomainProcessors(AbstractProcessorPackage):
     purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
     get_domain: ActionProcessor[GetDomainAction, GetDomainActionResult]
     search_domains: ActionProcessor[SearchDomainsAction, SearchDomainsActionResult]
+    search_rg_domains: ActionProcessor[SearchRGDomainsAction, SearchRGDomainsActionResult]
 
     def __init__(self, service: DomainService, action_monitors: list[ActionMonitor]) -> None:
         self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
@@ -58,6 +63,7 @@ class DomainProcessors(AbstractProcessorPackage):
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
         self.get_domain = ActionProcessor(service.get_domain, action_monitors)
         self.search_domains = ActionProcessor(service.search_domains, action_monitors)
+        self.search_rg_domains = ActionProcessor(service.search_rg_domains, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -70,4 +76,5 @@ class DomainProcessors(AbstractProcessorPackage):
             PurgeDomainAction.spec(),
             GetDomainAction.spec(),
             SearchDomainsAction.spec(),
+            SearchRGDomainsAction.spec(),
         ]

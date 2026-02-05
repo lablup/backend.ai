@@ -18,8 +18,10 @@ from ai.backend.manager.api.gql.domain_v2.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.repositories.domain.options import DomainConditions, DomainOrders
+from ai.backend.manager.repositories.domain.types import DomainSearchScope
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 
 
 @lru_cache(maxsize=1)
@@ -109,6 +111,77 @@ async def fetch_admin_domains(
     # Execute via processor
     action_result = await processors.domain.search_domains.wait_for_complete(
         SearchDomainsAction(querier=querier)
+    )
+
+    # Build connection
+    nodes = [DomainV2GQL.from_data(data) for data in action_result.items]
+    edges = [DomainV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return DomainV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=action_result.total_count,
+    )
+
+
+async def fetch_rg_domains(
+    info: Info[StrawberryGQLContext],
+    scope: DomainSearchScope,
+    filter: DomainV2Filter | None = None,
+    order_by: list[DomainV2OrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> DomainV2Connection:
+    """Fetch domains within a resource group scope.
+
+    This fetcher returns only domains that are associated with the specified resource group
+    through the sgroups_for_domains relationship.
+
+    Args:
+        info: Strawberry GraphQL context.
+        scope: DomainSearchScope containing resource_group filter.
+        filter: Optional filter criteria.
+        order_by: Optional ordering specification.
+        before: Cursor for backward pagination.
+        after: Cursor for forward pagination.
+        first: Number of items from the start.
+        last: Number of items from the end.
+        limit: Maximum number of items (offset-based).
+        offset: Starting position (offset-based).
+
+    Returns:
+        DomainV2Connection with paginated domain records.
+    """
+    processors = info.context.processors
+
+    # Build querier
+    querier = info.context.gql_adapter.build_querier(
+        PaginationOptions(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        get_domain_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
+        base_conditions=None,
+    )
+
+    # Execute via processor with scope
+    action_result = await processors.domain.search_rg_domains.wait_for_complete(
+        SearchRGDomainsAction(scope=scope, querier=querier)
     )
 
     # Build connection

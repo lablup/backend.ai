@@ -8,9 +8,10 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.domain.types import DomainSearchResult
+from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -52,6 +53,42 @@ class DomainDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DomainRow)
             result = await execute_batch_querier(db_sess, query, querier)
+
+            items = [row.DomainRow.to_data() for row in result.rows]
+
+            return DomainSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_rg_domains(
+        self,
+        scope: DomainSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainSearchResult:
+        """Search domains within a resource group scope.
+
+        Args:
+            scope: DomainSearchScope containing resource_group filter.
+            querier: Contains additional conditions, orders, and pagination.
+
+        Returns:
+            DomainSearchResult with items, total_count, and pagination flags.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Execute query with join to sgroups_for_domains
+            query = (
+                sa.select(DomainRow)
+                .join(
+                    ScalingGroupForDomainRow,
+                    DomainRow.name == ScalingGroupForDomainRow.domain,
+                )
+                .distinct()
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
 
             items = [row.DomainRow.to_data() for row in result.rows]
 

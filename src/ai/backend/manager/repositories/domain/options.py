@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 __all__ = (
@@ -135,6 +136,24 @@ class DomainConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.modified_at > dt
+
+        return inner
+
+    # ==================== Resource Group Filters ====================
+
+    @staticmethod
+    def by_resource_group(resource_group: str) -> QueryCondition:
+        """Filter domains by resource group (scaling group).
+
+        This requires joining with the sgroups_for_domains table.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.exists(
+                sa.select(1)
+                .where(ScalingGroupForDomainRow.domain == DomainRow.name)
+                .where(ScalingGroupForDomainRow.scaling_group == resource_group)
+            )
 
         return inner
 
