@@ -117,6 +117,8 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_image_alias,
+    admin_image_aliases,
     admin_images_v2,
     container_registry_images_v2,
     image_v2,
@@ -299,6 +301,9 @@ class Query:
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    # Image Alias APIs
+    admin_image_alias = admin_image_alias
+    admin_image_aliases = admin_image_aliases
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config

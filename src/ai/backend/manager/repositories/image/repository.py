@@ -19,6 +19,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
     ImageAgentInstallStatus,
     ImageAliasData,
+    ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
     ImageListResult,
@@ -322,10 +323,9 @@ class ImageRepository:
         return await self._db_source.search_images(querier)
 
     @image_repository_resilience.apply()
-    async def rescan_images(
-        self,
-        registry_or_image: str | None = None,
-        project: str | None = None,
-        reporter: ProgressReporter | None = None,
-    ) -> RescanImagesResult:
-        return await self._db_source.rescan_images(registry_or_image, project, reporter)
+    async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        Returns ImageAliasListResult with items and pagination info.
+        """
+        return await self._db_source.search_aliases(querier)
