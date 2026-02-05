@@ -2959,7 +2959,7 @@ type Mutation {
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
 
   """
-  Added in 25.16.0. Update artifact storage metadata (common fields like name)
+  Added in 26.2.0. Update artifact storage metadata (common fields like name)
   """
   updateArtifactStorage(input: UpdateArtifactStorageInput!): UpdateArtifactStoragePayload!
 
@@ -4959,15 +4959,21 @@ type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
-"""Added in 25.16.0. Input for updating artifact storage metadata"""
+"""Added in 26.2.0. Input for updating artifact storage metadata"""
 input UpdateArtifactStorageInput {
+  """The ID of the artifact storage"""
   id: ID!
+
+  """The new name for the artifact storage"""
   name: String
 }
 
-"""Added in 25.16.0. Payload for updating artifact storage metadata"""
+"""Added in 26.2.0. Payload for updating artifact storage metadata"""
 type UpdateArtifactStoragePayload {
+  """The ID of the updated artifact storage"""
   id: ID!
+
+  """The name of the updated artifact storage"""
   name: String!
 }
 

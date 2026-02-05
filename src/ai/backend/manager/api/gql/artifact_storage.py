@@ -16,12 +16,14 @@ from ai.backend.manager.types import OptionalState
 from .types import StrawberryGQLContext
 
 
-@strawberry.input(description="Added in 25.16.0. Input for updating artifact storage metadata")
+@strawberry.input(description="Added in 26.2.0. Input for updating artifact storage metadata")
 class UpdateArtifactStorageInput:
     """Input for updating artifact storage metadata (common fields like name)."""
 
-    id: ID  # This is the storage_id (ObjectStorage.id or VFSStorage.id)
-    name: str | None = UNSET
+    id: ID = strawberry.field(description="The ID of the artifact storage")
+    name: str | None = strawberry.field(
+        default=UNSET, description="The new name for the artifact storage"
+    )
 
     def to_updater(self) -> Updater[ArtifactStorageRow]:
         spec = ArtifactStorageUpdaterSpec(
@@ -30,15 +32,15 @@ class UpdateArtifactStorageInput:
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
-@strawberry.type(description="Added in 25.16.0. Payload for updating artifact storage metadata")
+@strawberry.type(description="Added in 26.2.0. Payload for updating artifact storage metadata")
 class UpdateArtifactStoragePayload:
-    id: ID
-    name: str
+    id: ID = strawberry.field(description="The ID of the updated artifact storage")
+    name: str = strawberry.field(description="The name of the updated artifact storage")
 
 
 @strawberry.mutation(  # type: ignore[misc]
     name="updateArtifactStorage",
-    description="Added in 25.16.0. Update artifact storage metadata (common fields like name)",
+    description="Added in 26.2.0. Update artifact storage metadata (common fields like name)",
 )
 async def update_artifact_storage(
     input: UpdateArtifactStorageInput, info: Info[StrawberryGQLContext]
