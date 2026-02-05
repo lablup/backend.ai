@@ -3964,9 +3964,9 @@ type FairShareScalingGroupSpec
   defaultWeight: Decimal!
 
   """
-  Weights for each resource type when calculating normalized usage. If a resource type is not specified, default weight (1.0) is used.
+  Added in 26.2.0. Weights for each resource type with default indicators. All resource types from capacity are included. Shows which resources use explicit vs default weights.
   """
-  resourceWeights: ResourceSlot!
+  resourceWeights: [ResourceWeightEntry!]!
 }
 
 """
@@ -8381,7 +8381,7 @@ type ResourceGroup implements Node
   scheduler: ResourceGroupSchedulerConfig!
 
   """
-  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
+  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
   """
   fairShareSpec: FairShareScalingGroupSpec!
 
