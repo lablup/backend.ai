@@ -1214,6 +1214,35 @@ class VFolderID:
             return cls(QuotaScopeID.parse(first), UUID(hex=second))
         return cls(None, UUID(hex=first))
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for VFolderID serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def validate_vfolder_id(v: Any) -> VFolderID:
+            if isinstance(v, VFolderID):
+                return v
+            if isinstance(v, str):
+                return cls.from_str(v)
+            raise ValueError(f"Invalid VFolderID: {v}")
+
+        # Accept both VFolderID objects and strings
+        return core_schema.no_info_after_validator_function(
+            validate_vfolder_id,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+            ),
+        )
+
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
         match quota_scope_id:

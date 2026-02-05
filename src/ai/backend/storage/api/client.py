@@ -473,7 +473,13 @@ async def prepare_tus_session_headers(
 
 
 class DownloadHandler:
-    """Handler class for download operations following manager's api_handler pattern."""
+    """Handler class for download operations following manager's api_handler pattern.
+
+    Future refactoring: When StreamReader class is settled and if we decide to put
+    Reader class in api_handler, we will refactor this to receive StreamReader as
+    interface, which decouples handler logic from aiohttp web.Request/Response objects
+    for better testability and separation of concerns.
+    """
 
     @stream_api_handler
     async def download_archive(
@@ -500,12 +506,9 @@ class DownloadHandler:
                     raise web.HTTPNotFound(reason=f"File not found: {relpath}")
 
             reader = ZipArchiveStreamReader(vfolder_root)
-            try:
-                reader.add_entries(sanitized)
-            except ValueError as e:
-                raise InvalidAPIParameters(extra_msg=str(e)) from e
+            reader.add_entries(sanitized)
 
-            headers = build_attachment_headers("archive.zip", reader.content_type())
+            headers = build_attachment_headers(reader.filename(), reader.content_type())
             return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
 
 
