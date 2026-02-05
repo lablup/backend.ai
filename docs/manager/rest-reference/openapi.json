@@ -2941,6 +2941,146 @@
         "title": "CreateNotificationChannelRequest",
         "type": "object"
       },
+      "EmailSpecResponse": {
+        "description": "Response model for email specification.",
+        "properties": {
+          "smtp": {
+            "$ref": "#/components/schemas/SMTPConnection",
+            "description": "SMTP connection settings"
+          },
+          "message": {
+            "$ref": "#/components/schemas/EmailMessage",
+            "description": "Email message settings"
+          },
+          "auth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SMTPAuth"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SMTP authentication credentials"
+          }
+        },
+        "required": [
+          "smtp",
+          "message"
+        ],
+        "title": "EmailSpecResponse",
+        "type": "object"
+      },
+      "NotificationChannelDTO": {
+        "description": "DTO for notification channel data.",
+        "properties": {
+          "id": {
+            "description": "Channel ID",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Channel name",
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Channel description",
+            "title": "Description"
+          },
+          "channel_type": {
+            "$ref": "#/components/schemas/NotificationChannelType",
+            "description": "Channel type"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookSpecResponse"
+              },
+              {
+                "$ref": "#/components/schemas/EmailSpecResponse"
+              }
+            ],
+            "description": "Channel configuration",
+            "title": "Spec"
+          },
+          "enabled": {
+            "description": "Whether the channel is enabled",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "created_at": {
+            "description": "Creation timestamp",
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "description": "ID of user who created the channel",
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "Last update timestamp",
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "channel_type",
+          "spec",
+          "enabled",
+          "created_at",
+          "created_by",
+          "updated_at"
+        ],
+        "title": "NotificationChannelDTO",
+        "type": "object"
+      },
+      "WebhookSpecResponse": {
+        "description": "Response model for webhook specification.",
+        "properties": {
+          "url": {
+            "description": "Webhook URL",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "WebhookSpecResponse",
+        "type": "object"
+      },
+      "CreateNotificationChannelResponse": {
+        "description": "Response for creating a notification channel.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/NotificationChannelDTO",
+            "description": "Created channel"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "CreateNotificationChannelResponse",
+        "type": "object"
+      },
       "NotificationChannelFilter": {
         "description": "Filter for notification channels.",
         "properties": {
@@ -3292,6 +3432,77 @@
         "title": "SearchNotificationChannelsRequest",
         "type": "object"
       },
+      "PaginationInfo": {
+        "description": "Pagination information.",
+        "properties": {
+          "total": {
+            "description": "Total number of items",
+            "title": "Total",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Number of items skipped",
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum items returned",
+            "title": "Limit"
+          }
+        },
+        "required": [
+          "total",
+          "offset"
+        ],
+        "title": "PaginationInfo",
+        "type": "object"
+      },
+      "ListNotificationChannelsResponse": {
+        "description": "Response for listing notification channels.",
+        "properties": {
+          "channels": {
+            "description": "List of channels",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannelDTO"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "Pagination information"
+          }
+        },
+        "required": [
+          "channels",
+          "pagination"
+        ],
+        "title": "ListNotificationChannelsResponse",
+        "type": "object"
+      },
+      "GetNotificationChannelResponse": {
+        "description": "Response for getting a notification channel.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/NotificationChannelDTO",
+            "description": "Channel data"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "GetNotificationChannelResponse",
+        "type": "object"
+      },
       "UpdateNotificationChannelRequest": {
         "description": "Request to update a notification channel.",
         "properties": {
@@ -3354,6 +3565,35 @@
         "title": "UpdateNotificationChannelRequest",
         "type": "object"
       },
+      "UpdateNotificationChannelResponse": {
+        "description": "Response for updating a notification channel.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/NotificationChannelDTO",
+            "description": "Updated channel"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "UpdateNotificationChannelResponse",
+        "type": "object"
+      },
+      "DeleteNotificationChannelResponse": {
+        "description": "Response for deleting a notification channel.",
+        "properties": {
+          "deleted": {
+            "description": "Whether the channel was deleted",
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteNotificationChannelResponse",
+        "type": "object"
+      },
       "ValidateNotificationChannelRequest": {
         "description": "Request body for validating a notification channel.",
         "properties": {
@@ -3368,6 +3608,22 @@
           "test_message"
         ],
         "title": "ValidateNotificationChannelRequest",
+        "type": "object"
+      },
+      "ValidateNotificationChannelResponse": {
+        "description": "Response for validating a notification channel.",
+        "properties": {
+          "channel_id": {
+            "description": "ID of the validated channel",
+            "format": "uuid",
+            "title": "Channel Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel_id"
+        ],
+        "title": "ValidateNotificationChannelResponse",
         "type": "object"
       },
       "NotificationRuleType": {
@@ -16107,7 +16363,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateNotificationChannelResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16136,7 +16399,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNotificationChannelsResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16165,7 +16435,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetNotificationChannelResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16192,7 +16469,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotificationChannelResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16228,7 +16512,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteNotificationChannelResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -16257,7 +16548,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateNotificationChannelResponse"
+                }
+              }
+            }
           }
         },
         "security": [
