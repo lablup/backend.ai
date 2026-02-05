@@ -472,13 +472,6 @@ type AgentV2 implements Node
   id: ID!
 
   """
-  Hardware resource capacity, usage, and availability information.
-  Contains capacity (total), used (occupied by sessions), and free (available) resource slots
-  including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
-  """
-  resourceInfo: AgentResource!
-
-  """
   Current operational status and lifecycle timestamps.
   Includes the agent's status (ALIVE, LOST, etc.), status change history,
   initial registration time, and schedulability state.
@@ -511,6 +504,13 @@ type AgentV2 implements Node
   quota management, and workload isolation across different user groups or projects.
   """
   scalingGroup: String!
+
+  """
+  Hardware resource capacity, usage, and availability information.
+  Contains capacity (total), used (occupied by sessions), and free (available) resource slots
+  including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
+  """
+  resourceInfo: AgentResource!
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int!

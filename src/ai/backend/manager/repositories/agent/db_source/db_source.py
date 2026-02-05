@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -6,7 +7,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.types import AgentId, ImageID
+from ai.backend.common.resource.types import AgentResourceData
+from ai.backend.common.types import AgentId, ImageID, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -141,6 +143,44 @@ class AgentDBSource:
     async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
+
+    async def get_agent_resource_slots(
+        self,
+        agent_ids: Sequence[AgentId],
+    ) -> dict[AgentId, AgentResourceData]:
+        """Calculates resource usage data for the specified agents.
+
+        Args:
+            agent_ids: List of agent IDs to calculate resources for.
+        Returns:
+            A mapping from agent ID to AgentResourceData.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(AgentRow)
+                .where(AgentRow.id.in_(agent_ids))
+                .options(
+                    selectinload(AgentRow.kernels),
+                    with_loader_criteria(
+                        KernelRow,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                )
+            )
+            result: dict[AgentId, AgentResourceData] = {}
+            agent_rows: list[AgentRow] = list((await db_sess.scalars(query)).all())
+            for agent_row in agent_rows:
+                agent_id = AgentId(agent_row.id)
+                capacity_slots = agent_row.available_slots or ResourceSlot()
+                used_slots = agent_row.actual_occupied_slots()
+                free_slots = capacity_slots - used_slots
+                result[agent_id] = AgentResourceData(
+                    used_slots=used_slots,
+                    free_slots=free_slots,
+                    capacity_slots=capacity_slots,
+                )
+
+            return result
 
     async def search_agents(
         self,
