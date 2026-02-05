@@ -703,6 +703,21 @@ type ArtifactStatusChangedPayload {
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.2.0. Artifact storage metadata"""
+type ArtifactStorage {
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The name of the artifact storage"""
+  name: String!
+
+  """The ID of the underlying storage (ObjectStorage or VFSStorage)"""
+  storageId: ID!
+
+  """The type of the artifact storage"""
+  type: String!
+}
+
 enum ArtifactType {
   MODEL
   PACKAGE
@@ -4970,11 +4985,8 @@ input UpdateArtifactStorageInput {
 
 """Added in 26.2.0. Payload for updating artifact storage metadata"""
 type UpdateArtifactStoragePayload {
-  """The ID of the updated artifact storage"""
-  id: ID!
-
-  """The name of the updated artifact storage"""
-  name: String!
+  """The updated artifact storage"""
+  artifactStorage: ArtifactStorage!
 }
 
 input UpdateAutoScalingRuleInput {

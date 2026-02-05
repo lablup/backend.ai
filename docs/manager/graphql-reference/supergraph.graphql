@@ -990,6 +990,23 @@ type ArtifactStatusChangedPayload
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 26.2.0. Artifact storage metadata"""
+type ArtifactStorage
+  @join__type(graph: STRAWBERRY)
+{
+  """The ID of the artifact storage"""
+  id: ID!
+
+  """The name of the artifact storage"""
+  name: String!
+
+  """The ID of the underlying storage (ObjectStorage or VFSStorage)"""
+  storageId: ID!
+
+  """The type of the artifact storage"""
+  type: String!
+}
+
 enum ArtifactType
   @join__type(graph: STRAWBERRY)
 {
@@ -9566,11 +9583,8 @@ input UpdateArtifactStorageInput
 type UpdateArtifactStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """The ID of the updated artifact storage"""
-  id: ID!
-
-  """The name of the updated artifact storage"""
-  name: String!
+  """The updated artifact storage"""
+  artifactStorage: ArtifactStorage!
 }
 
 input UpdateAutoScalingRuleInput
