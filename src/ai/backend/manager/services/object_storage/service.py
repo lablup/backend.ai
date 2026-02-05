@@ -77,7 +77,9 @@ class ObjectStorageService:
         Create a new object storage.
         """
         log.info("Creating object storage with data: {}", action.creator)
-        storage_data = await self._object_storage_repository.create(action.creator, action.meta)
+        storage_data = await self._object_storage_repository.create(
+            action.creator, action.meta_creator
+        )
         return CreateObjectStorageActionResult(result=storage_data)
 
     async def update(self, action: UpdateObjectStorageAction) -> UpdateObjectStorageActionResult:
@@ -85,7 +87,9 @@ class ObjectStorageService:
         Update an existing object storage.
         """
         log.info("Updating object storage with id: {}", action.updater.pk_value)
-        storage_data = await self._object_storage_repository.update(action.updater, action.meta)
+        storage_data = await self._object_storage_repository.update(
+            action.updater, action.meta_updater
+        )
         return UpdateObjectStorageActionResult(result=storage_data)
 
     async def delete(self, action: DeleteObjectStorageAction) -> DeleteObjectStorageActionResult:

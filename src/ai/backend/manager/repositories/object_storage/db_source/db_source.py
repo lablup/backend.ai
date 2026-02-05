@@ -5,10 +5,9 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorMeta,
-    ArtifactStorageModifierMeta,
+    ArtifactStorageCreatorSpec,
+    ArtifactStorageUpdaterSpec,
 )
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.object_storage import (
@@ -100,7 +99,7 @@ class ObjectStorageDBSource:
             return row.object_storage_row.to_dataclass()
 
     async def create(
-        self, creator: Creator[ObjectStorageRow], meta: ArtifactStorageCreatorMeta
+        self, creator: Creator[ObjectStorageRow], meta_creator: Creator[ArtifactStorageRow]
     ) -> ObjectStorageData:
         """
         Create a new object storage configuration in the database.
@@ -109,13 +108,12 @@ class ObjectStorageDBSource:
             creator_result = await execute_creator(db_session, creator)
             new_row = creator_result.row
 
-            # Create the ArtifactStorageRow with the newly created storage ID
-            meta_insert = sa.insert(ArtifactStorageRow).values(
-                name=meta.name,
-                storage_id=new_row.id,
-                type=ArtifactStorageType.OBJECT_STORAGE,
-            )
-            await db_session.execute(meta_insert)
+            # Set the storage_id on the meta creator spec and create ArtifactStorageRow
+            meta_spec = meta_creator.spec
+            if not isinstance(meta_spec, ArtifactStorageCreatorSpec):
+                raise TypeError("meta_creator.spec must be ArtifactStorageCreatorSpec")
+            meta_spec.set_storage_id(new_row.id)
+            await execute_creator(db_session, meta_creator)
 
             # Re-query to load the meta relationship
             query = (
@@ -130,7 +128,7 @@ class ObjectStorageDBSource:
     async def update(
         self,
         updater: Updater[ObjectStorageRow],
-        meta: ArtifactStorageModifierMeta,
+        meta_updater: Updater[ArtifactStorageRow],
     ) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
@@ -143,13 +141,19 @@ class ObjectStorageDBSource:
                 )
             updated_row_id = result.row.id
 
-            # Update the ArtifactStorageRow if name is provided
-            if (name := meta.name.optional_value()) is not None:
-                await db_session.execute(
-                    sa.update(ArtifactStorageRow)
-                    .where(ArtifactStorageRow.storage_id == updated_row_id)
-                    .values(name=name)
-                )
+            # Update the ArtifactStorageRow using storage_id from the spec
+            meta_spec = meta_updater.spec
+            if not isinstance(meta_spec, ArtifactStorageUpdaterSpec):
+                raise TypeError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
+
+            # Find ArtifactStorageRow by storage_id and apply updates
+            meta_query = sa.select(ArtifactStorageRow).where(
+                ArtifactStorageRow.storage_id == meta_spec.storage_id
+            )
+            meta_result = await db_session.execute(meta_query)
+            meta_row = meta_result.scalar_one_or_none()
+            if meta_row is not None:
+                meta_spec.apply_to_row(meta_row)
 
             # Re-query to load the meta relationship
             query = (

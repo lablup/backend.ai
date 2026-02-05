@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageModifierMeta
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
+
 
 @dataclass
 class UpdateObjectStorageAction(ObjectStorageAction):
     updater: Updater[ObjectStorageRow]
-    meta: ArtifactStorageModifierMeta
+    meta_updater: Updater[ArtifactStorageRow]
 
     @override
     def entity_id(self) -> str | None:

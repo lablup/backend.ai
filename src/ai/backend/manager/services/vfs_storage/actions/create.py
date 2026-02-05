@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorMeta
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
+
 
 @dataclass
 class CreateVFSStorageAction(VFSStorageAction):
     creator: Creator[VFSStorageRow]
-    meta: ArtifactStorageCreatorMeta
+    meta_creator: Creator[ArtifactStorageRow]
 
     @override
     def entity_id(self) -> str | None:

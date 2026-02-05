@@ -5,10 +5,9 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorMeta,
-    ArtifactStorageModifierMeta,
+    ArtifactStorageCreatorSpec,
+    ArtifactStorageUpdaterSpec,
 )
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
 from ai.backend.manager.errors.vfs_storage import (
@@ -67,7 +66,7 @@ class VFSStorageDBSource:
             return row.to_dataclass()
 
     async def create(
-        self, creator: Creator[VFSStorageRow], meta: ArtifactStorageCreatorMeta
+        self, creator: Creator[VFSStorageRow], meta_creator: Creator[ArtifactStorageRow]
     ) -> VFSStorageData:
         """
         Create a new VFS storage configuration in the database.
@@ -76,13 +75,12 @@ class VFSStorageDBSource:
             creator_result = await execute_creator(db_session, creator)
             new_row = creator_result.row
 
-            # Create the ArtifactStorageRow with the newly created storage ID
-            meta_insert = sa.insert(ArtifactStorageRow).values(
-                name=meta.name,
-                storage_id=new_row.id,
-                type=ArtifactStorageType.VFS_STORAGE,
-            )
-            await db_session.execute(meta_insert)
+            # Set the storage_id on the meta creator spec and create ArtifactStorageRow
+            meta_spec = meta_creator.spec
+            if not isinstance(meta_spec, ArtifactStorageCreatorSpec):
+                raise TypeError("meta_creator.spec must be ArtifactStorageCreatorSpec")
+            meta_spec.set_storage_id(new_row.id)
+            await execute_creator(db_session, meta_creator)
 
             # Re-query to load the meta relationship
             query = (
@@ -97,7 +95,7 @@ class VFSStorageDBSource:
     async def update(
         self,
         updater: Updater[VFSStorageRow],
-        meta: ArtifactStorageModifierMeta,
+        meta_updater: Updater[ArtifactStorageRow],
     ) -> VFSStorageData:
         """
         Update an existing VFS storage configuration in the database.
@@ -108,13 +106,19 @@ class VFSStorageDBSource:
                 raise VFSStorageNotFoundError(f"VFS storage with ID {updater.pk_value} not found.")
             updated_row_id = result.row.id
 
-            # Update the ArtifactStorageRow if name is provided
-            if (name := meta.name.optional_value()) is not None:
-                await db_session.execute(
-                    sa.update(ArtifactStorageRow)
-                    .where(ArtifactStorageRow.storage_id == updated_row_id)
-                    .values(name=name)
-                )
+            # Update the ArtifactStorageRow using storage_id from the spec
+            meta_spec = meta_updater.spec
+            if not isinstance(meta_spec, ArtifactStorageUpdaterSpec):
+                raise TypeError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
+
+            # Find ArtifactStorageRow by storage_id and apply updates
+            meta_query = sa.select(ArtifactStorageRow).where(
+                ArtifactStorageRow.storage_id == meta_spec.storage_id
+            )
+            meta_result = await db_session.execute(meta_query)
+            meta_row = meta_result.scalar_one_or_none()
+            if meta_row is not None:
+                meta_spec.apply_to_row(meta_row)
 
             # Re-query to load the meta relationship
             query = (

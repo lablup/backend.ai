@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -7,10 +10,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorMeta,
-    ArtifactStorageModifierMeta,
-)
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -18,6 +17,9 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.object_storage.db_source.db_source import ObjectStorageDBSource
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 object_storage_repository_resilience = Resilience(
     policies=[
@@ -58,17 +60,17 @@ class ObjectStorageRepository:
 
     @object_storage_repository_resilience.apply()
     async def create(
-        self, creator: Creator[ObjectStorageRow], meta: ArtifactStorageCreatorMeta
+        self, creator: Creator[ObjectStorageRow], meta_creator: Creator[ArtifactStorageRow]
     ) -> ObjectStorageData:
-        return await self._db_source.create(creator, meta)
+        return await self._db_source.create(creator, meta_creator)
 
     @object_storage_repository_resilience.apply()
     async def update(
         self,
         updater: Updater[ObjectStorageRow],
-        meta: ArtifactStorageModifierMeta,
+        meta_updater: Updater[ArtifactStorageRow],
     ) -> ObjectStorageData:
-        return await self._db_source.update(updater, meta)
+        return await self._db_source.update(updater, meta_updater)
 
     @object_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorMeta,
-    ArtifactStorageModifierMeta,
+    ArtifactStorageCreatorSpec,
+    ArtifactStorageUpdaterSpec,
 )
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
@@ -26,6 +27,9 @@ from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStor
 from ai.backend.manager.types import OptionalState
 
 from .types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 
 
 @strawberry.type(description="Added in 25.16.0. VFS Storage configuration")
@@ -108,8 +112,13 @@ class CreateVFSStorageInput:
             )
         )
 
-    def to_creator_meta(self) -> ArtifactStorageCreatorMeta:
-        return ArtifactStorageCreatorMeta(name=self.name)
+    def to_meta_creator(self) -> Creator[ArtifactStorageRow]:
+        return Creator(
+            spec=ArtifactStorageCreatorSpec(
+                name=self.name,
+                storage_type=ArtifactStorageType.VFS_STORAGE,
+            )
+        )
 
 
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
@@ -126,9 +135,14 @@ class UpdateVFSStorageInput:
         )
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
-    def to_modifier_meta(self) -> ArtifactStorageModifierMeta:
-        return ArtifactStorageModifierMeta(
-            name=OptionalState[str].from_graphql(self.name),
+    def to_meta_updater(self) -> Updater[ArtifactStorageRow]:
+        storage_id = uuid.UUID(self.id)
+        return Updater(
+            spec=ArtifactStorageUpdaterSpec(
+                name=OptionalState[str].from_graphql(self.name),
+                storage_id=storage_id,
+            ),
+            pk_value=storage_id,  # Not used directly, but required by Updater
         )
 
 
@@ -163,7 +177,7 @@ async def create_vfs_storage(
     action_result = await processors.vfs_storage.create.wait_for_complete(
         CreateVFSStorageAction(
             creator=input.to_creator(),
-            meta=input.to_creator_meta(),
+            meta_creator=input.to_meta_creator(),
         )
     )
 
@@ -181,7 +195,7 @@ async def update_vfs_storage(
     action_result = await processors.vfs_storage.update.wait_for_complete(
         UpdateVFSStorageAction(
             updater=input.to_updater(),
-            meta=input.to_modifier_meta(),
+            meta_updater=input.to_meta_updater(),
         )
     )
 
