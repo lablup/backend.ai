@@ -72,6 +72,11 @@ from .deployment import (
     update_model_deployment,
     update_route_traffic_status,
 )
+from .domain_v2 import (
+    admin_domains_v2,
+    domain_v2,
+    rg_domains_v2,
+)
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
     admin_bulk_upsert_project_fair_share_weight,
@@ -313,6 +318,10 @@ class Query:
     domain_users_v2 = domain_users_v2
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
+    # Domain V2 APIs
+    domain_v2 = domain_v2
+    admin_domains_v2 = admin_domains_v2
+    rg_domains_v2 = rg_domains_v2
 
 
 @strawberry.type
