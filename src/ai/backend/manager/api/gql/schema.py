@@ -299,7 +299,6 @@ class Query:
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
-    admin_kernels_v2 = admin_kernels_v2
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config
