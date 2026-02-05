@@ -135,35 +135,36 @@ class ObjectStorageDBSource:
         Update an existing object storage configuration in the database.
         """
         async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectStorageNotFoundError(
-                    f"Object storage with ID {updater.pk_value} not found."
-                )
-            updated_row_id = result.row.id
+            # Execute update (may return None if no values to update, which is fine)
+            await execute_updater(db_session, updater)
 
             # Update the ArtifactStorageRow using storage_id from the spec
             meta_spec = meta_updater.spec
             if not isinstance(meta_spec, ArtifactStorageUpdaterSpec):
                 raise InternalServerError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
 
-            # Find ArtifactStorageRow by storage_id and apply updates
-            meta_query = sa.select(ArtifactStorageRow).where(
+            # Query for ArtifactStorageRow.id using storage_id (since storage_id is unique but not the PK)
+            artifact_storage_query = sa.select(ArtifactStorageRow.id).where(
                 ArtifactStorageRow.storage_id == meta_spec.storage_id
             )
-            meta_result = await db_session.execute(meta_query)
-            meta_row = meta_result.scalar_one_or_none()
-            if meta_row is not None:
-                meta_spec.apply_to_row(meta_row)
+            artifact_storage_result = await db_session.execute(artifact_storage_query)
+            artifact_storage_id = artifact_storage_result.scalar_one_or_none()
+            if artifact_storage_id is not None:
+                # Create a new Updater with the actual PK and execute
+                actual_meta_updater = Updater(spec=meta_spec, pk_value=artifact_storage_id)
+                await execute_updater(db_session, actual_meta_updater)
 
+            storage_id = uuid.UUID(str(updater.pk_value))
             # Re-query to load the meta relationship
             query = (
                 sa.select(ObjectStorageRow)
-                .where(ObjectStorageRow.id == updated_row_id)
+                .where(ObjectStorageRow.id == storage_id)
                 .options(selectinload(ObjectStorageRow.meta))
             )
             row_result = await db_session.execute(query)
-            row = row_result.scalar_one()
+            row = row_result.scalar_one_or_none()
+            if row is None:
+                raise ObjectStorageNotFoundError(f"Object storage with ID {storage_id} not found.")
             return row.to_dataclass()
 
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:
