@@ -16,6 +16,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.agent_cache import AgentRPCCache
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -136,6 +137,7 @@ class ServiceArgs:
     event_producer: EventProducer
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
+    appproxy_client_pool: AppProxyClientPool
 
 
 @dataclass
@@ -249,6 +251,7 @@ class Services:
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
                 scheduling_controller=args.scheduling_controller,
+                appproxy_client_pool=args.appproxy_client_pool,
             )
         )
         keypair_resource_policy_service = KeypairResourcePolicyService(

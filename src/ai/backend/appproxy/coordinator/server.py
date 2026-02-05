@@ -71,6 +71,7 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
     ping_redis_connection,
 )
+from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
@@ -845,10 +846,11 @@ async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
     advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
-    return web.json_response({
-        "api_version": "v2",
-        "advertise_address": advertised_addr,
-    })
+    response = AppProxyStatusResponse(
+        api_version="v2",
+        advertise_address=advertised_addr,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 def handle_loop_error(

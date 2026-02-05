@@ -35,10 +35,10 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
@@ -211,6 +211,7 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     scheduling_controller: SchedulingController
+    appproxy_client_pool: AppProxyClientPool
 
 
 class SessionService:
@@ -222,6 +223,7 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _scheduling_controller: SchedulingController
+    _appproxy_client_pool: AppProxyClientPool
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -237,6 +239,7 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._scheduling_controller = args.scheduling_controller
+        self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
@@ -1255,9 +1258,10 @@ class SessionService:
         )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-        if advertise_addr := wsproxy_status.get("advertise_address"):
-            wsproxy_advertise_addr = advertise_addr
+        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        wsproxy_status = await client.fetch_status()
+        if wsproxy_status.advertise_address:
+            wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
             wsproxy_advertise_addr = wsproxy_addr
 

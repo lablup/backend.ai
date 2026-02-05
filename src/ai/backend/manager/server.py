@@ -146,6 +146,7 @@ from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
 from .clients.agent import AgentClientPool, AgentPoolSpec
+from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
 from .config.loader.config_overrider import ConfigOverrider
 from .config.loader.etcd_loader import (
@@ -762,6 +763,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
+                appproxy_client_pool=root_ctx.appproxy_client_pool,
             ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -1103,6 +1105,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             recovery_timeout=60.0,
         ),
     )
+    root_ctx.appproxy_client_pool = AppProxyClientPool()
     root_ctx.registry = AgentRegistry(
         root_ctx.config_provider,
         root_ctx.db,
@@ -1126,6 +1129,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
     finally:
         await root_ctx.agent_client_pool.close()
+        await root_ctx.appproxy_client_pool.close()
         await root_ctx.registry.shutdown()
 
 
