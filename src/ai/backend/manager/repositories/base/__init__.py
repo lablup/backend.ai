@@ -5,11 +5,14 @@ Re-exports all public APIs for backward compatibility.
 
 from .creator import (
     BulkCreator,
+    BulkCreatorError,
     BulkCreatorResult,
+    BulkCreatorResultWithFailures,
     Creator,
     CreatorResult,
     CreatorSpec,
     execute_bulk_creator,
+    execute_bulk_creator_partial,
     execute_creator,
 )
 from .export import (
@@ -118,8 +121,11 @@ __all__ = [
     "execute_creator",
     # BulkCreator
     "BulkCreator",
+    "BulkCreatorError",
     "BulkCreatorResult",
+    "BulkCreatorResultWithFailures",
     "execute_bulk_creator",
+    "execute_bulk_creator_partial",
     # Updater
     "UpdaterSpec",
     "Updater",
