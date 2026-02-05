@@ -1,14 +1,15 @@
 """ProjectV2 GraphQL API package.
 
-This package provides GraphQL API types for ProjectV2 (formerly GroupNode).
-Types use structured field groups instead of JSON scalars.
-
-Structure:
-- types/: GraphQL type definitions (enums, nested types, nodes)
-- resolver/: Query and mutation resolvers (future)
-- fetcher/: Data loaders and fetchers (future)
+Added in 26.2.0. Provides structured project management API with typed fields
+replacing JSON scalars and organized into logical field groups.
 """
 
+from .resolver import (
+    admin_projects_v2,
+    domain_projects_v2,
+    project_domain_v2,
+    project_v2,
+)
 from .types import (
     ProjectBasicInfoGQL,
     ProjectLifecycleInfoGQL,
@@ -23,6 +24,11 @@ from .types import (
 )
 
 __all__ = [
+    # Queries
+    "admin_projects_v2",
+    "domain_projects_v2",
+    "project_domain_v2",
+    "project_v2",
     # Enums
     "ProjectTypeEnum",
     "VFolderHostPermissionEnum",

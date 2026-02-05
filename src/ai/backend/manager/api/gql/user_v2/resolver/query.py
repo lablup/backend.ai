@@ -7,6 +7,7 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.fetcher import (
     fetch_admin_users,
@@ -21,6 +22,7 @@ from ai.backend.manager.api.gql.user_v2.types import (
     UserV2GQL,
     UserV2OrderBy,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 
 @strawberry.field(
@@ -43,10 +45,16 @@ async def admin_user_v2(
         UserV2GQL object.
 
     Raises:
-        NotImplementedError: This resolver is not yet implemented.
         UserNotFound: If the user with the given UUID does not exist.
     """
-    raise NotImplementedError("admin_user_v2 is not yet implemented")
+    processors = info.context.processors
+
+    # Execute GetUserAction via processor
+    action_result = await processors.user.get_user.wait_for_complete(
+        GetUserAction(user_uuid=user_id)
+    )
+
+    return UserV2GQL.from_data(action_result.user)
 
 
 @strawberry.field(
@@ -55,7 +63,7 @@ async def admin_user_v2(
         "Requires superadmin privileges."
     )
 )  # type: ignore[misc]
-async def admin_users(
+async def admin_users_v2(
     info: Info[StrawberryGQLContext],
     filter: UserV2Filter | None = None,
     order_by: list[UserV2OrderBy] | None = None,
@@ -101,7 +109,7 @@ async def admin_users(
         "Requires domain admin privileges or higher."
     )
 )  # type: ignore[misc]
-async def domain_users(
+async def domain_users_v2(
     info: Info[StrawberryGQLContext],
     scope: DomainUserScope,
     filter: UserV2Filter | None = None,
@@ -130,9 +138,11 @@ async def domain_users(
     Returns:
         UserV2Connection with paginated user records from the domain.
     """
+    from ai.backend.manager.repositories.user.types import DomainUserSearchScope
+
     return await fetch_domain_users(
         info,
-        domain_name=scope.domain_name,
+        scope=DomainUserSearchScope(domain_name=scope.domain_name),
         filter=filter,
         order_by=order_by,
         before=before,
@@ -150,7 +160,7 @@ async def domain_users(
         "Requires project membership or higher privileges."
     )
 )  # type: ignore[misc]
-async def project_users(
+async def project_users_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectUserScope,
     filter: UserV2Filter | None = None,
@@ -179,9 +189,11 @@ async def project_users(
     Returns:
         UserV2Connection with paginated user records from the project.
     """
+    from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
+
     return await fetch_project_users(
         info,
-        project_id=scope.project_id,
+        scope=ProjectUserSearchScope(project_id=scope.project_id),
         filter=filter,
         order_by=order_by,
         before=before,
@@ -200,7 +212,7 @@ async def project_users(
         "Returns an error if not authenticated."
     )
 )  # type: ignore[misc]
-async def user_v2(
+async def my_user_v2(
     info: Info[StrawberryGQLContext],
 ) -> UserV2GQL:
     """Get the current authenticated user's information.
@@ -212,7 +224,21 @@ async def user_v2(
         UserV2GQL for the current user.
 
     Raises:
-        NotImplementedError: This resolver is not yet implemented.
         Unauthorized: If the user is not authenticated.
+        UserNotFound: If the current user does not exist.
     """
-    raise NotImplementedError("user_v2 is not yet implemented")
+    # Get current authenticated user
+    me = current_user()
+    if me is None:
+        from aiohttp import web
+
+        raise web.HTTPUnauthorized(reason="Authentication required")
+
+    processors = info.context.processors
+
+    # Execute GetUserAction via processor
+    action_result = await processors.user.get_user.wait_for_complete(
+        GetUserAction(user_uuid=me.user_id)
+    )
+
+    return UserV2GQL.from_data(action_result.user)

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -151,6 +152,84 @@ class GroupConditions:
     def by_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return GroupRow.is_active == is_active
+
+        return inner
+
+    # ==================== ID (UUID) Filters ====================
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Filter by project ID equality.
+
+        Args:
+            spec: UUID equality specification with value and negated flag.
+
+        Returns:
+            QueryCondition callable for project ID filtering.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = GroupRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Filter by project ID IN operation.
+
+        Args:
+            spec: UUID IN specification with values list and negated flag.
+
+        Returns:
+            QueryCondition callable for project ID IN filtering.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = GroupRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        """Filter by created_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        """Filter by created_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_before(dt: datetime) -> QueryCondition:
+        """Filter by modified_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.modified_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_after(dt: datetime) -> QueryCondition:
+        """Filter by modified_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.modified_at > dt
 
         return inner
 

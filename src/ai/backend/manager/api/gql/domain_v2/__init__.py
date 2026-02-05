@@ -1,27 +1,35 @@
 """DomainV2 GraphQL API package.
 
-This package provides GraphQL types, resolvers, and data loaders for the DomainV2 API.
-DomainV2 replaces the legacy DomainNode with structured field groups instead of JSON scalars.
-
-Package structure:
-- types/: GraphQL type definitions (nested types, node, edge, connection)
-- resolver/: Query and mutation resolvers (to be implemented)
-- fetcher/: Data loaders for efficient batch fetching (to be implemented)
+Added in 26.2.0. Provides structured domain management API with typed fields
+replacing JSON scalars and organized into logical field groups.
 """
 
+from .resolver import admin_domains_v2, domain_v2
 from .types import (
     DomainBasicInfoGQL,
     DomainLifecycleInfoGQL,
     DomainRegistryInfoGQL,
     DomainV2Connection,
     DomainV2Edge,
+    DomainV2Filter,
     DomainV2GQL,
+    DomainV2OrderBy,
+    DomainV2OrderField,
 )
 
 __all__ = [
+    # Queries
+    "domain_v2",
+    "admin_domains_v2",
+    # Filter and OrderBy
+    "DomainV2Filter",
+    "DomainV2OrderBy",
+    "DomainV2OrderField",
+    # Nested types
     "DomainBasicInfoGQL",
     "DomainLifecycleInfoGQL",
     "DomainRegistryInfoGQL",
+    # Node types
     "DomainV2GQL",
     "DomainV2Edge",
     "DomainV2Connection",

@@ -89,19 +89,28 @@ class DomainV2GQL(Node):
         offset: int | None = None,
     ) -> DomainFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
-            fetch_domain_fair_shares,
+            fetch_rg_domain_fair_shares,
         )
         from ai.backend.manager.repositories.fair_share.options import (
             DomainFairShareConditions,
         )
+        from ai.backend.manager.repositories.fair_share.types import (
+            DomainFairShareSearchScope,
+        )
 
+        # Create repository scope with context information
+        repository_scope = DomainFairShareSearchScope(
+            resource_group=scope.resource_group,
+        )
+
+        # Entity-specific filter only
         base_conditions = [
-            DomainFairShareConditions.by_resource_group(scope.resource_group),
             DomainFairShareConditions.by_domain_name(str(self.id)),
         ]
 
-        return await fetch_domain_fair_shares(
+        return await fetch_rg_domain_fair_shares(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,
@@ -133,19 +142,24 @@ class DomainV2GQL(Node):
         offset: int | None = None,
     ) -> DomainUsageBucketConnection:
         from ai.backend.manager.api.gql.resource_usage.fetcher.domain_usage import (
-            fetch_domain_usage_buckets,
+            fetch_rg_domain_usage_buckets,
         )
-        from ai.backend.manager.repositories.resource_usage_history.options import (
-            DomainUsageBucketConditions,
+        from ai.backend.manager.repositories.resource_usage_history.types import (
+            DomainUsageBucketSearchScope,
         )
 
-        base_conditions = [
-            DomainUsageBucketConditions.by_resource_group(scope.resource_group),
-            DomainUsageBucketConditions.by_domain_name(str(self.id)),
-        ]
+        # Create repository scope with context information
+        repository_scope = DomainUsageBucketSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=str(self.id),
+        )
 
-        return await fetch_domain_usage_buckets(
+        # No additional filters needed (scope includes all entity info)
+        base_conditions = None
+
+        return await fetch_rg_domain_usage_buckets(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,

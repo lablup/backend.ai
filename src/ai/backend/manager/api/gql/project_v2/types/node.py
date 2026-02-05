@@ -96,19 +96,29 @@ class ProjectV2GQL(Node):
         offset: int | None = None,
     ) -> ProjectFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher.project import (
-            fetch_project_fair_shares,
+            fetch_rg_project_fair_shares,
         )
         from ai.backend.manager.repositories.fair_share.options import (
             ProjectFairShareConditions,
         )
+        from ai.backend.manager.repositories.fair_share.types import (
+            ProjectFairShareSearchScope,
+        )
 
+        # Create repository scope with context information
+        repository_scope = ProjectFairShareSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+        )
+
+        # Entity-specific filter only
         base_conditions = [
-            ProjectFairShareConditions.by_resource_group(scope.resource_group),
             ProjectFairShareConditions.by_project_id(UUID(str(self.id))),
         ]
 
-        return await fetch_project_fair_shares(
+        return await fetch_rg_project_fair_shares(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,
@@ -140,19 +150,25 @@ class ProjectV2GQL(Node):
         offset: int | None = None,
     ) -> ProjectUsageBucketConnection:
         from ai.backend.manager.api.gql.resource_usage.fetcher.project_usage import (
-            fetch_project_usage_buckets,
+            fetch_rg_project_usage_buckets,
         )
-        from ai.backend.manager.repositories.resource_usage_history.options import (
-            ProjectUsageBucketConditions,
+        from ai.backend.manager.repositories.resource_usage_history.types import (
+            ProjectUsageBucketSearchScope,
         )
 
-        base_conditions = [
-            ProjectUsageBucketConditions.by_resource_group(scope.resource_group),
-            ProjectUsageBucketConditions.by_project_id(UUID(str(self.id))),
-        ]
+        # Create repository scope with context information
+        repository_scope = ProjectUsageBucketSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+            project_id=UUID(str(self.id)),
+        )
 
-        return await fetch_project_usage_buckets(
+        # No additional filters needed (scope includes all entity info)
+        base_conditions = None
+
+        return await fetch_rg_project_usage_buckets(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,

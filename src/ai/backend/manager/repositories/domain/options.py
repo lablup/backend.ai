@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import sqlalchemy as sa
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
@@ -95,6 +97,44 @@ class DomainConditions:
             if has_integration:
                 return DomainRow.integration_id.is_not(None)
             return DomainRow.integration_id.is_(None)
+
+        return inner
+
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        """Filter by created_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        """Filter by created_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_before(dt: datetime) -> QueryCondition:
+        """Filter by modified_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.modified_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_after(dt: datetime) -> QueryCondition:
+        """Filter by modified_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.modified_at > dt
 
         return inner
 

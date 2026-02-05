@@ -15,6 +15,10 @@ from ai.backend.manager.services.domain.actions.delete_domain import (
     DeleteDomainAction,
     DeleteDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.get_domain import (
+    GetDomainAction,
+    GetDomainActionResult,
+)
 from ai.backend.manager.services.domain.actions.modify_domain import (
     ModifyDomainAction,
     ModifyDomainActionResult,
@@ -27,6 +31,10 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.search_domains import (
+    SearchDomainsAction,
+    SearchDomainsActionResult,
+)
 
 from .service import DomainService
 
@@ -38,6 +46,8 @@ class DomainProcessors(AbstractProcessorPackage):
     modify_domain: ActionProcessor[ModifyDomainAction, ModifyDomainActionResult]
     delete_domain: ActionProcessor[DeleteDomainAction, DeleteDomainActionResult]
     purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    get_domain: ActionProcessor[GetDomainAction, GetDomainActionResult]
+    search_domains: ActionProcessor[SearchDomainsAction, SearchDomainsActionResult]
 
     def __init__(self, service: DomainService, action_monitors: list[ActionMonitor]) -> None:
         self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
@@ -46,6 +56,8 @@ class DomainProcessors(AbstractProcessorPackage):
         self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
         self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
+        self.get_domain = ActionProcessor(service.get_domain, action_monitors)
+        self.search_domains = ActionProcessor(service.search_domains, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -56,4 +68,6 @@ class DomainProcessors(AbstractProcessorPackage):
             ModifyDomainAction.spec(),
             DeleteDomainAction.spec(),
             PurgeDomainAction.spec(),
+            GetDomainAction.spec(),
+            SearchDomainsAction.spec(),
         ]
