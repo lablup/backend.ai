@@ -53,7 +53,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.image.adapter import ImageCreatorAdapter
 from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -111,7 +110,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         }
         self.credentials = {}
         self.ssl_verify = ssl_verify
-        self._creator_adapter = ImageCreatorAdapter()
 
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
