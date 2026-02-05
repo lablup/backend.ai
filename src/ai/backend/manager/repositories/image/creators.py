@@ -5,7 +5,6 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.permission.id import ScopeId as ScopeData
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
