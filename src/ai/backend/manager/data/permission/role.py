@@ -97,7 +97,7 @@ class UserRoleAssignmentInput:
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
     user_id: uuid.UUID
-    role_id: uuid.UUID
+    role: RoleData
     granted_by: uuid.UUID | None = None
 
 
@@ -141,7 +141,7 @@ class UserRoleRevocationInput:
 class UserRoleRevocationData:
     user_role_id: uuid.UUID
     user_id: uuid.UUID
-    role_id: uuid.UUID
+    role: RoleData
 
 
 @dataclass(frozen=True)

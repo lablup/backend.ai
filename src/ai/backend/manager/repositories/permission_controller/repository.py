@@ -193,15 +193,11 @@ class PermissionControllerRepository:
 
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
-        result = await self._db_source.assign_role(data)
-        return result.to_data()
+        return await self._db_source.assign_role(data)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> UserRoleRevocationData:
-        user_role_id = await self._db_source.revoke_role(data)
-        return UserRoleRevocationData(
-            user_role_id=user_role_id, user_id=data.user_id, role_id=data.role_id
-        )
+        return await self._db_source.revoke_role(data)
 
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:

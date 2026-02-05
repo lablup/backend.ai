@@ -22,36 +22,75 @@ from ai.backend.manager.data.permission.types import (
 
 @strawberry.enum(name="EntityType", description="Entity types managed by the RBAC system")
 class EntityTypeGQL(StrEnum):
-    COMPUTE_SESSION = "compute_session"
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
     VFOLDER = "vfolder"
     IMAGE = "image"
-    MODEL_SERVICE = "model_service"
-    MODEL_ARTIFACT = "model_artifact"
-    AGENT = "agent"
-    RESOURCE_GROUP = "resource_group"
-    STORAGE_HOST = "storage_host"
+    COMPUTE_SESSION = "compute_session"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
     APP_CONFIG = "app_config"
-    NOTIFICATION = "notification"
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
-    ROLE = "role"
-    ROLE_ASSIGNMENT = "role_assignment"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NOTIFICATION_RULE = "notification_rule"
+    MODEL_DEPLOYMENT = "model_deployment"
 
     @classmethod
     def from_internal(cls, internal_type: EntityTypeInternal) -> EntityTypeGQL:
         """Convert internal EntityType to GraphQL enum."""
-        # Map internal "session" to GQL "compute_session"
-        if internal_type == EntityTypeInternal.SESSION:
-            return cls.COMPUTE_SESSION
-        return cls(internal_type.value)
+        match internal_type:
+            case EntityTypeInternal.USER:
+                return cls.USER
+            case EntityTypeInternal.PROJECT:
+                return cls.PROJECT
+            case EntityTypeInternal.DOMAIN:
+                return cls.DOMAIN
+            case EntityTypeInternal.VFOLDER:
+                return cls.VFOLDER
+            case EntityTypeInternal.IMAGE:
+                return cls.IMAGE
+            case EntityTypeInternal.SESSION:
+                return cls.COMPUTE_SESSION
+            case EntityTypeInternal.ARTIFACT:
+                return cls.ARTIFACT
+            case EntityTypeInternal.ARTIFACT_REGISTRY:
+                return cls.ARTIFACT_REGISTRY
+            case EntityTypeInternal.APP_CONFIG:
+                return cls.APP_CONFIG
+            case EntityTypeInternal.NOTIFICATION_CHANNEL:
+                return cls.NOTIFICATION_CHANNEL
+            case EntityTypeInternal.NOTIFICATION_RULE:
+                return cls.NOTIFICATION_RULE
+            case EntityTypeInternal.MODEL_DEPLOYMENT:
+                return cls.MODEL_DEPLOYMENT
 
     def to_internal(self) -> EntityTypeInternal:
         """Convert GraphQL enum to internal EntityType."""
-        # Map GQL "compute_session" to internal "session"
-        if self == EntityTypeGQL.COMPUTE_SESSION:
-            return EntityTypeInternal.SESSION
-        return EntityTypeInternal(self.value)
+        match self:
+            case EntityTypeGQL.USER:
+                return EntityTypeInternal.USER
+            case EntityTypeGQL.PROJECT:
+                return EntityTypeInternal.PROJECT
+            case EntityTypeGQL.DOMAIN:
+                return EntityTypeInternal.DOMAIN
+            case EntityTypeGQL.VFOLDER:
+                return EntityTypeInternal.VFOLDER
+            case EntityTypeGQL.IMAGE:
+                return EntityTypeInternal.IMAGE
+            case EntityTypeGQL.COMPUTE_SESSION:
+                return EntityTypeInternal.SESSION
+            case EntityTypeGQL.ARTIFACT:
+                return EntityTypeInternal.ARTIFACT
+            case EntityTypeGQL.ARTIFACT_REGISTRY:
+                return EntityTypeInternal.ARTIFACT_REGISTRY
+            case EntityTypeGQL.APP_CONFIG:
+                return EntityTypeInternal.APP_CONFIG
+            case EntityTypeGQL.NOTIFICATION_CHANNEL:
+                return EntityTypeInternal.NOTIFICATION_CHANNEL
+            case EntityTypeGQL.NOTIFICATION_RULE:
+                return EntityTypeInternal.NOTIFICATION_RULE
+            case EntityTypeGQL.MODEL_DEPLOYMENT:
+                return EntityTypeInternal.MODEL_DEPLOYMENT
 
 
 @strawberry.enum(name="OperationType", description="Operations that can be performed on entities")

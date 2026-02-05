@@ -15,7 +15,7 @@ class SearchObjectPermissionsAction(RoleAction):
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.scope.role_id) if self.scope else None
+        return None
 
     @override
     @classmethod

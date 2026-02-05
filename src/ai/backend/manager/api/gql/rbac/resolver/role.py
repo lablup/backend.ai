@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.rbac.fetcher import fetch_role, fetch_roles
 from ai.backend.manager.api.gql.rbac.types import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
+    DeleteRoleAssignmentInput,
     Role,
     RoleConnection,
     RoleFilter,
@@ -36,7 +37,6 @@ from ai.backend.manager.services.permission_contoller.actions import (
     AssignRoleAction,
     CreateRoleAction,
     DeleteRoleAction,
-    GetRoleDetailAction,
     PurgeRoleAction,
     RevokeRoleAction,
     UpdateRoleAction,
@@ -106,7 +106,6 @@ async def admin_create_role(input: CreateRoleInput, info: Info[StrawberryGQLCont
         CreateRoleAction(creator=creator)
     )
 
-    # Return role with deferred permission resolution
     return Role.from_data(action_result.data)
 
 
@@ -125,7 +124,6 @@ async def admin_update_role(input: UpdateRoleInput, info: Info[StrawberryGQLCont
         UpdateRoleAction(updater=updater)
     )
 
-    # Return role with deferred permission resolution
     return Role.from_data(action_result.data)
 
 
@@ -140,22 +138,15 @@ async def admin_delete_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
     processors = info.context.processors
     role_id = uuid.UUID(id)
 
-    # Get role details before deletion (for returning scope info)
-    detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=role_id)
-    )
-
-    # Delete role
     spec = RoleUpdaterSpec(
         status=OptionalState.update(RoleStatus.DELETED),
     )
     updater = Updater(spec=spec, pk_value=role_id)
-    await processors.permission_controller.delete_role.wait_for_complete(
+    result = await processors.permission_controller.delete_role.wait_for_complete(
         DeleteRoleAction(updater=updater)
     )
 
-    # Return the deleted role (with original data)
-    return Role.from_detail_data(detail_result_before.role)
+    return Role.from_data(result.data)
 
 
 @strawberry.field(description="Purge a role (hard delete)")  # type: ignore[misc]
@@ -169,19 +160,12 @@ async def admin_purge_role(id: ID, info: Info[StrawberryGQLContext]) -> Role:
     processors = info.context.processors
     role_id = uuid.UUID(id)
 
-    # Get role details before deletion (for returning scope info)
-    detail_result_before = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=role_id)
-    )
-
-    # Purge role
     purger = Purger(row_class=RoleRow, pk_value=role_id)
-    await processors.permission_controller.purge_role.wait_for_complete(
+    result = await processors.permission_controller.purge_role.wait_for_complete(
         PurgeRoleAction(purger=purger)
     )
 
-    # Return the deleted role (with original data)
-    return Role.from_detail_data(detail_result_before.role)
+    return Role.from_data(result.data)
 
 
 @strawberry.field(description="Update role permissions")  # type: ignore[misc]
@@ -198,7 +182,6 @@ async def admin_update_role_permissions(
     check_admin_only()
     processors = info.context.processors
 
-    # Build RolePermissionsUpdateInput for deletion only
     input_data = RolePermissionsUpdateInput(
         role_id=uuid.UUID(input.role_id),
         remove_scoped_permission_ids=[
@@ -209,7 +192,6 @@ async def admin_update_role_permissions(
         ],
     )
 
-    # Update permissions
     action_result = (
         await processors.permission_controller.update_role_permissions.wait_for_complete(
             UpdateRolePermissionsAction(input_data=input_data)
@@ -234,63 +216,40 @@ async def admin_create_role_assignment(
     me = current_user()
     processors = info.context.processors
 
-    # Create assignment input
     assignment_input = UserRoleAssignmentInput(
         user_id=uuid.UUID(input.user_id),
         role_id=uuid.UUID(input.role_id),
         granted_by=me.user_id if me else None,
     )
 
-    await processors.permission_controller.assign_role.wait_for_complete(
+    result = await processors.permission_controller.assign_role.wait_for_complete(
         AssignRoleAction(input=assignment_input)
     )
 
-    # Return the assigned role with scope info
-    detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=uuid.UUID(input.role_id))
-    )
-
-    return Role.from_detail_data(detail_result.role)
+    return Role.from_data(result.data.role)
 
 
 @strawberry.field(description="Revoke a role assignment")  # type: ignore[misc]
-async def admin_delete_role_assignment(id: ID, info: Info[StrawberryGQLContext]) -> Role:
+async def admin_delete_role_assignment(
+    input: DeleteRoleAssignmentInput,
+    info: Info[StrawberryGQLContext],
+) -> Role:
     """Revoke a role assignment (remove role from user).
 
     Requires: Superadmin permission.
-
-    NOTE: The 'id' parameter should be formatted as 'user_id:role_id' since we don't
-    have a separate RoleAssignment entity with its own ID in the current implementation.
 
     Returns the role that was revoked.
     """
     check_admin_only()
     processors = info.context.processors
 
-    # Parse the composite ID (format: "user_id:role_id")
-    try:
-        user_id_str, role_id_str = str(id).split(":", 1)
-        user_id = uuid.UUID(user_id_str)
-        role_id = uuid.UUID(role_id_str)
-    except (ValueError, AttributeError) as e:
-        raise ValueError(
-            f"Invalid role assignment ID format: {id}. Expected 'user_id:role_id'"
-        ) from e
-
-    # Get role details before revocation (for returning scope info)
-    detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-        GetRoleDetailAction(role_id=role_id)
-    )
-
-    # Revoke assignment
     revocation_input = UserRoleRevocationInput(
-        user_id=user_id,
-        role_id=role_id,
+        user_id=uuid.UUID(input.user_id),
+        role_id=uuid.UUID(input.role_id),
     )
 
-    await processors.permission_controller.revoke_role.wait_for_complete(
+    result = await processors.permission_controller.revoke_role.wait_for_complete(
         RevokeRoleAction(input=revocation_input)
     )
 
-    # Return the revoked role
-    return Role.from_detail_data(detail_result.role)
+    return Role.from_data(result.data.role)
