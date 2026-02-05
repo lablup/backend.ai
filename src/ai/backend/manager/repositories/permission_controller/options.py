@@ -126,42 +126,6 @@ class RoleConditions:
 
         return inner
 
-    @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
-        """Filter roles by scope type.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_type == scope_type
-
-        return inner
-
-    @staticmethod
-    def by_scope_id(scope_id: str) -> QueryCondition:
-        """Filter roles by scope ID.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_id == scope_id
-
-        return inner
-
-    @staticmethod
-    def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
-        """Filter roles having permission for entity type.
-
-        Requires JOIN with ObjectPermissionRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
-
-        return inner
-
 
 class RoleOrders:
     """Query orders for roles."""

@@ -206,7 +206,7 @@ class PermissionControllerService:
         self, action: SearchPermissionGroupsAction
     ) -> SearchPermissionGroupsActionResult:
         """Search permission groups (scopes) with pagination and filtering."""
-        result = await self._repository.search_permission_groups(action.querier)
+        result = await self._repository.search_permission_groups(action.querier, scope=action.scope)
         return SearchPermissionGroupsActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -218,7 +218,9 @@ class PermissionControllerService:
         self, action: SearchScopedPermissionsAction
     ) -> SearchScopedPermissionsActionResult:
         """Search scoped permissions with pagination and filtering."""
-        result = await self._repository.search_scoped_permissions(action.querier)
+        result = await self._repository.search_scoped_permissions(
+            querier=action.querier, scope=action.scope
+        )
         return SearchScopedPermissionsActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -230,7 +232,9 @@ class PermissionControllerService:
         self, action: SearchObjectPermissionsAction
     ) -> SearchObjectPermissionsActionResult:
         """Search object permissions with pagination and filtering."""
-        result = await self._repository.search_object_permissions(action.querier)
+        result = await self._repository.search_object_permissions(
+            querier=action.querier, scope=action.scope
+        )
         return SearchObjectPermissionsActionResult(
             items=result.items,
             total_count=result.total_count,

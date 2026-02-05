@@ -16,8 +16,14 @@ from .actions import (
     PurgeRoleAction,
     RevokeRoleAction,
     RevokeRoleActionResult,
+    SearchObjectPermissionsAction,
+    SearchObjectPermissionsActionResult,
+    SearchPermissionGroupsAction,
+    SearchPermissionGroupsActionResult,
     SearchRolesAction,
     SearchRolesActionResult,
+    SearchScopedPermissionsAction,
+    SearchScopedPermissionsActionResult,
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
@@ -64,6 +70,15 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
     get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
     search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
+    search_scoped_permissions: ActionProcessor[
+        SearchScopedPermissionsAction, SearchScopedPermissionsActionResult
+    ]
+    search_object_permissions: ActionProcessor[
+        SearchObjectPermissionsAction, SearchObjectPermissionsActionResult
+    ]
+    search_permission_groups: ActionProcessor[
+        SearchPermissionGroupsAction, SearchPermissionGroupsActionResult
+    ]
 
     def __init__(
         self, service: PermissionControllerService, action_monitors: list[ActionMonitor]
@@ -86,6 +101,15 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
         self.search_entities = ActionProcessor(service.search_entities, action_monitors)
+        self.search_scoped_permissions = ActionProcessor(
+            service.search_scoped_permissions, action_monitors
+        )
+        self.search_object_permissions = ActionProcessor(
+            service.search_object_permissions, action_monitors
+        )
+        self.search_permission_groups = ActionProcessor(
+            service.search_permission_groups, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -104,4 +128,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),
             SearchEntitiesAction.spec(),
+            SearchScopedPermissionsAction.spec(),
+            SearchObjectPermissionsAction.spec(),
+            SearchPermissionGroupsAction.spec(),
         ]

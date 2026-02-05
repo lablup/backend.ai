@@ -9,6 +9,11 @@ from .enums import (
     ScopedPermissionOrderField,
     ScopeTypeGQL,
 )
+from .filters import (
+    RoleFilter,
+    RoleOrderBy,
+    RoleSourceFilter,
+)
 from .inputs import (
     CreateRoleAssignmentInput,
     CreateRoleInput,
@@ -18,23 +23,20 @@ from .inputs import (
     UpdateRoleInput,
     UpdateRolePermissionsInput,
 )
-from .permission import (
+from .node import (
     ObjectPermission,
     ObjectPermissionConnection,
     ObjectPermissionEdge,
+    PermissionGroup,
+    PermissionGroupConnection,
+    PermissionGroupEdge,
+    Role,
+    RoleConnection,
+    RoleEdge,
     Scope,
     ScopedPermission,
     ScopedPermissionConnection,
     ScopedPermissionEdge,
-)
-from .role import (
-    Role,
-    RoleConnection,
-    RoleEdge,
-    RoleFilter,
-    RoleOrderBy,
-    RoleSourceFilter,
-    ScopeTypeFilter,
 )
 
 __all__ = [
@@ -46,6 +48,10 @@ __all__ = [
     "RoleSourceGQL",
     "ScopedPermissionOrderField",
     "ScopeTypeGQL",
+    # Filters
+    "RoleFilter",
+    "RoleOrderBy",
+    "RoleSourceFilter",
     # Inputs
     "CreateRoleAssignmentInput",
     "CreateRoleInput",
@@ -54,20 +60,18 @@ __all__ = [
     "ScopedPermissionInput",
     "UpdateRoleInput",
     "UpdateRolePermissionsInput",
-    # Permissions
+    # Node types
     "ObjectPermission",
     "ObjectPermissionConnection",
     "ObjectPermissionEdge",
+    "PermissionGroup",
+    "PermissionGroupConnection",
+    "PermissionGroupEdge",
+    "Role",
+    "RoleConnection",
+    "RoleEdge",
     "Scope",
     "ScopedPermission",
     "ScopedPermissionConnection",
     "ScopedPermissionEdge",
-    # Role
-    "Role",
-    "RoleConnection",
-    "RoleEdge",
-    "RoleFilter",
-    "RoleOrderBy",
-    "RoleSourceFilter",
-    "ScopeTypeFilter",
 ]

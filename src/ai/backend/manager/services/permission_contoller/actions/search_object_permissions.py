@@ -4,16 +4,18 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.permission_controller.types import ObjectPermissionSearchScope
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
 class SearchObjectPermissionsAction(RoleAction):
     querier: BatchQuerier
+    scope: ObjectPermissionSearchScope | None = None
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return str(self.scope.role_id) if self.scope else None
 
     @override
     @classmethod

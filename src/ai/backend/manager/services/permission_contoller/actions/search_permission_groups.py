@@ -4,12 +4,14 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.permission.permission_group import PermissionGroupData
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.permission_controller.types import PermissionGroupSearchScope
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
 @dataclass
 class SearchPermissionGroupsAction(RoleAction):
     querier: BatchQuerier
+    scope: PermissionGroupSearchScope | None = None
 
     @override
     def entity_id(self) -> str | None:

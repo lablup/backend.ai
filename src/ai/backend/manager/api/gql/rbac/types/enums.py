@@ -79,7 +79,6 @@ class OperationTypeGQL(StrEnum):
 
 @strawberry.enum(name="ScopeType", description="Scope types in the permission hierarchy")
 class ScopeTypeGQL(StrEnum):
-    GLOBAL = "global"
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"

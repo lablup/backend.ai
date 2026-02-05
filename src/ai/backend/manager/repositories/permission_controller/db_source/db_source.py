@@ -814,26 +814,9 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
     ) -> RoleListResult:
-        """Searches roles with pagination and filtering.
-
-        Uses LEFT JOIN with PermissionGroupRow and ObjectPermissionRow to support
-        scope-based and entity-based filtering. The JOINs are always performed to
-        simplify the implementation, with distinct() used to prevent duplicates.
-        """
+        """Searches roles with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            # Build query with LEFT JOINs to support scope and entity filtering
-            query = (
-                sa.select(RoleRow)
-                .outerjoin(
-                    PermissionGroupRow,
-                    RoleRow.id == PermissionGroupRow.role_id,
-                )
-                .outerjoin(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .distinct()
-            )
+            query = sa.select(RoleRow)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -891,7 +874,7 @@ class PermissionDBSource:
                 scope,
             )
 
-            items = [row.PermissionRow.to_data() for row in result.rows]
+            items = [row.to_data() for row in result.rows]
 
             return ScopedPermissionListResult(
                 items=items,

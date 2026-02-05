@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 import strawberry
 from strawberry import ID
@@ -24,13 +23,13 @@ from .enums import EntityTypeGQL, OperationTypeGQL, ScopeTypeGQL
 @strawberry.input(description="Input for specifying a scope in mutations")
 class ScopeInput:
     type: ScopeTypeGQL
-    id: Optional[ID] = None
+    id: ID | None = None
 
 
 @strawberry.input(description="Input for creating a new custom role")
 class CreateRoleInput:
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     scope: ScopeInput
 
     def to_creator(self) -> Creator[RoleRow]:
@@ -48,8 +47,8 @@ class CreateRoleInput:
 @strawberry.input(description="Input for updating an existing role")
 class UpdateRoleInput:
     id: ID
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
     def to_updater(self) -> Updater[RoleRow]:
         """Convert to Updater for repository."""
@@ -82,10 +81,10 @@ class ObjectPermissionInput:
 @strawberry.input(description="Input for updating role permissions")
 class UpdateRolePermissionsInput:
     role_id: ID
-    scoped_permissions_to_add: Optional[list[ScopedPermissionInput]] = None
-    object_permissions_to_add: Optional[list[ObjectPermissionInput]] = None
-    scoped_permission_ids_to_delete: Optional[list[ID]] = None
-    object_permission_ids_to_delete: Optional[list[ID]] = None
+    scoped_permissions_to_add: list[ScopedPermissionInput] | None = None
+    object_permissions_to_add: list[ObjectPermissionInput] | None = None
+    scoped_permission_ids_to_delete: list[ID] | None = None
+    object_permission_ids_to_delete: list[ID] | None = None
 
 
 @strawberry.input(description="Input for creating a role assignment")
@@ -93,4 +92,4 @@ class CreateRoleAssignmentInput:
     user_id: ID
     role_id: ID
     scope: ScopeInput
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None

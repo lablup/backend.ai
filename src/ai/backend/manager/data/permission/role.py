@@ -19,10 +19,7 @@ from .types import EntityType, OperationType, RoleSource
 
 @dataclass(frozen=True)
 class RoleData:
-    """
-    Information about a role.
-    If detailed information is needed, use RoleDetailData.
-    """
+    """Information about a role."""
 
     id: uuid.UUID
     name: str

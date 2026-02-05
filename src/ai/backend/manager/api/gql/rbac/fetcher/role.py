@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 from uuid import UUID
 
 from strawberry import Info
@@ -46,16 +45,20 @@ def get_role_pagination_spec() -> PaginationSpec:
 
 async def fetch_roles(
     info: Info[StrawberryGQLContext],
-    filter: Optional[RoleFilter] = None,
-    order_by: Optional[list[RoleOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: RoleFilter | None = None,
+    order_by: list[RoleOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> RoleConnection:
-    """Fetch roles with optional filtering, ordering, and pagination."""
+    """Fetch roles with optional filtering, ordering, and pagination.
+
+    Uses RoleData with deferred resolution for permissions.
+    Scope info may not be available in list view - use fetch_role for full details.
+    """
     processors = info.context.processors
 
     # Build querier using gql_adapter
@@ -77,16 +80,8 @@ async def fetch_roles(
         SearchRolesAction(querier=querier)
     )
 
-    # Convert RoleData to RoleDetailData by fetching details for each role
-    roles_with_details = []
-    for role_data in action_result.items:
-        detail_result = await processors.permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=role_data.id)
-        )
-        if detail_result.role:
-            roles_with_details.append(detail_result.role)
-
-    nodes = [Role.from_dataclass(data) for data in roles_with_details]
+    # Use RoleData directly - permissions are deferred
+    nodes = [Role.from_data(data) for data in action_result.items]
     edges = [RoleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return RoleConnection(
@@ -104,14 +99,15 @@ async def fetch_roles(
 async def fetch_role(
     info: Info[StrawberryGQLContext],
     role_id: UUID,
-) -> Optional[Role]:
-    """Fetch a specific role by ID."""
+) -> Role:
+    """Fetch a specific role by ID with full details.
+
+    Uses GetRoleDetailAction to get scope info.
+    Permissions are still deferred for efficiency.
+    """
     processors = info.context.processors
     action_result = await processors.permission_controller.get_role_detail.wait_for_complete(
         GetRoleDetailAction(role_id=role_id)
     )
 
-    if action_result.role is None:
-        return None
-
-    return Role.from_dataclass(action_result.role)
+    return Role.from_detail_data(action_result.role)
