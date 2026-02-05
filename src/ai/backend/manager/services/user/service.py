@@ -22,6 +22,10 @@ from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
+from ai.backend.manager.services.user.actions.get_user import (
+    GetUserAction,
+    GetUserActionResult,
+)
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
@@ -97,6 +101,21 @@ class UserService:
             email=action.email,
         )
         return DeleteUserActionResult()
+
+    async def get_user(self, action: GetUserAction) -> GetUserActionResult:
+        """Retrieve a single user by UUID.
+
+        Args:
+            action: GetUserAction containing user UUID.
+
+        Returns:
+            GetUserActionResult containing user data.
+
+        Raises:
+            UserNotFound: If the user with the given UUID does not exist.
+        """
+        user_data = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        return GetUserActionResult(user=user_data)
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
         email = action.email

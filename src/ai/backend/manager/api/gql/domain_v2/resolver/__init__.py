@@ -1,5 +1,8 @@
-"""DomainV2 GraphQL resolvers package.
+"""DomainV2 GraphQL resolvers package."""
 
-This package will contain query and mutation resolvers for DomainV2 GraphQL API.
-To be implemented in a future task.
-"""
+from .query import admin_domains_v2, domain_v2
+
+__all__ = [
+    "domain_v2",
+    "admin_domains_v2",
+]

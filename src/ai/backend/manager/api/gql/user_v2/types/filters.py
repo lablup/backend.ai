@@ -8,6 +8,7 @@ from uuid import UUID
 
 import strawberry
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -15,7 +16,14 @@ from ai.backend.manager.api.gql.base import (
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
 
 from .enums import UserRoleEnum, UserStatusEnum
 
@@ -137,11 +145,95 @@ class UserV2Filter(GQLFilter):
 
         Returns:
             List of QueryCondition callables.
-
-        Raises:
-            NotImplementedError: This method is not yet implemented.
         """
-        raise NotImplementedError("UserV2Filter.build_conditions is not yet implemented")
+        conditions: list[QueryCondition] = []
+
+        if self.uuid:
+            condition = self.uuid.build_query_condition(
+                equals_factory=lambda spec: UserConditions.by_uuid_equals(spec),
+                in_factory=lambda spec: UserConditions.by_uuid_in(spec),
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.username:
+            condition = self.username.build_query_condition(
+                contains_factory=lambda spec: UserConditions.by_username_contains(spec),
+                equals_factory=lambda spec: UserConditions.by_username_equals(spec),
+                starts_with_factory=lambda spec: UserConditions.by_username_starts_with(spec),
+                ends_with_factory=lambda spec: UserConditions.by_username_ends_with(spec),
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.email:
+            condition = self.email.build_query_condition(
+                contains_factory=lambda spec: UserConditions.by_email_contains(spec),
+                equals_factory=lambda spec: UserConditions.by_email_equals(spec),
+                starts_with_factory=lambda spec: UserConditions.by_email_starts_with(spec),
+                ends_with_factory=lambda spec: UserConditions.by_email_ends_with(spec),
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.status:
+            if self.status.equals:
+                conditions.append(
+                    UserConditions.by_status_equals(UserStatus[self.status.equals.name])
+                )
+            if self.status.in_:
+                conditions.append(
+                    UserConditions.by_status_in([
+                        UserStatus[status.name] for status in self.status.in_
+                    ])
+                )
+
+        if self.domain_name:
+            condition = self.domain_name.build_query_condition(
+                contains_factory=lambda spec: UserConditions.by_domain_name_contains(spec),
+                equals_factory=lambda spec: UserConditions.by_domain_name_equals(spec),
+                starts_with_factory=lambda spec: UserConditions.by_domain_name_starts_with(spec),
+                ends_with_factory=lambda spec: UserConditions.by_domain_name_ends_with(spec),
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.role:
+            if self.role.equals:
+                conditions.append(UserConditions.by_role_equals(UserRole[self.role.equals.name]))
+            if self.role.in_:
+                conditions.append(
+                    UserConditions.by_role_in([UserRole[role.name] for role in self.role.in_])
+                )
+
+        if self.created_at:
+            condition = self.created_at.build_query_condition(
+                before_factory=lambda dt: UserConditions.by_created_at_before(dt),
+                after_factory=lambda dt: UserConditions.by_created_at_after(dt),
+            )
+            if condition:
+                conditions.append(condition)
+
+        # Handle logical operators
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
+        return conditions
 
 
 @strawberry.enum(
@@ -188,11 +280,19 @@ class UserV2OrderBy(GQLOrderBy):
 
         Returns:
             QueryOrder for the specified field and direction.
-
-        Raises:
-            NotImplementedError: This method is not yet implemented.
         """
-        raise NotImplementedError("UserV2OrderBy.to_query_order is not yet implemented")
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case UserV2OrderField.CREATED_AT:
+                return UserOrders.created_at(ascending)
+            case UserV2OrderField.MODIFIED_AT:
+                return UserOrders.modified_at(ascending)
+            case UserV2OrderField.USERNAME:
+                return UserOrders.username(ascending)
+            case UserV2OrderField.EMAIL:
+                return UserOrders.email(ascending)
+            case UserV2OrderField.STATUS:
+                return UserOrders.status(ascending)
 
 
 @strawberry.input(

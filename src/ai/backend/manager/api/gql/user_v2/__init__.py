@@ -15,20 +15,20 @@ from .resolver import (
     admin_update_user,
     # Queries
     admin_user_v2,
-    admin_users,
-    domain_users,
-    project_users,
+    admin_users_v2,
+    domain_users_v2,
+    my_user_v2,
+    project_users_v2,
     update_user,
-    user_v2,
 )
 
 __all__ = [
     # Queries
     "admin_user_v2",
-    "admin_users",
-    "domain_users",
-    "project_users",
-    "user_v2",
+    "admin_users_v2",
+    "domain_users_v2",
+    "my_user_v2",
+    "project_users_v2",
     # Mutations
     "admin_create_user",
     "admin_bulk_create_users",
