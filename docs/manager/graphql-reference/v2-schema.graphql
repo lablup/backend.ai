@@ -1628,6 +1628,12 @@ type DeploymentPolicy implements Node {
   updatedAt: DateTime!
 }
 
+"""Scope for deployment scheduling history query"""
+input DeploymentScope {
+  """Deployment ID to get history for"""
+  deploymentId: UUID!
+}
+
 """
 Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
@@ -3931,6 +3937,15 @@ type Query {
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
 
+  """Added in 26.2.0. Get scheduling history for a specific session."""
+  sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+
+  """Added in 26.2.0. Get scheduling history for a specific deployment."""
+  deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+
+  """Added in 26.2.0. Get scheduling history for a specific route."""
+  routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
@@ -4618,6 +4633,12 @@ enum RouteOrderField {
   TRAFFIC_RATIO
 }
 
+"""Scope for route scheduling history query"""
+input RouteScope {
+  """Route ID to get history for"""
+  routeId: UUID!
+}
+
 """
 Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
 """
@@ -4824,6 +4845,12 @@ input SessionSchedulingHistoryOrderBy {
 enum SessionSchedulingHistoryOrderField {
   CREATED_AT
   UPDATED_AT
+}
+
+"""Scope for session scheduling history query"""
+input SessionScope {
+  """Session ID to get history for"""
+  sessionId: UUID!
 }
 
 """
