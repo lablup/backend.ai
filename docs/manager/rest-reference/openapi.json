@@ -17734,6 +17734,144 @@
         "description": "Search user usage buckets.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/fair-share/rg/{resource_group}/usage-buckets/domains/search": {
+      "post": {
+        "operationId": "fair-share.rg_search_domain_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchDomainUsageBucketsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search domain usage buckets within resource group scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/rg/{resource_group}/domains/{domain_name}/usage-buckets/projects/search": {
+      "post": {
+        "operationId": "fair-share.rg_search_project_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchProjectUsageBucketsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search project usage buckets within resource group and domain scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/fair-share/rg/{resource_group}/domains/{domain_name}/projects/{project_id}/usage-buckets/users/search": {
+      "post": {
+        "operationId": "fair-share.rg_search_user_usage_buckets",
+        "tags": [
+          "fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchUserUsageBucketsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "resource_group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search user usage buckets within resource group, domain, and project scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/fair-share/rg/{resource_group}/domains/{domain_name}": {
       "get": {
         "operationId": "fair-share.rg_get_domain_fair_share",

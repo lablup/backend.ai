@@ -223,6 +223,17 @@ class UsageBucketMetadataDTO(BaseModel):
     created_at: datetime = Field(description="Timestamp when this record was created")
     updated_at: datetime = Field(description="Timestamp when this record was last updated")
 
+    # BA-4202: Fair Share Metric calculation fields
+    average_daily_usage: ResourceSlotDTO = Field(
+        description="Average daily resource usage during this period"
+    )
+    usage_capacity_ratio: ResourceSlotDTO = Field(
+        description="Ratio of usage to capacity (usage / total capacity available)"
+    )
+    average_capacity_per_second: ResourceSlotDTO = Field(
+        description="Average capacity available per second during this period"
+    )
+
 
 # Domain Usage Bucket
 

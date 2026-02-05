@@ -37,6 +37,10 @@ __all__ = (
     "RGDomainFairShareSearchPathParam",
     "RGProjectFairShareSearchPathParam",
     "RGUserFairShareSearchPathParam",
+    # Path parameters - RG Scoped Usage Bucket Search
+    "RGDomainUsageBucketSearchPathParam",
+    "RGProjectUsageBucketSearchPathParam",
+    "RGUserUsageBucketSearchPathParam",
     # Path parameters - Upsert Weight
     "UpsertDomainFairShareWeightPathParam",
     "UpsertProjectFairShareWeightPathParam",
@@ -140,6 +144,27 @@ class RGUserFairShareSearchPathParam(BaseRequestModel):
     """Path parameters for RG-scoped user fair share search."""
 
     resource_group: str = Field(description="Scaling group name")
+    domain_name: str = Field(description="Domain name")
+    project_id: UUID = Field(description="Project ID")
+
+
+class RGDomainUsageBucketSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped domain usage bucket search."""
+
+    resource_group: str = Field(description="Resource group name")
+
+
+class RGProjectUsageBucketSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped project usage bucket search."""
+
+    resource_group: str = Field(description="Resource group name")
+    domain_name: str = Field(description="Domain name")
+
+
+class RGUserUsageBucketSearchPathParam(BaseRequestModel):
+    """Path parameters for RG-scoped user usage bucket search."""
+
+    resource_group: str = Field(description="Resource group name")
     domain_name: str = Field(description="Domain name")
     project_id: UUID = Field(description="Project ID")
 
