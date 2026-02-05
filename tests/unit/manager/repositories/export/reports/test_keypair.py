@@ -39,7 +39,7 @@ class TestKeypairReportDefinition:
         assert KEYPAIR_REPORT.select_from is KeyPairRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 37 fields total (9 basic + 28 new)."""
+        """Should have 37 fields total (6 basic + 31 relationship)."""
         assert len(KEYPAIR_REPORT.fields) == 37
 
 
@@ -55,20 +55,19 @@ class TestKeypairFieldDefinitions:
         """Basic fields without joins should exist."""
         basic_keys = {
             "access_key",
-            "user_id",
-            "user_uuid",
             "is_active",
             "is_admin",
             "created_at",
             "modified_at",
             "last_used",
-            "resource_policy_name",
         }
         assert basic_keys.issubset(field_keys)
 
     def test_user_fields_exist(self, field_keys: set[str]) -> None:
         """User fields should exist."""
         user_keys = {
+            "user_id",
+            "user_uuid",
             "user_username",
             "user_full_name",
             "user_role",
@@ -80,6 +79,7 @@ class TestKeypairFieldDefinitions:
     def test_resource_policy_fields_exist(self, field_keys: set[str]) -> None:
         """Resource policy fields should exist."""
         policy_keys = {
+            "resource_policy_name",
             "resource_policy_created_at",
             "resource_policy_max_concurrent_sessions",
             "resource_policy_max_containers_per_session",
@@ -114,7 +114,7 @@ class TestKeypairFieldDefinitions:
             "session_group_id",
             "session_created_at",
             "session_terminated_at",
-            "session_requested_slots",
+            "session_resource_requested",
         }
         assert session_keys.issubset(field_keys)
 
@@ -161,11 +161,8 @@ class TestFieldJoinAssignments:
         """Basic fields should not have joins."""
         basic_keys = [
             "access_key",
-            "user_id",
-            "user_uuid",
             "is_active",
             "is_admin",
-            "resource_policy_name",
         ]
         for key in basic_keys:
             field = fields_by_key[key]
@@ -174,6 +171,8 @@ class TestFieldJoinAssignments:
     def test_user_fields_have_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """User fields should have USER_JOIN."""
         user_keys = [
+            "user_id",
+            "user_uuid",
             "user_username",
             "user_full_name",
             "user_role",
@@ -186,11 +185,12 @@ class TestFieldJoinAssignments:
             assert USER_JOIN in field.joins
             assert len(field.joins) == 1
 
-    def test_resource_policy_detail_fields_have_join(
+    def test_resource_policy_fields_have_join(
         self, fields_by_key: dict[str, ExportFieldDef]
     ) -> None:
-        """Resource policy detail fields should have RESOURCE_POLICY_JOIN."""
+        """Resource policy fields should have RESOURCE_POLICY_JOIN."""
         policy_keys = [
+            "resource_policy_name",
             "resource_policy_created_at",
             "resource_policy_max_concurrent_sessions",
             "resource_policy_max_containers_per_session",
@@ -235,7 +235,7 @@ class TestFieldJoinAssignments:
             "session_group_id",
             "session_created_at",
             "session_terminated_at",
-            "session_requested_slots",
+            "session_resource_requested",
         ]
         for key in session_keys:
             field = fields_by_key[key]
@@ -256,7 +256,7 @@ class TestBuildKeypairQueryWithRealReport:
         """Selecting only basic fields should not add JOINs."""
         query = adapter.build_keypair_query(
             report=KEYPAIR_REPORT,
-            fields=["access_key", "user_id", "is_active"],
+            fields=["access_key", "is_active", "is_admin"],
             filter=None,
             order=None,
             max_rows=1000,

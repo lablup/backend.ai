@@ -39,8 +39,8 @@ class TestSessionReportDefinition:
         assert SESSION_REPORT.select_from is SessionRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 35 fields total (12 basic + 23 new)."""
-        assert len(SESSION_REPORT.fields) == 35
+        """Should have 41 fields total (12 basic + 29 relationship)."""
+        assert len(SESSION_REPORT.fields) == 41
 
 
 class TestSessionFieldDefinitions:
@@ -61,9 +61,9 @@ class TestSessionFieldDefinitions:
             "access_key",
             "status",
             "status_info",
-            "scaling_group_name",
             "cluster_size",
-            "occupying_slots",
+            "resource_used",
+            "resource_requested",
             "created_at",
             "terminated_at",
         }
@@ -108,6 +108,18 @@ class TestSessionFieldDefinitions:
             "user_role",
         }
         assert user_keys.issubset(field_keys)
+
+    def test_resource_group_fields_exist(self, field_keys: set[str]) -> None:
+        """Resource group fields should exist."""
+        resource_group_keys = {
+            "resource_group_name",
+            "resource_group_description",
+            "resource_group_is_active",
+            "resource_group_is_public",
+            "resource_group_scheduler",
+            "resource_group_created_at",
+        }
+        assert resource_group_keys.issubset(field_keys)
 
     def test_kernel_fields_exist(self, field_keys: set[str]) -> None:
         """Kernel fields should exist."""

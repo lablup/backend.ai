@@ -162,12 +162,12 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is None
 
-    def test_resource_policy_name_has_no_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
-        """resource_policy_name is in GroupRow, so no join needed."""
+    def test_resource_policy_name_has_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+        """resource_policy_name requires RESOURCE_POLICY_JOIN."""
         field = fields_by_key["resource_policy_name"]
-        assert field.joins is None
+        assert field.joins is not None
+        assert RESOURCE_POLICY_JOIN in field.joins
+        assert len(field.joins) == 1
 
     def test_resource_policy_detail_fields_have_join(
         self, fields_by_key: dict[str, ExportFieldDef]
