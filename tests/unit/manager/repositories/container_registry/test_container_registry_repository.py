@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -46,8 +47,12 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryCreatorSpec,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -369,6 +374,121 @@ class TestContainerRegistryRepository:
 
         # Then
         assert len(result) == 2
+
+    @pytest.fixture
+    async def creator(self) -> Creator[ContainerRegistryRow]:
+        """Fixture that provides a minimal creator spec for creating registries."""
+        return Creator(
+            spec=ContainerRegistryCreatorSpec(
+                url="https://minimal.example.com",
+                type=ContainerRegistryType.HARBOR2,
+                registry_name="minimal-registry",
+                project="minimal-project",
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_registry_minimal(
+        self,
+        repository: ContainerRegistryRepository,
+        creator: Creator[ContainerRegistryRow],
+    ) -> None:
+        """Test creating registry with minimal required fields"""
+        # When
+        result = await repository.create_registry(creator)
+
+        # Then - Verify result
+        spec: ContainerRegistryCreatorSpec = cast(ContainerRegistryCreatorSpec, creator.spec)
+        assert result is not None
+        assert result.registry_name == spec.registry_name
+        assert result.url == spec.url
+        assert result.type == spec.type
+        assert result.project == spec.project
+        assert result.id is not None
+
+    @pytest.fixture
+    async def creator_spec_with_allowed_groups(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
+        """Fixture that provides a creator spec with allowed_groups for creating registries."""
+        registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
+        project = "project-with-groups-" + str(uuid.uuid4())[:8]
+        domain_name = f"test-domain-{registry_name}"
+        resource_policy_name = f"test-policy-{registry_name}"
+
+        # Pre-create domain, resource policy, and 2 groups to associate
+        group_ids: list[str] = []
+        async with db_with_cleanup.begin_session() as session:
+            # Create domain
+            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            session.add(domain)
+
+            # Create project resource policy
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            await session.flush()
+
+            # Create 2 groups
+            for i in range(2):
+                group = GroupRow(
+                    name=f"test-group-for-registry-{i}-{registry_name}",
+                    domain_name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    resource_policy=resource_policy_name,
+                )
+                session.add(group)
+                await session.flush()
+                group_ids.append(str(group.id))
+            await session.commit()
+
+        spec = ContainerRegistryCreatorSpec(
+            url=f"https://{registry_name}",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name=registry_name,
+            project=project,
+            allowed_groups=AllowedGroupsModel(add=group_ids, remove=[]),
+        )
+        return spec, group_ids
+
+    @pytest.mark.asyncio
+    async def test_create_registry_with_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreatorSpec, list[str]],
+    ) -> None:
+        """Test creating registry with allowed_groups"""
+        # Given - Registry and groups
+        spec, group_ids = creator_spec_with_allowed_groups
+        # When
+        result = await repository.create_registry(Creator(spec=spec))
+
+        # Then - Verify registry created
+        assert result is not None
+        assert result.registry_name == spec.registry_name
+
+        # Then - Verify allowed_groups associations created
+        async with db_with_cleanup.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id == result.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 2
+            assert {str(a.group_id) for a in associations} == set(group_ids)
 
     @pytest.fixture
     async def sample_registry_with_images(
