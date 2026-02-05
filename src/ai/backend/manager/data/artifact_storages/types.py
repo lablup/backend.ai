@@ -4,6 +4,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
@@ -28,7 +29,7 @@ class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
         from ai.backend.manager.models.artifact_storages import ArtifactStorageRow  # noqa: PLC0415
 
         if self._storage_id is None:
-            raise ValueError("storage_id must be set before building row")
+            raise InternalServerError("storage_id must be set before building row")
         return ArtifactStorageRow(
             name=self._name,
             storage_id=self._storage_id,
