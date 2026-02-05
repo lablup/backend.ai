@@ -2015,6 +2015,87 @@ type DomainV2 implements Node @key(fields: "id") {
 }
 
 """
+Added in 26.2.0. Paginated connection for domain records. Provides relay-style cursor-based pagination for efficient traversal of domain data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type DomainV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DomainV2Edge!]!
+
+  """Total number of domain records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DomainV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DomainV2!
+}
+
+"""
+Added in 26.2.0. Filter input for querying domains. Supports filtering by name, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input DomainV2Filter {
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """
+  Filter by active status. True for active domains, False for inactive domains.
+  """
+  isActive: Boolean = null
+
+  """
+  Filter by creation timestamp. Supports before, after, and between operations.
+  """
+  createdAt: DateTimeFilter = null
+
+  """
+  Filter by last modification timestamp. Supports before, after, and between operations.
+  """
+  modifiedAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [DomainV2Filter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [DomainV2Filter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [DomainV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Specifies ordering for domain query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input DomainV2OrderBy {
+  """The field to order by. See DomainV2OrderField for available options."""
+  field: DomainV2OrderField!
+
+  """Sort direction. ASC for ascending, DESC for descending."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically.
+"""
+enum DomainV2OrderField {
+  CREATED_AT
+  MODIFIED_AT
+  NAME
+}
+
+"""
 Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
 """
 input DomainWeightInputItem {
