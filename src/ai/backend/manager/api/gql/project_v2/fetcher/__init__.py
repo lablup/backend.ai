@@ -1,5 +1,15 @@
-"""ProjectV2 GraphQL data fetchers and loaders.
+"""Project V2 GraphQL fetcher package."""
 
-This module will contain data loaders and fetchers for ProjectV2.
-Future implementation will include DataLoader patterns for efficient data fetching.
-"""
+from .project import (
+    fetch_admin_projects,
+    fetch_domain_projects,
+    fetch_project,
+    fetch_project_domain,
+)
+
+__all__ = [
+    "fetch_admin_projects",
+    "fetch_domain_projects",
+    "fetch_project",
+    "fetch_project_domain",
+]

@@ -206,11 +206,11 @@ from .user_v2 import (
     admin_update_user,
     # Queries
     admin_user_v2,
-    admin_users,
-    domain_users,
-    project_users,
+    admin_users_v2,
+    domain_users_v2,
+    my_user_v2,
+    project_users_v2,
     update_user,
-    user_v2,
 )
 from .vfs_storage import (
     create_vfs_storage,
@@ -309,10 +309,10 @@ class Query:
     route_histories = route_histories
     # User V2 APIs
     admin_user_v2 = admin_user_v2
-    admin_users = admin_users
-    domain_users = domain_users
-    project_users = project_users
-    user_v2 = user_v2
+    admin_users_v2 = admin_users_v2
+    domain_users_v2 = domain_users_v2
+    my_user_v2 = my_user_v2
+    project_users_v2 = project_users_v2
 
 
 @strawberry.type

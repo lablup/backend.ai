@@ -1,5 +1,8 @@
-"""DomainV2 GraphQL data fetchers/loaders package.
+"""DomainV2 GraphQL data fetchers/loaders package."""
 
-This package will contain data loaders for efficient batch data fetching.
-To be implemented in a future task.
-"""
+from .domain import fetch_admin_domains, fetch_domain
+
+__all__ = [
+    "fetch_domain",
+    "fetch_admin_domains",
+]

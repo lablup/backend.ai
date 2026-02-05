@@ -1,7 +1,16 @@
-"""ProjectV2 GraphQL resolvers.
+"""Project V2 GraphQL resolver package."""
 
-This module will contain query and mutation resolvers for ProjectV2.
-Future implementation will include:
-- Query resolvers: admin_project_v2, admin_projects, domain_projects
-- Mutation resolvers: create, update, delete, purge
-"""
+from .query import (
+    admin_projects_v2,
+    domain_projects_v2,
+    project_domain_v2,
+    project_v2,
+)
+
+__all__ = [
+    # Queries
+    "admin_projects_v2",
+    "domain_projects_v2",
+    "project_domain_v2",
+    "project_v2",
+]

@@ -19,6 +19,14 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.search_projects import (
+    GetProjectAction,
+    GetProjectActionResult,
+    SearchProjectsAction,
+    SearchProjectsActionResult,
+    SearchProjectsByDomainAction,
+    SearchProjectsByUserAction,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -37,6 +45,12 @@ class GroupProcessors(AbstractProcessorPackage):
     purge_group: ActionProcessor[PurgeGroupAction, PurgeGroupActionResult]
     usage_per_month: ActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: ActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
+    search_projects: ActionProcessor[SearchProjectsAction, SearchProjectsActionResult]
+    search_projects_by_domain: ActionProcessor[
+        SearchProjectsByDomainAction, SearchProjectsActionResult
+    ]
+    search_projects_by_user: ActionProcessor[SearchProjectsByUserAction, SearchProjectsActionResult]
+    get_project: ActionProcessor[GetProjectAction, GetProjectActionResult]
 
     def __init__(self, group_service: GroupService, action_monitors: list[ActionMonitor]) -> None:
         self.create_group = ActionProcessor(group_service.create_group, action_monitors)
@@ -45,6 +59,14 @@ class GroupProcessors(AbstractProcessorPackage):
         self.purge_group = ActionProcessor(group_service.purge_group, action_monitors)
         self.usage_per_month = ActionProcessor(group_service.usage_per_month, action_monitors)
         self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)
+        self.search_projects = ActionProcessor(group_service.search_projects, action_monitors)
+        self.search_projects_by_domain = ActionProcessor(
+            group_service.search_projects_by_domain, action_monitors
+        )
+        self.search_projects_by_user = ActionProcessor(
+            group_service.search_projects_by_user, action_monitors
+        )
+        self.get_project = ActionProcessor(group_service.get_project, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -55,4 +77,8 @@ class GroupProcessors(AbstractProcessorPackage):
             PurgeGroupAction.spec(),
             UsagePerMonthAction.spec(),
             UsagePerPeriodAction.spec(),
+            SearchProjectsAction.spec(),
+            SearchProjectsByDomainAction.spec(),
+            SearchProjectsByUserAction.spec(),
+            GetProjectAction.spec(),
         ]

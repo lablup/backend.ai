@@ -15,6 +15,10 @@ from .delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
+from .get_user import (
+    GetUserAction,
+    GetUserActionResult,
+)
 from .modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
@@ -47,6 +51,8 @@ __all__ = (
     "CreateUserActionResult",
     "DeleteUserAction",
     "DeleteUserActionResult",
+    "GetUserAction",
+    "GetUserActionResult",
     "ModifyUserAction",
     "ModifyUserActionResult",
     "PurgeUserAction",
