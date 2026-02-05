@@ -13,6 +13,7 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common import msgpack
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, InsufficientPrivilege
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -82,8 +83,6 @@ class ProjectConfigDBSource:
 
     async def resolve_project_for_admin(
         self,
-        user_domain: str,
-        is_superadmin: bool,
         domain_name: str | None,
         project_id_or_name: uuid.UUID | str,
     ) -> ResolvedProject:
@@ -95,8 +94,6 @@ class ProjectConfigDBSource:
         projects within their domain.
 
         Args:
-            user_domain: Domain name of the requesting user
-            is_superadmin: Whether the user is a superadmin
             domain_name: Domain name (required if project_id_or_name is a string name)
             project_id_or_name: UUID or string name of the project
 
@@ -104,10 +101,15 @@ class ProjectConfigDBSource:
             ResolvedProject containing id and domain_name
 
         Raises:
+            InsufficientPrivilege: If user context is not available
             InvalidAPIParameters: If domain_name is missing when project name is provided
             ProjectNotFound: If project is not found
             InsufficientPrivilege: If admin lacks permission for the project
         """
+        user = current_user()
+        if user is None:
+            raise InsufficientPrivilege("Authentication required")
+
         async with self._db.begin_read_committed() as conn:
             if isinstance(project_id_or_name, str):
                 if domain_name is None:
@@ -125,7 +127,7 @@ class ProjectConfigDBSource:
             if row is None:
                 raise ProjectNotFound()
 
-            if not is_superadmin and user_domain != row.domain_name:
+            if not user.is_superadmin and user.domain_name != row.domain_name:
                 raise InsufficientPrivilege(
                     "Admins cannot modify project dotfiles of other domains"
                 )
@@ -134,10 +136,6 @@ class ProjectConfigDBSource:
 
     async def resolve_project_for_user(
         self,
-        user_id: uuid.UUID,
-        user_domain: str,
-        is_admin: bool,
-        is_superadmin: bool,
         domain_name: str | None,
         project_id_or_name: uuid.UUID | str,
     ) -> ResolvedProject:
@@ -149,10 +147,6 @@ class ProjectConfigDBSource:
         within their domain, regular users must be members of the project.
 
         Args:
-            user_id: UUID of the requesting user
-            user_domain: Domain name of the requesting user
-            is_admin: Whether the user is a domain admin
-            is_superadmin: Whether the user is a superadmin
             domain_name: Domain name (required if project_id_or_name is a string name)
             project_id_or_name: UUID or string name of the project
 
@@ -160,11 +154,16 @@ class ProjectConfigDBSource:
             ResolvedProject containing id and domain_name
 
         Raises:
+            InsufficientPrivilege: If user context is not available
             InvalidAPIParameters: If domain_name is missing when project name is provided
             ProjectNotFound: If project is not found
             InsufficientPrivilege: If admin lacks permission for the project
             GroupMembershipNotFoundError: If regular user is not a member of the project
         """
+        user = current_user()
+        if user is None:
+            raise InsufficientPrivilege("Authentication required")
+
         async with self._db.begin_read_committed() as conn:
             if isinstance(project_id_or_name, str):
                 if domain_name is None:
@@ -182,11 +181,11 @@ class ProjectConfigDBSource:
             if row is None:
                 raise ProjectNotFound()
 
-            if is_superadmin:
+            if user.is_superadmin:
                 return ResolvedProject(id=row.id, domain_name=row.domain_name)
 
-            if is_admin:
-                if user_domain != row.domain_name:
+            if user.is_admin:
+                if user.domain_name != row.domain_name:
                     raise InsufficientPrivilege(
                         "Domain admins cannot access project dotfiles of other domains"
                     )
@@ -195,7 +194,7 @@ class ProjectConfigDBSource:
             # Regular user: check membership
             membership_query = (
                 sa.select(AssocGroupUserRow.group_id)
-                .where(AssocGroupUserRow.user_id == user_id)
+                .where(AssocGroupUserRow.user_id == user.user_id)
                 .where(AssocGroupUserRow.group_id == row.id)
             )
             membership_result = await conn.scalar(membership_query)
