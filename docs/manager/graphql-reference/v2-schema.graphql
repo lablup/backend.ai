@@ -2605,6 +2605,16 @@ type ImageResourceLimit {
 """
 Added in 26.2.0.
 
+Scope for querying aliases within a specific image.
+"""
+input ImageScope {
+  """UUID of the image to scope the query to."""
+  imageId: UUID!
+}
+
+"""
+Added in 26.2.0.
+
 Status of an image in the system.
 """
 enum ImageStatus {
@@ -4631,6 +4641,17 @@ type Query {
   Supports both cursor-based and offset-based pagination.
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+
+  """
+  Added in 26.2.0.
+  
+  Query image aliases within a specific image with optional filtering,
+  ordering, and pagination.
+  
+  Returns image aliases that belong to the specified image.
+  Supports both cursor-based and offset-based pagination.
+  """
+  imageScopedAliases(scope: ImageScope!, filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!

@@ -121,6 +121,7 @@ from .image import (
     admin_images_v2,
     container_registry_images_v2,
     image_alias,
+    image_scoped_aliases,
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
@@ -299,6 +300,8 @@ class Query:
     rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
+    # Image Scoped APIs
+    image_scoped_aliases = image_scoped_aliases
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories

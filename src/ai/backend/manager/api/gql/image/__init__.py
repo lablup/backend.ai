@@ -11,6 +11,7 @@ from .resolver import (
     admin_images_v2,
     container_registry_images_v2,
     image_alias,
+    image_scoped_aliases,
     image_v2,
 )
 from .types import (
@@ -33,6 +34,7 @@ from .types import (
     ImagePermissionInfoGQL,
     ImageRequirementsInfoGQL,
     ImageResourceLimitGQL,
+    ImageScopeGQL,
     ImageStatusGQL,
     ImageTagEntryGQL,
     ImageV2GQL,
@@ -66,6 +68,7 @@ __all__ = [
     "ImageAliasFilterGQL",
     "ImageAliasOrderByGQL",
     "ContainerRegistryScopeGQL",
+    "ImageScopeGQL",
     # Fetcher functions
     "fetch_images",
     "fetch_image",
@@ -76,5 +79,6 @@ __all__ = [
     "image_v2",
     "container_registry_images_v2",
     "image_alias",
+    "image_scoped_aliases",
     "admin_image_aliases",
 ]

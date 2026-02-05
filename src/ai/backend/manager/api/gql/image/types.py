@@ -473,6 +473,18 @@ class ContainerRegistryScopeGQL:
 
 
 @strawberry.input(
+    name="ImageScope",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Scope for querying aliases within a specific image.
+    """),
+)
+class ImageScopeGQL:
+    image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
+
+
+@strawberry.input(
     description=dedent_strip("""
     Added in 26.2.0.
 
