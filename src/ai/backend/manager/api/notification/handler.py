@@ -94,7 +94,7 @@ class NotificationAPIHandler:
         self,
         body: BodyParam[CreateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[CreateNotificationChannelResponse]:
         """Create a new notification channel."""
         processors = processors_ctx.processors
         me = current_user()
@@ -132,7 +132,7 @@ class NotificationAPIHandler:
         self,
         body: BodyParam[SearchNotificationChannelsRequest],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[ListNotificationChannelsResponse]:
         """Search notification channels with filters, orders, and pagination."""
         processors = processors_ctx.processors
         me = current_user()
@@ -164,7 +164,7 @@ class NotificationAPIHandler:
         self,
         path: PathParam[GetNotificationChannelPathParam],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[GetNotificationChannelResponse]:
         """Get a specific notification channel."""
         processors = processors_ctx.processors
         me = current_user()
@@ -189,7 +189,7 @@ class NotificationAPIHandler:
         path: PathParam[UpdateNotificationChannelPathParam],
         body: BodyParam[UpdateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[UpdateNotificationChannelResponse]:
         """Update an existing notification channel."""
         processors = processors_ctx.processors
         me = current_user()
@@ -214,7 +214,7 @@ class NotificationAPIHandler:
         self,
         path: PathParam[DeleteNotificationChannelPathParam],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[DeleteNotificationChannelResponse]:
         """Delete a notification channel."""
         processors = processors_ctx.processors
         me = current_user()
@@ -237,7 +237,7 @@ class NotificationAPIHandler:
         path: PathParam[ValidateNotificationChannelPathParam],
         body: BodyParam[ValidateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
+    ) -> APIResponse[ValidateNotificationChannelResponse]:
         """Validate a notification channel by sending a test webhook."""
         processors = processors_ctx.processors
         me = current_user()
