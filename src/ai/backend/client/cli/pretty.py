@@ -249,7 +249,7 @@ class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
     ) -> str:
         # Return the prefix string only.
         # Suppress unused variable warnings (params required for tqdm compatibility)
-        _ = n, total, elapsed, ncols, ascii, unit, unit_scale, rate, bar_format, args
+        _ = n, total, elapsed, ncols, ascii, unit, unit_scale, rate, bar_format, args, kwargs
         return str(prefix) + str(postfix)
 
     def __init__(
