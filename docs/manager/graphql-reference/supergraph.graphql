@@ -3136,6 +3136,8 @@ enum DeploymentStatus
   SCALING @join__enumValue(graph: STRAWBERRY)
   DEPLOYING @join__enumValue(graph: STRAWBERRY)
   READY @join__enumValue(graph: STRAWBERRY)
+  DESTROYING @join__enumValue(graph: STRAWBERRY)
+  DESTROYED @join__enumValue(graph: STRAWBERRY)
   STOPPING @join__enumValue(graph: STRAWBERRY)
   STOPPED @join__enumValue(graph: STRAWBERRY)
 }

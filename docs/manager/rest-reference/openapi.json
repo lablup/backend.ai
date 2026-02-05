@@ -4176,6 +4176,8 @@
           "SCALING",
           "DEPLOYING",
           "READY",
+          "DESTROYING",
+          "DESTROYED",
           "STOPPING",
           "STOPPED"
         ],
