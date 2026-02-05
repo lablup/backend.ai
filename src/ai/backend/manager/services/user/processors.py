@@ -8,6 +8,8 @@ from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
+    BulkCreateUserAction,
+    BulkCreateUserActionResult,
     CreateUserAction,
     CreateUserActionResult,
 )
@@ -48,6 +50,7 @@ from ai.backend.manager.services.user.service import UserService
 
 class UserProcessors(AbstractProcessorPackage):
     create_user: ActionProcessor[CreateUserAction, CreateUserActionResult]
+    bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
     modify_user: ActionProcessor[ModifyUserAction, ModifyUserActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
     get_user: ActionProcessor[GetUserAction, GetUserActionResult]
@@ -64,6 +67,7 @@ class UserProcessors(AbstractProcessorPackage):
 
     def __init__(self, user_service: UserService, action_monitors: list[ActionMonitor]) -> None:
         self.create_user = ActionProcessor(user_service.create_user, action_monitors)
+        self.bulk_create_users = ActionProcessor(user_service.bulk_create_users, action_monitors)
         self.modify_user = ActionProcessor(user_service.modify_user, action_monitors)
         self.delete_user = ActionProcessor(user_service.delete_user, action_monitors)
         self.get_user = ActionProcessor(user_service.get_user, action_monitors)
@@ -82,6 +86,7 @@ class UserProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateUserAction.spec(),
+            BulkCreateUserAction.spec(),
             ModifyUserAction.spec(),
             DeleteUserAction.spec(),
             GetUserAction.spec(),

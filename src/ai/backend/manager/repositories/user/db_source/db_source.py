@@ -21,7 +21,12 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreateResultData, UserData, UserSearchResult
+from ai.backend.manager.data.user.types import (
+    BulkUserCreateResultData,
+    UserCreateResultData,
+    UserData,
+    UserSearchResult,
+)
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -70,7 +75,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import BulkCreatorError, Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater
@@ -89,6 +94,7 @@ from ai.backend.manager.repositories.user.purgers import (
 )
 from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.user.actions.create_user import BulkUserCreateItem
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -202,6 +208,103 @@ class UserDBSource:
             await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
 
         return UserCreateResultData(created_user, kp_data)
+
+    async def bulk_create_users_validated(
+        self,
+        items: list[BulkUserCreateItem],
+    ) -> BulkUserCreateResultData:
+        """Create multiple users with partial failure support.
+
+        Each user is created in a savepoint - if one fails, others can still succeed.
+
+        Args:
+            items: List of BulkUserCreateItem for each user to create.
+        """
+        if not items:
+            return BulkUserCreateResultData(successes=[], failures=[])
+
+        successes: list[UserData] = []
+        failures: list[BulkCreatorError[UserRow]] = []
+
+        async with self._db.begin_session() as db_session:
+            for idx, item in enumerate(items):
+                spec = cast(UserCreatorSpec, item.creator.spec)
+
+                try:
+                    async with db_session.begin_nested():
+                        # Validate domain
+                        if not await self._check_domain_exists(db_session, spec.domain_name):
+                            raise UserCreationBadRequest(
+                                f"Domain '{spec.domain_name}' does not exist"
+                            )
+
+                        # Validate no duplicate
+                        if await self._check_user_exists_with_email_or_username(
+                            db_session, email=spec.email, username=spec.username
+                        ):
+                            raise UserConflict(
+                                f"Email '{spec.email}' or username '{spec.username}' already exists"
+                            )
+
+                        # Create user
+                        result = await execute_creator(db_session, item.creator)
+                        row = result.row
+                        if not row:
+                            raise UserCreationFailure(f"Failed to create user {spec.email}")
+
+                        created_user = row.to_data()
+
+                        # Create default keypair
+                        keypair_creator = KeyPairCreator(
+                            is_active=(created_user.status == UserStatus.ACTIVE),
+                            is_admin=created_user.role in ["superadmin", "admin"],
+                            resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                            rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
+                        )
+                        generated = generate_keypair_data()
+                        kp_row = KeyPairRow.from_creator(
+                            keypair_creator, generated, created_user.id, created_user.email
+                        )
+                        db_session.add(kp_row)
+                        await db_session.flush()
+                        kp_data = kp_row.to_data()
+
+                        # Update user main_access_key
+                        row.main_access_key = kp_data.access_key
+                        created_user.main_access_key = kp_data.access_key
+
+                        # Add user to groups
+                        if created_user.domain_name:
+                            await self._add_user_to_groups(
+                                db_session,
+                                created_user.uuid,
+                                created_user.domain_name,
+                                item.group_ids or [],
+                            )
+
+                        # Create system role and mappings
+                        role = await self._role_manager.create_system_role(db_session, created_user)
+                        user_role_creator = Creator(
+                            spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
+                        )
+                        await self._role_manager.map_user_to_role(db_session, user_role_creator)
+                        entity_scope_creator = Creator(
+                            spec=AssociationScopesEntitiesCreatorSpec(
+                                scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+                                object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
+                            )
+                        )
+                        await self._role_manager.map_entity_to_scope(
+                            db_session, entity_scope_creator
+                        )
+
+                        successes.append(created_user)
+
+                except Exception as e:
+                    log.warning("Failed to create user {}: {}", spec.email, str(e))
+                    failures.append(BulkCreatorError(spec=spec, exception=e, index=idx))
+
+        return BulkUserCreateResultData(successes=successes, failures=failures)
 
     async def update_user_validated(
         self,
