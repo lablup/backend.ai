@@ -14,6 +14,7 @@ from yarl import URL
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
@@ -728,15 +729,17 @@ class ModelServingService:
 
         # Generate token via wsproxy
         body = {"user_uuid": str(endpoint_data.session_owner_id), "exp": action.expires_at}
+        headers: dict[str, str] = {
+            "accept": "application/json",
+            "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
+        }
+        bind_request_id(headers, "wsproxy token generation request")
         async with (
             aiohttp.ClientSession() as session,
             session.post(
                 f"{scaling_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
                 json=body,
-                headers={
-                    "accept": "application/json",
-                    "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
-                },
+                headers=headers,
             ) as resp,
         ):
             resp_json = await resp.json()

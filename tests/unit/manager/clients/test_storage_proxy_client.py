@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterator
 from typing import Any
 
 import pytest
@@ -9,6 +9,7 @@ from aiohttp import ClientTimeout, web
 from aiohttp.test_utils import TestClient
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.contexts.request_id import REQUEST_ID_HEADER, with_request_id
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
@@ -25,6 +26,8 @@ type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
     [str, HandlerType], Coroutine[Any, Any, StorageProxyHTTPClient]
 ]
+
+TEST_REQUEST_ID = "test-request-id"
 
 
 @pytest.fixture
@@ -167,3 +170,39 @@ class TestStorageProxyClient:
         # The request should succeed because timeout is sufficient
         result = await manager_client.get_volumes()
         assert result == {"volumes": ["volume1", "volume2"]}
+
+
+class TestStorageProxyClientRequestId:
+    @pytest.fixture
+    def request_id(self) -> Iterator[str]:
+        """Set up request_id context for the test."""
+        with with_request_id(TEST_REQUEST_ID):
+            yield TEST_REQUEST_ID
+
+    @pytest.mark.asyncio
+    async def test_request_includes_request_id_header(
+        self, request_id: str, aiohttp_client: Any
+    ) -> None:
+        """Verify that request_id from context is included in HTTP headers."""
+        received_headers: dict[str, str] = {}
+
+        async def capture_headers_handler(request: web.Request) -> web.Response:
+            received_headers.update(dict(request.headers))
+            return web.json_response({"status": "ok"})
+
+        app = web.Application()
+        app.router.add_get("/test", capture_headers_handler)
+        client: TestClient = await aiohttp_client(app)
+
+        storage_client = StorageProxyHTTPClient(
+            client_session=client.session,
+            args=StorageProxyClientArgs(
+                endpoint=client.make_url("/"),
+                secret="test-secret",
+            ),
+        )
+
+        await storage_client.request(method="GET", url="test", timeout=DEFAULT_TIMEOUT)
+
+        assert REQUEST_ID_HEADER in received_headers
+        assert received_headers[REQUEST_ID_HEADER] == request_id

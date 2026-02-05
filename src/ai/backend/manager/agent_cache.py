@@ -17,6 +17,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -42,10 +43,13 @@ class PeerInvoker(Peer):
                 return f
 
             async def _wrapped(*args: Any, **kwargs: Any) -> Any:
-                request_body = {
+                request_body: dict[str, object] = {
                     "args": args,
                     "kwargs": kwargs,
                 }
+                # NOTE: callosum's Peer.invoke() API doesn't expose metadata parameter,
+                # so we pass request_id through the body instead of RPC metadata/headers.
+                bind_request_id(request_body, "RPC call to agent", key="request_id")
                 self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
                 ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
                 self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]

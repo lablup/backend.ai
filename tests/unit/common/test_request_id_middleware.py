@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from aiohttp import web
 
@@ -27,11 +28,17 @@ async def test_request_id_middleware_with_custom_request_id(aiohttp_client: Any)
     test_id = str(uuid.uuid4())
     resp = await client.get("/", headers={REQUEST_ID_HEADER: test_id})
     assert resp.status == 200
+    # Verify request_id is included in response headers
+    assert resp.headers.get(REQUEST_ID_HEADER) == test_id
 
 
 async def test_request_id_middleware_without_request_id(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
-        assert current_request_id() is not None
+        # When no request_id header is provided, with_request_id generates a UUID
+        req_id = current_request_id()
+        assert req_id is not None
+        # Verify it's a valid UUID
+        UUID(req_id)
         return web.Response(text="ok")
 
     app = web.Application()
@@ -40,6 +47,8 @@ async def test_request_id_middleware_without_request_id(aiohttp_client: Any) -> 
 
     client = await aiohttp_client(app)
 
-    # Test without request ID (should be None)
+    # Test without request ID header
     resp = await client.get("/")
     assert resp.status == 200
+    # Response should not have request_id header when none was provided in request
+    assert REQUEST_ID_HEADER not in resp.headers

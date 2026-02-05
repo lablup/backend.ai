@@ -3,6 +3,7 @@ from uuid import UUID
 
 import aiohttp
 
+from ai.backend.common.contexts.request_id import bind_request_id
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -36,6 +37,12 @@ class AppProxyClient:
         self._address = address
         self._token = token
 
+    def _get_headers(self) -> dict[str, str]:
+        """Get common headers for API requests."""
+        headers = {"X-BackendAI-Token": self._token}
+        bind_request_id(headers, "AppProxy request")
+        return headers
+
     @appproxy_client_resilience.apply()
     async def create_endpoint(
         self,
@@ -45,9 +52,7 @@ class AppProxyClient:
         async with self._client_session.post(
             f"/v2/endpoints/{endpoint_id}",
             json=body.model_dump(mode="json"),
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._get_headers(),
         ) as resp:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
@@ -60,8 +65,6 @@ class AppProxyClient:
     ) -> None:
         async with self._client_session.delete(
             f"/v2/endpoints/{endpoint_id}",
-            headers={
-                "X-BackendAI-Token": self._token,
-            },
+            headers=self._get_headers(),
         ):
             pass
