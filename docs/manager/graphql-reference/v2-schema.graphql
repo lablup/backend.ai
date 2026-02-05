@@ -1806,6 +1806,11 @@ enum DomainFairShareOrderField {
   CREATED_AT
 }
 
+input DomainFairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroup: String!
+}
+
 """
 Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
 """
@@ -1997,6 +2002,16 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: DomainLifecycleInfo!
+
+  """
+  Fair share records for this domain, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: DomainFairShareScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """
+  Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
 }
 
 """
@@ -2684,17 +2699,11 @@ enum KernelStatus {
   PENDING
   SCHEDULED
   PREPARING
-  BUILDING
-  PULLING
   PREPARED
   CREATING
   RUNNING
-  RESTARTING
-  RESIZING
-  SUSPENDED
   TERMINATING
   TERMINATED
-  ERROR
   CANCELLED
 }
 
@@ -3847,68 +3856,6 @@ enum ProjectTypeV2 {
 }
 
 """
-Added in 26.2.0. Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input ProjectTypeV2EnumFilter {
-  """Exact match for project type."""
-  equals: ProjectTypeV2 = null
-
-  """Match any of the provided types."""
-  in: [ProjectTypeV2!] = null
-
-  """Exclude exact type match."""
-  notEquals: ProjectTypeV2 = null
-
-  """Exclude any of the provided types."""
-  notIn: [ProjectTypeV2!] = null
-}
-
-"""
-Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
-"""
-type ProjectLifecycleInfo {
-  """
-  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
-  """
-  isActive: Boolean
-
-  """Timestamp when the project was created."""
-  createdAt: DateTime
-
-  """Timestamp when the project was last modified."""
-  modifiedAt: DateTime
-}
-
-"""
-Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
-"""
-type ProjectOrganizationInfo {
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """Name of the project resource policy applied to this project."""
-  resourcePolicy: String!
-}
-
-"""
-Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
-"""
-type ProjectStorageInfo {
-  """
-  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
-  """
-  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
-}
-
-"""
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management.
-"""
-enum ProjectTypeV2 {
-  GENERAL
-  MODEL_STORE
-}
-
-"""
 Added in 26.1.0. Project-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
 """
 type ProjectUsageBucket implements Node {
@@ -4072,6 +4019,16 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: ProjectLifecycleInfo!
+
+  """
+  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """
+  Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
 }
 
 """
@@ -4397,14 +4354,6 @@ type Query {
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
-
-  """Added in 26.2.0. Query a single kernel by ID. (admin only)"""
-  adminKernelV2(id: UUID!): KernelV2
-
-  """
-  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
-  """
-  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -5415,18 +5364,13 @@ enum SessionSchedulingHistoryOrderField {
   UPDATED_AT
 }
 
-"""
-Added in 26.2.0. Scope for querying resources within a specific session.
-"""
+"""Scope for session scheduling history query"""
 input SessionScope {
-  """
-  Session UUID to scope the query. Only resources belonging to this session will be returned.
-  """
+  """Session ID to get history for"""
   sessionId: UUID!
 }
 
-"""Added in 26.1.0. Type of compute session."""
-enum SessionType {
+enum SessionTypes {
   INTERACTIVE
   BATCH
   INFERENCE

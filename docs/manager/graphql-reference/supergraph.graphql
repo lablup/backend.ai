@@ -3682,6 +3682,16 @@ type DomainV2 implements Node
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: DomainLifecycleInfo!
+
+  """
+  Fair share records for this domain, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: DomainFairShareScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """
+  Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
 }
 
 """
@@ -5032,17 +5042,11 @@ enum KernelStatus
   PENDING @join__enumValue(graph: STRAWBERRY)
   SCHEDULED @join__enumValue(graph: STRAWBERRY)
   PREPARING @join__enumValue(graph: STRAWBERRY)
-  BUILDING @join__enumValue(graph: STRAWBERRY)
-  PULLING @join__enumValue(graph: STRAWBERRY)
   PREPARED @join__enumValue(graph: STRAWBERRY)
   CREATING @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
-  RESTARTING @join__enumValue(graph: STRAWBERRY)
-  RESIZING @join__enumValue(graph: STRAWBERRY)
-  SUSPENDED @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
-  ERROR @join__enumValue(graph: STRAWBERRY)
   CANCELLED @join__enumValue(graph: STRAWBERRY)
 }
 
@@ -7397,6 +7401,13 @@ enum ProjectFairShareOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+input ProjectFairShareScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter fair shares by."""
+  resourceGroup: String!
+}
+
 """
 Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
 """
@@ -7656,6 +7667,16 @@ type ProjectV2 implements Node
 
   """Lifecycle information including activation status and timestamps."""
   lifecycle: ProjectLifecycleInfo!
+
+  """
+  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """
+  Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
 }
 
 """
@@ -8465,14 +8486,6 @@ type Query
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @join__field(graph: STRAWBERRY)
-
-  """Added in 26.2.0. Query a single kernel by ID. (admin only)"""
-  adminKernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
-  """
-  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -9914,20 +9927,15 @@ enum SessionSchedulingHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 26.2.0. Scope for querying resources within a specific session.
-"""
+"""Scope for session scheduling history query"""
 input SessionScope
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Session UUID to scope the query. Only resources belonging to this session will be returned.
-  """
+  """Session ID to get history for"""
   sessionId: UUID!
 }
 
-"""Added in 26.1.0. Type of compute session."""
-enum SessionType
+enum SessionTypes
   @join__type(graph: STRAWBERRY)
 {
   INTERACTIVE @join__enumValue(graph: STRAWBERRY)

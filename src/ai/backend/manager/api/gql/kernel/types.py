@@ -47,17 +47,11 @@ class KernelStatusGQL(StrEnum):
     PENDING = "PENDING"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
-    BUILDING = "BUILDING"
-    PULLING = "PULLING"
     PREPARED = "PREPARED"
     CREATING = "CREATING"
     RUNNING = "RUNNING"
-    RESTARTING = "RESTARTING"
-    RESIZING = "RESIZING"
-    SUSPENDED = "SUSPENDED"
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
-    ERROR = "ERROR"
     CANCELLED = "CANCELLED"
 
     @classmethod
@@ -68,31 +62,26 @@ class KernelStatusGQL(StrEnum):
                 return cls.PENDING
             case KernelStatus.SCHEDULED:
                 return cls.SCHEDULED
-            case KernelStatus.PREPARING:
+            case KernelStatus.PREPARING | KernelStatus.PULLING:
                 return cls.PREPARING
-            case KernelStatus.BUILDING:
-                return cls.BUILDING
-            case KernelStatus.PULLING:
-                return cls.PULLING
             case KernelStatus.PREPARED:
                 return cls.PREPARED
             case KernelStatus.CREATING:
                 return cls.CREATING
             case KernelStatus.RUNNING:
                 return cls.RUNNING
-            case KernelStatus.RESTARTING:
-                return cls.RESTARTING
-            case KernelStatus.RESIZING:
-                return cls.RESIZING
-            case KernelStatus.SUSPENDED:
-                return cls.SUSPENDED
             case KernelStatus.TERMINATING:
                 return cls.TERMINATING
             case KernelStatus.TERMINATED:
                 return cls.TERMINATED
-            case KernelStatus.ERROR:
-                return cls.ERROR
-            case KernelStatus.CANCELLED:
+            case (
+                KernelStatus.CANCELLED
+                | KernelStatus.BUILDING
+                | KernelStatus.RESTARTING
+                | KernelStatus.RESIZING
+                | KernelStatus.SUSPENDED
+                | KernelStatus.ERROR
+            ):
                 return cls.CANCELLED
 
     def to_internal(self) -> KernelStatus:
@@ -104,28 +93,16 @@ class KernelStatusGQL(StrEnum):
                 return KernelStatus.SCHEDULED
             case KernelStatusGQL.PREPARING:
                 return KernelStatus.PREPARING
-            case KernelStatusGQL.BUILDING:
-                return KernelStatus.BUILDING
-            case KernelStatusGQL.PULLING:
-                return KernelStatus.PULLING
             case KernelStatusGQL.PREPARED:
                 return KernelStatus.PREPARED
             case KernelStatusGQL.CREATING:
                 return KernelStatus.CREATING
             case KernelStatusGQL.RUNNING:
                 return KernelStatus.RUNNING
-            case KernelStatusGQL.RESTARTING:
-                return KernelStatus.RESTARTING
-            case KernelStatusGQL.RESIZING:
-                return KernelStatus.RESIZING
-            case KernelStatusGQL.SUSPENDED:
-                return KernelStatus.SUSPENDED
             case KernelStatusGQL.TERMINATING:
                 return KernelStatus.TERMINATING
             case KernelStatusGQL.TERMINATED:
                 return KernelStatus.TERMINATED
-            case KernelStatusGQL.ERROR:
-                return KernelStatus.ERROR
             case KernelStatusGQL.CANCELLED:
                 return KernelStatus.CANCELLED
 
@@ -184,18 +161,6 @@ class KernelStatusFilterGQL:
                 )
             )
         return None
-
-
-@strawberry.input(
-    name="SessionScope",
-    description="Added in 26.2.0. Scope for querying resources within a specific session.",
-)
-class SessionScopeGQL:
-    """Scope for session-level queries."""
-
-    session_id: UUID = strawberry.field(
-        description="Session UUID to scope the query. Only resources belonging to this session will be returned."
-    )
 
 
 @strawberry.input(

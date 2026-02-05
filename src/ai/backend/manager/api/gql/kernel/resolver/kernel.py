@@ -12,8 +12,8 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelFilterGQL,
     KernelOrderByGQL,
     KernelV2GQL,
-    SessionScopeGQL,
 )
+from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.scheduler.options import KernelConditions
@@ -61,7 +61,7 @@ async def admin_kernels_v2(
 )  # type: ignore[misc]
 async def session_kernels_v2(
     info: Info[StrawberryGQLContext],
-    scope: SessionScopeGQL,
+    scope: SessionScope,
     filter: KernelFilterGQL | None = None,
     order_by: list[KernelOrderByGQL] | None = None,
     before: str | None = None,
