@@ -139,10 +139,11 @@ USER_FIELDS: list[ExportFieldDef] = [
     # =========================================================================
     ExportFieldDef(
         key="resource_policy_name",
-        name="Resource Policy",
+        name="Resource Policy Name",
         description="User resource policy name",
         field_type=ExportFieldType.STRING,
-        column=UserRow.resource_policy,
+        column=UserResourcePolicyRow.name,
+        joins=frozenset({USER_RESOURCE_POLICY_JOIN}),
     ),
     ExportFieldDef(
         key="resource_policy_created_at",

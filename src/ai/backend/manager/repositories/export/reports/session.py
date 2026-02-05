@@ -11,6 +11,7 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -80,6 +81,12 @@ MAIN_KERNEL_JOIN = JoinDef(
     ),
 )
 
+# Scaling Group JOIN (N:1, no duplication)
+SCALING_GROUP_JOIN = JoinDef(
+    table=ScalingGroupRow.__table__,
+    condition=SessionRow.scaling_group_name == ScalingGroupRow.name,
+)
+
 # Field definitions for session export
 SESSION_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
@@ -134,13 +141,6 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         column=SessionRow.status_info,
     ),
     ExportFieldDef(
-        key="scaling_group_name",
-        name="Scaling Group",
-        description="Scaling group name",
-        field_type=ExportFieldType.STRING,
-        column=SessionRow.scaling_group_name,
-    ),
-    ExportFieldDef(
         key="cluster_size",
         name="Cluster Size",
         description="Number of cluster nodes",
@@ -148,11 +148,19 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         column=SessionRow.cluster_size,
     ),
     ExportFieldDef(
-        key="occupying_slots",
-        name="Resources",
+        key="resource_used",
+        name="Resources Used",
         description="Occupied resource slots",
         field_type=ExportFieldType.JSON,
         column=SessionRow.occupying_slots,
+        formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
+    ),
+    ExportFieldDef(
+        key="resource_requested",
+        name="Resources Requested",
+        description="Requested resource slots",
+        field_type=ExportFieldType.JSON,
+        column=SessionRow.requested_slots,
         formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
     ),
     ExportFieldDef(
@@ -312,6 +320,58 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         column=UserRow.role,
         formatter=lambda v: str(v) if v else "",
         joins=frozenset({USER_JOIN}),
+    ),
+    # =========================================================================
+    # Resource Group Fields (N:1, no duplication)
+    # =========================================================================
+    ExportFieldDef(
+        key="resource_group_name",
+        name="Resource Group Name",
+        description="Resource group name",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.name,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_description",
+        name="Resource Group Description",
+        description="Resource group description",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.description,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_is_active",
+        name="Resource Group Active",
+        description="Resource group active status",
+        field_type=ExportFieldType.BOOLEAN,
+        column=ScalingGroupRow.is_active,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_is_public",
+        name="Resource Group Public",
+        description="Resource group public status",
+        field_type=ExportFieldType.BOOLEAN,
+        column=ScalingGroupRow.is_public,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_scheduler",
+        name="Resource Group Scheduler",
+        description="Resource group scheduler type",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.scheduler,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_created_at",
+        name="Resource Group Created At",
+        description="Resource group creation time",
+        field_type=ExportFieldType.DATETIME,
+        column=ScalingGroupRow.created_at,
+        formatter=lambda v: v.isoformat() if v else "",
+        joins=frozenset({SCALING_GROUP_JOIN}),
     ),
     # =========================================================================
     # Kernel Fields (1:N, causes duplication)

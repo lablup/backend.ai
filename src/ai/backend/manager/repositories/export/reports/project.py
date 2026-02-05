@@ -153,7 +153,8 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Resource Policy Name",
         description="Project resource policy name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.resource_policy,
+        column=ProjectResourcePolicyRow.name,
+        joins=frozenset({RESOURCE_POLICY_JOIN}),
     ),
     ExportFieldDef(
         key="resource_policy_max_vfolder_count",

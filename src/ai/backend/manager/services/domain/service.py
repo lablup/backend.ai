@@ -39,6 +39,10 @@ from ai.backend.manager.services.domain.actions.search_domains import (
     SearchDomainsAction,
     SearchDomainsActionResult,
 )
+from ai.backend.manager.services.domain.actions.search_rg_domains import (
+    SearchRGDomainsAction,
+    SearchRGDomainsActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -148,6 +152,26 @@ class DomainService:
         """
         result = await self._repository.search_domains(querier=action.querier)
         return SearchDomainsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_rg_domains(self, action: SearchRGDomainsAction) -> SearchRGDomainsActionResult:
+        """Search domains within a resource group scope.
+
+        Args:
+            action: SearchRGDomainsAction with scope and querier.
+
+        Returns:
+            SearchRGDomainsActionResult with items and pagination info.
+        """
+        result = await self._repository.search_rg_domains(
+            scope=action.scope,
+            querier=action.querier,
+        )
+        return SearchRGDomainsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
