@@ -85,6 +85,29 @@ REST Handler → Processor → Service → Repository
 - `src/ai/backend/manager/api/{domain}/adapter.py` - Filters
 - `src/ai/backend/manager/api/adapter.py` - Base adapter
 
+### Processor-Based Service Invocation
+
+**Core principle:**
+- REST/GraphQL handlers MUST call service methods through Processors
+- Never call service methods directly from handlers
+- Processors wrap service methods as Actions and provide cross-cutting concerns (hooks, metrics, monitoring)
+
+**Pattern:**
+1. Handler creates Action with operation parameters
+2. Handler calls processor's `wait_for_complete()` with Action
+3. Processor invokes corresponding service method and returns ActionResult
+
+**ActionProcessor responsibilities:**
+- Action-based service method invocation
+- Hook execution (pre/post operation)
+- Metrics collection and monitoring
+- Error handling and logging
+
+**See complete examples:**
+- `api/fair_share/handler.py:144` - Handler calling processor
+- `services/storage_namespace/processors.py:29-56` - Processor implementation
+- `services/processors.py` - ActionProcessor base class
+
 ### Scope Pattern
 
 Scope defines access boundaries.
