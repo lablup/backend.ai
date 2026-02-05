@@ -9,6 +9,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql.fair_share.types import (
     UserFairShareConnection,
     UserFairShareFilter,
@@ -107,20 +108,32 @@ class UserV2GQL(Node):
         offset: int | None = None,
     ) -> UserFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher.user import (
-            fetch_user_fair_shares,
+            fetch_rg_user_fair_shares,
         )
         from ai.backend.manager.repositories.fair_share.options import (
             UserFairShareConditions,
         )
+        from ai.backend.manager.repositories.fair_share.types import (
+            UserFairShareSearchScope,
+        )
 
+        # Create repository scope with context information
+        if self.organization.domain_name is None:
+            raise InvalidAPIParameters("User must belong to a domain to query fair shares")
+        repository_scope = UserFairShareSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+            project_id=scope.project_id,
+        )
+
+        # Entity-specific filter only
         base_conditions = [
-            UserFairShareConditions.by_resource_group(scope.resource_group),
             UserFairShareConditions.by_user_uuid(UUID(str(self.id))),
-            UserFairShareConditions.by_project_id(scope.project_id),
         ]
 
-        return await fetch_user_fair_shares(
+        return await fetch_rg_user_fair_shares(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,

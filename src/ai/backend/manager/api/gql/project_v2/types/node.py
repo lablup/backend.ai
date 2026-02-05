@@ -96,19 +96,29 @@ class ProjectV2GQL(Node):
         offset: int | None = None,
     ) -> ProjectFairShareConnection:
         from ai.backend.manager.api.gql.fair_share.fetcher.project import (
-            fetch_project_fair_shares,
+            fetch_rg_project_fair_shares,
         )
         from ai.backend.manager.repositories.fair_share.options import (
             ProjectFairShareConditions,
         )
+        from ai.backend.manager.repositories.fair_share.types import (
+            ProjectFairShareSearchScope,
+        )
 
+        # Create repository scope with context information
+        repository_scope = ProjectFairShareSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+        )
+
+        # Entity-specific filter only
         base_conditions = [
-            ProjectFairShareConditions.by_resource_group(scope.resource_group),
             ProjectFairShareConditions.by_project_id(UUID(str(self.id))),
         ]
 
-        return await fetch_project_fair_shares(
+        return await fetch_rg_project_fair_shares(
             info=info,
+            scope=repository_scope,
             filter=filter,
             order_by=order_by,
             before=before,
