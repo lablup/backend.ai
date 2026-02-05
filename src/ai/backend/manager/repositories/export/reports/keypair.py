@@ -85,20 +85,6 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         column=KeyPairRow.access_key,
     ),
     ExportFieldDef(
-        key="user_id",
-        name="User Email",
-        description="User email (ID)",
-        field_type=ExportFieldType.STRING,
-        column=KeyPairRow.user_id,
-    ),
-    ExportFieldDef(
-        key="user_uuid",
-        name="User UUID",
-        description="User UUID",
-        field_type=ExportFieldType.UUID,
-        column=KeyPairRow.user,
-    ),
-    ExportFieldDef(
         key="is_active",
         name="Active",
         description="Keypair active status",
@@ -136,16 +122,25 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         column=KeyPairRow.last_used,
         formatter=lambda v: v.isoformat() if v else "",
     ),
-    ExportFieldDef(
-        key="resource_policy_name",
-        name="Resource Policy",
-        description="Keypair resource policy name",
-        field_type=ExportFieldType.STRING,
-        column=KeyPairRow.resource_policy,
-    ),
     # =========================================================================
     # User Fields (N:1, no duplication)
     # =========================================================================
+    ExportFieldDef(
+        key="user_id",
+        name="User Email",
+        description="User email (ID)",
+        field_type=ExportFieldType.STRING,
+        column=UserRow.email,
+        joins=frozenset({USER_JOIN}),
+    ),
+    ExportFieldDef(
+        key="user_uuid",
+        name="User UUID",
+        description="User UUID",
+        field_type=ExportFieldType.UUID,
+        column=UserRow.uuid,
+        joins=frozenset({USER_JOIN}),
+    ),
     ExportFieldDef(
         key="user_username",
         name="User Username",
@@ -191,6 +186,14 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
     # =========================================================================
     # Keypair Resource Policy Fields (N:1, no duplication)
     # =========================================================================
+    ExportFieldDef(
+        key="resource_policy_name",
+        name="Resource Policy Name",
+        description="Keypair resource policy name",
+        field_type=ExportFieldType.STRING,
+        column=KeyPairResourcePolicyRow.name,
+        joins=frozenset({RESOURCE_POLICY_JOIN}),
+    ),
     ExportFieldDef(
         key="resource_policy_created_at",
         name="Policy Created At",
@@ -381,8 +384,8 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         joins=frozenset({SESSION_JOIN}),
     ),
     ExportFieldDef(
-        key="session_requested_slots",
-        name="Session Requested Slots",
+        key="session_resource_requested",
+        name="Session Resource Requested",
         description="Requested resource slots for session",
         field_type=ExportFieldType.JSON,
         column=SessionRow.requested_slots,
