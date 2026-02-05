@@ -1628,6 +1628,12 @@ type DeploymentPolicy implements Node {
   updatedAt: DateTime!
 }
 
+"""Scope for deployment scheduling history query"""
+input DeploymentScope {
+  """Deployment ID to get history for"""
+  deploymentId: UUID!
+}
+
 """
 Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
@@ -1815,6 +1821,21 @@ type DomainUsageBucket implements Node {
   Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
   """
   capacitySnapshot: ResourceSlot!
+
+  """
+  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
+  """
+  averageDailyUsage: ResourceSlot!
+
+  """
+  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
+  """
+  usageCapacityRatio: ResourceSlot!
+
+  """
+  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
+  """
+  averageCapacityPerSecond: ResourceSlot!
 
   """
   Added in 26.1.0. Project usage buckets belonging to this domain. Returns paginated project-level usage history for all projects in this domain within the same scaling group.
@@ -2070,9 +2091,9 @@ type FairShareScalingGroupSpec {
   defaultWeight: Decimal!
 
   """
-  Weights for each resource type when calculating normalized usage. If a resource type is not specified, default weight (1.0) is used.
+  Added in 26.2.0. Weights for each resource type with default indicators. All resource types from capacity are included. Shows which resources use explicit vs default weights.
   """
-  resourceWeights: ResourceSlot!
+  resourceWeights: [ResourceWeightEntry!]!
 }
 
 """
@@ -2105,9 +2126,9 @@ type FairShareSpec {
   decayUnitDays: Int!
 
   """
-  Weights for each resource type when calculating normalized usage. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
+  Added in 26.2.0. Weights for each resource type with default indicators. Shows which resources use explicit vs default weights. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
   """
-  resourceWeights: ResourceSlot!
+  resourceWeights: [ResourceWeightEntry!]!
 }
 
 """Added in 25.14.0"""
@@ -3503,6 +3524,21 @@ type ProjectUsageBucket implements Node {
   capacitySnapshot: ResourceSlot!
 
   """
+  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
+  """
+  averageDailyUsage: ResourceSlot!
+
+  """
+  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
+  """
+  usageCapacityRatio: ResourceSlot!
+
+  """
+  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
+  """
+  averageCapacityPerSecond: ResourceSlot!
+
+  """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
   """
   userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
@@ -3901,6 +3937,15 @@ type Query {
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
 
+  """Added in 26.2.0. Get scheduling history for a specific session."""
+  sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+
+  """Added in 26.2.0. Get scheduling history for a specific deployment."""
+  deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+
+  """Added in 26.2.0. Get scheduling history for a specific route."""
+  routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
@@ -3988,22 +4033,22 @@ type Query {
   """
   Added in 26.2.0. List all users with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminUsers(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
-  domainUsers(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
-
-  """
-  Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
-  """
-  projectUsers(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
   """
-  userV2: UserV2!
+  myUserV2: UserV2!
+
+  """
+  Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
+  """
+  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 }
 
 """
@@ -4188,7 +4233,7 @@ type ResourceGroup implements Node {
   scheduler: ResourceGroupSchedulerConfig!
 
   """
-  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation.
+  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
   """
   fairShareSpec: FairShareScalingGroupSpec!
 
@@ -4406,6 +4451,26 @@ input ResourceSlotInput {
 }
 
 """
+Added in 26.2.0. Resource weight with default indicator. Shows whether this resource type's weight was explicitly set or uses default.
+"""
+type ResourceWeightEntry {
+  """
+  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). Matches the resource types available in the scaling group.
+  """
+  resourceType: String!
+
+  """
+  Weight multiplier for this resource type in fair share calculations. Higher weight means more contribution to normalized usage.
+  """
+  weight: Decimal!
+
+  """
+  Whether this resource uses the resource group's default weight. True means no explicit weight was configured for this type.
+  """
+  usesDefault: Boolean!
+}
+
+"""
 Added in 26.1.0. Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.
 """
 input ResourceWeightEntryInput {
@@ -4586,6 +4651,12 @@ enum RouteOrderField {
   CREATED_AT
   STATUS
   TRAFFIC_RATIO
+}
+
+"""Scope for route scheduling history query"""
+input RouteScope {
+  """Route ID to get history for"""
+  routeId: UUID!
 }
 
 """
@@ -4794,6 +4865,12 @@ input SessionSchedulingHistoryOrderBy {
 enum SessionSchedulingHistoryOrderField {
   CREATED_AT
   UPDATED_AT
+}
+
+"""Scope for session scheduling history query"""
+input SessionScope {
+  """Session ID to get history for"""
+  sessionId: UUID!
 }
 
 """
@@ -5528,6 +5605,16 @@ enum UserFairShareOrderField {
   CREATED_AT
 }
 
+input UserFairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroup: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
+}
+
 extend type UserNode @key(fields: "id") {
   id: ID! @external
 }
@@ -5617,6 +5704,21 @@ type UserUsageBucket implements Node {
   Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
   """
   capacitySnapshot: ResourceSlot!
+
+  """
+  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
+  """
+  averageDailyUsage: ResourceSlot!
+
+  """
+  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
+  """
+  usageCapacityRatio: ResourceSlot!
+
+  """
+  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
+  """
+  averageCapacityPerSecond: ResourceSlot!
 }
 
 """
@@ -5701,6 +5803,14 @@ input UserUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+input UserUsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroup: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
+}
+
 """
 Added in 26.2.0. User entity with structured field groups. Provides comprehensive user information organized into logical categories: basic_info (profile), status (account state), organization (permissions), security (auth settings), container (execution settings), and timestamps.
 """
@@ -5725,6 +5835,16 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Creation and modification timestamps."""
   timestamps: EntityTimestamps!
+
+  """
+  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
+  """
+  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """
+  Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
+  """
+  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 }
 
 """

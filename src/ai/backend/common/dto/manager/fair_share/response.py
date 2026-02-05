@@ -22,16 +22,19 @@ __all__ = (
     "GetDomainFairShareResponse",
     "SearchDomainFairSharesResponse",
     "UpsertDomainFairShareWeightResponse",
+    "BulkUpsertDomainFairShareWeightResponse",
     # Project Fair Share
     "ProjectFairShareDTO",
     "GetProjectFairShareResponse",
     "SearchProjectFairSharesResponse",
     "UpsertProjectFairShareWeightResponse",
+    "BulkUpsertProjectFairShareWeightResponse",
     # User Fair Share
     "UserFairShareDTO",
     "GetUserFairShareResponse",
     "SearchUserFairSharesResponse",
     "UpsertUserFairShareWeightResponse",
+    "BulkUpsertUserFairShareWeightResponse",
     # Domain Usage Bucket
     "UsageBucketMetadataDTO",
     "DomainUsageBucketDTO",
@@ -220,6 +223,17 @@ class UsageBucketMetadataDTO(BaseModel):
     created_at: datetime = Field(description="Timestamp when this record was created")
     updated_at: datetime = Field(description="Timestamp when this record was last updated")
 
+    # BA-4202: Fair Share Metric calculation fields
+    average_daily_usage: ResourceSlotDTO = Field(
+        description="Average daily resource usage during this period"
+    )
+    usage_capacity_ratio: ResourceSlotDTO = Field(
+        description="Ratio of usage to capacity (usage / total capacity available)"
+    )
+    average_capacity_per_second: ResourceSlotDTO = Field(
+        description="Average capacity available per second during this period"
+    )
+
 
 # Domain Usage Bucket
 
@@ -340,6 +354,27 @@ class UpsertUserFairShareWeightResponse(BaseResponseModel):
     """Response for upserting user fair share weight."""
 
     item: UserFairShareDTO = Field(description="Updated user fair share data")
+
+
+# Bulk Upsert Weight Responses
+
+
+class BulkUpsertDomainFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting domain fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
+
+
+class BulkUpsertProjectFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting project fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
+
+
+class BulkUpsertUserFairShareWeightResponse(BaseResponseModel):
+    """Response for bulk upserting user fair share weights."""
+
+    upserted_count: int = Field(description="Number of records upserted")
 
 
 # Resource Group Fair Share Spec

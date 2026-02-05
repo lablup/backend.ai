@@ -21,6 +21,7 @@ from ai.backend.manager.api.gql.resource_group.types import (
 )
 from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoActionResult,
 )
@@ -156,7 +157,13 @@ class TestResourceGroupGQLResourceInfoResolver:
                 use_host_network=False,
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(type=SchedulerTypeGQL.FIFO),
-            fair_share_spec=MagicMock(),
+            _fair_share_spec_data=FairShareScalingGroupSpec(
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                default_weight=Decimal("1.0"),
+                resource_weights=ResourceSlot({}),
+            ),
         )
 
     @pytest.fixture

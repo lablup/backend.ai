@@ -5,8 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Self
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.api.gql.fair_share.types import (
+    DomainFairShareConnection,
+    DomainFairShareFilter,
+    DomainFairShareOrderBy,
+)
+from ai.backend.manager.api.gql.resource_usage.types import (
+    DomainUsageBucketConnection,
+    DomainUsageBucketFilter,
+    DomainUsageBucketOrderBy,
+)
 
 from .nested import (
     DomainBasicInfoGQL,
@@ -16,6 +27,20 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.domain.types import DomainData
+
+
+@strawberry.input(name="DomainFairShareScope")
+class DomainFairShareScopeGQL:
+    """Scope parameters for filtering domain fair shares."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter fair shares by.")
+
+
+@strawberry.input(name="DomainUsageScope")
+class DomainUsageScopeGQL:
+    """Scope parameters for filtering domain usage buckets."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter usage buckets by.")
 
 
 @strawberry.federation.type(
@@ -43,6 +68,108 @@ class DomainV2GQL(Node):
     lifecycle: DomainLifecycleInfoGQL = strawberry.field(
         description="Lifecycle information including activation status and timestamps."
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Fair share records for this domain, filtered by resource group. "
+            "Returns fair share policy specifications and calculation snapshots."
+        )
+    )
+    async def fair_shares(
+        self,
+        info: Info,
+        scope: DomainFairShareScopeGQL,
+        filter: DomainFairShareFilter | None = None,
+        order_by: list[DomainFairShareOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> DomainFairShareConnection:
+        from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
+            fetch_rg_domain_fair_shares,
+        )
+        from ai.backend.manager.repositories.fair_share.options import (
+            DomainFairShareConditions,
+        )
+        from ai.backend.manager.repositories.fair_share.types import (
+            DomainFairShareSearchScope,
+        )
+
+        # Create repository scope with context information
+        repository_scope = DomainFairShareSearchScope(
+            resource_group=scope.resource_group,
+        )
+
+        # Entity-specific filter only
+        base_conditions = [
+            DomainFairShareConditions.by_domain_name(str(self.id)),
+        ]
+
+        return await fetch_rg_domain_fair_shares(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Usage buckets for this domain, filtered by resource group. "
+            "Returns aggregated resource usage statistics over time."
+        )
+    )
+    async def usage_buckets(
+        self,
+        info: Info,
+        scope: DomainUsageScopeGQL,
+        filter: DomainUsageBucketFilter | None = None,
+        order_by: list[DomainUsageBucketOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> DomainUsageBucketConnection:
+        from ai.backend.manager.api.gql.resource_usage.fetcher.domain_usage import (
+            fetch_rg_domain_usage_buckets,
+        )
+        from ai.backend.manager.repositories.resource_usage_history.types import (
+            DomainUsageBucketSearchScope,
+        )
+
+        # Create repository scope with context information
+        repository_scope = DomainUsageBucketSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=str(self.id),
+        )
+
+        # No additional filters needed (scope includes all entity info)
+        base_conditions = None
+
+        return await fetch_rg_domain_usage_buckets(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
 
     @classmethod
     def from_data(

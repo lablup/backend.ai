@@ -84,6 +84,48 @@ Multi-tenant access control for queries.
 - `repositories/group/repository.py` - Scope usage patterns
 - `repositories/domain/repository.py` - Standard operations
 
+## DB Source and Cache Source Architecture
+
+**Architecture principle:**
+- Repositories are transitioning to delegate data access to DB Source pattern
+- Repository acts as coordinator between DB Source and Cache Source (if present)
+- Actual database queries and transactions are handled by DB Source
+- Cache operations are handled by Cache Source (optional)
+
+**Directory structure:**
+```
+repositories/{domain}/
+├── repository.py        # Public interface, source delegation
+├── db_source/
+│   ├── __init__.py
+│   └── db_source.py     # DB operations implementation
+└── cache_source/        # (Optional)
+    ├── __init__.py
+    └── cache_source.py  # Cache operations implementation
+```
+
+**Pattern:**
+- Repository imports and uses `db_source` module
+- Repository public methods delegate to DB Source methods
+- Transactions are managed at DB Source level (using `begin_session()` or `begin_readonly_session()`)
+- Cache Source handles cache invalidation and retrieval (when present)
+
+**Responsibilities:**
+- **Repository**: Public API, coordination between sources, business logic orchestration
+- **DB Source**: Database queries, transaction management, ORM operations
+- **Cache Source**: Cache reads/writes, invalidation strategies
+
+**See complete examples:**
+- `repositories/fair_share/repository.py:39` - DB Source import and usage
+- `repositories/fair_share/db_source/db_source.py` - DB Source implementation
+- `repositories/scheduler/cache_source/cache_source.py` - Cache Source example
+- `repositories/README.md:78` - Cache management reference
+
+**Migration status:**
+- Not all repositories have migrated to this pattern yet
+- New repositories SHOULD use this pattern
+- Existing repositories can be migrated gradually when modified
+
 ## Implementation Steps
 
 ### 1. Define Types

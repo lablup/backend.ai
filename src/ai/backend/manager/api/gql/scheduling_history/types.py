@@ -52,6 +52,10 @@ __all__ = (
     "DeploymentHistoryOrderBy",
     "RouteHistoryFilter",
     "RouteHistoryOrderBy",
+    # Scope types (added in 26.2.0)
+    "SessionScope",
+    "DeploymentScope",
+    "RouteScope",
 )
 
 
@@ -263,6 +267,30 @@ class RouteHistory(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
+
+
+# Scope input types (added in 26.2.0)
+
+
+@strawberry.input(description="Scope for session scheduling history query")
+class SessionScope:
+    """Scope for session-level scheduling history queries."""
+
+    session_id: UUID = strawberry.field(description="Session ID to get history for")
+
+
+@strawberry.input(description="Scope for deployment scheduling history query")
+class DeploymentScope:
+    """Scope for deployment-level scheduling history queries."""
+
+    deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
+
+
+@strawberry.input(description="Scope for route scheduling history query")
+class RouteScope:
+    """Scope for route-level scheduling history queries."""
+
+    route_id: UUID = strawberry.field(description="Route ID to get history for")
 
 
 # Filters

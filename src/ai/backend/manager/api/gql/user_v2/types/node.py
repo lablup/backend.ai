@@ -3,10 +3,23 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Self
+from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.api.gql.fair_share.types import (
+    UserFairShareConnection,
+    UserFairShareFilter,
+    UserFairShareOrderBy,
+)
+from ai.backend.manager.api.gql.resource_usage.types import (
+    UserUsageBucketConnection,
+    UserUsageBucketFilter,
+    UserUsageBucketOrderBy,
+)
 
 from .enums import UserRoleEnum, UserStatusEnum
 from .nested import (
@@ -20,6 +33,26 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.user.types import UserData
+
+
+@strawberry.input(name="UserFairShareScope")
+class UserFairShareScopeGQL:
+    """Scope parameters for filtering user fair shares."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter fair shares by.")
+    project_id: UUID = strawberry.field(
+        description="Project ID that the user belongs to (required for user-level fair shares)."
+    )
+
+
+@strawberry.input(name="UserUsageScope")
+class UserUsageScopeGQL:
+    """Scope parameters for filtering user usage buckets."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter usage buckets by.")
+    project_id: UUID = strawberry.field(
+        description="Project ID that the user belongs to (required for user-level usage)."
+    )
 
 
 @strawberry.federation.type(
@@ -54,6 +87,116 @@ class UserV2GQL(Node):
     timestamps: EntityTimestampsGQL = strawberry.field(
         description="Creation and modification timestamps."
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Fair share records for this user, filtered by resource group and project. "
+            "Returns fair share policy specifications and calculation snapshots."
+        )
+    )
+    async def fair_shares(
+        self,
+        info: Info,
+        scope: UserFairShareScopeGQL,
+        filter: UserFairShareFilter | None = None,
+        order_by: list[UserFairShareOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> UserFairShareConnection:
+        from ai.backend.manager.api.gql.fair_share.fetcher.user import (
+            fetch_rg_user_fair_shares,
+        )
+        from ai.backend.manager.repositories.fair_share.options import (
+            UserFairShareConditions,
+        )
+        from ai.backend.manager.repositories.fair_share.types import (
+            UserFairShareSearchScope,
+        )
+
+        # Create repository scope with context information
+        if self.organization.domain_name is None:
+            raise InvalidAPIParameters("User must belong to a domain to query fair shares")
+        repository_scope = UserFairShareSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+            project_id=scope.project_id,
+        )
+
+        # Entity-specific filter only
+        base_conditions = [
+            UserFairShareConditions.by_user_uuid(UUID(str(self.id))),
+        ]
+
+        return await fetch_rg_user_fair_shares(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Usage buckets for this user, filtered by resource group and project. "
+            "Returns aggregated resource usage statistics over time."
+        )
+    )
+    async def usage_buckets(
+        self,
+        info: Info,
+        scope: UserUsageScopeGQL,
+        filter: UserUsageBucketFilter | None = None,
+        order_by: list[UserUsageBucketOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> UserUsageBucketConnection:
+        from ai.backend.manager.api.gql.resource_usage.fetcher.user_usage import (
+            fetch_rg_user_usage_buckets,
+        )
+        from ai.backend.manager.repositories.resource_usage_history.types import (
+            UserUsageBucketSearchScope,
+        )
+
+        # Create repository scope with context information
+        if self.organization.domain_name is None:
+            raise InvalidAPIParameters("User must belong to a domain to query usage buckets")
+        repository_scope = UserUsageBucketSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+            project_id=scope.project_id,
+            user_uuid=UUID(str(self.id)),
+        )
+
+        # No additional filters needed (scope includes all entity info)
+        base_conditions = None
+
+        return await fetch_rg_user_usage_buckets(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
 
     @classmethod
     def from_data(cls, data: UserData) -> Self:

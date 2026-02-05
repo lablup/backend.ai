@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from .request import (
+    BulkUpsertDomainFairShareWeightRequest,
+    BulkUpsertProjectFairShareWeightRequest,
+    BulkUpsertUserFairShareWeightRequest,
+    DomainWeightEntryInput,
     GetDomainFairSharePathParam,
     GetDomainFairShareRequest,
     GetProjectFairSharePathParam,
@@ -10,13 +14,17 @@ from .request import (
     GetResourceGroupFairShareSpecPathParam,
     GetUserFairSharePathParam,
     GetUserFairShareRequest,
+    ProjectWeightEntryInput,
     ResourceWeightEntryInput,
     RGDomainFairSharePathParam,
     RGDomainFairShareSearchPathParam,
+    RGDomainUsageBucketSearchPathParam,
     RGProjectFairSharePathParam,
     RGProjectFairShareSearchPathParam,
+    RGProjectUsageBucketSearchPathParam,
     RGUserFairSharePathParam,
     RGUserFairShareSearchPathParam,
+    RGUserUsageBucketSearchPathParam,
     SearchDomainFairSharesRequest,
     SearchDomainUsageBucketsRequest,
     SearchProjectFairSharesRequest,
@@ -31,8 +39,12 @@ from .request import (
     UpsertProjectFairShareWeightRequest,
     UpsertUserFairShareWeightPathParam,
     UpsertUserFairShareWeightRequest,
+    UserWeightEntryInput,
 )
 from .response import (
+    BulkUpsertDomainFairShareWeightResponse,
+    BulkUpsertProjectFairShareWeightResponse,
+    BulkUpsertUserFairShareWeightResponse,
     DomainFairShareDTO,
     DomainUsageBucketDTO,
     FairShareCalculationSnapshotDTO,
@@ -127,10 +139,13 @@ __all__ = (
     # Request - Path Parameters (RG Scoped)
     "RGDomainFairSharePathParam",
     "RGDomainFairShareSearchPathParam",
+    "RGDomainUsageBucketSearchPathParam",
     "RGProjectFairSharePathParam",
     "RGProjectFairShareSearchPathParam",
+    "RGProjectUsageBucketSearchPathParam",
     "RGUserFairSharePathParam",
     "RGUserFairShareSearchPathParam",
+    "RGUserUsageBucketSearchPathParam",
     # Request - Get (deprecated, use PathParam)
     "GetDomainFairShareRequest",
     "GetProjectFairShareRequest",
@@ -146,6 +161,13 @@ __all__ = (
     "UpsertDomainFairShareWeightRequest",
     "UpsertProjectFairShareWeightRequest",
     "UpsertUserFairShareWeightRequest",
+    # Request - Bulk Upsert Weight
+    "DomainWeightEntryInput",
+    "BulkUpsertDomainFairShareWeightRequest",
+    "ProjectWeightEntryInput",
+    "BulkUpsertProjectFairShareWeightRequest",
+    "UserWeightEntryInput",
+    "BulkUpsertUserFairShareWeightRequest",
     # Request - Update Spec
     "ResourceWeightEntryInput",
     "UpdateResourceGroupFairShareSpecRequest",
@@ -161,16 +183,19 @@ __all__ = (
     "GetDomainFairShareResponse",
     "SearchDomainFairSharesResponse",
     "UpsertDomainFairShareWeightResponse",
+    "BulkUpsertDomainFairShareWeightResponse",
     # Response - Project Fair Share
     "ProjectFairShareDTO",
     "GetProjectFairShareResponse",
     "SearchProjectFairSharesResponse",
     "UpsertProjectFairShareWeightResponse",
+    "BulkUpsertProjectFairShareWeightResponse",
     # Response - User Fair Share
     "UserFairShareDTO",
     "GetUserFairShareResponse",
     "SearchUserFairSharesResponse",
     "UpsertUserFairShareWeightResponse",
+    "BulkUpsertUserFairShareWeightResponse",
     # Response - Domain Usage Bucket
     "DomainUsageBucketDTO",
     "SearchDomainUsageBucketsResponse",

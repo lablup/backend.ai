@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import datetime
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -212,6 +213,84 @@ class UserConditions:
     def by_role_in(roles: Collection[UserRole]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRow.role.in_(roles)
+
+        return inner
+
+    # ==================== UUID Filters ====================
+
+    @staticmethod
+    def by_uuid_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Filter by UUID equality.
+
+        Args:
+            spec: UUID equality specification with value and negated flag.
+
+        Returns:
+            QueryCondition callable for UUID filtering.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRow.uuid == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_uuid_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Filter by UUID IN operation.
+
+        Args:
+            spec: UUID IN specification with values list and negated flag.
+
+        Returns:
+            QueryCondition callable for UUID IN filtering.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRow.uuid.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        """Filter by created_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        """Filter by created_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_before(dt: datetime) -> QueryCondition:
+        """Filter by modified_at < datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.modified_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_after(dt: datetime) -> QueryCondition:
+        """Filter by modified_at > datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.modified_at > dt
 
         return inner
 

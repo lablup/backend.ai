@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Self
+from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
+
+from ai.backend.manager.api.gql.fair_share.types import (
+    ProjectFairShareConnection,
+    ProjectFairShareFilter,
+    ProjectFairShareOrderBy,
+)
+from ai.backend.manager.api.gql.resource_usage.types import (
+    ProjectUsageBucketConnection,
+    ProjectUsageBucketFilter,
+    ProjectUsageBucketOrderBy,
+)
 
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 from .nested import (
@@ -19,6 +31,20 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.group.types import GroupData
+
+
+@strawberry.input(name="ProjectFairShareScope")
+class ProjectFairShareScopeGQL:
+    """Scope parameters for filtering project fair shares."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter fair shares by.")
+
+
+@strawberry.input(name="ProjectUsageScope")
+class ProjectUsageScopeGQL:
+    """Scope parameters for filtering project usage buckets."""
+
+    resource_group: str = strawberry.field(description="Resource group to filter usage buckets by.")
 
 
 @strawberry.federation.type(
@@ -49,6 +75,110 @@ class ProjectV2GQL(Node):
     lifecycle: ProjectLifecycleInfoGQL = strawberry.field(
         description="Lifecycle information including activation status and timestamps."
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Fair share records for this project, filtered by resource group. "
+            "Returns fair share policy specifications and calculation snapshots."
+        )
+    )
+    async def fair_shares(
+        self,
+        info: Info,
+        scope: ProjectFairShareScopeGQL,
+        filter: ProjectFairShareFilter | None = None,
+        order_by: list[ProjectFairShareOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ProjectFairShareConnection:
+        from ai.backend.manager.api.gql.fair_share.fetcher.project import (
+            fetch_rg_project_fair_shares,
+        )
+        from ai.backend.manager.repositories.fair_share.options import (
+            ProjectFairShareConditions,
+        )
+        from ai.backend.manager.repositories.fair_share.types import (
+            ProjectFairShareSearchScope,
+        )
+
+        # Create repository scope with context information
+        repository_scope = ProjectFairShareSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+        )
+
+        # Entity-specific filter only
+        base_conditions = [
+            ProjectFairShareConditions.by_project_id(UUID(str(self.id))),
+        ]
+
+        return await fetch_rg_project_fair_shares(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Usage buckets for this project, filtered by resource group. "
+            "Returns aggregated resource usage statistics over time."
+        )
+    )
+    async def usage_buckets(
+        self,
+        info: Info,
+        scope: ProjectUsageScopeGQL,
+        filter: ProjectUsageBucketFilter | None = None,
+        order_by: list[ProjectUsageBucketOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ProjectUsageBucketConnection:
+        from ai.backend.manager.api.gql.resource_usage.fetcher.project_usage import (
+            fetch_rg_project_usage_buckets,
+        )
+        from ai.backend.manager.repositories.resource_usage_history.types import (
+            ProjectUsageBucketSearchScope,
+        )
+
+        # Create repository scope with context information
+        repository_scope = ProjectUsageBucketSearchScope(
+            resource_group=scope.resource_group,
+            domain_name=self.organization.domain_name,
+            project_id=UUID(str(self.id)),
+        )
+
+        # No additional filters needed (scope includes all entity info)
+        base_conditions = None
+
+        return await fetch_rg_project_usage_buckets(
+            info=info,
+            scope=repository_scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=base_conditions,
+        )
 
     @classmethod
     def from_data(

@@ -19,6 +19,10 @@ from ai.backend.manager.services.domain.actions.delete_domain import (
     DeleteDomainAction,
     DeleteDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.get_domain import (
+    GetDomainAction,
+    GetDomainActionResult,
+)
 from ai.backend.manager.services.domain.actions.modify_domain import (
     ModifyDomainAction,
     ModifyDomainActionResult,
@@ -30,6 +34,10 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.search_domains import (
+    SearchDomainsAction,
+    SearchDomainsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -112,4 +120,36 @@ class DomainService:
         )
         return ModifyDomainNodeActionResult(
             domain_data=domain_data,
+        )
+
+    async def get_domain(self, action: GetDomainAction) -> GetDomainActionResult:
+        """Get a single domain by name.
+
+        Args:
+            action: GetDomainAction with domain_name.
+
+        Returns:
+            GetDomainActionResult with domain data.
+
+        Raises:
+            DomainNotFound: If domain does not exist.
+        """
+        data = await self._repository.get_domain(action.domain_name)
+        return GetDomainActionResult(data=data)
+
+    async def search_domains(self, action: SearchDomainsAction) -> SearchDomainsActionResult:
+        """Search all domains (admin only - no scope filter).
+
+        Args:
+            action: SearchDomainsAction with querier.
+
+        Returns:
+            SearchDomainsActionResult with items and pagination info.
+        """
+        result = await self._repository.search_domains(querier=action.querier)
+        return SearchDomainsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
