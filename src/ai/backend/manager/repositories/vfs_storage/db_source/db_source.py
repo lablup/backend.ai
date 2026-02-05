@@ -10,6 +10,7 @@ from ai.backend.manager.data.artifact_storages.types import (
     ArtifactStorageUpdaterSpec,
 )
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData, VFSStorageListResult
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.vfs_storage import (
     VFSStorageNotFoundError,
 )
@@ -78,7 +79,7 @@ class VFSStorageDBSource:
             # Set the storage_id on the meta creator spec and create ArtifactStorageRow
             meta_spec = meta_creator.spec
             if not isinstance(meta_spec, ArtifactStorageCreatorSpec):
-                raise TypeError("meta_creator.spec must be ArtifactStorageCreatorSpec")
+                raise InternalServerError("meta_creator.spec must be ArtifactStorageCreatorSpec")
             meta_spec.set_storage_id(new_row.id)
             await execute_creator(db_session, meta_creator)
 
@@ -109,7 +110,7 @@ class VFSStorageDBSource:
             # Update the ArtifactStorageRow using storage_id from the spec
             meta_spec = meta_updater.spec
             if not isinstance(meta_spec, ArtifactStorageUpdaterSpec):
-                raise TypeError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
+                raise InternalServerError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
 
             # Find ArtifactStorageRow by storage_id and apply updates
             meta_query = sa.select(ArtifactStorageRow).where(
