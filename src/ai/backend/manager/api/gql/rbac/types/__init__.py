@@ -11,11 +11,17 @@ from .enums import (
     ScopeTypeGQL,
 )
 from .filters import (
+    EntityTypeFilter,
+    ObjectPermissionFilter,
+    ObjectPermissionOrderBy,
+    OperationTypeFilter,
     PermissionGroupFilter,
     PermissionGroupOrderBy,
     RoleFilter,
     RoleOrderBy,
     RoleSourceFilter,
+    ScopedPermissionFilter,
+    ScopedPermissionOrderBy,
     ScopeTypeFilter,
 )
 from .inputs import (
@@ -55,11 +61,17 @@ __all__ = [
     "ScopedPermissionOrderField",
     "ScopeTypeGQL",
     # Filters
+    "EntityTypeFilter",
+    "ObjectPermissionFilter",
+    "ObjectPermissionOrderBy",
+    "OperationTypeFilter",
     "PermissionGroupFilter",
     "PermissionGroupOrderBy",
     "RoleFilter",
     "RoleOrderBy",
     "RoleSourceFilter",
+    "ScopedPermissionFilter",
+    "ScopedPermissionOrderBy",
     "ScopeTypeFilter",
     # Inputs
     "CreateRoleAssignmentInput",

@@ -11,12 +11,16 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.rbac.fetcher import (
+    fetch_object_permissions,
     fetch_permission_groups,
-    fetch_role_object_permissions,
-    fetch_role_scoped_permissions,
+    fetch_scoped_permissions,
 )
 from ai.backend.manager.api.gql.rbac.types.enums import RoleSourceGQL
-from ai.backend.manager.api.gql.rbac.types.filters import PermissionGroupFilter
+from ai.backend.manager.api.gql.rbac.types.filters import (
+    ObjectPermissionFilter,
+    PermissionGroupFilter,
+    ScopedPermissionFilter,
+)
 from ai.backend.manager.api.gql.rbac.types.node.permission import (
     ObjectPermissionConnection,
     PermissionGroupConnection,
@@ -74,9 +78,9 @@ class Role(Node):
         offset: int | None = None,
     ) -> ScopedPermissionConnection:
         """Fetch scoped permissions with pagination (deferred resolution)."""
-        return await fetch_role_scoped_permissions(
+        return await fetch_scoped_permissions(
             info,
-            role_id=self._role_id,
+            filter=ScopedPermissionFilter(role_id=ID(str(self._role_id))),
             before=before,
             after=after,
             first=first,
@@ -97,9 +101,9 @@ class Role(Node):
         offset: int | None = None,
     ) -> ObjectPermissionConnection:
         """Fetch object permissions with pagination (deferred resolution)."""
-        return await fetch_role_object_permissions(
+        return await fetch_object_permissions(
             info,
-            role_id=self._role_id,
+            filter=ObjectPermissionFilter(role_id=ID(str(self._role_id))),
             before=before,
             after=after,
             first=first,

@@ -639,6 +639,17 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        """Filter scoped permissions by role (via permission_group subquery)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.permission_group_id.in_(
+                sa.select(PermissionGroupRow.id).where(PermissionGroupRow.role_id == role_id)
+            )
+
+        return inner
+
+    @staticmethod
     def by_entity_type(entity_type: EntityType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.entity_type == entity_type

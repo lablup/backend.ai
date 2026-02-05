@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -14,6 +13,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     ObjectPermission,
     ObjectPermissionConnection,
     ObjectPermissionEdge,
+    ObjectPermissionFilter,
+    ObjectPermissionOrderBy,
     PermissionGroup,
     PermissionGroupConnection,
     PermissionGroupEdge,
@@ -22,6 +23,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     ScopedPermission,
     ScopedPermissionConnection,
     ScopedPermissionEdge,
+    ScopedPermissionFilter,
+    ScopedPermissionOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.repositories.permission_controller.options import (
@@ -31,10 +34,6 @@ from ai.backend.manager.repositories.permission_controller.options import (
     PermissionGroupOrders,
     ScopedPermissionConditions,
     ScopedPermissionOrders,
-)
-from ai.backend.manager.repositories.permission_controller.types import (
-    ObjectPermissionSearchScope,
-    ScopedPermissionSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions import (
     SearchObjectPermissionsAction,
@@ -65,9 +64,10 @@ def get_object_permission_pagination_spec() -> PaginationSpec:
     )
 
 
-async def fetch_role_scoped_permissions(
+async def fetch_scoped_permissions(
     info: Info[StrawberryGQLContext],
-    role_id: UUID,
+    filter: ScopedPermissionFilter | None = None,
+    order_by: list[ScopedPermissionOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -75,10 +75,8 @@ async def fetch_role_scoped_permissions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ScopedPermissionConnection:
-    """Fetch scoped permissions for a role with pagination."""
+    """Fetch scoped permissions with filtering and pagination."""
     processors = info.context.processors
-
-    scope = ScopedPermissionSearchScope(role_id=role_id)
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -90,11 +88,13 @@ async def fetch_role_scoped_permissions(
             offset=offset,
         ),
         get_scoped_permission_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
     action_result = (
         await processors.permission_controller.search_scoped_permissions.wait_for_complete(
-            SearchScopedPermissionsAction(querier=querier, scope=scope)
+            SearchScopedPermissionsAction(querier=querier, scope=None)
         )
     )
 
@@ -113,9 +113,10 @@ async def fetch_role_scoped_permissions(
     )
 
 
-async def fetch_role_object_permissions(
+async def fetch_object_permissions(
     info: Info[StrawberryGQLContext],
-    role_id: UUID,
+    filter: ObjectPermissionFilter | None = None,
+    order_by: list[ObjectPermissionOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -123,10 +124,8 @@ async def fetch_role_object_permissions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ObjectPermissionConnection:
-    """Fetch object permissions for a role with pagination."""
+    """Fetch object permissions with filtering and pagination."""
     processors = info.context.processors
-
-    scope = ObjectPermissionSearchScope(role_id=role_id)
 
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
@@ -138,11 +137,13 @@ async def fetch_role_object_permissions(
             offset=offset,
         ),
         get_object_permission_pagination_spec(),
+        filter=filter,
+        order_by=order_by,
     )
 
     action_result = (
         await processors.permission_controller.search_object_permissions.wait_for_complete(
-            SearchObjectPermissionsAction(querier=querier, scope=scope)
+            SearchObjectPermissionsAction(querier=querier, scope=None)
         )
     )
 
