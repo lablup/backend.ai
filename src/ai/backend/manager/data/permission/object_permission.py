@@ -57,3 +57,13 @@ class ObjectPermissionData:
     permission_group_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
+
+
+@dataclass(frozen=True)
+class ObjectPermissionListResult:
+    """Result of object permission search with pagination info."""
+
+    items: list[ObjectPermissionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool

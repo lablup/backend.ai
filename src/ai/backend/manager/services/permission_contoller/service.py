@@ -56,9 +56,21 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
     SearchEntitiesAction,
     SearchEntitiesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
+    SearchObjectPermissionsAction,
+    SearchObjectPermissionsActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_permission_groups import (
+    SearchPermissionGroupsAction,
+    SearchPermissionGroupsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_scoped_permissions import (
+    SearchScopedPermissionsAction,
+    SearchScopedPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
@@ -184,6 +196,42 @@ class PermissionControllerService:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
         return SearchRolesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_permission_groups(
+        self, action: SearchPermissionGroupsAction
+    ) -> SearchPermissionGroupsActionResult:
+        """Search permission groups (scopes) with pagination and filtering."""
+        result = await self._repository.search_permission_groups(action.querier)
+        return SearchPermissionGroupsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_scoped_permissions(
+        self, action: SearchScopedPermissionsAction
+    ) -> SearchScopedPermissionsActionResult:
+        """Search scoped permissions with pagination and filtering."""
+        result = await self._repository.search_scoped_permissions(action.querier)
+        return SearchScopedPermissionsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_object_permissions(
+        self, action: SearchObjectPermissionsAction
+    ) -> SearchObjectPermissionsActionResult:
+        """Search object permissions with pagination and filtering."""
+        result = await self._repository.search_object_permissions(action.querier)
+        return SearchObjectPermissionsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

@@ -5,7 +5,19 @@ from .delete_role import DeleteRoleAction, DeleteRoleActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction, PurgeRoleActionResult
 from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
+from .search_object_permissions import (
+    SearchObjectPermissionsAction,
+    SearchObjectPermissionsActionResult,
+)
+from .search_permission_groups import (
+    SearchPermissionGroupsAction,
+    SearchPermissionGroupsActionResult,
+)
 from .search_roles import SearchRolesAction, SearchRolesActionResult
+from .search_scoped_permissions import (
+    SearchScopedPermissionsAction,
+    SearchScopedPermissionsActionResult,
+)
 from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
@@ -31,8 +43,14 @@ __all__ = [
     "PurgeRoleActionResult",
     "RevokeRoleAction",
     "RevokeRoleActionResult",
+    "SearchObjectPermissionsAction",
+    "SearchObjectPermissionsActionResult",
+    "SearchPermissionGroupsAction",
+    "SearchPermissionGroupsActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
+    "SearchScopedPermissionsAction",
+    "SearchScopedPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
     "UpdateRoleAction",
