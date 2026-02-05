@@ -19,6 +19,7 @@ from ai.backend.manager.repositories.base import (
     CreatorResult,
     CreatorSpec,
     execute_bulk_creator,
+    execute_bulk_creator_partial,
     execute_creator,
 )
 from ai.backend.testutils.db import with_tables
@@ -47,6 +48,19 @@ class SimpleCreatorSpec(CreatorSpec[CreatorTestRow]):
 
     def build_row(self) -> CreatorTestRow:
         return CreatorTestRow(name=self._name, value=self._value)
+
+
+class FailingCreatorSpec(CreatorSpec[CreatorTestRow]):
+    """Creator spec that simulates a failure during build_row."""
+
+    def __init__(self, should_fail: bool = True, name: str = "test") -> None:
+        self._should_fail = should_fail
+        self._name = name
+
+    def build_row(self) -> CreatorTestRow:
+        if self._should_fail:
+            raise ValueError(f"Simulated failure for {self._name}")
+        return CreatorTestRow(name=self._name, value="success")
 
 
 @pytest.fixture
@@ -516,3 +530,165 @@ class TestCreatorPythonDefaults:
             # Verify all UUIDs are unique
             ids = [row.id for row in result.rows]
             assert len(set(ids)) == 3, "All UUIDs should be unique"
+
+
+class TestBulkCreatorPartialFailure:
+    """Tests for partial failure handling in bulk creator operations."""
+
+    async def test_all_rows_succeed_with_partial_failure_support(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that all successful rows work correctly with new function."""
+        async with database_connection.begin_session() as db_sess:
+            specs = [
+                SimpleCreatorSpec(name="item-0", value="value-0"),
+                SimpleCreatorSpec(name="item-1", value="value-1"),
+                SimpleCreatorSpec(name="item-2", value="value-2"),
+            ]
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=specs)
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.successes) == 3
+            assert len(result.errors) == 0
+            assert result.success_count() == 3
+            assert not result.has_failures()
+
+            # Verify order is preserved
+            assert result.successes[0].name == "item-0"
+            assert result.successes[1].name == "item-1"
+            assert result.successes[2].name == "item-2"
+
+    async def test_all_rows_fail(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that all failing specs are captured in errors."""
+        async with database_connection.begin_session() as db_sess:
+            specs = [
+                FailingCreatorSpec(should_fail=True, name="fail-0"),
+                FailingCreatorSpec(should_fail=True, name="fail-1"),
+                FailingCreatorSpec(should_fail=True, name="fail-2"),
+            ]
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=specs)
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.successes) == 0
+            assert len(result.errors) == 3
+            assert result.success_count() == 0
+            assert result.has_failures()
+
+            # Verify error details
+            for i, error in enumerate(result.errors):
+                assert error.index == i
+                assert error.spec == specs[i]
+                assert isinstance(error.exception, ValueError)
+                assert f"fail-{i}" in str(error.exception)
+
+    async def test_partial_success_some_fail(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test mixed success and failure scenario."""
+        async with database_connection.begin_session() as db_sess:
+            specs = [
+                SimpleCreatorSpec(name="success-0", value="value-0"),
+                FailingCreatorSpec(should_fail=True, name="fail-1"),
+                SimpleCreatorSpec(name="success-2", value="value-2"),
+                FailingCreatorSpec(should_fail=True, name="fail-3"),
+                SimpleCreatorSpec(name="success-4", value="value-4"),
+            ]
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=specs)
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.successes) == 3
+            assert len(result.errors) == 2
+            assert result.success_count() == 3
+            assert result.has_failures()
+
+            # Verify successes
+            assert result.successes[0].name == "success-0"
+            assert result.successes[1].name == "success-2"
+            assert result.successes[2].name == "success-4"
+
+            # Verify errors
+            assert result.errors[0].index == 1
+            assert result.errors[1].index == 3
+
+    async def test_partial_success_preserves_database_state(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that successful rows are persisted even when some fail."""
+        async with database_connection.begin_session() as db_sess:
+            specs = [
+                SimpleCreatorSpec(name="persist-0", value="value-0"),
+                FailingCreatorSpec(should_fail=True, name="fail-1"),
+                SimpleCreatorSpec(name="persist-2", value="value-2"),
+            ]
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=specs)
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.successes) == 2
+            assert len(result.errors) == 1
+
+            # Verify database state
+            created_ids = [row.id for row in result.successes]
+            query = (
+                sa.select(CreatorTestRow)
+                .where(CreatorTestRow.id.in_(created_ids))
+                .order_by(CreatorTestRow.id)
+            )
+            db_result = await db_sess.execute(query)
+            db_rows = db_result.scalars().all()
+
+            assert len(db_rows) == 2
+            assert db_rows[0].name == "persist-0"
+            assert db_rows[1].name == "persist-2"
+
+    async def test_empty_specs_with_partial_failure(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that empty specs return empty result."""
+        async with database_connection.begin_session() as db_sess:
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=[])
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.successes) == 0
+            assert len(result.errors) == 0
+            assert result.success_count() == 0
+            assert not result.has_failures()
+
+    async def test_error_includes_spec_and_exception(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test that error information includes full context."""
+        async with database_connection.begin_session() as db_sess:
+            specs = [
+                FailingCreatorSpec(should_fail=True, name="error-test"),
+            ]
+            bulk_creator: BulkCreator[CreatorTestRow] = BulkCreator(specs=specs)
+
+            result = await execute_bulk_creator_partial(db_sess, bulk_creator)
+
+            assert len(result.errors) == 1
+            error = result.errors[0]
+
+            # Verify error structure
+            assert error.spec is specs[0]
+            assert error.index == 0
+            assert isinstance(error.exception, ValueError)
+            assert "error-test" in str(error.exception)

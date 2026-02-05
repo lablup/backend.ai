@@ -12,7 +12,7 @@ from .base import SchedulingHistoryAction
 
 @dataclass
 class SearchSessionHistoryAction(SchedulingHistoryAction):
-    """Action to search session scheduling history."""
+    """Action to search session scheduling history (admin API)."""
 
     querier: BatchQuerier
 

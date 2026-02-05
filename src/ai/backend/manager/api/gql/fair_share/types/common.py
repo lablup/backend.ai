@@ -101,6 +101,38 @@ class ResourceSlotGQL:
 
 
 @strawberry.type(
+    name="ResourceWeightEntry",
+    description=(
+        "Added in 26.2.0. Resource weight with default indicator. "
+        "Shows whether this resource type's weight was explicitly set or uses default."
+    ),
+)
+class ResourceWeightEntryGQL:
+    """Individual resource type weight with default usage flag."""
+
+    resource_type: str = strawberry.field(
+        description=(
+            "Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). "
+            "Matches the resource types available in the scaling group."
+        )
+    )
+
+    weight: Decimal = strawberry.field(
+        description=(
+            "Weight multiplier for this resource type in fair share calculations. "
+            "Higher weight means more contribution to normalized usage."
+        )
+    )
+
+    uses_default: bool = strawberry.field(
+        description=(
+            "Whether this resource uses the resource group's default weight. "
+            "True means no explicit weight was configured for this type."
+        )
+    )
+
+
+@strawberry.type(
     name="FairShareSpec",
     description=(
         "Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. "
@@ -141,16 +173,22 @@ class FairShareSpecGQL:
             "Smaller values provide more precision but require more storage. Typically 1 day."
         )
     )
-    resource_weights: ResourceSlotGQL = strawberry.field(
+    resource_weights: list[ResourceWeightEntryGQL] = strawberry.field(
         description=(
-            "Weights for each resource type when calculating normalized usage. "
+            "Added in 26.2.0. Weights for each resource type with default indicators. "
+            "Shows which resources use explicit vs default weights. "
             "Allows different resources to contribute differently to the fair share calculation. "
             "For example, GPU usage might be weighted higher than CPU usage."
         )
     )
 
     @classmethod
-    def from_spec(cls, spec: FairShareSpec, use_default: bool) -> Self:
+    def from_spec(
+        cls,
+        spec: FairShareSpec,
+        use_default: bool,
+        uses_default_resources: frozenset[str],
+    ) -> Self:
         """Convert from data layer FairShareSpec to GQL type.
 
         No DB queries - all data comes from Repository layer.
@@ -159,6 +197,7 @@ class FairShareSpecGQL:
         Args:
             spec: FairShareSpec with weight already resolved
             use_default: Whether this spec uses default values (from FairShareData)
+            uses_default_resources: Set of resource types using default weights
 
         Returns:
             FairShareSpecGQL with effective weight and uses_default flag.
@@ -167,13 +206,23 @@ class FairShareSpecGQL:
         if spec.weight is None:
             raise FairShareError("Repository must set spec.weight")
 
+        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
+        weight_entries = [
+            ResourceWeightEntryGQL(
+                resource_type=resource_type,
+                weight=weight,
+                uses_default=resource_type in uses_default_resources,
+            )
+            for resource_type, weight in spec.resource_weights.items()
+        ]
+
         return cls(
             weight=spec.weight,
             uses_default=use_default,
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
-            resource_weights=ResourceSlotGQL.from_resource_slot(spec.resource_weights),
+            resource_weights=weight_entries,
         )
 
 

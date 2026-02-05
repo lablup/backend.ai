@@ -185,8 +185,11 @@ from .scheduling_history import (
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
+    deployment_scoped_scheduling_histories,
     route_histories,
+    route_scoped_scheduling_histories,
     session_scheduling_histories,
+    session_scoped_scheduling_histories,
 )
 from .storage_namespace import (
     register_storage_namespace,
@@ -276,6 +279,10 @@ class Query:
     rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
+    # Entity Scoped APIs (added in 26.2.0)
+    session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
+    route_scoped_scheduling_histories = route_scoped_scheduling_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config

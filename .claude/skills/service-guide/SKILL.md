@@ -110,9 +110,28 @@ services/{domain}/
 - `delete_{entity}`: Soft delete (status change)
 - `purge_{entity}`: Hard delete
 
+### Repository Call Pattern
+
+**Core principle (preferred):**
+- Service method SHOULD call a single repository method
+- Avoid combining multiple repository calls in service layer
+- If complex composition is needed, consider adding specialized repository method
+
+**Transaction boundary:**
+- DB sessions are created and managed at repository method level
+- Service methods do NOT create transactions directly
+- Repository uses `begin_session()` (write) or `begin_readonly_session()` (read)
+- Each repository public method defines its own transaction scope
+
+**Exception cases:**
+- Multi-repository coordination is acceptable when business logic requires
+- Example: Creating domain requires both domain and user_group repositories
+- Document the reason when combining multiple repository calls
+
 **See complete examples:**
-- `services/storage_namespace/service.py` - Full service implementation
-- `services/domain/service.py` - Multi-repository coordination
+- `services/storage_namespace/service.py:38-81` - Single repository call pattern
+- `services/domain/service.py` - Multi-repository coordination (exceptional case)
+- `repositories/README.md:54-61` - Service-Repository integration principles
 
 
 ## Implementation Workflow
@@ -193,6 +212,8 @@ Protocol with all standard operations
 - Explicit exceptions (inherit BackendAIError)
 - Repository coordination only
 - Always return ActionResult
+- Single repository call per method (preferred pattern)
+- Transaction boundary managed by repository
 
 ### Processor Design
 - Thin orchestration

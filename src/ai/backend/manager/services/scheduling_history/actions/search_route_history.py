@@ -12,7 +12,7 @@ from .base import SchedulingHistoryAction
 
 @dataclass
 class SearchRouteHistoryAction(SchedulingHistoryAction):
-    """Action to search route history."""
+    """Action to search route history (admin API)."""
 
     querier: BatchQuerier
 

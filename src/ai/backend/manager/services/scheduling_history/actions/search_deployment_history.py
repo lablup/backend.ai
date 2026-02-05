@@ -12,7 +12,7 @@ from .base import SchedulingHistoryAction
 
 @dataclass
 class SearchDeploymentHistoryAction(SchedulingHistoryAction):
-    """Action to search deployment history."""
+    """Action to search deployment history (admin API)."""
 
     querier: BatchQuerier
 
