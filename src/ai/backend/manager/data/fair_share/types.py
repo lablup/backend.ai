@@ -133,6 +133,10 @@ class FairShareData:
     use_default: bool
     """True if this record uses default weight (generated from scaling group defaults)."""
 
+    uses_default_resources: frozenset[str] = frozenset()
+    """Resource types that use default weight from scaling group.
+    Empty frozenset means all resources have explicit weights configured."""
+
 
 @dataclass(frozen=True)
 class DomainFairShareData:

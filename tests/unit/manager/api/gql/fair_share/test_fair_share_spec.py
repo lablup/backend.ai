@@ -51,7 +51,9 @@ class TestFairShareSpecGQLWeight:
     ) -> None:
         """Test that explicit weight is used when set."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, use_default=False)
+        gql = FairShareSpecGQL.from_spec(
+            spec_with_explicit_weight, use_default=False, uses_default_resources=frozenset()
+        )
 
         # Then
         assert gql.weight == Decimal("2.5")
@@ -63,7 +65,9 @@ class TestFairShareSpecGQLWeight:
     ) -> None:
         """Test that default weight flag is set when using defaults."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_default_weight, use_default=True)
+        gql = FairShareSpecGQL.from_spec(
+            spec_with_default_weight, use_default=True, uses_default_resources=frozenset()
+        )
 
         # Then
         assert gql.weight == Decimal("3.0")  # default_weight fixture value
@@ -83,7 +87,9 @@ class TestFairShareSpecGQLWeight:
         )
 
         # When
-        gql = FairShareSpecGQL.from_spec(spec, use_default=False)
+        gql = FairShareSpecGQL.from_spec(
+            spec, use_default=False, uses_default_resources=frozenset()
+        )
 
         # Then
         assert gql.weight == Decimal("3.0")
@@ -95,10 +101,12 @@ class TestFairShareSpecGQLWeight:
     ) -> None:
         """Test that other spec fields are correctly converted."""
         # When
-        gql = FairShareSpecGQL.from_spec(spec_with_explicit_weight, use_default=False)
+        gql = FairShareSpecGQL.from_spec(
+            spec_with_explicit_weight, use_default=False, uses_default_resources=frozenset()
+        )
 
         # Then
         assert gql.half_life_days == 14
         assert gql.lookback_days == 30
         assert gql.decay_unit_days == 2
-        assert len(gql.resource_weights.entries) == 2
+        assert len(gql.resource_weights) == 2
