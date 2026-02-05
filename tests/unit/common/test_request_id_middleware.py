@@ -12,6 +12,7 @@ from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER, request_
 if TYPE_CHECKING:
     pass
 
+
 async def test_request_id_middleware_with_custom_request_id(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
         assert current_request_id() == request.headers.get(REQUEST_ID_HEADER)
