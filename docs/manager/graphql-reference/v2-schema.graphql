@@ -4481,6 +4481,15 @@ type Query {
   """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2
 
+  """
+  Added in 26.2.0.
+
+  Retrieve a specific image alias by its ID.
+
+  Returns the alias information including the alias string.
+  """
+  imageAlias(id: ID!): ImageAlias
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
 
@@ -4564,6 +4573,17 @@ type Query {
   sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 
   """
+  Added in 26.2.0.
+
+  Query image aliases with optional filtering, ordering, and pagination.
+
+  Returns image aliases that provide alternative names for container images.
+  Use filters to search by alias string.
+  Supports both cursor-based and offset-based pagination.
+  """
+  adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
+
+  """
   Added in 26.2.0. Get domain fair share data within resource group scope.
   """
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare!
@@ -4602,10 +4622,10 @@ type Query {
 
   """
   Added in 26.2.0.
-
+  
   Query images within a specific container registry with optional filtering,
   ordering, and pagination.
-
+  
   Returns container images that belong to the specified registry.
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
@@ -4620,26 +4640,6 @@ type Query {
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
-
-  """
-  Added in 26.2.0.
-
-  Retrieve a specific image alias by its ID.
-
-  Returns the alias information including the alias string.
-  """
-  adminImageAlias(id: ID!): ImageAlias
-
-  """
-  Added in 26.2.0.
-
-  Query image aliases with optional filtering, ordering, and pagination.
-
-  Returns image aliases that provide alternative names for container images.
-  Use filters to search by alias string.
-  Supports both cursor-based and offset-based pagination.
-  """
-  adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")

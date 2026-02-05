@@ -7,10 +7,10 @@ See BEP-1038 for detailed specifications.
 
 from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .resolver import (
-    admin_image_alias,
     admin_image_aliases,
     admin_images_v2,
     container_registry_images_v2,
+    image_alias,
     image_v2,
 )
 from .types import (
@@ -75,6 +75,6 @@ __all__ = [
     "admin_images_v2",
     "image_v2",
     "container_registry_images_v2",
-    "admin_image_alias",
+    "image_alias",
     "admin_image_aliases",
 ]

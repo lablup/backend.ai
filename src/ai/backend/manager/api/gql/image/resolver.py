@@ -169,6 +169,5 @@ async def admin_image_aliases(
     Returns the alias information including the alias string.
     """)
 )
-async def admin_image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageAliasGQL | None:
-    check_admin_only()
+async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageAliasGQL | None:
     return await fetch_image_alias(info, UUID(id))
