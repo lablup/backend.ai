@@ -447,6 +447,87 @@ class TestUserRepository:
         assert result.description == "Updated Description"
 
     @pytest.mark.asyncio
+    async def test_update_user_role_preserves_group_associations(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+    ) -> None:
+        """
+        Regression test: Changing user role should NOT delete group associations.
+
+        Previously, when a user's role was changed without explicitly providing group_ids,
+        all group associations were incorrectly deleted. This caused login failures because
+        the web UI requires at least one group association to function properly.
+
+        See: PR fix for role change incorrectly clearing user groups
+        """
+        # Arrange: Create a user with group association
+        password_info = create_test_password_info("test_password")
+        spec = UserCreatorSpec(
+            username=f"roletest-{uuid.uuid4().hex[:8]}",
+            email=f"roletest-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="Role Test User",
+            description="User for role change test",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+        created_result = await user_repository.create_user_validated(
+            creator,
+            group_ids=[sample_group_id],
+        )
+        user_email = created_result.user.email
+        user_uuid = created_result.user.uuid
+
+        # Verify user has group association before role change
+        async with db_with_cleanup.begin_session() as session:
+            initial_groups = await session.scalars(
+                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_uuid)
+            )
+            initial_group_count = len(list(initial_groups))
+            assert initial_group_count == 1, "User should have 1 group association initially"
+
+        # Act: Update user role from USER to SUPERADMIN without providing group_ids
+        updater_spec = UserUpdaterSpec(
+            role=OptionalState.update(UserRole.SUPERADMIN),
+        )
+        updater = Updater(spec=updater_spec, pk_value=user_email)
+        result = await user_repository.update_user_validated(
+            email=user_email,
+            updater=updater,
+        )
+
+        # Assert: Role should be updated
+        assert result is not None
+        assert result.role == UserRole.SUPERADMIN
+
+        # Assert: Group associations should be PRESERVED (not deleted)
+        async with db_with_cleanup.begin_session() as session:
+            final_groups = await session.scalars(
+                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_uuid)
+            )
+            final_group_list = list(final_groups)
+            assert len(final_group_list) == 1, (
+                "Group associations should be preserved after role change. "
+                "If this fails, the bug where role changes delete groups has regressed."
+            )
+            assert str(final_group_list[0].group_id) == sample_group_id
+
+    @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
         self,
         user_repository: UserRepository,
