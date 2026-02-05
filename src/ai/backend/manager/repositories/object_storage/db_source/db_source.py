@@ -5,10 +5,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorSpec,
-    ArtifactStorageUpdaterSpec,
-)
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.object_storage.types import ObjectStorageData, ObjectStorageListResult
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.object_storage import (
@@ -129,7 +126,6 @@ class ObjectStorageDBSource:
     async def update(
         self,
         updater: Updater[ObjectStorageRow],
-        meta_updater: Updater[ArtifactStorageRow],
     ) -> ObjectStorageData:
         """
         Update an existing object storage configuration in the database.
@@ -137,22 +133,6 @@ class ObjectStorageDBSource:
         async with self._db.begin_session() as db_session:
             # Execute update (may return None if no values to update, which is fine)
             await execute_updater(db_session, updater)
-
-            # Update the ArtifactStorageRow using storage_id from the spec
-            meta_spec = meta_updater.spec
-            if not isinstance(meta_spec, ArtifactStorageUpdaterSpec):
-                raise InternalServerError("meta_updater.spec must be ArtifactStorageUpdaterSpec")
-
-            # Query for ArtifactStorageRow.id using storage_id (since storage_id is unique but not the PK)
-            artifact_storage_query = sa.select(ArtifactStorageRow.id).where(
-                ArtifactStorageRow.storage_id == meta_spec.storage_id
-            )
-            artifact_storage_result = await db_session.execute(artifact_storage_query)
-            artifact_storage_id = artifact_storage_result.scalar_one_or_none()
-            if artifact_storage_id is not None:
-                # Create a new Updater with the actual PK and execute
-                actual_meta_updater = Updater(spec=meta_spec, pk_value=artifact_storage_id)
-                await execute_updater(db_session, actual_meta_updater)
 
             storage_id = uuid.UUID(str(updater.pk_value))
             # Re-query to load the meta relationship

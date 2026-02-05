@@ -12,6 +12,16 @@ from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
 
 
+@dataclass(frozen=True)
+class ArtifactStorageData:
+    """Data class for ArtifactStorageRow."""
+
+    id: uuid.UUID
+    name: str
+    storage_id: uuid.UUID
+    type: ArtifactStorageType
+
+
 class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
     """CreatorSpec for ArtifactStorageRow with deferred storage_id."""
 
@@ -36,14 +46,9 @@ class ArtifactStorageCreatorSpec(CreatorSpec[ArtifactStorageRow]):
 
 @dataclass
 class ArtifactStorageUpdaterSpec(UpdaterSpec[ArtifactStorageRow]):
-    """UpdaterSpec for ArtifactStorageRow.
-
-    Note: storage_id is used to find the ArtifactStorageRow (since it's unique),
-    then the actual PK (id) is retrieved and used with execute_updater.
-    """
+    """UpdaterSpec for ArtifactStorageRow."""
 
     name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    storage_id: uuid.UUID | None = None
 
     @property
     @override

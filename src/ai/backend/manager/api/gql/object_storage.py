@@ -10,10 +10,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorSpec,
-    ArtifactStorageUpdaterSpec,
-)
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -179,7 +176,6 @@ class CreateObjectStorageInput:
 @strawberry.input(description="Added in 25.14.0")
 class UpdateObjectStorageInput:
     id: ID
-    name: str | None = UNSET
     host: str | None = UNSET
     access_key: str | None = UNSET
     secret_key: str | None = UNSET
@@ -195,16 +191,6 @@ class UpdateObjectStorageInput:
             region=OptionalState[str].from_graphql(self.region),
         )
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
-
-    def to_meta_updater(self) -> Updater[ArtifactStorageRow]:
-        storage_id = uuid.UUID(self.id)
-        return Updater(
-            spec=ArtifactStorageUpdaterSpec(
-                name=OptionalState[str].from_graphql(self.name),
-                storage_id=storage_id,
-            ),
-            pk_value=storage_id,  # Not used directly, but required by Updater
-        )
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -278,7 +264,6 @@ async def update_object_storage(
     action_result = await processors.object_storage.update.wait_for_complete(
         UpdateObjectStorageAction(
             updater=input.to_updater(),
-            meta_updater=input.to_meta_updater(),
         )
     )
 

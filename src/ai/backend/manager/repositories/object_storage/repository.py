@@ -68,9 +68,8 @@ class ObjectStorageRepository:
     async def update(
         self,
         updater: Updater[ObjectStorageRow],
-        meta_updater: Updater[ArtifactStorageRow],
     ) -> ObjectStorageData:
-        return await self._db_source.update(updater, meta_updater)
+        return await self._db_source.update(updater)
 
     @object_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

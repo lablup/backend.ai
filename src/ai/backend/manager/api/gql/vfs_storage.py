@@ -9,10 +9,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.data.artifact_storages.types import (
-    ArtifactStorageCreatorSpec,
-    ArtifactStorageUpdaterSpec,
-)
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageCreatorSpec
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -124,7 +121,6 @@ class CreateVFSStorageInput:
 @strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
 class UpdateVFSStorageInput:
     id: ID
-    name: str | None = UNSET
     host: str | None = UNSET
     base_path: str | None = UNSET
 
@@ -134,16 +130,6 @@ class UpdateVFSStorageInput:
             base_path=OptionalState[str].from_graphql(self.base_path),
         )
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
-
-    def to_meta_updater(self) -> Updater[ArtifactStorageRow]:
-        storage_id = uuid.UUID(self.id)
-        return Updater(
-            spec=ArtifactStorageUpdaterSpec(
-                name=OptionalState[str].from_graphql(self.name),
-                storage_id=storage_id,
-            ),
-            pk_value=storage_id,  # Not used directly, but required by Updater
-        )
 
 
 @strawberry.input(description="Added in 25.16.0. Input for deleting VFS storage")
@@ -195,7 +181,6 @@ async def update_vfs_storage(
     action_result = await processors.vfs_storage.update.wait_for_complete(
         UpdateVFSStorageAction(
             updater=input.to_updater(),
-            meta_updater=input.to_meta_updater(),
         )
     )
 

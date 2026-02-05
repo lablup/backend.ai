@@ -6372,6 +6372,11 @@ type Mutation
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 25.16.0. Update artifact storage metadata (common fields like name)
+  """
+  updateArtifactStorage(input: UpdateArtifactStorageInput!): UpdateArtifactStoragePayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 25.15.0.
   
   Registers a new namespace within a storage.
@@ -9546,6 +9551,22 @@ type UpdateArtifactPayload
   artifact: Artifact!
 }
 
+"""Added in 25.16.0. Input for updating artifact storage metadata"""
+input UpdateArtifactStorageInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  name: String
+}
+
+"""Added in 25.16.0. Payload for updating artifact storage metadata"""
+type UpdateArtifactStoragePayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  name: String!
+}
+
 input UpdateAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -9653,7 +9674,6 @@ input UpdateObjectStorageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  name: String
   host: String
   accessKey: String
   secretKey: String
@@ -9860,7 +9880,6 @@ input UpdateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  name: String
   host: String
   basePath: String
 }

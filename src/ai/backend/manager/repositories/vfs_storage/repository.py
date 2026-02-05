@@ -62,9 +62,8 @@ class VFSStorageRepository:
     async def update(
         self,
         updater: Updater[VFSStorageRow],
-        meta_updater: Updater[ArtifactStorageRow],
     ) -> VFSStorageData:
-        return await self._db_source.update(updater, meta_updater)
+        return await self._db_source.update(updater)
 
     @vfs_storage_repository_resilience.apply()
     async def delete(self, storage_id: uuid.UUID) -> uuid.UUID:

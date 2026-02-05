@@ -2959,6 +2959,11 @@ type Mutation {
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
 
   """
+  Added in 25.16.0. Update artifact storage metadata (common fields like name)
+  """
+  updateArtifactStorage(input: UpdateArtifactStorageInput!): UpdateArtifactStoragePayload!
+
+  """
   Added in 25.15.0.
   
   Registers a new namespace within a storage.
@@ -4954,6 +4959,18 @@ type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
+"""Added in 25.16.0. Input for updating artifact storage metadata"""
+input UpdateArtifactStorageInput {
+  id: ID!
+  name: String
+}
+
+"""Added in 25.16.0. Payload for updating artifact storage metadata"""
+type UpdateArtifactStoragePayload {
+  id: ID!
+  name: String!
+}
+
 input UpdateAutoScalingRuleInput {
   id: ID!
   metricSource: AutoScalingMetricSource
@@ -5031,7 +5048,6 @@ type UpdateNotificationRulePayload {
 """Added in 25.14.0"""
 input UpdateObjectStorageInput {
   id: ID!
-  name: String
   host: String
   accessKey: String
   secretKey: String
@@ -5214,7 +5230,6 @@ type UpdateUserV2Payload {
 """Added in 25.16.0. Input for updating VFS storage"""
 input UpdateVFSStorageInput {
   id: ID!
-  name: String
   host: String
   basePath: String
 }

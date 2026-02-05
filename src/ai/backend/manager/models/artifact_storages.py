@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -15,6 +16,7 @@ from .base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
     from ai.backend.manager.models.object_storage import ObjectStorageRow
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
@@ -69,3 +71,13 @@ class ArtifactStorageRow(Base):  # type: ignore[misc]
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def to_dataclass(self) -> ArtifactStorageData:
+        from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
+
+        return ArtifactStorageData(
+            id=self.id,
+            name=self.name,
+            storage_id=self.storage_id,
+            type=ArtifactStorageType(self.type),
+        )
