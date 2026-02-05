@@ -133,7 +133,8 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
-                scope_refs=[ScopeRef(ScopeType.USER, user_id)],
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
@@ -179,7 +180,8 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
-                scope_refs=[ScopeRef(ScopeType.PROJECT, project_id)],
+                scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             await execute_rbac_entity_creator(db_sess, creator)
@@ -207,7 +209,8 @@ class TestRBACEntityCreatorBasic:
                 )
                 creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                     spec=spec,
-                    scope_refs=[ScopeRef(ScopeType.USER, user_id)],
+                    scope_ref=ScopeRef(ScopeType.USER, user_id),
+                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
                 )
                 result = await execute_rbac_entity_creator(db_sess, creator)
@@ -240,10 +243,8 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
-                scope_refs=[
-                    ScopeRef(ScopeType.PROJECT, project_id),
-                    ScopeRef(ScopeType.USER, user_id),
-                ],
+                scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                additional_scope_refs=[ScopeRef(ScopeType.USER, user_id)],
                 entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
@@ -306,7 +307,8 @@ class TestRBACEntityCreatorIdempotent:
             )
             creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec1,
-                scope_refs=[ScopeRef(ScopeType.USER, user_id)],
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             result1 = await execute_rbac_entity_creator(db_sess, creator1)
@@ -498,7 +500,8 @@ class TestRBACEntityCreatorCompositePK:
                 spec = CompositePKCreatorSpec(tenant_id=1, item_id=1, name="test")
                 creator = RBACEntityCreator(
                     spec=spec,
-                    scope_refs=[ScopeRef(ScopeType.USER, "user-123")],
+                    scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
                 )
 

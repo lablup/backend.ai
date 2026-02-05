@@ -299,7 +299,8 @@ class VfolderRepository:
             # Use RBACEntityCreator for atomic entity + scope association creation
             rbac_creator = RBACEntityCreator(
                 spec=spec,
-                scope_refs=[ScopeId(scope_type=scope_type, scope_id=scope_id)],
+                scope_ref=ScopeId(scope_type=scope_type, scope_id=scope_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(session, rbac_creator)

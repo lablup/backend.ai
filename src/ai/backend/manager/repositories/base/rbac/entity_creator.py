@@ -28,16 +28,21 @@ TRow = TypeVar("TRow", bound=Base)
 
 @dataclass
 class RBACEntityCreator[TRow: Base]:
-    """Creator for a single entity with multiple scope associations.
+    """Creator for a single entity with scope associations for RBAC.
+
+    Creates an entity row and associates it with one or more permission scopes.
+    The primary scope is required; additional scopes are optional.
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
-        scope_refs: Sequence of scope references (scope_type + scope_id) for this entity.
+        scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
+        additional_scope_refs: Additional scope references for multi-scope entities.
         entity_type: The entity type for RBAC association.
     """
 
     spec: CreatorSpec[TRow]
-    scope_refs: Sequence[ScopeId]
+    scope_ref: ScopeId
+    additional_scope_refs: Sequence[ScopeId]
     entity_type: EntityType
 
 
@@ -88,7 +93,8 @@ async def execute_rbac_entity_creator[TRow: Base](
     # 3. Extract RBAC info and insert associations for all scopes
     instance_state = inspect(row)
     pk_value = instance_state.identity[0]
-    for scope_ref in creator.scope_refs:
+    all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
+    for scope_ref in all_scope_refs:
         db_sess.add(
             AssociationScopesEntitiesRow(
                 scope_type=scope_ref.scope_type,

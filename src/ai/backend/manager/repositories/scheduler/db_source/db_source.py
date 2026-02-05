@@ -1145,12 +1145,11 @@ class ScheduleDBSource:
             # Use RBACEntityCreator to create session with RBAC scope association
             rbac_creator = RBACEntityCreator(
                 spec=SessionRowCreatorSpec(row=session),
-                scope_refs=[
-                    ScopeId(
-                        scope_type=ScopeType.USER,
-                        scope_id=str(session_data.group_id),
-                    )
-                ],
+                scope_ref=ScopeId(
+                    scope_type=ScopeType.USER,
+                    scope_id=str(session_data.group_id),
+                ),
+                additional_scope_refs=[],
                 entity_type=EntityType.SESSION,
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
