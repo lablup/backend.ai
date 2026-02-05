@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Mapping
+from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
@@ -551,7 +552,7 @@ class ArchiveDownloadTokenData(BaseModel):
     volume: str
     vfolder_id: VFolderIDField
     files: list[str] = Field(min_length=1)
-
+    exp: datetime
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
 
 

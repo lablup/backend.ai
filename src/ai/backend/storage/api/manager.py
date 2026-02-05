@@ -1109,9 +1109,9 @@ class ArchiveDownloadHandler:
             volume=body.parsed.volume,
             vfolder_id=body.parsed.vfid,
             files=body.parsed.files,
+            exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
         )
         payload = token_payload.model_dump(mode="json")
-        payload["exp"] = datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire
         token = jwt.encode(
             payload,
             ctx.root_ctx.local_config.storage_proxy.secret,

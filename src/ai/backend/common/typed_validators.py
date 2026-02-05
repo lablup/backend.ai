@@ -27,6 +27,12 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
+from ai.backend.common.exception import (
+    JWTDecodeError,
+    JWTExpiredError,
+    JWTInvalidSignatureError,
+    JWTPayloadValidationError,
+)
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
@@ -512,36 +518,6 @@ class CommaSeparatedStrList(DelimiterSeparatedList[str]):
     min_length = None
 
 
-class JWTValidationError(Exception):
-    """Base exception for JWT validation errors."""
-
-    pass
-
-
-class JWTExpiredError(JWTValidationError):
-    """Raised when JWT token has expired."""
-
-    pass
-
-
-class JWTInvalidSignatureError(JWTValidationError):
-    """Raised when JWT signature verification fails."""
-
-    pass
-
-
-class JWTDecodeError(JWTValidationError):
-    """Raised when JWT token cannot be decoded."""
-
-    pass
-
-
-class JWTPayloadValidationError(JWTValidationError):
-    """Raised when JWT payload fails pydantic model validation."""
-
-    pass
-
-
 class PydanticJWTValidator[TModel: BaseModel]:
     """
     Generic JWT validator with pydantic model-based payload validation.
@@ -600,13 +576,13 @@ class PydanticJWTValidator[TModel: BaseModel]:
                 algorithms=self._algorithms,
             )
         except jwt.ExpiredSignatureError as e:
-            raise JWTExpiredError("JWT token has expired") from e
+            raise JWTExpiredError() from e
         except jwt.InvalidSignatureError as e:
-            raise JWTInvalidSignatureError("JWT signature verification failed") from e
+            raise JWTInvalidSignatureError() from e
         except jwt.DecodeError as e:
-            raise JWTDecodeError(f"Failed to decode JWT token: {e}") from e
+            raise JWTDecodeError(extra_msg=str(e)) from e
 
         try:
             return self._model.model_validate(payload)
         except ValidationError as e:
-            raise JWTPayloadValidationError(str(e)) from e
+            raise JWTPayloadValidationError(extra_msg=str(e)) from e
