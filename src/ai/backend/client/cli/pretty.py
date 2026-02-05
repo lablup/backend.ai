@@ -233,9 +233,9 @@ class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
 
     @staticmethod
     def alt_format_meter(
-        n: int | float = 0,
-        total: int | float | None = None,
-        elapsed: float = 0,
+        n: int | float,
+        total: int | float | None,
+        elapsed: float,
         ncols: int | None = None,
         prefix: str = "",
         ascii: bool = False,
