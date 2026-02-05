@@ -24,6 +24,8 @@ class ModelDeploymentStatus(CIStrEnum):
     SCALING = "SCALING"
     DEPLOYING = "DEPLOYING"
     READY = "READY"
+    DESTROYING = "DESTROYING"
+    DESTROYED = "DESTROYED"
     STOPPING = "STOPPING"
     STOPPED = "STOPPED"
 
