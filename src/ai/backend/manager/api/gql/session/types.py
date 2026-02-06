@@ -15,7 +15,9 @@ from ai.backend.manager.api.gql.common.types import (
     SessionResultGQL,
     SessionTypeGQL,
 )
+from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+from ai.backend.manager.api.gql.image.types import ImageConnectionV2GQL
 from ai.backend.manager.api.gql.kernel.types import KernelConnectionV2GQL, ResourceAllocationGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.resource_group.resolver import ResourceGroupConnection
@@ -230,10 +232,32 @@ class SessionLifecycleInfoGQL:
 
 
 @strawberry.type(
+    name="SessionRuntimeInfo",
+    description="Added in 26.2.0. Runtime execution configuration for a session.",
+)
+class SessionRuntimeInfoGQL:
+    environ: EnvironmentVariablesGQL | None = strawberry.field(
+        description="Environment variables for the session."
+    )
+    bootstrap_script: str | None = strawberry.field(
+        description="Bootstrap script to run before the main process."
+    )
+    startup_command: str | None = strawberry.field(
+        description="Startup command to execute when the session starts."
+    )
+    callback_url: str | None = strawberry.field(
+        description="URL to call back when the session completes (e.g., for batch sessions)."
+    )
+
+
+@strawberry.type(
     name="SessionNetworkInfo",
     description="Added in 26.2.0. Network configuration for a session.",
 )
 class SessionNetworkInfoGQL:
+    use_host_network: bool = strawberry.field(
+        description="Whether the session uses the host network directly."
+    )
     network_type: str | None = strawberry.field(description="Type of network used by the session.")
     network_id: str | None = strawberry.field(description="ID of the network if applicable.")
 
@@ -261,6 +285,9 @@ class SessionV2GQL(Node):
     )
     lifecycle: SessionLifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
+    )
+    runtime: SessionRuntimeInfoGQL = strawberry.field(
+        description="Runtime execution configuration."
     )
     network: SessionNetworkInfoGQL = strawberry.field(description="Network configuration.")
 
@@ -295,10 +322,18 @@ class SessionV2GQL(Node):
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
+    )
+    async def images(self) -> ImageConnectionV2GQL:
+        raise NotImplementedError
+
+    @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The kernels belonging to this session."
     )
     async def kernels(self) -> KernelConnectionV2GQL:
         raise NotImplementedError
+
+    # TODO: Add `vfolder_mounts` dynamic field (VFolderV2 connection type needed)
 
     @classmethod
     def from_session_info(cls, session_info: SessionInfo) -> Self:

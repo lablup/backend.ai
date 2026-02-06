@@ -5690,6 +5690,9 @@ type SessionMetadataInfo {
 
 """Added in 26.2.0. Network configuration for a session."""
 type SessionNetworkInfo {
+  """Whether the session uses the host network directly."""
+  useHostNetwork: Boolean!
+
   """Type of network used by the session."""
   networkType: String
 
@@ -5727,6 +5730,23 @@ enum SessionResult {
   UNDEFINED
   SUCCESS
   FAILURE
+}
+
+"""Added in 26.2.0. Runtime execution configuration for a session."""
+type SessionRuntimeInfo {
+  """Environment variables for the session."""
+  environ: EnvironmentVariables
+
+  """Bootstrap script to run before the main process."""
+  bootstrapScript: String
+
+  """Startup command to execute when the session starts."""
+  startupCommand: String
+
+  """
+  URL to call back when the session completes (e.g., for batch sessions).
+  """
+  callbackUrl: String
 }
 
 """Session scheduling history record"""
@@ -5845,6 +5865,9 @@ type SessionV2 implements Node {
   """Lifecycle status and timestamps."""
   lifecycle: SessionLifecycleInfo!
 
+  """Runtime execution configuration."""
+  runtime: SessionRuntimeInfo!
+
   """Network configuration."""
   network: SessionNetworkInfo!
 
@@ -5863,7 +5886,12 @@ type SessionV2 implements Node {
   """
   Added in 26.2.0. The candidate resource groups considered during scheduling.
   """
-  targetResourceGroups: ResourceGroupConnection!
+  targetResourceGroups: ResourceGroupConnection
+
+  """
+  Added in 26.2.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  """
+  images: ImageConnectionV2!
 
   """Added in 26.2.0. The kernels belonging to this session."""
   kernels: KernelConnectionV2!
