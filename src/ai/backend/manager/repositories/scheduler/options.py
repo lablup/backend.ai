@@ -274,6 +274,15 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_agent_id(agent_id: str) -> QueryCondition:
+        """Filter kernels by agent ID."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.agent == agent_id
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
