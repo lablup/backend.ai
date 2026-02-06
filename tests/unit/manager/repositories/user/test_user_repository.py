@@ -50,6 +50,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -611,6 +612,96 @@ class TestUserRepository:
         # The method is idempotent - it doesn't raise an error for non-existent users
         await user_repository.soft_delete_user_validated(email="nonexistent@example.com")
         # No exception should be raised
+
+    @pytest.mark.asyncio
+    async def test_bulk_create_users_validated_success(
+        self,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> None:
+        """Test successful bulk user creation with multiple users"""
+        items: list[UserCreateSpec] = []
+        for i in range(3):
+            password_info = create_test_password_info(f"password_{i}")
+            spec = UserCreatorSpec(
+                username=f"bulkuser-{uuid.uuid4().hex[:8]}",
+                email=f"bulkuser-{uuid.uuid4().hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                full_name=f"Bulk User {i}",
+                description=f"Bulk created user {i}",
+                status=UserStatus.ACTIVE,
+                domain_name=sample_domain,
+                role=UserRole.USER,
+                resource_policy=user_resource_policy,
+                allowed_client_ip=None,
+                totp_activated=False,
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            )
+            items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=None))
+
+        result = await user_repository.bulk_create_users_validated(items)
+
+        assert result.success_count() == 3
+        assert result.failure_count() == 0
+        assert len(result.successes) == 3
+        # Verify each created user has expected data
+        for user_data in result.successes:
+            assert user_data.domain_name == sample_domain
+            assert user_data.role == UserRole.USER
+            assert user_data.status == UserStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_bulk_create_users_validated_partial_failure(
+        self,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> None:
+        """Test partial failure in bulk creation - first succeeds, second fails due to duplicate email"""
+        # Create two users with the same email - second should fail
+        shared_email = f"duplicate-{uuid.uuid4().hex[:8]}@example.com"
+
+        items: list[UserCreateSpec] = []
+        for i in range(2):
+            password_info = create_test_password_info(f"password_{i}")
+            spec = UserCreatorSpec(
+                username=f"bulkuser-{uuid.uuid4().hex[:8]}",
+                email=shared_email,  # Same email for both - will cause conflict
+                password=password_info,
+                need_password_change=False,
+                full_name=f"Bulk User {i}",
+                description=f"Bulk created user {i}",
+                status=UserStatus.ACTIVE,
+                domain_name=sample_domain,
+                role=UserRole.USER,
+                resource_policy=user_resource_policy,
+                allowed_client_ip=None,
+                totp_activated=False,
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            )
+            items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=None))
+
+        result = await user_repository.bulk_create_users_validated(items)
+
+        # First user succeeds, second fails due to duplicate email
+        assert result.success_count() == 1
+        assert result.failure_count() == 1
+        assert len(result.successes) == 1
+        assert len(result.failures) == 1
+        # Verify the successful user
+        assert result.successes[0].email == shared_email
+        # Verify the failure has the correct index
+        assert result.failures[0].index == 1
 
     @pytest.mark.asyncio
     async def test_repository_has_expected_methods(
