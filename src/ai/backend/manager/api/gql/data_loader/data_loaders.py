@@ -6,6 +6,7 @@ from functools import cached_property, partial
 from strawberry.dataloader import DataLoader
 
 from ai.backend.common.types import AgentId, ImageID, KernelId
+from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.deployment.types import (
@@ -25,7 +26,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
 
-from .agent.loader import load_container_counts
+from .agent.loader import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
@@ -163,6 +164,12 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, ModelReplicaData | None]:
         return DataLoader(load_fn=partial(load_replicas_by_ids, self._processors.deployment))
+
+    @cached_property
+    def agent_loader(
+        self,
+    ) -> DataLoader[AgentId, AgentDetailData | None]:
+        return DataLoader(load_fn=partial(load_agents_by_ids, self._processors.agent))
 
     @cached_property
     def container_count_loader(
