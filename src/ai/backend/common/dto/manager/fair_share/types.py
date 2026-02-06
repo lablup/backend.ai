@@ -7,7 +7,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter, UUIDFilter
 
 __all__ = (
     # Enums
@@ -126,6 +126,9 @@ class DomainUsageBucketFilter(BaseRequestModel):
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    period_start: DateRangeFilter | None = Field(
+        default=None, description="Filter by period start date"
+    )
 
 
 class DomainUsageBucketOrder(BaseRequestModel):
@@ -148,6 +151,9 @@ class ProjectUsageBucketFilter(BaseRequestModel):
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    period_start: DateRangeFilter | None = Field(
+        default=None, description="Filter by period start date"
+    )
 
 
 class ProjectUsageBucketOrder(BaseRequestModel):
@@ -171,6 +177,9 @@ class UserUsageBucketFilter(BaseRequestModel):
     user_uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    period_start: DateRangeFilter | None = Field(
+        default=None, description="Filter by period start date"
+    )
 
 
 class UserUsageBucketOrder(BaseRequestModel):
