@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -71,6 +72,13 @@ class DomainConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
+
+        return inner
+
+    @staticmethod
+    def by_names(names: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.in_(names)
 
         return inner
 

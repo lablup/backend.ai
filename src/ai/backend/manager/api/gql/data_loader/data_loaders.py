@@ -15,6 +15,8 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     RouteInfo,
 )
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
@@ -23,6 +25,7 @@ from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.services.processors import Processors
 
@@ -36,14 +39,17 @@ from .deployment import (
     load_revisions_by_ids,
     load_routes_by_ids,
 )
+from .domain import load_domains_by_names
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .image import load_alias_by_ids, load_images_by_ids
 from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
+from .project import load_projects_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
 from .resource_group import load_resource_groups_by_names
 from .storage_namespace import load_storage_namespaces_by_ids
+from .user import load_users_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
 
 
@@ -68,6 +74,24 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(load_resource_groups_by_names, self._processors.scaling_group)
         )
+
+    @cached_property
+    def user_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, UserData | None]:
+        return DataLoader(load_fn=partial(load_users_by_ids, self._processors.user))
+
+    @cached_property
+    def project_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, GroupData | None]:
+        return DataLoader(load_fn=partial(load_projects_by_ids, self._processors.group))
+
+    @cached_property
+    def domain_loader(
+        self,
+    ) -> DataLoader[str, DomainData | None]:
+        return DataLoader(load_fn=partial(load_domains_by_names, self._processors.domain))
 
     @cached_property
     def notification_channel_loader(

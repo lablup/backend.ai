@@ -35,9 +35,6 @@ from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
-from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 
 @strawberry.enum(
@@ -411,11 +408,10 @@ class KernelV2GQL(Node):
         user_id = self.user_info.user_id
         if user_id is None:
             return None
-
-        result = await info.context.processors.user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=user_id)
-        )
-        return UserV2GQL.from_data(result.user)
+        data = await info.context.data_loaders.user_loader.load(user_id)
+        if data is None:
+            return None
+        return UserV2GQL.from_data(data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The project this kernel belongs to."
@@ -424,10 +420,10 @@ class KernelV2GQL(Node):
         group_id = self.user_info.group_id
         if group_id is None:
             return None
-        result = await info.context.processors.group.get_project.wait_for_complete(
-            GetProjectAction(project_id=group_id)
-        )
-        return ProjectV2GQL.from_data(result.data)
+        data = await info.context.data_loaders.project_loader.load(group_id)
+        if data is None:
+            return None
+        return ProjectV2GQL.from_data(data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this kernel belongs to."
@@ -436,10 +432,10 @@ class KernelV2GQL(Node):
         domain_name = self.user_info.domain_name
         if domain_name is None:
             return None
-        result = await info.context.processors.domain.get_domain.wait_for_complete(
-            GetDomainAction(domain_name=domain_name)
-        )
-        return DomainV2GQL.from_data(result.data)
+        data = await info.context.data_loaders.domain_loader.load(domain_name)
+        if data is None:
+            return None
+        return DomainV2GQL.from_data(data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The resource group this kernel is assigned to."
