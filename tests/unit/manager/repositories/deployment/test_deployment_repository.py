@@ -14,6 +14,8 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -56,6 +58,9 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -78,6 +83,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
@@ -85,6 +91,9 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
     RouteCreatorSpec,
+)
+from ai.backend.manager.repositories.deployment.creators.endpoint import (
+    LegacyEndpointCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
@@ -2904,3 +2913,324 @@ class TestRouteOperations:
         result = await deployment_repository.update_route(updater)
 
         assert result is False
+
+
+class TestDeploymentRepositoryDuplicateName:
+    """Test cases for duplicate endpoint name validation via DeploymentRepository."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with required tables for EndpointRow and RBAC."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                AgentRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                ImageRow,
+                EndpointRow,
+                AssociationScopesEntitiesRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        """Create test image and return image ID."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            image = ImageRow(
+                name="test-image:latest",
+                project=str(uuid.uuid4()),
+                image="test-image",
+                registry="docker.io",
+                registry_id=uuid.uuid4(),
+                architecture="x86_64",
+                is_local=False,
+                config_digest="sha256:abc123",
+                size_bytes=1000000,
+                type=ImageType.COMPUTE,
+                labels={},
+            )
+            db_sess.add(image)
+            await db_sess.commit()
+            return image.id
+
+    @pytest.fixture
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainRow:
+        """Create test domain."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=f"test-domain-{uuid.uuid4().hex[:8]}",
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+            return domain
+
+    @pytest.fixture
+    async def test_scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ScalingGroupRow:
+        """Create test scaling group."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=f"test-sgroup-{uuid.uuid4().hex[:8]}",
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.commit()
+            return sgroup
+
+    @pytest.fixture
+    async def default_project_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ProjectResourcePolicyRow:
+        """Create default project resource policy."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name="default",
+                max_vfolder_count=10,
+                max_quota_scope_size=0,
+                max_network_count=0,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+            return policy
+
+    @pytest.fixture
+    async def test_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        default_project_policy: ProjectResourcePolicyRow,
+    ) -> GroupRow:
+        """Create test group (project)."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=uuid.uuid4(),
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain.name,
+                description="Test group",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                resource_policy=default_project_policy.name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+            return group
+
+    @pytest.fixture
+    async def different_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        default_project_policy: ProjectResourcePolicyRow,
+    ) -> GroupRow:
+        """Create a different group (project) for cross-project tests."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=uuid.uuid4(),
+                name=f"different-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain.name,
+                description="Different group",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                resource_policy=default_project_policy.name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+            return group
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        """Create DeploymentRepository instance with mocked dependencies."""
+        mock_storage_manager = MagicMock()
+        mock_valkey_stat = MagicMock()
+        mock_valkey_live = MagicMock()
+        mock_valkey_schedule = MagicMock()
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=mock_storage_manager,
+            valkey_stat=mock_valkey_stat,
+            valkey_live=mock_valkey_live,
+            valkey_schedule=mock_valkey_schedule,
+        )
+
+    def _create_endpoint_creator(
+        self,
+        name: str,
+        domain: DomainRow,
+        group: GroupRow,
+        scaling_group: ScalingGroupRow,
+        image_id: uuid.UUID | None = None,
+    ) -> RBACEntityCreator[EndpointRow]:
+        """Helper to create RBACEntityCreator for endpoint creation."""
+        user_id = uuid.uuid4()
+        spec = LegacyEndpointCreatorSpec(
+            name=name,
+            domain=domain.name,
+            project=group.id,
+            resource_group=scaling_group.name,
+            created_user=user_id,
+            session_owner=user_id,
+            revision_history_limit=10,
+            tag=None,
+            replicas=1,
+            desired_replicas=1,
+            open_to_public=False,
+            url=None,
+            image_id=image_id,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal(str(1024**3))}),
+            resource_opts=None,
+            model=None,
+            model_mount_destination="/models",
+            model_definition_path=None,
+            extra_mounts=[],
+            runtime_variant=RuntimeVariant.CUSTOM,
+            startup_command=None,
+            bootstrap_script=None,
+            environ=None,
+            callback_url=None,
+            policy=None,
+        )
+        return RBACEntityCreator(
+            spec=spec,
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(group.id),
+            entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_endpoint_raises_when_duplicate_name(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """Test that create_endpoint_legacy raises DeploymentNameAlreadyExists for duplicate name."""
+        # Create first endpoint with specific name
+        first_creator = self._create_endpoint_creator(
+            name="duplicate-test-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        await deployment_repository.create_endpoint_legacy(first_creator)
+
+        # Attempt to create second endpoint with same name should fail
+        second_creator = self._create_endpoint_creator(
+            name="duplicate-test-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+
+        with pytest.raises(DeploymentNameAlreadyExists):
+            await deployment_repository.create_endpoint_legacy(second_creator)
+
+    @pytest.mark.asyncio
+    async def test_create_endpoint_succeeds_with_different_name(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """Test that create_endpoint_legacy succeeds with a different name."""
+        # Create first endpoint
+        first_creator = self._create_endpoint_creator(
+            name="existing-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        await deployment_repository.create_endpoint_legacy(first_creator)
+
+        # Create second endpoint with different name should succeed
+        second_creator = self._create_endpoint_creator(
+            name="different-endpoint-name",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+
+        result = await deployment_repository.create_endpoint_legacy(second_creator)
+
+        assert result.metadata.name == "different-endpoint-name"
+        assert result.metadata.project == test_group.id
+
+    @pytest.mark.asyncio
+    async def test_create_endpoint_succeeds_with_same_name_in_different_project(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        different_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """Test that create_endpoint_legacy allows same name in different project."""
+        # Create endpoint in first project
+        first_creator = self._create_endpoint_creator(
+            name="same-name-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        await deployment_repository.create_endpoint_legacy(first_creator)
+
+        # Create endpoint with same name in different project should succeed
+        second_creator = self._create_endpoint_creator(
+            name="same-name-endpoint",
+            domain=test_domain,
+            group=different_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+
+        result = await deployment_repository.create_endpoint_legacy(second_creator)
+
+        assert result.metadata.name == "same-name-endpoint"
+        assert result.metadata.project == different_group.id

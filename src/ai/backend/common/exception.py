@@ -789,6 +789,18 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class DeploymentNameAlreadyExists(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/deployment-name-already-exists"
+    error_title = "Deployment name already exists."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
 class PassthroughError(BackendAIError):
     """
     Wraps and forwards errors from requests with original status code and message.
