@@ -31,7 +31,7 @@ from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
 @strawberry.input(
     name="UserStatusV2EnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserStatusV2EnumGQL fields. "
+        "Added in 26.2.0. Filter for UserStatusV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
@@ -60,7 +60,7 @@ class UserStatusV2EnumFilterGQL:
 @strawberry.input(
     name="UserRoleV2EnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserRoleV2EnumGQL fields. "
+        "Added in 26.2.0. Filter for UserRoleV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
