@@ -19,7 +19,7 @@ The `ContainerUtilizationMetricService` previously contained both business logic
 
 The refactoring aims to:
 - Separate metric identification (what to query) from query execution (how to query)
-- Create an extensible interface hierarchy for different metric querier types
+- Create a template-based query system where PromQL patterns are defined as presets
 - Enable the Prometheus client to work with any querier implementing the interface
 
 ## Current Design
@@ -46,40 +46,23 @@ ContainerUtilizationMetricService
 
 ## Proposed Design
 
-### Interface Hierarchy
+### Overview
 
-```
-PrometheusMetricQuerier (ABC)
-    │   ├── name() → str              # Prometheus metric name
-    │   └── labels() → dict[str, str] # Label selectors
-    │
-    └── AggregatingMetricQuerier (ABC)
-            │   └── group_by_labels() → list[str]  # For sum by, avg by
-            │
-            └── UtilizationMetricQuerier (ABC)
-                    └── query_strategy() → QueryStrategy  # gauge/rate/rate_normalized
-```
+The design separates concerns into:
+- **MetricQuerier**: Abstract interface defining what metric to query
+- **MetricPreset**: Defines PromQL template and allowed placeholders (defined elsewhere)
+- **MetricQueryInput**: User-provided query parameters
+- **PrometheusClient**: Renders template and executes HTTP request
 
-### New Type Definitions
+### MetricQuerier ABC
+
+`MetricQuerier` is an abstract base class that defines what metric to query. It provides the common interface for metric identification — name, label selectors, and grouping labels.
 
 ```python
 # clients/prometheus/types.py
 
-class QueryStrategy(StrEnum):
-    """Query strategy for utilization metrics."""
-    GAUGE = "gauge"              # Instant value (mem_used, gpu_mem)
-    RATE = "rate"                # Rate of change (cpu_util)
-    RATE_NORMALIZED = "rate_normalized"  # Rate / interval (net_rx, net_tx)
-
-@dataclass(frozen=True)
-class QueryTimeRange:
-    """Time range parameters for Prometheus queries."""
-    start: str
-    end: str
-    step: str
-
-class PrometheusMetricQuerier(ABC):
-    """Base interface for metric identification."""
+class MetricQuerier(ABC):
+    """Abstract interface for metric query specification."""
 
     @abstractmethod
     def name(self) -> str:
@@ -91,37 +74,27 @@ class PrometheusMetricQuerier(ABC):
         """Return label selectors for filtering."""
         ...
 
-class AggregatingMetricQuerier(PrometheusMetricQuerier):
-    """Interface for queries that support aggregation."""
-
     @abstractmethod
     def group_by_labels(self) -> list[str]:
         """Return labels to group by when aggregating."""
         ...
-
-class UtilizationMetricQuerier(AggregatingMetricQuerier):
-    """Interface for utilization metrics that know their query strategy."""
-
-    @abstractmethod
-    def query_strategy(self) -> QueryStrategy:
-        """Return the query strategy for this metric."""
-        ...
 ```
 
-### Concrete Implementation
+### ContainerMetricQuerier
+
+`ContainerMetricQuerier` is a concrete implementation for container-level utilization metrics:
 
 ```python
+# clients/prometheus/querier.py
+
 @dataclass(kw_only=True)
-class ContainerMetricQuerier(UtilizationMetricQuerier):
+class ContainerMetricQuerier(MetricQuerier):
     """Querier for container-level utilization metrics."""
 
     metric_name: str
-    value_type: str  # "current" or "capacity"
+    value_type: str
     kernel_id: UUID | None = None
-    agent_id: str | None = None
-    session_id: UUID | None = None
-    user_id: UUID | None = None
-    project_id: UUID | None = None
+    # ... other optional fields
 
     @override
     def name(self) -> str:
@@ -129,89 +102,101 @@ class ContainerMetricQuerier(UtilizationMetricQuerier):
 
     @override
     def labels(self) -> dict[str, str]:
-        result = {
-            "container_metric_name": self.metric_name,
-            "value_type": self.value_type,
-        }
-        if self.kernel_id is not None:
-            result["kernel_id"] = str(self.kernel_id)
-        # ... other optional labels
-        return result
+        # Build label selectors from fields
+        ...
 
     @override
     def group_by_labels(self) -> list[str]:
-        group_by = ["value_type"]
-        if self.kernel_id is not None:
-            group_by.append("kernel_id")
-        # ... other optional labels
-        return group_by
-
-    @override
-    def query_strategy(self) -> QueryStrategy:
-        match self.metric_name:
-            case "cpu_util":
-                return QueryStrategy.RATE
-            case "net_rx" | "net_tx":
-                return QueryStrategy.RATE_NORMALIZED
-            case _:
-                return QueryStrategy.GAUGE
+        # Return labels to group by
+        ...
 ```
 
-### Unified PrometheusClient
+### Type Definitions
 
 ```python
+# clients/prometheus/types.py
+
+
+@dataclass(frozen=True)
+class QueryTimeRange:
+    """Time range parameters for Prometheus range queries."""
+    start: str
+    end: str
+    step: str
+```
+
+### PrometheusClient
+
+`PrometheusClient` takes a `MetricPreset`, `MetricQuerier`, and `window` parameter to render and execute the query. The client uses the querier's `name()`, `labels()`, `group_by_labels()` to fill the preset template.
+
+```python
+# clients/prometheus/client.py
+
 class PrometheusClient:
 
-    _client_pool: ClientPool # Using client pool
+    _client_pool: ClientPool
     _client_key: ClientKey
 
-    # ── Public API ──────────────────────────────────────────────────
-    async def query_utilization(
+    async def query_range(
         self,
-        querier: UtilizationMetricQuerier,
+        preset: MetricPreset,
+        querier: MetricQuerier,
         time_range: QueryTimeRange,
         *,
-        rate_interval: str = "5m",
+        window: str = "5m",
     ) -> PrometheusQueryRangeResponse:
-        """Query utilization metrics with automatic strategy selection."""
-        match querier.query_strategy():
-            case QueryStrategy.RATE:
-                return await self._query_rate(querier, time_range, rate_interval)
-            ...
+        """Execute a Prometheus range query."""
+        query = self._render_query(preset, querier, window)
+        return await self._post("/api/v1/query_range", data={
+            "query": query,
+            "start": time_range.start,
+            "end": time_range.end,
+            "step": time_range.step,
+        })
 
-    async def query_available_container_metrics(self) -> list[str]:
-        """Fetch list of available container metric names."""
-        ...
+    def _render_query(preset: MetricPreset, querier: MetricQuerier, window: str) -> str:
+        """Simple template substitution using querier interface."""
+        labels_str = ",".join(f'{k}="{v}"' for k, v in querier.labels().items())
+        group_by_str = ",".join(querier.group_by_labels())
 
-    # ── Private: Query Building ─────────────────────────────────────
-    async def _query_gauge(self, querier, time_range): ...
-    async def _query_rate(self, querier, time_range, interval, *, normalize=False): ...
-
-    # ── Private: HTTP Transport ─────────────────────────────────────
-    async def _post(self, path, *, data=None, request_timeout=None): ...
-    async def _get(self, path, *, params=None, request_timeout=None): ...
+        return preset.query_template.format(
+            metric_name=querier.name(),
+            labels=labels_str,
+            group_by=group_by_str,
+            window=window,
+        )
 ```
+
+**PromQL rendering examples:**
+
+| Preset Template | Input | Rendered PromQL |
+|---|---|---|
+| `sum by ({group_by})(rate({metric_name}{{{labels}}}[{window}]))` | `labels={"endpoint": "/auth"}, group_by=["endpoint"], window="1m"` | `sum by (endpoint)(rate(backendai_api_request_count_total{endpoint="/auth"}[1m]))` |
+| `{metric_name}{{{labels}}}` | `labels={"value_type": "current"}, group_by=[], window="5m"` | `backendai_container_utilization{value_type="current"}` |
 
 ### Simplified Service Layer
 
+The `ContainerUtilizationMetricService` becomes a thin coordination layer that delegates to `PrometheusClient`:
+
 ```python
+# services/metric/container_metric.py
+
 class ContainerUtilizationMetricService:
     """Thin coordination layer - delegates to client."""
 
-    async def fetch_metric(self, action: ContainerMetricAction):
+    _prometheus_client: PrometheusClient
+
+    async def fetch_metric(self, action: ContainerMetricAction) -> ContainerMetricActionResult:
+        preset = get_preset_for_metric(action.metric_name)
         querier = ContainerMetricQuerier(
             metric_name=action.metric_name,
             value_type=action.labels.value_type,
             kernel_id=action.labels.kernel_id,
-            # ... map action to querier
+            ...
         )
-        time_range = QueryTimeRange(
-            start=action.start,
-            end=action.end,
-            step=action.step,
-        )
-        result = await self._prometheus_client.query_utilization(
-            querier, time_range, rate_interval=self._rate_interval
+        time_range = QueryTimeRange(start=action.start, end=action.end, step=action.step)
+        result = await self._prometheus_client.query_range(
+            preset, querier, time_range, window=self._rate_interval
         )
         # ... transform result
 ```
@@ -220,33 +205,12 @@ class ContainerUtilizationMetricService:
 
 ### Backward Compatibility
 
-- **Internal API change**: `query_range()` and `query_label_values()` removed from public API
-- **No external impact**: These methods were only used by `ContainerUtilizationMetricService`
-- **Service API unchanged**: `ContainerUtilizationMetricService.query_metric()` signature preserved
+- **Internal API change**: Direct query building methods removed from service layer
+- **No external impact**: `ContainerUtilizationMetricService.fetch_metric()` signature preserved
+- **Service API unchanged**: All callers continue to work without modification
 
 ### Removed Types
 
-The following types were removed from `services/metric/types.py`:
-- `UtilizationMetricType` enum → Replaced by `QueryStrategy` in `clients/prometheus/types.py`
-- `MetricSpecForQuery` dataclass → Logic moved to `ContainerMetricQuerier`
-
-## Extensibility Example
-
-Adding a new metric querier requires no client changes:
-
-```python
-@dataclass(kw_only=True)
-class NodeMetricQuerier(UtilizationMetricQuerier):
-    """Querier for node-level metrics."""
-
-    metric_name: str
-    node_id: str
-
-    ...
-
-# Usage - client unchanged
-result = await prometheus_client.query_utilization(
-    NodeMetricQuerier(metric_name="cpu_usage", node_id="node-001"),
-    time_range,
-)
-```
+The following types are removed from `services/metric/types.py`:
+- `UtilizationMetricType` enum → Replaced by preset's query template
+- `MetricSpecForQuery` dataclass → Replaced by `MetricQuerier` interface
