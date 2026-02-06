@@ -4,6 +4,7 @@ from typing import Protocol
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 
+from ai.backend.common.contexts.operation import get_client_operation
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +20,7 @@ class APIMetricObserverProtocol(Protocol):
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
+        client_operation: str = "",
     ) -> None: ...
 
 
@@ -61,6 +63,7 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
                 error_code=error_code,
                 status_code=status_code,
                 duration=elapsed,
+                client_operation=get_client_operation(),
             )
 
     return metric_middleware

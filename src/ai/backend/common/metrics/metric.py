@@ -35,13 +35,19 @@ class APIMetricObserver:
         return cls._instance
 
     def _inc_request_total(
-        self, *, method: str, endpoint: str, error_code: ErrorCode | None, status_code: int
+        self,
+        *,
+        method: str,
+        endpoint: str,
+        error_code: ErrorCode | None,
+        status_code: int,
+        client_operation: str = "",
     ) -> None:
         self._request_count.labels(
             method=method,
             endpoint=endpoint,
             domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else "",
+            operation=error_code.operation if error_code else client_operation,
             error_detail=error_code.error_detail if error_code else "",
             status_code=status_code,
         ).inc()
@@ -54,12 +60,13 @@ class APIMetricObserver:
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
+        client_operation: str = "",
     ) -> None:
         self._request_duration_sec.labels(
             method=method,
             endpoint=endpoint,
             domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else "",
+            operation=error_code.operation if error_code else client_operation,
             error_detail=error_code.error_detail if error_code else "",
             status_code=status_code,
         ).observe(duration)
@@ -72,9 +79,14 @@ class APIMetricObserver:
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
+        client_operation: str = "",
     ) -> None:
         self._inc_request_total(
-            method=method, endpoint=endpoint, error_code=error_code, status_code=status_code
+            method=method,
+            endpoint=endpoint,
+            error_code=error_code,
+            status_code=status_code,
+            client_operation=client_operation,
         )
         self._observe_request_duration(
             method=method,
@@ -82,6 +94,7 @@ class APIMetricObserver:
             status_code=status_code,
             error_code=error_code,
             duration=duration,
+            client_operation=client_operation,
         )
 
 
