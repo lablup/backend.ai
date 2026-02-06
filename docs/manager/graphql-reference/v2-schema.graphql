@@ -894,13 +894,13 @@ input BlueGreenConfigInput {
 """
 Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
 """
-input BulkCreateUserInput {
+input BulkCreateUserV2Input {
   """List of user creation inputs."""
-  users: [CreateUserInput!]!
+  users: [CreateUserV2Input!]!
 }
 
 """Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersPayload {
+type BulkCreateUsersV2Payload {
   """Number of users successfully created."""
   createdCount: Int!
 
@@ -1208,7 +1208,7 @@ type CreateRevisionPayload {
 """
 Added in 26.2.0. Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.
 """
-input CreateUserInput {
+input CreateUserV2Input {
   """User's email address. Must be unique across the system."""
   email: String!
 
@@ -1262,7 +1262,7 @@ input CreateUserInput {
 }
 
 """Added in 26.2.0. Payload for user creation mutation."""
-type CreateUserPayload {
+type CreateUserV2Payload {
   """The newly created user."""
   user: UserV2!
 }
@@ -1507,7 +1507,7 @@ type DeleteUserConfigPayload {
 }
 
 """Added in 26.2.0. Payload for single user soft-delete mutation."""
-type DeleteUserPayload {
+type DeleteUserV2Payload {
   """Whether the deletion was successful."""
   success: Boolean!
 }
@@ -1515,13 +1515,13 @@ type DeleteUserPayload {
 """
 Added in 26.2.0. Input for soft-deleting multiple users. Soft delete changes user status to DELETED but preserves data.
 """
-input DeleteUsersInput {
+input DeleteUsersV2Input {
   """List of user UUIDs to soft-delete."""
   userIds: [UUID!]!
 }
 
 """Added in 26.2.0. Payload for bulk user soft-delete mutation."""
-type DeleteUsersPayload {
+type DeleteUsersV2Payload {
   """Number of users successfully soft-deleted."""
   deletedCount: Int!
 }
@@ -1647,6 +1647,8 @@ enum DeploymentStatus {
   SCALING
   DEPLOYING
   READY
+  DESTROYING
+  DESTROYED
   STOPPING
   STOPPED
 }
@@ -1989,7 +1991,7 @@ input DomainUsageScope {
 """
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
-input DomainUserScope {
+input DomainUserV2Scope {
   """
   Domain name to scope the user query. Only users belonging to this domain will be returned.
   """
@@ -3337,42 +3339,42 @@ type Mutation {
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
-  adminCreateUser(input: CreateUserInput!): CreateUserPayload!
+  adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload!
 
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserInput!): BulkCreateUsersPayload!
+  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
   Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateUser(userId: UUID!, input: UpdateUserInput!): UpdateUserPayload!
+  adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
 
   """
   Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role.
   """
-  updateUser(input: UpdateUserInput!): UpdateUserPayload!
+  updateUser(input: UpdateUserV2Input!): UpdateUserV2Payload!
 
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
   """
-  adminDeleteUser(userId: UUID!): DeleteUserPayload!
+  adminDeleteUser(userId: UUID!): DeleteUserV2Payload!
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
   """
-  adminDeleteUsers(input: DeleteUsersInput!): DeleteUsersPayload!
+  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
   """
-  adminPurgeUser(input: PurgeUserInputV2!): PurgeUserPayload!
+  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload!
 
   """
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
-  adminPurgeUsers(input: PurgeUsersInput!): PurgeUsersPayload!
+  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 }
 
 """An object with a Globally Unique ID"""
@@ -3912,7 +3914,7 @@ input ProjectUsageScope {
 """
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
-input ProjectUserScope {
+input ProjectUserV2Scope {
   """
   Project UUID to scope the user query. Only users who are members of this project will be returned.
   """
@@ -4070,13 +4072,13 @@ input ProjectWeightInputItem {
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
-input PurgeUserInputV2 {
+input PurgeUserV2Input {
   """UUID of the user to purge."""
   userId: UUID!
 }
 
 """Added in 26.2.0. Payload for single user permanent deletion mutation."""
-type PurgeUserPayload {
+type PurgeUserV2Payload {
   """Whether the purge was successful."""
   success: Boolean!
 }
@@ -4084,13 +4086,13 @@ type PurgeUserPayload {
 """
 Added in 26.2.0. Input for permanently deleting multiple users. This action is irreversible.
 """
-input PurgeUsersInput {
+input PurgeUsersV2Input {
   """List of user UUIDs to purge."""
   userIds: [UUID!]!
 }
 
 """Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersPayload {
+type PurgeUsersV2Payload {
   """Number of users successfully purged."""
   purgedCount: Int!
 
@@ -4451,12 +4453,12 @@ type Query {
   """
   Added in 26.2.0. List all users with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminUsersV2(filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
-  domainUsersV2(scope: DomainUserScope!, filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
@@ -4466,7 +4468,7 @@ type Query {
   """
   Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
   """
-  projectUsersV2(scope: ProjectUserScope!, filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 
   """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
@@ -5724,7 +5726,7 @@ type UpdateRouteTrafficStatusPayload {
 """
 Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
 """
-input UpdateUserInput {
+input UpdateUserV2Input {
   """New username."""
   username: String = null
 
@@ -5775,7 +5777,7 @@ input UpdateUserInput {
 }
 
 """Added in 26.2.0. Payload for user update mutation."""
-type UpdateUserPayload {
+type UpdateUserV2Payload {
   """The updated user."""
   user: UserV2!
 }
@@ -6086,87 +6088,24 @@ input UserFairShareScope {
   projectId: UUID!
 }
 
-"""
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input UserFilter {
-  """Filter by user UUID. Supports equals and 'in' operations."""
-  uuid: UUIDFilter = null
-
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """
-  Filter by email address. Supports equals, contains, startsWith, and endsWith.
-  """
-  email: StringFilter = null
-
-  """
-  Filter by account status. Supports equals, in, not_equals, and not_in operations.
-  """
-  status: UserStatusEnumFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  domainName: StringFilter = null
-
-  """
-  Filter by user role. Supports equals, in, not_equals, and not_in operations.
-  """
-  role: UserRoleEnumFilter = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [UserFilter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [UserFilter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [UserFilter!] = null
-}
-
 extend type UserNode @key(fields: "id") {
   id: ID! @external
 }
 
 """
-Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
 """
-input UserOrderBy {
-  """The field to order by. See UserOrderField for available options."""
-  field: UserOrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
+enum UserRoleV2 {
+  USER
+  ADMIN
+  SUPERADMIN
+  MONITOR
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
-enum UserOrderField {
-  CREATED_AT
-  MODIFIED_AT
-  USERNAME
-  EMAIL
-  STATUS
-}
-
-"""
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input UserRoleEnumFilter {
+input UserRoleV2EnumFilter {
   """Exact match for user role."""
   equals: UserRoleV2 = null
 
@@ -6181,19 +6120,19 @@ input UserRoleEnumFilter {
 }
 
 """
-Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
+Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
-enum UserRoleV2 {
-  USER
-  ADMIN
-  SUPERADMIN
-  MONITOR
+enum UserStatusV2 {
+  ACTIVE
+  INACTIVE
+  DELETED
+  BEFORE_VERIFICATION
 }
 
 """
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
-input UserStatusEnumFilter {
+input UserStatusV2EnumFilter {
   """Exact match for user status."""
   equals: UserStatusV2 = null
 
@@ -6205,16 +6144,6 @@ input UserStatusEnumFilter {
 
   """Exclude any of the provided statuses."""
   notIn: [UserStatusV2!] = null
-}
-
-"""
-Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
-"""
-enum UserStatusV2 {
-  ACTIVE
-  INACTIVE
-  DELETED
-  BEFORE_VERIFICATION
 }
 
 """
@@ -6450,6 +6379,79 @@ type UserV2Edge {
 
   """The item at the end of the edge"""
   node: UserV2!
+}
+
+"""
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input UserV2Filter {
+  """Filter by user UUID. Supports equals and 'in' operations."""
+  uuid: UUIDFilter = null
+
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """
+  Filter by email address. Supports equals, contains, startsWith, and endsWith.
+  """
+  email: StringFilter = null
+
+  """
+  Filter by account status. Supports equals, in, not_equals, and not_in operations.
+  """
+  status: UserStatusV2EnumFilter = null
+
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  domainName: StringFilter = null
+
+  """
+  Filter by user role. Supports equals, in, not_equals, and not_in operations.
+  """
+  role: UserRoleV2EnumFilter = null
+
+  """
+  Filter by creation timestamp. Supports before, after, and between operations.
+  """
+  createdAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [UserV2Filter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [UserV2Filter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [UserV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input UserV2OrderBy {
+  """The field to order by. See UserV2OrderField for available options."""
+  field: UserV2OrderField!
+
+  """Sort direction. ASC for ascending, DESC for descending."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+"""
+enum UserV2OrderField {
+  CREATED_AT
+  MODIFIED_AT
+  USERNAME
+  EMAIL
+  STATUS
 }
 
 """

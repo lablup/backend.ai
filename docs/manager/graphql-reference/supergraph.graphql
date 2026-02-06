@@ -1402,18 +1402,8 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
-"""
-Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
-"""
-input BulkCreateUserInput
-  @join__type(graph: STRAWBERRY)
-{
-  """List of user creation inputs."""
-  users: [CreateUserInput!]!
-}
-
 """Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersPayload
+type BulkCreateUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """Number of users successfully created."""
@@ -1421,6 +1411,16 @@ type BulkCreateUsersPayload
 
   """List of newly created users."""
   users: [UserV2!]!
+}
+
+"""
+Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
+"""
+input BulkCreateUserV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of user creation inputs."""
+  users: [CreateUserV2Input!]!
 }
 
 """
@@ -2438,10 +2438,43 @@ type CreateUser
   keypair: KeyPair
 }
 
+type CreateUserResourcePolicy
+  @join__type(graph: GRAPHENE)
+{
+  ok: Boolean
+  msg: String
+  resource_policy: UserResourcePolicy
+}
+
+input CreateUserResourcePolicyInput
+  @join__type(graph: GRAPHENE)
+{
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
+  max_quota_scope_size: BigInt
+
+  """
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
+}
+
 """
 Added in 26.2.0. Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.
 """
-input CreateUserInput
+input CreateUserV2Input
   @join__type(graph: STRAWBERRY)
 {
   """User's email address. Must be unique across the system."""
@@ -2497,44 +2530,11 @@ input CreateUserInput
 }
 
 """Added in 26.2.0. Payload for user creation mutation."""
-type CreateUserPayload
+type CreateUserV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """The newly created user."""
   user: UserV2!
-}
-
-type CreateUserResourcePolicy
-  @join__type(graph: GRAPHENE)
-{
-  ok: Boolean
-  msg: String
-  resource_policy: UserResourcePolicy
-}
-
-input CreateUserResourcePolicyInput
-  @join__type(graph: GRAPHENE)
-{
-  """
-  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
-  """
-  max_vfolder_count: Int
-
-  """
-  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
-  """
-  max_quota_scope_size: BigInt
-
-  """
-  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
-  """
-  max_session_count_per_model_session: Int
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
-
-  """
-  Added in 24.03.0. Maximum available number of customized images one can publish to.
-  """
-  max_customized_image_count: Int
 }
 
 """Added in 25.16.0. Input for creating VFS storage"""
@@ -2957,14 +2957,6 @@ type DeleteUserConfigPayload
   deleted: Boolean!
 }
 
-"""Added in 26.2.0. Payload for single user soft-delete mutation."""
-type DeleteUserPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """Whether the deletion was successful."""
-  success: Boolean!
-}
-
 type DeleteUserResourcePolicy
   @join__type(graph: GRAPHENE)
 {
@@ -2975,7 +2967,7 @@ type DeleteUserResourcePolicy
 """
 Added in 26.2.0. Input for soft-deleting multiple users. Soft delete changes user status to DELETED but preserves data.
 """
-input DeleteUsersInput
+input DeleteUsersV2Input
   @join__type(graph: STRAWBERRY)
 {
   """List of user UUIDs to soft-delete."""
@@ -2983,11 +2975,19 @@ input DeleteUsersInput
 }
 
 """Added in 26.2.0. Payload for bulk user soft-delete mutation."""
-type DeleteUsersPayload
+type DeleteUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """Number of users successfully soft-deleted."""
   deletedCount: Int!
+}
+
+"""Added in 26.2.0. Payload for single user soft-delete mutation."""
+type DeleteUserV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the deletion was successful."""
+  success: Boolean!
 }
 
 """Added in 25.16.0. Input for deleting VFS storage"""
@@ -3141,6 +3141,8 @@ enum DeploymentStatus
   SCALING @join__enumValue(graph: STRAWBERRY)
   DEPLOYING @join__enumValue(graph: STRAWBERRY)
   READY @join__enumValue(graph: STRAWBERRY)
+  DESTROYING @join__enumValue(graph: STRAWBERRY)
+  DESTROYED @join__enumValue(graph: STRAWBERRY)
   STOPPING @join__enumValue(graph: STRAWBERRY)
   STOPPED @join__enumValue(graph: STRAWBERRY)
 }
@@ -3664,7 +3666,7 @@ input DomainUsageScope
 """
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
-input DomainUserScope
+input DomainUserV2Scope
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -6781,42 +6783,42 @@ type Mutation
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
-  adminCreateUser(input: CreateUserInput!): CreateUserPayload! @join__field(graph: STRAWBERRY)
+  adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserInput!): BulkCreateUsersPayload! @join__field(graph: STRAWBERRY)
+  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateUser(userId: UUID!, input: UpdateUserInput!): UpdateUserPayload! @join__field(graph: STRAWBERRY)
+  adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role.
   """
-  updateUser(input: UpdateUserInput!): UpdateUserPayload! @join__field(graph: STRAWBERRY)
+  updateUser(input: UpdateUserV2Input!): UpdateUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
   """
-  adminDeleteUser(userId: UUID!): DeleteUserPayload! @join__field(graph: STRAWBERRY)
+  adminDeleteUser(userId: UUID!): DeleteUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
   """
-  adminDeleteUsers(input: DeleteUsersInput!): DeleteUsersPayload! @join__field(graph: STRAWBERRY)
+  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
   """
-  adminPurgeUser(input: PurgeUserInputV2!): PurgeUserPayload! @join__field(graph: STRAWBERRY)
+  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
-  adminPurgeUsers(input: PurgeUsersInput!): PurgeUsersPayload! @join__field(graph: STRAWBERRY)
+  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -7538,7 +7540,7 @@ input ProjectUsageScope
 """
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
-input ProjectUserScope
+input ProjectUserV2Scope
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -7815,27 +7817,9 @@ input PurgeUserInput
 }
 
 """
-Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
-"""
-input PurgeUserInputV2
-  @join__type(graph: STRAWBERRY)
-{
-  """UUID of the user to purge."""
-  userId: UUID!
-}
-
-"""Added in 26.2.0. Payload for single user permanent deletion mutation."""
-type PurgeUserPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """Whether the purge was successful."""
-  success: Boolean!
-}
-
-"""
 Added in 26.2.0. Input for permanently deleting multiple users. This action is irreversible.
 """
-input PurgeUsersInput
+input PurgeUsersV2Input
   @join__type(graph: STRAWBERRY)
 {
   """List of user UUIDs to purge."""
@@ -7843,7 +7827,7 @@ input PurgeUsersInput
 }
 
 """Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersPayload
+type PurgeUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """Number of users successfully purged."""
@@ -7851,6 +7835,24 @@ type PurgeUsersPayload
 
   """List of user UUIDs that failed to purge, if any."""
   failedUserIds: [UUID!]!
+}
+
+"""
+Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
+"""
+input PurgeUserV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user to purge."""
+  userId: UUID!
+}
+
+"""Added in 26.2.0. Payload for single user permanent deletion mutation."""
+type PurgeUserV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the purge was successful."""
+  success: Boolean!
 }
 
 type Query
@@ -8576,12 +8578,12 @@ type Query
   """
   Added in 26.2.0. List all users with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminUsersV2(filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
+  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
-  domainUsersV2(scope: DomainUserScope!, filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
+  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
@@ -8591,7 +8593,7 @@ type Query
   """
   Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
   """
-  projectUsersV2(scope: ProjectUserScope!, filter: UserFilter = null, orderBy: [UserOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
+  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
@@ -10430,7 +10432,7 @@ type UpdateRouteTrafficStatusPayload
 """
 Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
 """
-input UpdateUserInput
+input UpdateUserV2Input
   @join__type(graph: STRAWBERRY)
 {
   """New username."""
@@ -10483,7 +10485,7 @@ input UpdateUserInput
 }
 
 """Added in 26.2.0. Payload for user update mutation."""
-type UpdateUserPayload
+type UpdateUserV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """The updated user."""
@@ -10910,59 +10912,6 @@ input UserFairShareScope
   projectId: UUID!
 }
 
-"""
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input UserFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """Filter by user UUID. Supports equals and 'in' operations."""
-  uuid: UUIDFilter = null
-
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """
-  Filter by email address. Supports equals, contains, startsWith, and endsWith.
-  """
-  email: StringFilter = null
-
-  """
-  Filter by account status. Supports equals, in, not_equals, and not_in operations.
-  """
-  status: UserStatusEnumFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  domainName: StringFilter = null
-
-  """
-  Filter by user role. Supports equals, in, not_equals, and not_in operations.
-  """
-  role: UserRoleEnumFilter = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [UserFilter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [UserFilter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [UserFilter!] = null
-}
-
 type UserGroup
   @join__type(graph: GRAPHENE)
 {
@@ -11075,32 +11024,6 @@ type UserNode implements Node
   project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
 }
 
-"""
-Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input UserOrderBy
-  @join__type(graph: STRAWBERRY)
-{
-  """The field to order by. See UserOrderField for available options."""
-  field: UserOrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
-"""
-enum UserOrderField
-  @join__type(graph: STRAWBERRY)
-{
-  CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
-  USERNAME @join__enumValue(graph: STRAWBERRY)
-  EMAIL @join__enumValue(graph: STRAWBERRY)
-  STATUS @join__enumValue(graph: STRAWBERRY)
-}
-
 type UserResourcePolicy
   @join__type(graph: GRAPHENE)
 {
@@ -11131,9 +11054,21 @@ type UserResourcePolicy
 }
 
 """
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
 """
-input UserRoleEnumFilter
+enum UserRoleV2
+  @join__type(graph: STRAWBERRY)
+{
+  USER @join__enumValue(graph: STRAWBERRY)
+  ADMIN @join__enumValue(graph: STRAWBERRY)
+  SUPERADMIN @join__enumValue(graph: STRAWBERRY)
+  MONITOR @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
+"""
+input UserRoleV2EnumFilter
   @join__type(graph: STRAWBERRY)
 {
   """Exact match for user role."""
@@ -11150,21 +11085,21 @@ input UserRoleEnumFilter
 }
 
 """
-Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
+Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
 """
-enum UserRoleV2
+enum UserStatusV2
   @join__type(graph: STRAWBERRY)
 {
-  USER @join__enumValue(graph: STRAWBERRY)
-  ADMIN @join__enumValue(graph: STRAWBERRY)
-  SUPERADMIN @join__enumValue(graph: STRAWBERRY)
-  MONITOR @join__enumValue(graph: STRAWBERRY)
+  ACTIVE @join__enumValue(graph: STRAWBERRY)
+  INACTIVE @join__enumValue(graph: STRAWBERRY)
+  DELETED @join__enumValue(graph: STRAWBERRY)
+  BEFORE_VERIFICATION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
-input UserStatusEnumFilter
+input UserStatusV2EnumFilter
   @join__type(graph: STRAWBERRY)
 {
   """Exact match for user status."""
@@ -11178,18 +11113,6 @@ input UserStatusEnumFilter
 
   """Exclude any of the provided statuses."""
   notIn: [UserStatusV2!] = null
-}
-
-"""
-Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
-"""
-enum UserStatusV2
-  @join__type(graph: STRAWBERRY)
-{
-  ACTIVE @join__enumValue(graph: STRAWBERRY)
-  INACTIVE @join__enumValue(graph: STRAWBERRY)
-  DELETED @join__enumValue(graph: STRAWBERRY)
-  BEFORE_VERIFICATION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -11479,6 +11402,85 @@ type UserV2Edge
 
   """The item at the end of the edge"""
   node: UserV2!
+}
+
+"""
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input UserV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by user UUID. Supports equals and 'in' operations."""
+  uuid: UUIDFilter = null
+
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """
+  Filter by email address. Supports equals, contains, startsWith, and endsWith.
+  """
+  email: StringFilter = null
+
+  """
+  Filter by account status. Supports equals, in, not_equals, and not_in operations.
+  """
+  status: UserStatusV2EnumFilter = null
+
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  domainName: StringFilter = null
+
+  """
+  Filter by user role. Supports equals, in, not_equals, and not_in operations.
+  """
+  role: UserRoleV2EnumFilter = null
+
+  """
+  Filter by creation timestamp. Supports before, after, and between operations.
+  """
+  createdAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [UserV2Filter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [UserV2Filter!] = null
+
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [UserV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input UserV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by. See UserV2OrderField for available options."""
+  field: UserV2OrderField!
+
+  """Sort direction. ASC for ascending, DESC for descending."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+"""
+enum UserV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
+  USERNAME @join__enumValue(graph: STRAWBERRY)
+  EMAIL @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
