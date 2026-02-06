@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 from sqlalchemy import inspect
@@ -35,15 +35,15 @@ class RBACEntityCreator[TRow: Base]:
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
+        entity_type: The entity type for RBAC association.
         scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
         additional_scope_refs: Additional scope references for multi-scope entities.
-        entity_type: The entity type for RBAC association.
     """
 
     spec: CreatorSpec[TRow]
-    scope_ref: ScopeId
-    additional_scope_refs: Sequence[ScopeId]
     entity_type: EntityType
+    scope_ref: ScopeId
+    additional_scope_refs: Sequence[ScopeId] = field(default_factory=list)
 
 
 @dataclass
