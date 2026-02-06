@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from enum import StrEnum
 from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact_storages.types import (
     ArtifactStorageData,
     ArtifactStorageUpdaterSpec,
@@ -20,6 +22,44 @@ from ai.backend.manager.types import OptionalState
 from .types import StrawberryGQLContext
 
 
+@strawberry.enum(
+    name="ArtifactStorageType",
+    description=(
+        "Added in 26.2.0. The type of artifact storage backend. "
+        "OBJECT_STORAGE: Object storage (e.g., S3-compatible). "
+        "VFS_STORAGE: Virtual folder storage. "
+        "GIT_LFS: Git LFS storage."
+    ),
+)
+class ArtifactStorageTypeGQL(StrEnum):
+    """Artifact storage type enum."""
+
+    OBJECT_STORAGE = "object_storage"
+    VFS_STORAGE = "vfs_storage"
+    GIT_LFS = "git_lfs"
+
+    @classmethod
+    def from_internal(cls, internal_type: ArtifactStorageType) -> ArtifactStorageTypeGQL:
+        """Convert internal ArtifactStorageType to GraphQL enum."""
+        match internal_type:
+            case ArtifactStorageType.OBJECT_STORAGE:
+                return cls.OBJECT_STORAGE
+            case ArtifactStorageType.VFS_STORAGE:
+                return cls.VFS_STORAGE
+            case ArtifactStorageType.GIT_LFS:
+                return cls.GIT_LFS
+
+    def to_internal(self) -> ArtifactStorageType:
+        """Convert GraphQL enum to internal ArtifactStorageType."""
+        match self:
+            case ArtifactStorageTypeGQL.OBJECT_STORAGE:
+                return ArtifactStorageType.OBJECT_STORAGE
+            case ArtifactStorageTypeGQL.VFS_STORAGE:
+                return ArtifactStorageType.VFS_STORAGE
+            case ArtifactStorageTypeGQL.GIT_LFS:
+                return ArtifactStorageType.GIT_LFS
+
+
 @strawberry.type(description="Added in 26.2.0. Artifact storage metadata")
 class ArtifactStorage:
     id: ID = strawberry.field(description="The ID of the artifact storage")
@@ -27,7 +67,7 @@ class ArtifactStorage:
     storage_id: ID = strawberry.field(
         description="The ID of the underlying storage (ObjectStorage or VFSStorage)"
     )
-    type: str = strawberry.field(description="The type of the artifact storage")
+    type: ArtifactStorageTypeGQL = strawberry.field(description="The type of the artifact storage")
 
     @classmethod
     def from_dataclass(cls, data: ArtifactStorageData) -> Self:
@@ -35,7 +75,7 @@ class ArtifactStorage:
             id=ID(str(data.id)),
             name=data.name,
             storage_id=ID(str(data.storage_id)),
-            type=data.type.value,
+            type=ArtifactStorageTypeGQL.from_internal(data.type),
         )
 
 

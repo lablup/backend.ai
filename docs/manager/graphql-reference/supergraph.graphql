@@ -1004,7 +1004,18 @@ type ArtifactStorage
   storageId: ID!
 
   """The type of the artifact storage"""
-  type: String!
+  type: ArtifactStorageType!
+}
+
+"""
+Added in 26.2.0. The type of artifact storage backend. OBJECT_STORAGE: Object storage (e.g., S3-compatible). VFS_STORAGE: Virtual folder storage. GIT_LFS: Git LFS storage.
+"""
+enum ArtifactStorageType
+  @join__type(graph: STRAWBERRY)
+{
+  OBJECT_STORAGE @join__enumValue(graph: STRAWBERRY)
+  VFS_STORAGE @join__enumValue(graph: STRAWBERRY)
+  GIT_LFS @join__enumValue(graph: STRAWBERRY)
 }
 
 enum ArtifactType
