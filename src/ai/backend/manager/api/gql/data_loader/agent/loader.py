@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from ai.backend.common.types import AgentId

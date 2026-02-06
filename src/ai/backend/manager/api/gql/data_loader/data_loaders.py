@@ -184,6 +184,12 @@ class DataLoaders:
         return DataLoader(load_fn=partial(load_replicas_by_ids, self._processors.deployment))
 
     @cached_property
+    def agent_loader(
+        self,
+    ) -> DataLoader[AgentId, AgentDetailData | None]:
+        return DataLoader(load_fn=partial(load_agents_by_ids, self._processors.agent))
+
+    @cached_property
     def container_count_loader(
         self,
     ) -> DataLoader[AgentId, int]:
@@ -225,12 +231,6 @@ class DataLoaders:
         self,
     ) -> DataLoader[uuid.UUID, GroupData | None]:
         return DataLoader(load_fn=partial(load_projects_by_ids, self._processors.group))
-
-    @cached_property
-    def agent_loader(
-        self,
-    ) -> DataLoader[AgentId, AgentDetailData | None]:
-        return DataLoader(load_fn=partial(load_agents_by_ids, self._processors.agent))
 
     @cached_property
     def auto_scaling_rule_loader(
