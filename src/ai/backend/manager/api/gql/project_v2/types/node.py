@@ -9,11 +9,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.fair_share.types import (
-    ProjectFairShareConnection,
-    ProjectFairShareFilter,
-    ProjectFairShareOrderBy,
-)
+from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
@@ -78,56 +74,25 @@ class ProjectV2GQL(Node):
 
     @strawberry.field(  # type: ignore[misc]
         description=(
-            "Fair share records for this project, filtered by resource group. "
-            "Returns fair share policy specifications and calculation snapshots."
+            "Fair share record for this project in the specified resource group. "
+            "Returns the scheduling priority configuration for this project. "
+            "Always returns an object, even if no explicit configuration exists "
+            "(in which case default values are used)."
         )
     )
-    async def fair_shares(
+    async def fair_share(
         self,
         info: Info,
         scope: ProjectFairShareScopeGQL,
-        filter: ProjectFairShareFilter | None = None,
-        order_by: list[ProjectFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> ProjectFairShareConnection:
+    ) -> ProjectFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.project import (
-            fetch_rg_project_fair_shares,
-        )
-        from ai.backend.manager.repositories.fair_share.options import (
-            ProjectFairShareConditions,
-        )
-        from ai.backend.manager.repositories.fair_share.types import (
-            ProjectFairShareSearchScope,
+            fetch_single_project_fair_share,
         )
 
-        # Create repository scope with context information
-        repository_scope = ProjectFairShareSearchScope(
-            resource_group=scope.resource_group,
-            domain_name=self.organization.domain_name,
-        )
-
-        # Entity-specific filter only
-        base_conditions = [
-            ProjectFairShareConditions.by_project_id(UUID(str(self.id))),
-        ]
-
-        return await fetch_rg_project_fair_shares(
+        return await fetch_single_project_fair_share(
             info=info,
-            scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=base_conditions,
+            resource_group=scope.resource_group,
+            project_id=UUID(str(self.id)),
         )
 
     @strawberry.field(  # type: ignore[misc]

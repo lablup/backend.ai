@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -24,6 +25,7 @@ from ai.backend.manager.repositories.fair_share.options import (
 )
 from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
+    GetProjectFairShareAction,
     SearchProjectFairSharesAction,
     SearchRGProjectFairSharesAction,
 )
@@ -155,3 +157,25 @@ async def fetch_rg_project_fair_shares(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_single_project_fair_share(
+    info: Info[StrawberryGQLContext],
+    resource_group: str,
+    project_id: UUID,
+) -> ProjectFairShareGQL:
+    """Fetch a single project fair share record.
+
+    Returns the fair share record for the specified project and resource group.
+    If no record exists, returns a default-generated object (repository handles defaults).
+    """
+    processors = info.context.processors
+
+    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+        GetProjectFairShareAction(
+            resource_group=resource_group,
+            project_id=project_id,
+        )
+    )
+
+    return ProjectFairShareGQL.from_dataclass(action_result.data)

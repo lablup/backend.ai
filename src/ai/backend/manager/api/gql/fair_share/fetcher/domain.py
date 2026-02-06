@@ -24,6 +24,7 @@ from ai.backend.manager.repositories.fair_share.options import (
 )
 from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
+    GetDomainFairShareAction,
     SearchDomainFairSharesAction,
     SearchRGDomainFairSharesAction,
 )
@@ -155,3 +156,25 @@ async def fetch_rg_domain_fair_shares(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_single_domain_fair_share(
+    info: Info[StrawberryGQLContext],
+    resource_group: str,
+    domain_name: str,
+) -> DomainFairShareGQL:
+    """Fetch a single domain fair share record.
+
+    Returns the fair share record for the specified domain and resource group.
+    If no record exists, returns a default-generated object (repository handles defaults).
+    """
+    processors = info.context.processors
+
+    action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
+        GetDomainFairShareAction(
+            resource_group=resource_group,
+            domain_name=domain_name,
+        )
+    )
+
+    return DomainFairShareGQL.from_dataclass(action_result.data)
