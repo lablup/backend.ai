@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -554,6 +554,11 @@ class ArchiveDownloadTokenData(BaseModel):
     files: list[str] = Field(min_length=1)
     exp: datetime
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+    @field_serializer("exp")
+    def serialize_exp(self, exp: datetime) -> int:
+        """JWT standard requires exp to be Unix timestamp (integer)."""
+        return int(exp.timestamp())
 
 
 class ArchiveDownloadQueryParams(BaseRequestModel):
