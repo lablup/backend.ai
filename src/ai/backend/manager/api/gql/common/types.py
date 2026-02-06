@@ -17,17 +17,75 @@ from ai.backend.common.types import (
 # ========== Common Enums ==========
 
 
-SessionTypesGQL = strawberry.enum(
-    SessionTypes,
+@strawberry.enum(
     name="SessionType",
     description="Added in 26.2.0. Type of compute session.",
 )
+class SessionTypesGQL(StrEnum):
+    """GraphQL enum for session types."""
 
-SessionResultGQL = strawberry.enum(
-    SessionResult,
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
+    INFERENCE = "inference"
+    SYSTEM = "system"
+
+    @classmethod
+    def from_internal(cls, internal: SessionTypes) -> SessionTypesGQL:
+        """Convert internal SessionTypes to GraphQL enum."""
+        match internal:
+            case SessionTypes.INTERACTIVE:
+                return cls.INTERACTIVE
+            case SessionTypes.BATCH:
+                return cls.BATCH
+            case SessionTypes.INFERENCE:
+                return cls.INFERENCE
+            case SessionTypes.SYSTEM:
+                return cls.SYSTEM
+
+    def to_internal(self) -> SessionTypes:
+        """Convert GraphQL enum to internal SessionTypes."""
+        match self:
+            case SessionTypesGQL.INTERACTIVE:
+                return SessionTypes.INTERACTIVE
+            case SessionTypesGQL.BATCH:
+                return SessionTypes.BATCH
+            case SessionTypesGQL.INFERENCE:
+                return SessionTypes.INFERENCE
+            case SessionTypesGQL.SYSTEM:
+                return SessionTypes.SYSTEM
+
+
+@strawberry.enum(
     name="SessionResult",
     description="Added in 26.2.0. Result status of a session execution.",
 )
+class SessionResultGQL(StrEnum):
+    """GraphQL enum for session result."""
+
+    UNDEFINED = "undefined"
+    SUCCESS = "success"
+    FAILURE = "failure"
+
+    @classmethod
+    def from_internal(cls, internal: SessionResult) -> SessionResultGQL:
+        """Convert internal SessionResult to GraphQL enum."""
+        match internal:
+            case SessionResult.UNDEFINED:
+                return cls.UNDEFINED
+            case SessionResult.SUCCESS:
+                return cls.SUCCESS
+            case SessionResult.FAILURE:
+                return cls.FAILURE
+
+    def to_internal(self) -> SessionResult:
+        """Convert GraphQL enum to internal SessionResult."""
+        match self:
+            case SessionResultGQL.UNDEFINED:
+                return SessionResult.UNDEFINED
+            case SessionResultGQL.SUCCESS:
+                return SessionResult.SUCCESS
+            case SessionResultGQL.FAILURE:
+                return SessionResult.FAILURE
 
 
 @strawberry.enum(
