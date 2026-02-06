@@ -8662,9 +8662,9 @@ type Query
 
   """
   Added in 26.2.0.
-
+  
   Retrieve a specific image alias by its ID.
-
+  
   Returns the alias information including the alias string.
   """
   imageAlias(id: ID!): ImageAlias @join__field(graph: STRAWBERRY)
@@ -8748,19 +8748,19 @@ type Query
   """
   adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.2.0. Query kernels within a specific session."""
-  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
-
   """
   Added in 26.2.0.
-
+  
   Query image aliases with optional filtering, ordering, and pagination.
-
+  
   Returns image aliases that provide alternative names for container images.
   Use filters to search by alias string.
   Supports both cursor-based and offset-based pagination.
   """
   adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query kernels within a specific session."""
+  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
