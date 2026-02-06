@@ -79,8 +79,11 @@ def server_status_required(
     return decorator
 
 
-READ_ALLOWED: Final = frozenset({ManagerStatus.RUNNING, ManagerStatus.FROZEN})
-ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
+READ_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({
+    ManagerStatus.RUNNING,
+    ManagerStatus.FROZEN,
+})
+ALL_ALLOWED: Final[frozenset[ManagerStatus]] = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
