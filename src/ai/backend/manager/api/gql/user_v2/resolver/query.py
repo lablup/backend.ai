@@ -138,9 +138,11 @@ async def domain_users_v2(
     Returns:
         UserV2Connection with paginated user records from the domain.
     """
+    from ai.backend.manager.repositories.user.types import DomainUserSearchScope
+
     return await fetch_domain_users(
         info,
-        domain_name=scope.domain_name,
+        scope=DomainUserSearchScope(domain_name=scope.domain_name),
         filter=filter,
         order_by=order_by,
         before=before,
@@ -187,9 +189,11 @@ async def project_users_v2(
     Returns:
         UserV2Connection with paginated user records from the project.
     """
+    from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
+
     return await fetch_project_users(
         info,
-        project_id=scope.project_id,
+        scope=ProjectUserSearchScope(project_id=scope.project_id),
         filter=filter,
         order_by=order_by,
         before=before,
