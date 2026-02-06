@@ -94,7 +94,7 @@ from ai.backend.manager.repositories.user.purgers import (
 )
 from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.actions.create_user import BulkUserCreateItem
+from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -211,14 +211,14 @@ class UserDBSource:
 
     async def bulk_create_users_validated(
         self,
-        items: list[BulkUserCreateItem],
+        items: list[UserCreateSpec],
     ) -> BulkUserCreateResultData:
         """Create multiple users with partial failure support.
 
         Each user is created in a savepoint - if one fails, others can still succeed.
 
         Args:
-            items: List of BulkUserCreateItem for each user to create.
+            items: List of UserCreateSpec for each user to create.
         """
         if not items:
             return BulkUserCreateResultData(successes=[], failures=[])

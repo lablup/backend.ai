@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
-    BulkUserCreateItem,
+    UserCreateSpec,
 )
 
 # Create Mutations
@@ -85,8 +85,8 @@ async def admin_bulk_create_users(
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
-    # Build list of BulkUserCreateItem from input
-    items: list[BulkUserCreateItem] = []
+    # Build list of UserCreateSpec from input
+    items: list[UserCreateSpec] = []
     for user_input in input.users:
         password_info = PasswordInfo(
             password=user_input.password,
@@ -115,7 +115,7 @@ async def admin_bulk_create_users(
         )
 
         group_ids = [str(gid) for gid in user_input.group_ids] if user_input.group_ids else None
-        items.append(BulkUserCreateItem(creator=Creator(spec=spec), group_ids=group_ids))
+        items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
     action = BulkCreateUserAction(items=items)
     result = await ctx.processors.user.bulk_create_users.wait_for_complete(action)
