@@ -23,7 +23,6 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.api_handlers import (
     APIResponse,
-    BaseResponseModel,
     BodyParam,
     QueryParam,
     api_handler,
@@ -42,7 +41,6 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.common.dto.manager.auth.response import (
-    AuthorizeResponse,
     GetRoleResponse,
     GetSSHKeypairResponse,
     SignoutResponse,
@@ -51,6 +49,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
     AuthResponseType,
@@ -62,6 +61,7 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx, UserContext
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
@@ -875,22 +875,8 @@ def superadmin_required_for_method(
     return wrapped
 
 
-# Deferred import to break circular dependency:
-#   This module (api.auth) is imported by api.session for auth_required decorator.
-#   Meanwhile, ProcessorsCtx lives in dto.context which transitively imports
-#   api.session through: dto.context -> services.processors -> repositories
-#   -> repositories.session.repository -> api.session -> api.auth (partially loaded).
-#   Placing this import after auth_required ensures the decorator is already
-#   defined when the circular chain resolves back here.
-# TODO: Move find_dependency_sessions from api.session to repository layer
-#       to eliminate this circular dependency entirely.
-from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx, UserContext  # noqa: E402
-
-
 class AuthAPIHandler:
     """REST API handler class for auth operations."""
-
-    # Verify auth endpoint
 
     @auth_required_for_method
     @api_handler
@@ -899,72 +885,12 @@ class AuthAPIHandler:
         query: QueryParam[VerifyAuthRequest],
         user_ctx: UserContext,
     ) -> APIResponse:
-        """Verify authentication status."""
         req = query.parsed
-        log.info("AUTH.VERIFY(ak:{})", user_ctx.access_key)
-
-        class TestResponse(BaseResponseModel):
-            authorized: str
-            echo: str
-
+        log.info("AUTH.TEST(ak:{})", user_ctx.access_key)
         return APIResponse.build(
             status_code=HTTPStatus.OK,
-            response_model=TestResponse(authorized="yes", echo=req.echo),
+            response_model=VerifyAuthResponse(authorized="yes", echo=req.echo),
         )
-
-    # Authorization endpoints
-
-    async def authorize(
-        self,
-        request: web.Request,
-    ) -> web.StreamResponse:
-        """Authorize a user with domain, username, and password.
-
-        Note: This endpoint doesn't use @api_handler because it may return
-        a streaming response for 2FA flows.
-        """
-        # Parse request body with pydantic validation
-        body = await request.json()
-        req = AuthorizeRequest.model_validate(body)
-
-        root_ctx: RootContext = request.app["_root.context"]
-        processors = root_ctx.processors
-
-        log.info(
-            "AUTH.AUTHORIZE(d:{}, u:{}, passwd:****, type:{})",
-            req.domain,
-            req.username,
-            req.type,
-        )
-
-        action = AuthorizeAction(
-            request=request,
-            type=req.type,
-            domain_name=req.domain,
-            email=req.username,
-            password=req.password,
-            stoken=req.stoken,
-        )
-        result = await processors.auth.authorize.wait_for_complete(action)
-
-        # Handle streaming response (for 2FA flows)
-        if result.stream_response is not None:
-            return result.stream_response
-
-        if result.authorization_result is None:
-            raise AuthorizationFailed("Authorization result is missing")
-
-        auth_result = result.authorization_result
-        resp = AuthorizeResponse(
-            data=AuthSuccessResponse(
-                response_type=AuthResponseType.SUCCESS,
-                access_key=auth_result.access_key,
-                secret_key=auth_result.secret_key,
-                role=auth_result.role,
-                status=auth_result.status,
-            )
-        )
-        return web.json_response(resp.model_dump(mode="json"), status=HTTPStatus.OK)
 
     @auth_required_for_method
     @api_handler
@@ -974,7 +900,6 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Get user's role information."""
         req = query.parsed
         processors = processors_ctx.processors
         log.info(
@@ -983,23 +908,60 @@ class AuthAPIHandler:
             user_ctx.user_domain,
             req.group,
         )
-
-        # Get is_superadmin and is_admin from request context
-        # These are set by auth middleware
         action = GetRoleAction(
             user_id=user_ctx.user_uuid,
             group_id=req.group,
-            is_superadmin=False,  # Will be determined by service
-            is_admin=False,  # Will be determined by service
+            is_superadmin=False,
+            is_admin=False,
         )
         result = await processors.auth.get_role.wait_for_complete(action)
-
         resp = GetRoleResponse(
             global_role=result.global_role,
             domain_role=result.domain_role,
             group_role=result.group_role,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def authorize(
+        self,
+        request: web.Request,
+    ) -> web.StreamResponse:
+        body = await request.json()
+        req = AuthorizeRequest.model_validate(body)
+        log.info(
+            "AUTH.AUTHORIZE(d:{}, u:{}, passwd:****, type:{})",
+            req.domain,
+            req.username,
+            req.type,
+        )
+        root_ctx: RootContext = request.app["_root.context"]
+        action = AuthorizeAction(
+            request=request,
+            type=req.type,
+            domain_name=req.domain,
+            email=req.username,
+            password=req.password,
+            stoken=req.stoken,
+        )
+        result = await root_ctx.processors.auth.authorize.wait_for_complete(action)
+
+        if result.stream_response is not None:
+            return result.stream_response
+
+        if result.authorization_result is None:
+            raise AuthorizationFailed("Authorization result is missing")
+        auth_result = result.authorization_result
+        data = AuthSuccessResponse(
+            response_type=AuthResponseType.SUCCESS,
+            access_key=auth_result.access_key,
+            secret_key=auth_result.secret_key,
+            role=auth_result.role,
+            status=auth_result.status,
+        )
+
+        return web.json_response({
+            "data": data.to_dict(),
+        })
 
     @api_handler
     async def signup(
@@ -1008,11 +970,9 @@ class AuthAPIHandler:
         request_ctx: RequestCtx,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Sign up a new user."""
         req = body.parsed
         processors = processors_ctx.processors
         log.info("AUTH.SIGNUP(d:{}, email:{}, passwd:****)", req.domain, req.email)
-
         action = SignupAction(
             request=request_ctx.request,
             domain_name=req.domain,
@@ -1038,23 +998,46 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Sign out a user."""
         req = body.parsed
         processors = processors_ctx.processors
-        log.info("AUTH.SIGNOUT(d:{}, email:{})", user_ctx.user_domain, req.email)
+        domain_name = user_ctx.user_domain
+        email = req.email
+        password = req.password
+        log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, email)
 
-        action = SignoutAction(
-            user_id=user_ctx.user_uuid,
-            domain_name=user_ctx.user_domain,
-            requester_email=user_ctx.user_email,
-            email=req.email,
-            password=req.password,
+        await processors.auth.signout.wait_for_complete(
+            SignoutAction(
+                user_id=user_ctx.user_uuid,
+                domain_name=domain_name,
+                requester_email=user_ctx.user_email,
+                email=email,
+                password=password,
+            )
         )
-        await processors.auth.signout.wait_for_complete(action)
 
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=SignoutResponse())
 
-    # Password management endpoints
+    @auth_required_for_method
+    @api_handler
+    async def update_full_name(
+        self,
+        body: BodyParam[UpdateFullNameRequest],
+        user_ctx: UserContext,
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        processors = processors_ctx.processors
+        domain_name = user_ctx.user_domain
+        email = user_ctx.user_email
+        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
+        await processors.auth.update_full_name.wait_for_complete(
+            UpdateFullNameAction(
+                user_id=str(user_ctx.user_uuid),
+                full_name=body.parsed.full_name,
+                domain_name=domain_name,
+                email=email,
+            )
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=UpdateFullNameResponse())
 
     @auth_required_for_method
     @api_handler
@@ -1065,22 +1048,22 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Update user's password (requires authentication)."""
         req = body.parsed
         processors = processors_ctx.processors
-        log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", user_ctx.user_domain, user_ctx.user_email)
+        domain_name = user_ctx.user_domain
+        email = user_ctx.user_email
+        log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", domain_name, email)
 
         action = UpdatePasswordAction(
             request=request_ctx.request,
             user_id=user_ctx.user_uuid,
-            domain_name=user_ctx.user_domain,
-            email=user_ctx.user_email,
+            domain_name=domain_name,
+            email=email,
             old_password=req.old_password,
             new_password=req.new_password,
             new_password_confirm=req.new_password2,
         )
         result = await processors.auth.update_password.wait_for_complete(action)
-
         if not result.success:
             return APIResponse.build(
                 status_code=HTTPStatus.BAD_REQUEST,
@@ -1095,7 +1078,11 @@ class AuthAPIHandler:
         request_ctx: RequestCtx,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Update user's password without authentication (for expired passwords)."""
+        """
+        Update user's password without any authorization
+        to allows users to update passwords that have expired
+        because it's been too long since a user changed the password.
+        """
         req = body.parsed
         processors = processors_ctx.processors
         log.info(
@@ -1112,36 +1099,10 @@ class AuthAPIHandler:
             new_password=req.new_password,
         )
         result = await processors.auth.update_password_no_auth.wait_for_complete(action)
-
         resp = UpdatePasswordNoAuthResponse(
             password_changed_at=result.password_changed_at.isoformat(),
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def update_full_name(
-        self,
-        body: BodyParam[UpdateFullNameRequest],
-        user_ctx: UserContext,
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        """Update user's full name."""
-        req = body.parsed
-        processors = processors_ctx.processors
-        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", user_ctx.user_domain, user_ctx.user_email)
-
-        action = UpdateFullNameAction(
-            user_id=str(user_ctx.user_uuid),
-            full_name=req.full_name,
-            domain_name=user_ctx.user_domain,
-            email=user_ctx.user_email,
-        )
-        await processors.auth.update_full_name.wait_for_complete(action)
-
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=UpdateFullNameResponse())
-
-    # SSH keypair endpoints
 
     @auth_required_for_method
     @api_handler
@@ -1150,16 +1111,16 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Get user's SSH public key."""
         processors = processors_ctx.processors
-        log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", user_ctx.user_domain, user_ctx.access_key)
-
-        action = GetSSHKeypairAction(
-            user_id=user_ctx.user_uuid,
-            access_key=user_ctx.access_key,
+        domain_name = user_ctx.user_domain
+        access_key = user_ctx.access_key
+        log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+        result = await processors.auth.get_ssh_keypair.wait_for_complete(
+            GetSSHKeypairAction(
+                user_id=user_ctx.user_uuid,
+                access_key=access_key,
+            )
         )
-        result = await processors.auth.get_ssh_keypair.wait_for_complete(action)
-
         resp = GetSSHKeypairResponse(
             ssh_public_key=result.public_key,
         )
@@ -1172,16 +1133,16 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Generate a new SSH keypair for the user."""
+        domain_name = user_ctx.user_domain
+        access_key = user_ctx.access_key
+        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
         processors = processors_ctx.processors
-        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", user_ctx.user_domain, user_ctx.access_key)
-
-        action = GenerateSSHKeypairAction(
-            user_id=user_ctx.user_uuid,
-            access_key=user_ctx.access_key,
+        result = await processors.auth.generate_ssh_keypair.wait_for_complete(
+            GenerateSSHKeypairAction(
+                user_id=user_ctx.user_uuid,
+                access_key=access_key,
+            )
         )
-        result = await processors.auth.generate_ssh_keypair.wait_for_complete(action)
-
         resp = SSHKeypairResponse(
             ssh_public_key=result.ssh_keypair.ssh_public_key,
             ssh_private_key=result.ssh_keypair.ssh_private_key,
@@ -1196,23 +1157,22 @@ class AuthAPIHandler:
         user_ctx: UserContext,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """Upload a custom SSH keypair."""
         req = body.parsed
-        processors = processors_ctx.processors
-        log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", user_ctx.user_domain, user_ctx.access_key)
-
-        # Normalize keypair format (ensure trailing newline)
+        domain_name = user_ctx.user_domain
+        access_key = user_ctx.access_key
         pubkey = f"{req.pubkey.rstrip()}\n"
         privkey = f"{req.privkey.rstrip()}\n"
+        log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+        processors = processors_ctx.processors
 
-        action = UploadSSHKeypairAction(
-            user_id=user_ctx.user_uuid,
-            public_key=pubkey,
-            private_key=privkey,
-            access_key=user_ctx.access_key,
+        result = await processors.auth.upload_ssh_keypair.wait_for_complete(
+            UploadSSHKeypairAction(
+                user_id=user_ctx.user_uuid,
+                public_key=pubkey,
+                private_key=privkey,
+                access_key=access_key,
+            )
         )
-        result = await processors.auth.upload_ssh_keypair.wait_for_complete(action)
-
         resp = SSHKeypairResponse(
             ssh_public_key=result.ssh_keypair.ssh_public_key,
             ssh_private_key=result.ssh_keypair.ssh_private_key,

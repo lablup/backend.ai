@@ -21,6 +21,7 @@ __all__ = (
     "UpdatePasswordNoAuthResponse",
     "GetSSHKeypairResponse",
     "SSHKeypairResponse",
+    "VerifyAuthResponse",
 )
 
 
@@ -90,3 +91,10 @@ class SSHKeypairResponse(BaseResponseModel):
 
     ssh_public_key: str = Field(description="SSH public key in standard format")
     ssh_private_key: str = Field(description="SSH private key in PEM format")
+
+
+class VerifyAuthResponse(BaseResponseModel):
+    """Response for auth verification test."""
+
+    authorized: str = Field(description="Authorization status")
+    echo: str = Field(description="Echoed input string")
