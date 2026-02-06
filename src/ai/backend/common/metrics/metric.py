@@ -90,6 +90,7 @@ class GraphQLMetricObserver:
 
     _request_count: Counter
     _request_duration_sec: Histogram
+    _phase_duration_sec: Histogram
 
     def __init__(self) -> None:
         self._request_count = Counter(
@@ -120,6 +121,12 @@ class GraphQLMetricObserver:
                 "success",
             ],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
+        )
+        self._phase_duration_sec = Histogram(
+            name="backendai_gql_handler_phase_duration_sec",
+            documentation="Duration of GraphQL handler phases in seconds",
+            labelnames=["operation", "phase"],
+            buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
         )
 
     @classmethod
@@ -199,6 +206,18 @@ class GraphQLMetricObserver:
             success=success,
             duration=duration,
         )
+
+    def observe_phase(
+        self,
+        *,
+        operation: str,
+        phase: str,
+        duration: float,
+    ) -> None:
+        self._phase_duration_sec.labels(
+            operation=operation,
+            phase=phase,
+        ).observe(duration)
 
 
 class EventMetricObserver:

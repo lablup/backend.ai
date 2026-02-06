@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import traceback
 from collections.abc import Callable, Iterable
 from http import HTTPStatus
@@ -114,65 +115,91 @@ class CustomIntrospectionRule(ValidationRule):
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
-    manager_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
-    known_slot_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-    rules = []
-    if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
-        rules.append(CustomIntrospectionRule)
-    max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
-    if max_depth is not None:
-        rules.append(depth_limit_validator(max_depth=max_depth))
-    if rules:
-        validate_errors = validate(
-            schema=app_ctx.gql_schema.graphql_schema,
-            document_ast=parse(params["query"]),
-            rules=rules,
+    phase_observer = root_ctx.metrics.gql
+    operation_name = params["operation_name"] or "anonymous"
+
+    # --- gql_setup phase ---
+    setup_start = time.perf_counter()
+    try:
+        manager_status = (
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
         )
-        if validate_errors:
-            return ExecutionResult(None, errors=validate_errors)
-    gql_ctx = GraphQueryContext(
-        schema=app_ctx.gql_schema,
-        dataloader_manager=DataLoaderManager(),
-        config_provider=root_ctx.config_provider,
-        etcd=root_ctx.etcd,
-        user=request["user"],
-        access_key=request["keypair"]["access_key"],
-        db=root_ctx.db,
-        valkey_stat=root_ctx.valkey_stat,
-        valkey_image=root_ctx.valkey_image,
-        valkey_live=root_ctx.valkey_live,
-        valkey_schedule=root_ctx.valkey_schedule,
-        network_plugin_ctx=root_ctx.network_plugin_ctx,
-        manager_status=manager_status,
-        known_slot_types=known_slot_types,
-        background_task_manager=root_ctx.background_task_manager,
-        services_ctx=root_ctx.services_ctx,
-        storage_manager=root_ctx.storage_manager,
-        registry=root_ctx.registry,
-        idle_checker_host=root_ctx.idle_checker_host,
-        metric_observer=root_ctx.metrics.gql,
-        processors=root_ctx.processors,
-        scheduler_repository=root_ctx.repositories.scheduler.repository,
-        user_repository=root_ctx.repositories.user.repository,
-        agent_repository=root_ctx.repositories.agent.repository,
-    )
-    result = cast(
-        ExecutionResult,
-        await app_ctx.gql_schema.execute_async(
-            params["query"],
-            None,  # root
-            variable_values=params["variables"],
-            operation_name=params["operation_name"],
-            context_value=gql_ctx,
-            middleware=[
-                GQLMutationPrivilegeCheckMiddleware(),
-                GQLMutationUnfrozenRequiredMiddleware(),
-                GQLMetricMiddleware(),
-                GQLExceptionMiddleware(),
-                GQLLoggingMiddleware(),
-            ],
-        ),
-    )
+        known_slot_types = (
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
+        rules = []
+        if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
+            rules.append(CustomIntrospectionRule)
+        max_depth = root_ctx.config_provider.config.api.max_gql_query_depth
+        if max_depth is not None:
+            rules.append(depth_limit_validator(max_depth=max_depth))
+        if rules:
+            validate_errors = validate(
+                schema=app_ctx.gql_schema.graphql_schema,
+                document_ast=parse(params["query"]),
+                rules=rules,
+            )
+            if validate_errors:
+                return ExecutionResult(None, errors=validate_errors)
+        gql_ctx = GraphQueryContext(
+            schema=app_ctx.gql_schema,
+            dataloader_manager=DataLoaderManager(),
+            config_provider=root_ctx.config_provider,
+            etcd=root_ctx.etcd,
+            user=request["user"],
+            access_key=request["keypair"]["access_key"],
+            db=root_ctx.db,
+            valkey_stat=root_ctx.valkey_stat,
+            valkey_image=root_ctx.valkey_image,
+            valkey_live=root_ctx.valkey_live,
+            valkey_schedule=root_ctx.valkey_schedule,
+            network_plugin_ctx=root_ctx.network_plugin_ctx,
+            manager_status=manager_status,
+            known_slot_types=known_slot_types,
+            background_task_manager=root_ctx.background_task_manager,
+            services_ctx=root_ctx.services_ctx,
+            storage_manager=root_ctx.storage_manager,
+            registry=root_ctx.registry,
+            idle_checker_host=root_ctx.idle_checker_host,
+            metric_observer=root_ctx.metrics.gql,
+            processors=root_ctx.processors,
+            scheduler_repository=root_ctx.repositories.scheduler.repository,
+            user_repository=root_ctx.repositories.user.repository,
+            agent_repository=root_ctx.repositories.agent.repository,
+        )
+    finally:
+        phase_observer.observe_phase(
+            operation=operation_name,
+            phase="gql_setup",
+            duration=time.perf_counter() - setup_start,
+        )
+
+    # --- gql_execute phase ---
+    execute_start = time.perf_counter()
+    try:
+        result = cast(
+            ExecutionResult,
+            await app_ctx.gql_schema.execute_async(
+                params["query"],
+                None,  # root
+                variable_values=params["variables"],
+                operation_name=params["operation_name"],
+                context_value=gql_ctx,
+                middleware=[
+                    GQLMutationPrivilegeCheckMiddleware(),
+                    GQLMutationUnfrozenRequiredMiddleware(),
+                    GQLMetricMiddleware(),
+                    GQLExceptionMiddleware(),
+                    GQLLoggingMiddleware(),
+                ],
+            ),
+        )
+    finally:
+        phase_observer.observe_phase(
+            operation=operation_name,
+            phase="gql_execute",
+            duration=time.perf_counter() - execute_start,
+        )
 
     if result.errors:
         for e in result.errors:
@@ -191,7 +218,19 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 )
 async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
-    return web.json_response(result.formatted, status=HTTPStatus.OK)
+    root_ctx: RootContext = request.app["_root.context"]
+    phase_observer = root_ctx.metrics.gql
+    operation_name = params["operation_name"] or "anonymous"
+    serialize_start = time.perf_counter()
+    try:
+        response = web.json_response(result.formatted, status=HTTPStatus.OK)
+    finally:
+        phase_observer.observe_phase(
+            operation=operation_name,
+            phase="serialize",
+            duration=time.perf_counter() - serialize_start,
+        )
+    return response
 
 
 @auth_required
@@ -211,7 +250,19 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
             errors.append(e.formatted)
             log.error("ADMIN.GQL Exception: {}", e.formatted)
         raise BackendGQLError(extra_data=errors)
-    return web.json_response(result.data, status=HTTPStatus.OK)
+    root_ctx: RootContext = request.app["_root.context"]
+    phase_observer = root_ctx.metrics.gql
+    operation_name = params["operation_name"] or "anonymous"
+    serialize_start = time.perf_counter()
+    try:
+        response = web.json_response(result.data, status=HTTPStatus.OK)
+    finally:
+        phase_observer.observe_phase(
+            operation=operation_name,
+            phase="serialize",
+            duration=time.perf_counter() - serialize_start,
+        )
+    return response
 
 
 @attrs.define(auto_attribs=True, slots=True, init=False)
