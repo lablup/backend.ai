@@ -12,7 +12,7 @@ from .enums import UserRoleEnum, UserStatusEnum
 
 
 @strawberry.input(
-    name="CreateUserInput",
+    name="CreateUserInputV2",
     description=(
         "Added in 26.2.0. Input for creating a new user. "
         "Required fields: email, username, password, domain_name, need_password_change, status, role."
@@ -75,7 +75,7 @@ class CreateUserInputGQL:
 
 
 @strawberry.input(
-    name="BulkCreateUserInput",
+    name="BulkCreateUserInputV2",
     description=(
         "Added in 26.2.0. Input for bulk creating multiple users. "
         "Each user has individual specifications."
@@ -91,7 +91,7 @@ class BulkCreateUserInputGQL:
 
 
 @strawberry.input(
-    name="UpdateUserInput",
+    name="UpdateUserInputV2",
     description=(
         "Added in 26.2.0. Input for updating user information. "
         "All fields are optional - only provided fields will be updated."
@@ -170,7 +170,7 @@ class UpdateUserInputGQL:
 
 
 @strawberry.input(
-    name="DeleteUsersInput",
+    name="DeleteUsersInputV2",
     description=(
         "Added in 26.2.0. Input for soft-deleting multiple users. "
         "Soft delete changes user status to DELETED but preserves data."
@@ -199,7 +199,7 @@ class PurgeUserInputGQL:
 
 
 @strawberry.input(
-    name="PurgeUsersInput",
+    name="PurgeUsersInputV2",
     description=(
         "Added in 26.2.0. Input for permanently deleting multiple users. "
         "This action is irreversible."
