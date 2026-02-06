@@ -229,6 +229,9 @@ class SessionLifecycleInfoGQL:
     starts_at: datetime | None = strawberry.field(
         description="Scheduled start time for the session, if applicable."
     )
+    batch_timeout: int | None = strawberry.field(
+        description="Batch execution timeout in seconds. Applicable to batch sessions."
+    )
 
 
 @strawberry.type(
