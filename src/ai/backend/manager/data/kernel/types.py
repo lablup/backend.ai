@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -114,38 +114,6 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def pre_prepared_statuses(cls) -> frozenset[KernelStatus]:
-        """
-        Returns statuses before image pulling is complete.
-        Used for NOT_ANY kernel matching to promote sessions to PREPARED.
-        """
-        return frozenset((
-            cls.PENDING,
-            cls.SCHEDULED,
-            cls.PREPARING,
-            cls.BUILDING,
-            cls.PULLING,
-        ))
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def pre_running_statuses(cls) -> frozenset[KernelStatus]:
-        """
-        Returns statuses before kernel is actually running.
-        Used for NOT_ANY kernel matching to promote sessions to RUNNING.
-        """
-        return frozenset((
-            cls.PENDING,
-            cls.SCHEDULED,
-            cls.PREPARING,
-            cls.BUILDING,
-            cls.PULLING,
-            cls.PREPARED,
-            cls.CREATING,
-        ))
-
-    @classmethod
-    @lru_cache(maxsize=1)
     def retriable_statuses(cls) -> frozenset[KernelStatus]:
         """
         Returns a set of kernel statuses that are considered retriable.
@@ -166,8 +134,8 @@ class KernelStatus(CIStrEnum):
 @dataclass
 class RelatedSessionInfo:
     session_id: str  # Session UUID
-    creation_id: str | None
-    name: str | None
+    creation_id: Optional[str]
+    name: Optional[str]
     session_type: SessionTypes
 
 
@@ -187,17 +155,17 @@ class UserPermission:
     access_key: str
     domain_name: str
     group_id: UUID
-    uid: int | None
-    main_gid: int | None
-    gids: list[int] | None
+    uid: Optional[int]
+    main_gid: Optional[int]
+    gids: Optional[list[int]]
 
 
 @dataclass
 class ResourceInfo:
-    scaling_group: str | None
-    agent: str | None
-    agent_addr: str | None
-    container_id: str | None
+    scaling_group: Optional[str]
+    agent: Optional[str]
+    agent_addr: Optional[str]
+    container_id: Optional[str]
     occupied_slots: ResourceSlot
     requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
@@ -207,31 +175,31 @@ class ResourceInfo:
 
 @dataclass
 class ImageInfo:
-    identifier: ImageIdentifier | None
-    registry: str | None
-    tag: str | None
-    architecture: str | None
+    identifier: Optional[ImageIdentifier]
+    registry: Optional[str]
+    tag: Optional[str]
+    architecture: Optional[str]
 
 
 @dataclass
 class RuntimeConfig:
-    environ: list[str] | None
-    mounts: list[str] | None  # legacy
-    mount_map: dict[str, Any] | None  # legacy
-    vfolder_mounts: list[dict[str, Any]] | None
-    bootstrap_script: str | None
-    startup_command: str | None
+    environ: Optional[list[str]]
+    mounts: Optional[list[str]]  # legacy
+    mount_map: Optional[dict[str, Any]]  # legacy
+    vfolder_mounts: Optional[list[dict[str, Any]]]
+    bootstrap_script: Optional[str]
+    startup_command: Optional[str]
 
 
 @dataclass
 class NetworkConfig:
-    kernel_host: str | None
+    kernel_host: Optional[str]
     repl_in_port: int
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
-    service_ports: list[dict[str, Any]] | None
-    preopen_ports: list[int] | None
+    service_ports: Optional[list[dict[str, Any]]]
+    preopen_ports: Optional[list[int]]
     use_host_network: bool
 
 
@@ -239,28 +207,27 @@ class NetworkConfig:
 class LifecycleStatus:
     status: KernelStatus
     result: SessionResult
-    created_at: datetime | None
-    terminated_at: datetime | None
-    starts_at: datetime | None
-    status_changed: datetime | None
-    status_info: str | None
-    status_data: Mapping[str, Any] | None
-    status_history: dict[str, Any] | None
-    last_seen: datetime | None
-    last_observed_at: datetime | None
+    created_at: Optional[datetime]
+    terminated_at: Optional[datetime]
+    starts_at: Optional[datetime]
+    status_changed: Optional[datetime]
+    status_info: Optional[str]
+    status_data: Optional[Mapping[str, Any]]
+    status_history: Optional[dict[str, Any]]
+    last_seen: Optional[datetime]
 
 
 @dataclass
 class Metrics:
     num_queries: int
-    last_stat: dict[str, Any] | None
-    container_log: bytes | None
+    last_stat: Optional[dict[str, Any]]
+    container_log: Optional[bytes]
 
 
 @dataclass
 class Metadata:
-    callback_url: str | None
-    internal_data: dict[str, Any] | None
+    callback_url: Optional[str]
+    internal_data: Optional[dict[str, Any]]
 
 
 @dataclass
@@ -310,11 +277,11 @@ class KernelSchedulingHistoryData:
     session_id: SessionId
 
     phase: str  # ScheduleType value
-    from_status: KernelSchedulingPhase | None
-    to_status: KernelSchedulingPhase | None
+    from_status: Optional[KernelSchedulingPhase]
+    to_status: Optional[KernelSchedulingPhase]
 
     result: SchedulingResult
-    error_code: str | None
+    error_code: Optional[str]
     message: str
 
     attempts: int

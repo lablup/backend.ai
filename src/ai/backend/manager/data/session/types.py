@@ -380,7 +380,7 @@ class SessionSchedulingHistoryListResult:
 class SessionListResult:
     """Search result with total count and pagination info for sessions."""
 
-    items: list[SessionData]
+    items: list[SessionInfo]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

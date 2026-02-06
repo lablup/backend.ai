@@ -2,202 +2,93 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.scalars import JSON
 
-from ai.backend.common.types import SessionResult, SessionTypes
-from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.base import QueryCondition
-
-from ai.backend.manager.api.gql.agent.types import AgentV2GQL
+from ai.backend.common.types import KernelId, SessionId
+from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.common.types import (
+    DotfileInfoGQL,
+    MetricStatGQL,
+    MetricValueGQL,
     ResourceOptsGQL,
+    SchedulerInfoGQL,
+    SchedulerPredicateGQL,
     ServicePortEntryGQL,
     ServicePortsGQL,
+    SessionResultGQL,
+    SessionTypesGQL,
+    SSHKeypairGQL,
+    VFolderMountGQL,
 )
-from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
-from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.errors.kernel import InvalidKernelData
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
-
-@strawberry.enum(
-    name="KernelStatus",
-    description="Added in 26.2.0. Status of a kernel in its lifecycle.",
-)
-class KernelStatusGQL(StrEnum):
-    """GraphQL enum for kernel status."""
-
-    PENDING = "PENDING"
-    SCHEDULED = "SCHEDULED"
-    PREPARING = "PREPARING"
-    PREPARED = "PREPARED"
-    CREATING = "CREATING"
-    RUNNING = "RUNNING"
-    TERMINATING = "TERMINATING"
-    TERMINATED = "TERMINATED"
-    CANCELLED = "CANCELLED"
-
-    @classmethod
-    def from_internal(cls, internal_status: KernelStatus) -> KernelStatusGQL:
-        """Convert internal KernelStatus to GraphQL enum."""
-        match internal_status:
-            case KernelStatus.PENDING:
-                return cls.PENDING
-            case KernelStatus.SCHEDULED:
-                return cls.SCHEDULED
-            case KernelStatus.PREPARING | KernelStatus.PULLING:
-                return cls.PREPARING
-            case KernelStatus.PREPARED:
-                return cls.PREPARED
-            case KernelStatus.CREATING:
-                return cls.CREATING
-            case KernelStatus.RUNNING:
-                return cls.RUNNING
-            case KernelStatus.TERMINATING:
-                return cls.TERMINATING
-            case KernelStatus.TERMINATED:
-                return cls.TERMINATED
-            case (
-                KernelStatus.CANCELLED
-                | KernelStatus.BUILDING
-                | KernelStatus.RESTARTING
-                | KernelStatus.RESIZING
-                | KernelStatus.SUSPENDED
-                | KernelStatus.ERROR
-            ):
-                return cls.CANCELLED
-
-    def to_internal(self) -> KernelStatus:
-        """Convert GraphQL enum to internal KernelStatus."""
-        match self:
-            case KernelStatusGQL.PENDING:
-                return KernelStatus.PENDING
-            case KernelStatusGQL.SCHEDULED:
-                return KernelStatus.SCHEDULED
-            case KernelStatusGQL.PREPARING:
-                return KernelStatus.PREPARING
-            case KernelStatusGQL.PREPARED:
-                return KernelStatus.PREPARED
-            case KernelStatusGQL.CREATING:
-                return KernelStatus.CREATING
-            case KernelStatusGQL.RUNNING:
-                return KernelStatus.RUNNING
-            case KernelStatusGQL.TERMINATING:
-                return KernelStatus.TERMINATING
-            case KernelStatusGQL.TERMINATED:
-                return KernelStatus.TERMINATED
-            case KernelStatusGQL.CANCELLED:
-                return KernelStatus.CANCELLED
-
-
-@dataclass(frozen=True)
-class KernelStatusInMatchSpec:
-    """Specification for KernelStatus IN operations (IN, NOT IN)."""
-
-    values: list[KernelStatus]
-    negated: bool
+KernelStatusGQL = strawberry.enum(KernelStatus, name="KernelStatus", description="Added in 26.1.0")
 
 
 @strawberry.enum(
-    name="KernelOrderField", description="Added in 26.2.0. Fields available for ordering kernels."
+    name="KernelOrderField", description="Added in 26.1.0. Fields available for ordering kernels."
 )
 class KernelOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
-    TERMINATED_AT = "terminated_at"
-    STATUS = "status"
-    CLUSTER_MODE = "cluster_mode"
-    CLUSTER_HOSTNAME = "cluster_hostname"
-    CLUSTER_IDX = "cluster_idx"
+    ID = "id"
 
 
 @strawberry.input(
-    name="KernelStatusFilter", description="Added in 26.2.0. Filter for kernel status."
+    name="KernelStatusFilter", description="Added in 26.1.0. Filter for kernel status."
 )
 class KernelStatusFilterGQL:
     in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelStatusGQL] | None = None
 
-    def build_query_condition(
-        self,
-        in_factory: Callable[[KernelStatusInMatchSpec], QueryCondition],
-    ) -> QueryCondition | None:
-        """Build a query condition from this filter using the provided factory callable.
-
-        Args:
-            in_factory: Factory function for IN operations (IN, NOT IN)
-
-        Returns:
-            QueryCondition if any filter field is set, None otherwise
-        """
+    def build_condition(self) -> QueryCondition | None:
         if self.in_:
-            return in_factory(
-                KernelStatusInMatchSpec(
-                    values=[s.to_internal() for s in self.in_],
-                    negated=False,
-                )
-            )
+            return KernelConditions.by_statuses(self.in_)
         if self.not_in:
-            return in_factory(
-                KernelStatusInMatchSpec(
-                    values=[s.to_internal() for s in self.not_in],
-                    negated=True,
-                )
-            )
+            # For not_in, we need all statuses except the ones in the list
+            all_statuses = set(KernelStatus)
+            allowed_statuses = all_statuses - set(self.not_in)
+            return KernelConditions.by_statuses(list(allowed_statuses))
         return None
 
 
 @strawberry.input(
-    name="KernelFilter", description="Added in 26.2.0. Filter criteria for querying kernels."
+    name="KernelFilter", description="Added in 26.1.0. Filter criteria for querying kernels."
 )
 class KernelFilterGQL(GQLFilter):
-    id: UUIDFilter | None = None
+    id: UUID | None = None
     status: KernelStatusFilterGQL | None = None
-    session_id: UUIDFilter | None = None
+    session_id: UUID | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.id:
-            condition = self.id.build_query_condition(
-                KernelConditions.by_id_filter_equals,
-                KernelConditions.by_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
+            conditions.append(KernelConditions.by_id(KernelId(self.id)))
         if self.status:
-            condition = self.status.build_query_condition(
-                KernelConditions.by_status_filter_in,
-            )
+            condition = self.status.build_condition()
             if condition:
                 conditions.append(condition)
         if self.session_id:
-            condition = self.session_id.build_query_condition(
-                KernelConditions.by_session_id_filter_equals,
-                KernelConditions.by_session_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
+            conditions.append(KernelConditions.by_session_ids([SessionId(self.session_id)]))
         return conditions
 
 
 @strawberry.input(
-    name="KernelOrderBy", description="Added in 26.2.0. Ordering specification for kernels."
+    name="KernelOrderBy", description="Added in 26.1.0. Ordering specification for kernels."
 )
 class KernelOrderByGQL(GQLOrderBy):
     field: KernelOrderFieldGQL
@@ -208,18 +99,373 @@ class KernelOrderByGQL(GQLOrderBy):
         match self.field:
             case KernelOrderFieldGQL.CREATED_AT:
                 return KernelOrders.created_at(ascending)
-            case KernelOrderFieldGQL.TERMINATED_AT:
-                return KernelOrders.terminated_at(ascending)
-            case KernelOrderFieldGQL.STATUS:
-                return KernelOrders.status(ascending)
-            case KernelOrderFieldGQL.CLUSTER_MODE:
-                return KernelOrders.cluster_mode(ascending)
-            case KernelOrderFieldGQL.CLUSTER_HOSTNAME:
-                return KernelOrders.cluster_hostname(ascending)
-            case KernelOrderFieldGQL.CLUSTER_IDX:
-                return KernelOrders.cluster_idx(ascending)
-            case _:
-                raise ValueError(f"Unhandled KernelOrderFieldGQL value: {self.field!r}")
+            case KernelOrderFieldGQL.ID:
+                return KernelOrders.id(ascending)
+
+
+# ========== Kernel Status History Types ==========
+
+
+@strawberry.type(
+    name="KernelStatusHistoryEntry",
+    description=(
+        "Added in 26.1.0. A single status history entry recording a status transition. "
+        "Contains the status name and the timestamp when the kernel entered that status."
+    ),
+)
+class KernelStatusHistoryEntryGQL:
+    """Single status history entry with status and timestamp."""
+
+    status: str = strawberry.field(
+        description="The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."
+    )
+    timestamp: datetime = strawberry.field(
+        description="Timestamp when the kernel entered this status."
+    )
+
+
+@strawberry.type(
+    name="KernelStatusHistory",
+    description=(
+        "Added in 26.1.0. A collection of status history entries for a kernel. "
+        "Records the progression of status changes throughout the kernel's lifecycle."
+    ),
+)
+class KernelStatusHistoryGQL:
+    """Status history containing multiple entries."""
+
+    entries: list[KernelStatusHistoryEntryGQL] = strawberry.field(
+        description="List of status history entries in chronological order."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatusHistoryGQL:
+        """Convert a status history mapping to GraphQL type."""
+        entries = []
+        for status, timestamp in data.items():
+            if timestamp is None:
+                continue
+            if isinstance(timestamp, datetime):
+                entries.append(KernelStatusHistoryEntryGQL(status=status, timestamp=timestamp))
+            elif isinstance(timestamp, str):
+                entries.append(
+                    KernelStatusHistoryEntryGQL(
+                        status=status,
+                        timestamp=datetime.fromisoformat(timestamp),
+                    )
+                )
+            else:
+                raise InvalidKernelData(
+                    f"Invalid timestamp type for status '{status}': "
+                    f"expected datetime or str, got {type(timestamp).__name__}"
+                )
+        return cls(entries=entries)
+
+
+# ========== Kernel Status Data Types ==========
+
+
+@strawberry.type(
+    name="KernelStatusErrorInfo",
+    description=(
+        "Added in 26.1.0. Error information when a kernel enters an error state. "
+        "Contains details about the source and nature of the error."
+    ),
+)
+class KernelStatusErrorInfoGQL:
+    """Error information in kernel status_data."""
+
+    src: str = strawberry.field(
+        description="Source of the error: 'agent' for agent errors, 'other' for other errors."
+    )
+    agent_id: str | None = strawberry.field(
+        description="ID of the agent where the error occurred. Only present for agent errors in debug mode."
+    )
+    name: str = strawberry.field(description="Name of the exception class.")
+    repr: str = strawberry.field(description="String representation of the exception.")
+
+
+@strawberry.type(
+    name="KernelStatusDataKernel",
+    description="Added in 26.1.0. Kernel-specific status data during lifecycle transitions.",
+)
+class KernelStatusDataGQL:
+    """Kernel status data."""
+
+    exit_code: int | None = strawberry.field(
+        description="Exit code of the kernel process. Null if not yet terminated."
+    )
+
+
+@strawberry.type(
+    name="KernelSessionStatusData",
+    description="Added in 26.1.0. Session-specific status data during kernel lifecycle transitions.",
+)
+class KernelSessionStatusDataGQL:
+    """Session status data within kernel context."""
+
+    status: str | None = strawberry.field(
+        description="Status string of the session (e.g., 'terminating')."
+    )
+
+
+@strawberry.type(
+    name="KernelStatusData",
+    description=(
+        "Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. "
+        "The populated fields depend on the kernel's current status and recent state transitions."
+    ),
+)
+class KernelStatusDataContainerGQL:
+    """Structured status data with optional sections."""
+
+    error: KernelStatusErrorInfoGQL | None = strawberry.field(
+        description="Error information when the kernel is in an error state."
+    )
+    scheduler: SchedulerInfoGQL | None = strawberry.field(
+        description="Scheduler information during pending/scheduling states."
+    )
+    kernel: KernelStatusDataGQL | None = strawberry.field(
+        description="Kernel-specific status data during lifecycle transitions."
+    )
+    session: KernelSessionStatusDataGQL | None = strawberry.field(
+        description="Session-specific status data during lifecycle transitions."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatusDataContainerGQL:
+        """Convert a status_data mapping to GraphQL type."""
+        error = None
+        scheduler = None
+        kernel = None
+        session = None
+
+        if not data:
+            return cls(error=error, scheduler=scheduler, kernel=kernel, session=session)
+
+        # Parse error section
+        if "error" in data:
+            err = data["error"]
+            error = KernelStatusErrorInfoGQL(
+                src=err["src"],
+                agent_id=err.get("agent_id"),
+                name=err["name"],
+                repr=err["repr"],
+            )
+
+        # Parse scheduler section (can be nested under "scheduler" or at top level)
+        scheduler_data = data.get("scheduler", {})
+        # Also check for top-level scheduler fields
+        if not scheduler_data and any(
+            k in data for k in ["retries", "last_try", "failed_predicates", "passed_predicates"]
+        ):
+            scheduler_data = data
+
+        if scheduler_data:
+            failed_predicates = None
+            passed_predicates = None
+
+            if "failed_predicates" in scheduler_data:
+                failed_predicates = [
+                    SchedulerPredicateGQL(name=p["name"], msg=p["msg"])
+                    for p in scheduler_data["failed_predicates"]
+                ]
+
+            if "passed_predicates" in scheduler_data:
+                passed_predicates = [
+                    SchedulerPredicateGQL(name=p["name"], msg=None)
+                    for p in scheduler_data["passed_predicates"]
+                ]
+
+            if any(
+                k in scheduler_data
+                for k in ["retries", "last_try", "msg", "failed_predicates", "passed_predicates"]
+            ):
+                scheduler = SchedulerInfoGQL(
+                    retries=scheduler_data.get("retries"),
+                    last_try=scheduler_data.get("last_try"),
+                    msg=scheduler_data.get("msg"),
+                    failed_predicates=failed_predicates,
+                    passed_predicates=passed_predicates,
+                )
+
+        # Parse kernel section
+        if "kernel" in data:
+            kernel = KernelStatusDataGQL(exit_code=data["kernel"].get("exit_code"))
+
+        # Parse session section
+        if "session" in data:
+            session = KernelSessionStatusDataGQL(status=data["session"].get("status"))
+
+        return cls(error=error, scheduler=scheduler, kernel=kernel, session=session)
+
+
+# ========== Kernel Statistics Types ==========
+
+
+@strawberry.type(
+    name="KernelStatEntry",
+    description=(
+        "Added in 26.1.0. A single kernel statistic entry with metric key and value. "
+        "Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx."
+    ),
+)
+class KernelStatEntryGQL:
+    """Single kernel statistic entry."""
+
+    key: str = strawberry.field(description="Metric key name (e.g., 'cpu_util', 'mem', 'io_read').")
+    value: MetricValueGQL = strawberry.field(description="The metric measurement value.")
+
+
+@strawberry.type(
+    name="KernelStat",
+    description=(
+        "Added in 26.1.0. Collection of kernel resource statistics. "
+        "Contains utilization metrics for CPU, memory, I/O, network, and accelerators."
+    ),
+)
+class KernelStatGQL:
+    """Kernel statistics containing multiple metric entries."""
+
+    entries: list[KernelStatEntryGQL] = strawberry.field(
+        description="List of metric entries for this kernel."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelStatGQL:
+        """Convert a stat mapping to GraphQL type."""
+        entries = []
+        for key, metric_value in data.items():
+            if not isinstance(metric_value, dict):
+                raise InvalidKernelData(
+                    f"Invalid metric value type for key '{key}': "
+                    f"expected dict, got {type(metric_value).__name__}"
+                )
+            # Extract stats if present
+            stats = None
+            stat_keys = ["min", "max", "sum", "avg", "diff", "rate"]
+            stat_data = {}
+            for stat_key in stat_keys:
+                # Stats can be prefixed with "stats." in the serialized format
+                prefixed_key = f"stats.{stat_key}"
+                if prefixed_key in metric_value:
+                    stat_data[stat_key] = metric_value[prefixed_key]
+                elif stat_key in metric_value:
+                    stat_data[stat_key] = metric_value[stat_key]
+
+            if stat_data:
+                stats = MetricStatGQL(
+                    min=stat_data.get("min"),
+                    max=stat_data.get("max"),
+                    sum=stat_data.get("sum"),
+                    avg=stat_data.get("avg"),
+                    diff=stat_data.get("diff"),
+                    rate=stat_data.get("rate"),
+                )
+
+            entries.append(
+                KernelStatEntryGQL(
+                    key=key,
+                    value=MetricValueGQL(
+                        current=str(metric_value["current"]),
+                        capacity=str(metric_value["capacity"])
+                        if metric_value.get("capacity") is not None
+                        else None,
+                        pct=str(metric_value["pct"])
+                        if metric_value.get("pct") is not None
+                        else None,
+                        unit_hint=metric_value.get("unit_hint"),
+                        stats=stats,
+                    ),
+                )
+            )
+        return cls(entries=entries)
+
+
+# ========== Kernel Internal Data Types ==========
+
+
+@strawberry.type(
+    name="KernelInternalData",
+    description="Added in 26.1.0. Internal data stored with the kernel for system use.",
+)
+class KernelInternalDataGQL:
+    dotfiles: list[DotfileInfoGQL] | None = strawberry.field(
+        default=None,
+        description="List of dotfiles to be provisioned in the kernel's filesystem.",
+    )
+    ssh_keypair: SSHKeypairGQL | None = strawberry.field(
+        default=None, description="SSH keypair for secure access to the kernel."
+    )
+    model_definition_path: str | None = strawberry.field(
+        default=None, description="Path to the model definition file for inference services."
+    )
+    runtime_variant: str | None = strawberry.field(
+        default=None, description="Runtime variant identifier (e.g., 'custom')."
+    )
+    sudo_session_enabled: bool | None = strawberry.field(
+        default=None, description="Whether sudo is enabled for this session."
+    )
+    block_service_ports: bool | None = strawberry.field(
+        default=None,
+        description="Whether to block service ports. If true, no services can be started.",
+    )
+    prevent_vfolder_mounts: bool | None = strawberry.field(
+        default=None,
+        description="Whether to prevent vfolder mounts (except .logs directory).",
+    )
+    docker_credentials: JSON | None = strawberry.field(
+        default=None, description="Docker credentials for private registry access."
+    )
+    domain_socket_proxies: list[str] | None = strawberry.field(
+        default=None,
+        description="List of domain socket paths to proxy into the container.",
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> KernelInternalDataGQL:
+        dotfiles = None
+        if dotfiles_data := data.get("dotfiles"):
+            if not isinstance(dotfiles_data, Sequence):
+                raise InvalidKernelData(
+                    f"Invalid dotfiles type: expected Sequence, got {type(dotfiles_data).__name__}"
+                )
+            dotfiles = []
+            for df in dotfiles_data:
+                if not isinstance(df, dict):
+                    raise InvalidKernelData(
+                        f"Invalid dotfile entry type: expected dict, got {type(df).__name__}"
+                    )
+                dotfiles.append(
+                    DotfileInfoGQL(
+                        path=df["path"],
+                        data=df["data"],
+                        perm=df["perm"],
+                    )
+                )
+
+        ssh_keypair = None
+        if keypair_data := data.get("ssh_keypair"):
+            if not isinstance(keypair_data, dict):
+                raise InvalidKernelData(
+                    f"Invalid ssh_keypair type: expected dict, got {type(keypair_data).__name__}"
+                )
+            ssh_keypair = SSHKeypairGQL(
+                public_key=keypair_data["public_key"],
+                private_key=keypair_data["private_key"],
+            )
+
+        return cls(
+            dotfiles=dotfiles,
+            ssh_keypair=ssh_keypair,
+            model_definition_path=data.get("model_definition_path"),
+            runtime_variant=data.get("runtime_variant"),
+            sudo_session_enabled=data.get("sudo_session_enabled"),
+            block_service_ports=data.get("block_service_ports"),
+            prevent_vfolder_mounts=data.get("prevent_vfolder_mounts"),
+            docker_credentials=data.get("docker_credentials"),
+            domain_socket_proxies=data.get("domain_socket_proxies"),
+        )
 
 
 # ========== Kernel Sub-Info Types ==========
@@ -227,7 +473,7 @@ class KernelOrderByGQL(GQLOrderBy):
 
 @strawberry.type(
     name="KernelSessionInfo",
-    description="Added in 26.2.0. Information about the session this kernel belongs to.",
+    description="Added in 26.1.0. Information about the session this kernel belongs to.",
 )
 class KernelSessionInfoGQL:
     session_id: UUID = strawberry.field(
@@ -237,16 +483,20 @@ class KernelSessionInfoGQL:
         description="The creation ID used when creating the session."
     )
     name: str | None = strawberry.field(description="The name of the session.")
-    session_type: SessionTypes = strawberry.field(
+    session_type: SessionTypesGQL = strawberry.field(
         description="The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."
     )
 
 
 @strawberry.type(
     name="KernelClusterInfo",
-    description="Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.",
+    description="Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.",
 )
 class KernelClusterInfoGQL:
+    cluster_mode: str = strawberry.field(
+        description="The clustering mode (e.g., single-node, multi-node)."
+    )
+    cluster_size: int = strawberry.field(description="Total number of nodes in the cluster.")
     cluster_role: str = strawberry.field(
         description="The role of this kernel in the cluster (e.g., main, sub)."
     )
@@ -262,54 +512,158 @@ class KernelClusterInfoGQL:
 
 
 @strawberry.type(
-    name="KernelUserInfo",
-    description="Added in 26.2.0. User and ownership information for a kernel.",
+    name="KernelUserPermissionInfo",
+    description="Added in 26.1.0. User permission and ownership information for a kernel.",
 )
-class KernelUserInfoGQL:
-    user_id: UUID | None = strawberry.field(
-        description="The UUID of the user who owns this kernel."
+class KernelUserPermissionInfoGQL:
+    user_uuid: UUID = strawberry.field(description="The UUID of the user who owns this kernel.")
+    access_key: str = strawberry.field(description="The access key used to create this kernel.")
+    domain_name: str = strawberry.field(description="The domain this kernel belongs to.")
+    group_id: UUID = strawberry.field(description="The group (project) ID this kernel belongs to.")
+    uid: int | None = strawberry.field(
+        description="The Unix user ID for the kernel's container process."
     )
-    access_key: str | None = strawberry.field(
-        description="The access key used to create this kernel."
+    main_gid: int | None = strawberry.field(
+        description="The primary Unix group ID for the kernel's container process."
     )
-    domain_name: str | None = strawberry.field(description="The domain this kernel belongs to.")
-    group_id: UUID | None = strawberry.field(
-        description="The group (project) ID this kernel belongs to."
+    gids: list[int] | None = strawberry.field(
+        description="Additional Unix group IDs for the kernel's container process."
     )
 
 
 @strawberry.type(
-    name="ResourceAllocation",
-    description="Added in 26.2.0. Resource allocation with requested and used slots.",
+    name="KernelImageInfo",
+    description="Added in 26.1.0. Container image information for a kernel.",
 )
-class ResourceAllocationGQL:
-    requested: ResourceSlotGQL = strawberry.field(
-        description="The resource slots originally requested for this kernel."
+class KernelImageInfoGQL:
+    reference: str | None = strawberry.field(
+        description="The canonical reference of the container image (e.g., registry/repo:tag). May be null for legacy kernels with missing image data."
     )
-    used: ResourceSlotGQL | None = strawberry.field(
-        description="The resource slots currently used by this kernel. May be null if not yet allocated."
+    registry: str | None = strawberry.field(description="The container registry hosting the image.")
+    tag: str | None = strawberry.field(description="The tag of the container image.")
+    architecture: str | None = strawberry.field(
+        description="The CPU architecture the image is built for (e.g., x86_64, aarch64). May be null for legacy kernels."
     )
+
+
+@strawberry.type(
+    name="KernelDeviceModelInfo",
+    description=(
+        "Added in 26.1.0. Information about a specific device model attached to a kernel. "
+        "Contains device identification and capacity information."
+    ),
+)
+class KernelDeviceModelInfoGQL:
+    """Device model information with ID, name, and capacity data."""
+
+    device_id: str = strawberry.field(description="Unique identifier for the device instance.")
+    model_name: str = strawberry.field(
+        description="Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."
+    )
+    data: JSON = strawberry.field(
+        description="Device-specific capacity and capability information."
+    )
+
+
+@strawberry.type(
+    name="KernelAttachedDeviceEntry",
+    description=(
+        "Added in 26.1.0. A collection of devices of a specific type attached to a kernel. "
+        "Groups devices by their device type (e.g., 'cuda', 'rocm')."
+    ),
+)
+class KernelAttachedDeviceEntryGQL:
+    """Entry for a device type with its attached device instances."""
+
+    device_type: str = strawberry.field(
+        description="Type of the device (e.g., 'cuda', 'rocm', 'tpu')."
+    )
+    devices: list[KernelDeviceModelInfoGQL] = strawberry.field(
+        description="List of device instances of this type."
+    )
+
+
+@strawberry.type(
+    name="KernelAttachedDevices",
+    description=(
+        "Added in 26.1.0. A collection of all devices attached to a kernel. "
+        "Organized by device type, each containing multiple device instances."
+    ),
+)
+class KernelAttachedDevicesGQL:
+    """Attached devices organized by device type."""
+
+    entries: list[KernelAttachedDeviceEntryGQL] = strawberry.field(
+        description="List of device type entries, each containing attached device instances."
+    )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> Self:
+        """Convert an attached devices mapping to GraphQL type."""
+        entries = []
+        for device_type, devices in data.items():
+            if not isinstance(devices, Sequence):
+                raise InvalidKernelData(
+                    f"Invalid devices type for device_type '{device_type}': "
+                    f"expected Sequence, got {type(devices).__name__}"
+                )
+            device_infos = []
+            for device in devices:
+                if not isinstance(device, dict):
+                    raise InvalidKernelData(
+                        f"Invalid device entry type for device_type '{device_type}': "
+                        f"expected dict, got {type(device).__name__}"
+                    )
+                device_infos.append(
+                    KernelDeviceModelInfoGQL(
+                        device_id=str(device["device_id"]),
+                        model_name=device["model_name"],
+                        data=device.get("data", {}),
+                    )
+                )
+            entries.append(
+                KernelAttachedDeviceEntryGQL(
+                    device_type=device_type,
+                    devices=device_infos,
+                )
+            )
+        return cls(entries=entries)
 
 
 @strawberry.type(
     name="KernelResourceInfo",
-    description="Added in 26.2.0. Resource allocation information for a kernel.",
+    description="Added in 26.1.0. Resource allocation information for a kernel.",
 )
 class KernelResourceInfoGQL:
+    scaling_group: str | None = strawberry.field(
+        description="The scaling group this kernel is assigned to."
+    )
     agent_id: str | None = strawberry.field(
         description="The ID of the agent running this kernel. Null if not yet assigned or hidden."
     )
-    resource_group_name: str | None = strawberry.field(
-        description="The resource group (scaling group) this kernel is assigned to."
+    agent_addr: str | None = strawberry.field(
+        description="The network address of the agent. Null if not yet assigned or hidden."
     )
     container_id: str | None = strawberry.field(
         description="The container ID on the agent. Null if container not yet created or hidden."
     )
-    allocation: ResourceAllocationGQL = strawberry.field(
-        description="Resource allocation with requested and used slots."
+    occupied_slots: ResourceSlotGQL = strawberry.field(
+        description=dedent_strip("""
+            The resource slots currently occupied by this kernel.
+            Contains entries with resource types (e.g., cpu, mem, cuda.shares) and their quantities.
+        """)
     )
-    shares: ResourceSlotGQL = strawberry.field(
+    requested_slots: ResourceSlotGQL = strawberry.field(
+        description=dedent_strip("""
+            The resource slots originally requested for this kernel.
+            May differ from occupied_slots due to scheduling adjustments.
+        """)
+    )
+    occupied_shares: ResourceSlotGQL = strawberry.field(
         description="The fractional resource shares occupied by this kernel."
+    )
+    attached_devices: KernelAttachedDevicesGQL | None = strawberry.field(
+        description="Information about attached devices (e.g., GPUs) allocated to this kernel."
     )
     resource_opts: ResourceOptsGQL | None = strawberry.field(
         description="Additional resource options and configurations for this kernel."
@@ -317,21 +671,48 @@ class KernelResourceInfoGQL:
 
 
 @strawberry.type(
+    name="KernelRuntimeInfo",
+    description="Added in 26.1.0. Runtime configuration for a kernel.",
+)
+class KernelRuntimeInfoGQL:
+    environ: list[str] | None = strawberry.field(
+        description="Environment variables set for this kernel."
+    )
+    vfolder_mounts: list[VFolderMountGQL] | None = strawberry.field(
+        description="List of virtual folders mounted to this kernel."
+    )
+    bootstrap_script: str | None = strawberry.field(
+        description="Bootstrap script executed when the kernel starts."
+    )
+    startup_command: str | None = strawberry.field(
+        description="Startup command executed after bootstrap."
+    )
+
+
+@strawberry.type(
     name="KernelNetworkInfo",
-    description="Added in 26.2.0. Network configuration for a kernel.",
+    description="Added in 26.1.0. Network configuration for a kernel.",
 )
 class KernelNetworkInfoGQL:
+    kernel_host: str | None = strawberry.field(
+        description="The hostname or IP address where the kernel is accessible."
+    )
+    repl_in_port: int = strawberry.field(description="The port for REPL input stream.")
+    repl_out_port: int = strawberry.field(description="The port for REPL output stream.")
     service_ports: ServicePortsGQL | None = strawberry.field(
         description="Collection of service ports exposed by this kernel."
     )
     preopen_ports: list[int] | None = strawberry.field(
         description="List of ports that are pre-opened for this kernel."
     )
+    use_host_network: bool = strawberry.field(
+        description="Whether the kernel uses host network mode."
+    )
 
 
 @strawberry.type(
     name="KernelLifecycleInfo",
-    description="Added in 26.2.0. Lifecycle and status information for a kernel.",
+    description="Added in 26.1.0. Lifecycle and status information for a kernel.",
 )
 class KernelLifecycleInfoGQL:
     status: KernelStatusGQL = strawberry.field(
@@ -340,8 +721,20 @@ class KernelLifecycleInfoGQL:
             Indicates the kernel's position in its lifecycle.
         """)
     )
-    result: SessionResult = strawberry.field(
+    result: SessionResultGQL = strawberry.field(
         description="The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."
+    )
+    status_changed: datetime | None = strawberry.field(
+        description="Timestamp when the kernel last changed status."
+    )
+    status_info: str | None = strawberry.field(
+        description="Human-readable information about the current status."
+    )
+    status_data: KernelStatusDataContainerGQL | None = strawberry.field(
+        description="Structured data about the current status including error, scheduler, or lifecycle information."
+    )
+    status_history: KernelStatusHistoryGQL | None = strawberry.field(
+        description="History of status transitions with timestamps."
     )
     created_at: datetime | None = strawberry.field(
         description="Timestamp when the kernel was created."
@@ -352,6 +745,35 @@ class KernelLifecycleInfoGQL:
     starts_at: datetime | None = strawberry.field(
         description="Scheduled start time for the kernel, if applicable."
     )
+    last_seen: datetime | None = strawberry.field(
+        description="Timestamp when the kernel was last seen active."
+    )
+
+
+@strawberry.type(
+    name="KernelMetricsInfo",
+    description="Added in 26.1.0. Metrics and statistics for a kernel.",
+)
+class KernelMetricsInfoGQL:
+    num_queries: int = strawberry.field(
+        description="The number of queries/executions performed by this kernel."
+    )
+    last_stat: KernelStatGQL | None = strawberry.field(
+        description="The last collected statistics for this kernel including CPU, memory, I/O, and network metrics."
+    )
+
+
+@strawberry.type(
+    name="KernelMetadataInfo",
+    description="Added in 26.1.0. Additional metadata for a kernel.",
+)
+class KernelMetadataInfoGQL:
+    callback_url: str | None = strawberry.field(
+        description="URL to call back when kernel status changes."
+    )
+    internal_data: KernelInternalDataGQL | None = strawberry.field(
+        description="Internal data stored with the kernel for system use."
+    )
 
 
 # ========== Main Kernel Type ==========
@@ -359,23 +781,20 @@ class KernelLifecycleInfoGQL:
 
 @strawberry.type(
     name="KernelV2",
-    description="Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.",
+    description="Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.",
 )
 class KernelV2GQL(Node):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
 
-    # Inlined fields (from single-element types)
-    startup_command: str | None = strawberry.field(
-        description="Startup command executed when the kernel starts."
-    )
-
-    # Sub-info types
     session: KernelSessionInfoGQL = strawberry.field(
         description="Information about the session this kernel belongs to."
     )
-    user_info: KernelUserInfoGQL = strawberry.field(description="User and ownership information.")
+    user_permission: KernelUserPermissionInfoGQL = strawberry.field(
+        description="User permission and ownership information."
+    )
+    image: KernelImageInfoGQL = strawberry.field(description="Container image information.")
     network: KernelNetworkInfoGQL = strawberry.field(
         description="Network configuration and exposed ports."
     )
@@ -385,43 +804,32 @@ class KernelV2GQL(Node):
     resource: KernelResourceInfoGQL = strawberry.field(
         description="Resource allocation and agent information."
     )
+    runtime: KernelRuntimeInfoGQL = strawberry.field(
+        description="Runtime configuration (environment, scripts)."
+    )
     lifecycle: KernelLifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
     )
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The agent running this kernel."
+    metrics: KernelMetricsInfoGQL = strawberry.field(
+        description="Execution metrics and statistics."
     )
-    async def agent(self) -> AgentV2GQL | None:
-        raise NotImplementedError
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The user who owns this kernel."
+    metadata: KernelMetadataInfoGQL = strawberry.field(
+        description="Additional metadata and internal data."
     )
-    async def user(self) -> UserV2GQL | None:
-        raise NotImplementedError
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The project this kernel belongs to."
-    )
-    async def project(self) -> ProjectV2GQL | None:
-        raise NotImplementedError
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The domain this kernel belongs to."
-    )
-    async def domain(self) -> DomainV2GQL | None:
-        raise NotImplementedError
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The resource group this kernel is assigned to."
-    )
-    async def resource_group(self) -> ResourceGroupGQL | None:
-        raise NotImplementedError
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
         """Create KernelGQL from KernelInfo dataclass."""
+        image_canonical: str | None = None
+        architecture: str | None = None
+        if kernel_info.image.identifier:
+            image_canonical = kernel_info.image.identifier.canonical
+            architecture = kernel_info.image.identifier.architecture
+        registry = kernel_info.image.registry
+        tag = kernel_info.image.tag
+        if kernel_info.image.architecture:
+            architecture = kernel_info.image.architecture
+
         service_ports = (
             ServicePortsGQL(
                 entries=[
@@ -432,10 +840,10 @@ class KernelV2GQL(Node):
             else None
         )
 
-        used_slots = (
+        occupied_slots = (
             ResourceSlotGQL.from_resource_slot(kernel_info.resource.occupied_slots)
             if kernel_info.resource.occupied_slots
-            else None
+            else ResourceSlotGQL(entries=[])
         )
 
         requested_slots = (
@@ -444,50 +852,104 @@ class KernelV2GQL(Node):
             else ResourceSlotGQL(entries=[])
         )
 
-        shares = ResourceSlotGQL.from_resource_slot(kernel_info.resource.occupied_shares or {})
+        attached_devices = (
+            KernelAttachedDevicesGQL.from_mapping(kernel_info.resource.attached_devices)
+            if kernel_info.resource.attached_devices is not None
+            else KernelAttachedDevicesGQL(entries=[])
+        )
+
+        vfolder_mounts = (
+            [VFolderMountGQL.from_dict(m) for m in kernel_info.runtime.vfolder_mounts]
+            if kernel_info.runtime.vfolder_mounts
+            else None
+        )
+
+        status_data = KernelStatusDataContainerGQL.from_mapping(
+            kernel_info.lifecycle.status_data or {}
+        )
+        status_history = KernelStatusHistoryGQL.from_mapping(
+            kernel_info.lifecycle.status_history or {}
+        )
+        last_stat = KernelStatGQL.from_mapping(kernel_info.metrics.last_stat or {})
+        internal_data = KernelInternalDataGQL.from_mapping(kernel_info.metadata.internal_data or {})
 
         return cls(
             id=ID(str(kernel_info.id)),
-            startup_command=kernel_info.runtime.startup_command,
             session=KernelSessionInfoGQL(
                 session_id=UUID(kernel_info.session.session_id),
                 creation_id=kernel_info.session.creation_id,
                 name=kernel_info.session.name,
-                session_type=SessionTypes(kernel_info.session.session_type),
+                session_type=SessionTypesGQL(kernel_info.session.session_type),
             ),
-            user_info=KernelUserInfoGQL(
-                user_id=kernel_info.user_permission.user_uuid,
+            user_permission=KernelUserPermissionInfoGQL(
+                user_uuid=kernel_info.user_permission.user_uuid,
                 access_key=kernel_info.user_permission.access_key,
                 domain_name=kernel_info.user_permission.domain_name,
                 group_id=kernel_info.user_permission.group_id,
+                uid=kernel_info.user_permission.uid,
+                main_gid=kernel_info.user_permission.main_gid,
+                gids=kernel_info.user_permission.gids,
+            ),
+            image=KernelImageInfoGQL(
+                reference=image_canonical,
+                registry=registry,
+                tag=tag,
+                architecture=architecture,
             ),
             network=KernelNetworkInfoGQL(
+                kernel_host=kernel_info.network.kernel_host,
+                repl_in_port=kernel_info.network.repl_in_port,
+                repl_out_port=kernel_info.network.repl_out_port,
                 service_ports=service_ports,
                 preopen_ports=kernel_info.network.preopen_ports,
+                use_host_network=kernel_info.network.use_host_network,
             ),
             cluster=KernelClusterInfoGQL(
+                cluster_mode=kernel_info.cluster.cluster_mode,
+                cluster_size=kernel_info.cluster.cluster_size,
                 cluster_role=kernel_info.cluster.cluster_role,
                 cluster_idx=kernel_info.cluster.cluster_idx,
                 local_rank=kernel_info.cluster.local_rank,
                 cluster_hostname=kernel_info.cluster.cluster_hostname,
             ),
             resource=KernelResourceInfoGQL(
+                scaling_group=kernel_info.resource.scaling_group,
                 agent_id=kernel_info.resource.agent if not hide_agents else None,
-                resource_group_name=kernel_info.resource.scaling_group,
+                agent_addr=kernel_info.resource.agent_addr if not hide_agents else None,
                 container_id=kernel_info.resource.container_id if not hide_agents else None,
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=used_slots,
+                occupied_slots=occupied_slots,
+                requested_slots=requested_slots,
+                occupied_shares=ResourceSlotGQL.from_resource_slot(
+                    kernel_info.resource.occupied_shares or {}
                 ),
-                shares=shares,
+                attached_devices=attached_devices,
                 resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
             ),
+            runtime=KernelRuntimeInfoGQL(
+                environ=kernel_info.runtime.environ,
+                vfolder_mounts=vfolder_mounts,
+                bootstrap_script=kernel_info.runtime.bootstrap_script,
+                startup_command=kernel_info.runtime.startup_command,
+            ),
             lifecycle=KernelLifecycleInfoGQL(
-                status=KernelStatusGQL.from_internal(kernel_info.lifecycle.status),
-                result=SessionResult(kernel_info.lifecycle.result),
+                status=KernelStatusGQL(kernel_info.lifecycle.status),
+                result=SessionResultGQL(kernel_info.lifecycle.result),
+                status_changed=kernel_info.lifecycle.status_changed,
+                status_info=kernel_info.lifecycle.status_info,
+                status_data=status_data,
+                status_history=status_history,
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
                 starts_at=kernel_info.lifecycle.starts_at,
+                last_seen=kernel_info.lifecycle.last_seen,
+            ),
+            metrics=KernelMetricsInfoGQL(
+                num_queries=kernel_info.metrics.num_queries,
+                last_stat=last_stat,
+            ),
+            metadata=KernelMetadataInfoGQL(
+                callback_url=kernel_info.metadata.callback_url,
+                internal_data=internal_data,
             ),
         )
 
@@ -497,11 +959,11 @@ KernelEdgeGQL = Edge[KernelV2GQL]
 
 @strawberry.type(
     name="KernelConnectionV2",
-    description="Added in 26.2.0. Connection type for paginated kernel results.",
+    description="Added in 26.1.0. Connection type for paginated kernel results.",
 )
 class KernelConnectionV2GQL(Connection[KernelV2GQL]):
     count: int
 
-    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+    def __init__(self, *args, count: int, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count

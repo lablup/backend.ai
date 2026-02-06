@@ -3,60 +3,50 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from enum import StrEnum
 from typing import Any
 
 import strawberry
 
-from ai.backend.common.types import ServicePortProtocols
-
-
-@strawberry.enum(
-    name="ServicePortProtocol",
-    description="Added in 26.2.0. Protocol type for service ports.",
+from ai.backend.common.types import (
+    MountPermission,
+    ServicePortProtocols,
+    SessionResult,
+    SessionTypes,
+    VFolderUsageMode,
 )
-class ServicePortProtocolGQL(StrEnum):
-    """GraphQL enum for service port protocols."""
 
-    HTTP = "http"
-    TCP = "tcp"
-    PREOPEN = "preopen"
-    INTERNAL = "internal"
-    VNC = "vnc"
-    RDP = "rdp"
+# ========== Common Enums ==========
 
-    @classmethod
-    def from_internal(cls, internal: ServicePortProtocols) -> ServicePortProtocolGQL:
-        """Convert internal ServicePortProtocols to GraphQL enum."""
-        match internal:
-            case ServicePortProtocols.HTTP:
-                return cls.HTTP
-            case ServicePortProtocols.TCP:
-                return cls.TCP
-            case ServicePortProtocols.PREOPEN:
-                return cls.PREOPEN
-            case ServicePortProtocols.INTERNAL:
-                return cls.INTERNAL
-            case ServicePortProtocols.VNC:
-                return cls.VNC
-            case ServicePortProtocols.RDP:
-                return cls.RDP
 
-    def to_internal(self) -> ServicePortProtocols:
-        """Convert GraphQL enum to internal ServicePortProtocols."""
-        match self:
-            case ServicePortProtocolGQL.HTTP:
-                return ServicePortProtocols.HTTP
-            case ServicePortProtocolGQL.TCP:
-                return ServicePortProtocols.TCP
-            case ServicePortProtocolGQL.PREOPEN:
-                return ServicePortProtocols.PREOPEN
-            case ServicePortProtocolGQL.INTERNAL:
-                return ServicePortProtocols.INTERNAL
-            case ServicePortProtocolGQL.VNC:
-                return ServicePortProtocols.VNC
-            case ServicePortProtocolGQL.RDP:
-                return ServicePortProtocols.RDP
+SessionTypesGQL = strawberry.enum(
+    SessionTypes,
+    name="SessionType",
+    description="Added in 26.1.0. Type of compute session.",
+)
+
+SessionResultGQL = strawberry.enum(
+    SessionResult,
+    name="SessionResult",
+    description="Added in 26.1.0. Result status of a session execution.",
+)
+
+MountPermissionGQL = strawberry.enum(
+    MountPermission,
+    name="MountPermission",
+    description="Added in 26.1.0. Permission level for virtual folder mounts.",
+)
+
+VFolderUsageModeGQL = strawberry.enum(
+    VFolderUsageMode,
+    name="VFolderUsageMode",
+    description="Added in 26.1.0. Usage mode of a virtual folder.",
+)
+
+ServicePortProtocolGQL = strawberry.enum(
+    ServicePortProtocols,
+    name="ServicePortProtocol",
+    description="Added in 26.1.0. Protocol types for service ports.",
+)
 
 
 # ========== Resource Options Types ==========
@@ -65,29 +55,29 @@ class ServicePortProtocolGQL(StrEnum):
 @strawberry.type(
     name="ResourceOptsEntry",
     description=(
-        "Added in 26.1.0. A single key-value entry representing a resource option. "
-        "Contains additional resource configuration such as shared memory settings."
+        "Added in 26.1.0. A single resource option entry with name and value. "
+        "Resource options provide additional configuration like shared memory settings."
     ),
 )
 class ResourceOptsEntryGQL:
     """Single resource option entry with name and value."""
 
-    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
-    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
+    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
+    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
 
 
 @strawberry.type(
     name="ResourceOpts",
     description=(
-        "Added in 26.1.0. A collection of additional resource options for a deployment. "
-        "Contains key-value pairs for resource configuration like shared memory."
+        "Added in 26.1.0. A collection of additional resource options. "
+        "Contains configuration like shared memory and other resource-specific settings."
     ),
 )
 class ResourceOptsGQL:
-    """Resource options containing multiple key-value entries."""
+    """Resource options containing multiple entries."""
 
     entries: list[ResourceOptsEntryGQL] = strawberry.field(
-        description="List of resource option entries. Each entry contains a key-value pair."
+        description="List of resource option entries."
     )
 
     @classmethod
@@ -126,7 +116,7 @@ class ResourceOptsInput:
 @strawberry.type(
     name="ServicePortEntry",
     description=(
-        "Added in 26.2.0. A single service port entry representing an exposed service. "
+        "Added in 26.1.0. A single service port entry representing an exposed service. "
         "Contains port mapping and protocol information for accessing services."
     ),
 )
@@ -152,7 +142,7 @@ class ServicePortEntryGQL:
         """Convert a dict to ServicePortEntryGQL."""
         return cls(
             name=data["name"],
-            protocol=ServicePortProtocolGQL.from_internal(ServicePortProtocols(data["protocol"])),
+            protocol=ServicePortProtocolGQL(data["protocol"]),
             container_ports=list(data["container_ports"]),
             host_ports=list(data["host_ports"]),
             is_inference=data["is_inference"],
@@ -162,7 +152,7 @@ class ServicePortEntryGQL:
 @strawberry.type(
     name="ServicePorts",
     description=(
-        "Added in 26.2.0. A collection of exposed service ports. "
+        "Added in 26.1.0. A collection of exposed service ports. "
         "Each entry defines a service accessible through the compute session."
     ),
 )
@@ -172,3 +162,164 @@ class ServicePortsGQL:
     entries: list[ServicePortEntryGQL] = strawberry.field(
         description="List of service port entries."
     )
+
+
+# ========== Status Error and Scheduler Types ==========
+
+
+@strawberry.type(
+    name="SchedulerPredicate",
+    description=(
+        "Added in 26.1.0. A scheduler predicate result from scheduling attempts. "
+        "Predicates are conditions checked during session scheduling."
+    ),
+)
+class SchedulerPredicateGQL:
+    """A scheduler predicate entry."""
+
+    name: str = strawberry.field(
+        description="Name of the predicate (e.g., 'concurrency', 'reserved_time')."
+    )
+    msg: str | None = strawberry.field(
+        description="Message explaining why the predicate failed. Null for passed predicates."
+    )
+
+
+@strawberry.type(
+    name="SchedulerInfo",
+    description=(
+        "Added in 26.1.0. Scheduler information including retry attempts and predicate results. "
+        "Contains details about scheduling attempts when a session is pending."
+    ),
+)
+class SchedulerInfoGQL:
+    """Scheduler information in status_data."""
+
+    retries: int | None = strawberry.field(
+        description="Number of scheduling attempts made for this session."
+    )
+    last_try: str | None = strawberry.field(
+        description="ISO 8601 timestamp of the last scheduling attempt."
+    )
+    msg: str | None = strawberry.field(description="Message from the last scheduling attempt.")
+    failed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
+        description="List of predicates that failed during scheduling."
+    )
+    passed_predicates: list[SchedulerPredicateGQL] | None = strawberry.field(
+        description="List of predicates that passed during scheduling."
+    )
+
+
+# ========== Metric Types ==========
+
+
+@strawberry.type(
+    name="MetricStat",
+    description=(
+        "Added in 26.1.0. Statistical aggregation values for a metric over time. "
+        "Contains min, max, sum, average, difference, and rate calculations."
+    ),
+)
+class MetricStatGQL:
+    """Statistical values for a metric."""
+
+    min: str | None = strawberry.field(description="Minimum observed value.")
+    max: str | None = strawberry.field(description="Maximum observed value.")
+    sum: str | None = strawberry.field(description="Sum of all observed values.")
+    avg: str | None = strawberry.field(description="Average of observed values.")
+    diff: str | None = strawberry.field(description="Difference from previous measurement.")
+    rate: str | None = strawberry.field(description="Rate of change per second.")
+
+
+@strawberry.type(
+    name="MetricValue",
+    description=(
+        "Added in 26.1.0. A metric measurement with current value, capacity, and statistics. "
+        "Used for resource utilization metrics like CPU, memory, and I/O."
+    ),
+)
+class MetricValueGQL:
+    """A single metric measurement."""
+
+    current: str = strawberry.field(description="Current measured value.")
+    capacity: str | None = strawberry.field(
+        description="Maximum capacity for this metric. Null for unbounded metrics."
+    )
+    pct: str | None = strawberry.field(
+        description="Percentage utilization (current/capacity * 100)."
+    )
+    unit_hint: str | None = strawberry.field(
+        description="Unit hint for display (e.g., 'bytes', 'msec', 'percent')."
+    )
+    stats: MetricStatGQL | None = strawberry.field(
+        description="Statistical aggregation values over time."
+    )
+
+
+# ========== VFolder Mount Types ==========
+
+
+@strawberry.type(
+    name="VFolderMount",
+    description=(
+        "Added in 26.1.0. Information about a mounted virtual folder. "
+        "Contains mount path, permissions, and usage mode details."
+    ),
+)
+class VFolderMountGQL:
+    """Virtual folder mount information."""
+
+    name: str = strawberry.field(description="Name of the virtual folder.")
+    vfid: str = strawberry.field(description="Unique identifier of the virtual folder.")
+    vfsubpath: str = strawberry.field(description="Subpath within the virtual folder to mount.")
+    host_path: str = strawberry.field(
+        description="Path on the host where the virtual folder is stored."
+    )
+    kernel_path: str = strawberry.field(
+        description="Path inside the container where the folder is mounted."
+    )
+    mount_perm: MountPermissionGQL = strawberry.field(
+        description="Permission level for this mount (ro, rw, wd)."
+    )
+    usage_mode: VFolderUsageModeGQL = strawberry.field(
+        description="Usage mode of the virtual folder (general, model, data)."
+    )
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> VFolderMountGQL:
+        """Convert a dict to VFolderMountGQL."""
+        return cls(
+            name=data["name"],
+            vfid=str(data["vfid"]),
+            vfsubpath=str(data["vfsubpath"]),
+            host_path=str(data["host_path"]),
+            kernel_path=str(data["kernel_path"]),
+            mount_perm=MountPermissionGQL(data["mount_perm"]),
+            usage_mode=VFolderUsageModeGQL(data["usage_mode"]),
+        )
+
+
+# ========== Internal Data Types ==========
+
+
+@strawberry.type(
+    name="DotfileInfo",
+    description="Added in 26.1.0. Information about a dotfile to be provisioned in a container.",
+)
+class DotfileInfoGQL:
+    path: str = strawberry.field(
+        description="The file path where the dotfile will be placed (relative or absolute)."
+    )
+    data: str = strawberry.field(description="The content of the dotfile.")
+    perm: str = strawberry.field(
+        description="The file permission in octal string format (e.g., '0644')."
+    )
+
+
+@strawberry.type(
+    name="SSHKeypair",
+    description="Added in 26.1.0. SSH keypair for secure access.",
+)
+class SSHKeypairGQL:
+    public_key: str = strawberry.field(description="The public key in OpenSSH format.")
+    private_key: str = strawberry.field(description="The private key in PEM format.")

@@ -1,47 +1,47 @@
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
+from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
     KernelFilterGQL,
     KernelOrderByGQL,
     KernelV2GQL,
 )
-from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.repositories.scheduler.options import KernelConditions
+from ai.backend.manager.errors.kernel import TooManyKernelsFound
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
+@strawberry.field(description="Added in 26.1.0. Query a single kernel by ID.")
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> KernelV2GQL | None:
-    return await fetch_kernel(info, KernelId(id))
+) -> Optional[KernelV2GQL]:
+    result = await fetch_kernels(info, filter=KernelFilterGQL(id=id), limit=1)
+    if len(result.edges) >= 2:
+        raise TooManyKernelsFound
+    if result.edges:
+        return result.edges[0].node
+    return None
 
 
-@strawberry.field(
-    description="Added in 26.2.0. Query kernels with pagination and filtering. (admin only)"
-)  # type: ignore[misc]
-async def admin_kernels_v2(
+@strawberry.field(description="Added in 26.1.0. Query kernels with pagination and filtering.")
+async def kernels_v2(
     info: Info[StrawberryGQLContext],
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
+    filter: Optional[KernelFilterGQL] = None,
+    order_by: Optional[list[KernelOrderByGQL]] = None,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    first: Optional[int] = None,
+    last: Optional[int] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
 ) -> KernelConnectionV2GQL:
-    check_admin_only()
     return await fetch_kernels(
         info,
         filter=filter,
@@ -52,35 +52,4 @@ async def admin_kernels_v2(
         last=last,
         limit=limit,
         offset=offset,
-    )
-
-
-@strawberry.field(
-    name="sessionKernelsV2",
-    description="Added in 26.2.0. Query kernels within a specific session.",
-)  # type: ignore[misc]
-async def session_kernels_v2(
-    info: Info[StrawberryGQLContext],
-    scope: SessionScope,
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> KernelConnectionV2GQL:
-    base_conditions = [KernelConditions.by_session_ids([SessionId(scope.session_id)])]
-    return await fetch_kernels(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-        base_conditions=base_conditions,
     )

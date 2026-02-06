@@ -40,7 +40,21 @@ from ai.backend.manager.data.kernel.types import (
     RuntimeConfig,
     UserPermission,
 )
-from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
+from ai.backend.manager.data.session.types import (
+    ImageSpec,
+    MountSpec,
+    ResourceSpec,
+    SessionData,
+    SessionExecution,
+    SessionIdentity,
+    SessionInfo,
+    SessionLifecycle,
+    SessionListResult,
+    SessionMetadata,
+    SessionMetrics,
+    SessionNetwork,
+    SessionStatus,
+)
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
@@ -100,8 +114,8 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.actions.search_session import SearchSessionsAction
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -273,6 +287,77 @@ def sample_session_data(
         network_id=None,
         owner=None,
         service_ports=None,
+    )
+
+
+@pytest.fixture
+def sample_session_info(
+    sample_session_id: SessionId,
+    sample_access_key: AccessKey,
+    sample_user_id: UUID,
+    sample_group_id: UUID,
+) -> SessionInfo:
+    """Create sample session info data."""
+    return SessionInfo(
+        identity=SessionIdentity(
+            id=sample_session_id,
+            creation_id="test-creation-id",
+            name="test-session",
+            session_type=SessionTypes.INTERACTIVE,
+            priority=0,
+        ),
+        metadata=SessionMetadata(
+            name="test-session",
+            domain_name="default",
+            group_id=sample_group_id,
+            user_uuid=sample_user_id,
+            access_key=str(sample_access_key),
+            session_type=SessionTypes.INTERACTIVE,
+            priority=0,
+            created_at=datetime.now(tzutc()),
+            tag=None,
+        ),
+        resource=ResourceSpec(
+            cluster_mode="single-node",
+            cluster_size=1,
+            occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
+            requested_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
+            scaling_group_name="default",
+            target_sgroup_names=[],
+            agent_ids=["i-ubuntu"],
+        ),
+        image=ImageSpec(
+            images=["cr.backend.ai/stable/python:latest"],
+            tag=None,
+        ),
+        mounts=MountSpec(vfolder_mounts=None),
+        execution=SessionExecution(
+            environ={},
+            bootstrap_script=None,
+            startup_command=None,
+            use_host_network=False,
+            callback_url=None,
+        ),
+        lifecycle=SessionLifecycle(
+            status=SessionStatus.RUNNING,
+            result=SessionResult.UNDEFINED,
+            created_at=datetime.now(tzutc()),
+            terminated_at=None,
+            starts_at=None,
+            status_changed=None,
+            batch_timeout=None,
+            status_info=None,
+            status_data=None,
+            status_history={"PENDING": "2023-01-01T00:00:00Z", "RUNNING": "2023-01-01T00:01:00Z"},
+        ),
+        metrics=SessionMetrics(
+            num_queries=0,
+            last_stat=None,
+        ),
+        network=SessionNetwork(
+            network_type=NetworkType.VOLATILE,
+            network_id=None,
+        ),
     )
 
 
@@ -1543,12 +1628,12 @@ class TestSearch:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_session_data: SessionData,
+        sample_session_info: SessionInfo,
     ) -> None:
         """Test searching sessions with querier"""
         mock_session_repository.search = AsyncMock(
             return_value=SessionListResult(
-                items=[sample_session_data],
+                items=[sample_session_info],
                 total_count=1,
                 has_next_page=False,
                 has_previous_page=False,
@@ -1561,9 +1646,9 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
-        assert result.data == [sample_session_data]
+        assert result.data == [sample_session_info]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
@@ -1590,7 +1675,7 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
         assert result.data == []
         assert result.total_count == 0
@@ -1599,12 +1684,12 @@ class TestSearch:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_session_data: SessionData,
+        sample_session_info: SessionInfo,
     ) -> None:
         """Test searching sessions with pagination"""
         mock_session_repository.search = AsyncMock(
             return_value=SessionListResult(
-                items=[sample_session_data],
+                items=[sample_session_info],
                 total_count=25,
                 has_next_page=True,
                 has_previous_page=True,
@@ -1617,7 +1702,7 @@ class TestSearch:
             orders=[],
         )
         action = SearchSessionsAction(querier=querier)
-        result = await session_service.search(action)
+        result = await session_service.search_sessions(action)
 
         assert result.total_count == 25
         assert result.has_next_page is True

@@ -169,6 +169,20 @@ type AgentResource {
   free: JSON!
 }
 
+"""Added in 26.1.0. Configuration for the agent selection strategy"""
+type AgentSelectorConfig {
+  """
+  Number of existing kernels already running on the same endpoint.
+  Used by the concentrated agent selection strategy when enforce_spreading_endpoint_replica is enabled.
+  
+  When enforce_spreading_endpoint_replica is true, inference service replicas are distributed
+  across different agents for improved fault tolerance. This count helps the scheduler
+  avoid placing new replicas on agents that already host replicas for the same endpoint,
+  ensuring better distribution of model serving workloads.
+  """
+  kernelCountsAtSameEndpoint: Int!
+}
+
 """Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
@@ -891,80 +905,6 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
-"""
-Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
-"""
-input BulkCreateUserV2Input {
-  """List of user creation inputs."""
-  users: [CreateUserV2Input!]!
-}
-
-"""Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersV2Payload {
-  """Number of users successfully created."""
-  createdCount: Int!
-
-  """List of newly created users."""
-  users: [UserV2!]!
-}
-
-"""
-Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.
-"""
-input BulkUpsertDomainFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
-
-  """List of domain weight updates to apply."""
-  inputs: [DomainWeightInputItem!]!
-}
-
-"""
-Added in 26.1.0. Payload for bulk domain fair share weight upsert mutation.
-"""
-type BulkUpsertDomainFairShareWeightPayload {
-  """Number of domain fair share records created or updated."""
-  upsertedCount: Int!
-}
-
-"""
-Added in 26.1.0. Input for bulk upserting project fair share weights. Allows updating multiple projects in a single transaction.
-"""
-input BulkUpsertProjectFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
-
-  """List of project weight updates to apply."""
-  inputs: [ProjectWeightInputItem!]!
-}
-
-"""
-Added in 26.1.0. Payload for bulk project fair share weight upsert mutation.
-"""
-type BulkUpsertProjectFairShareWeightPayload {
-  """Number of project fair share records created or updated."""
-  upsertedCount: Int!
-}
-
-"""
-Added in 26.1.0. Input for bulk upserting user fair share weights. Allows updating multiple users in a single transaction.
-"""
-input BulkUpsertUserFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
-
-  """List of user weight updates to apply."""
-  inputs: [UserWeightInputItem!]!
-}
-
-"""
-Added in 26.1.0. Payload for bulk user fair share weight upsert mutation.
-"""
-type BulkUpsertUserFairShareWeightPayload {
-  """Number of user fair share records created or updated."""
-  upsertedCount: Int!
-}
-
 scalar ByteSize
 
 """
@@ -1061,16 +1001,6 @@ type ComputePlugins {
 
 extend type ComputeSessionNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0.
-
-Scope for querying images within a specific container registry.
-"""
-input ContainerRegistryScope {
-  """UUID of the container registry to scope the query to."""
-  registryId: UUID!
 }
 
 input CreateAccessTokenInput {
@@ -1205,68 +1135,6 @@ type CreateRevisionPayload {
   revision: ModelRevision!
 }
 
-"""
-Added in 26.2.0. Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.
-"""
-input CreateUserV2Input {
-  """User's email address. Must be unique across the system."""
-  email: String!
-
-  """Unique username for login."""
-  username: String!
-
-  """Initial password for the user."""
-  password: String!
-
-  """Domain to assign the user to."""
-  domainName: String!
-
-  """If true, user must change password on first login."""
-  needPasswordChange: Boolean!
-
-  """Initial account status."""
-  status: UserStatusV2!
-
-  """User role determining access permissions."""
-  role: UserRoleV2!
-
-  """User's full display name."""
-  fullName: String = null
-
-  """Optional description or notes about the user."""
-  description: String = null
-
-  """List of project (group) IDs to assign the user to."""
-  groupIds: [UUID!] = null
-
-  """Allowed client IP addresses or CIDR ranges."""
-  allowedClientIp: [String!] = null
-
-  """Whether to enable TOTP two-factor authentication."""
-  totpActivated: Boolean! = false
-
-  """Name of the user resource policy to apply."""
-  resourcePolicy: String! = "default"
-
-  """Whether this user can create sudo sessions."""
-  sudoSessionEnabled: Boolean! = false
-
-  """User ID (UID) for container processes."""
-  containerUid: Int = null
-
-  """Primary group ID (GID) for container processes."""
-  containerMainGid: Int = null
-
-  """Supplementary group IDs for container processes."""
-  containerGids: [Int!] = null
-}
-
-"""Added in 26.2.0. Payload for user creation mutation."""
-type CreateUserV2Payload {
-  """The newly created user."""
-  user: UserV2!
-}
-
 """Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput {
   name: String!
@@ -1281,13 +1149,6 @@ type CreateVFSStoragePayload {
 
 """Date (isoformat)"""
 scalar Date
-
-input DateFilter {
-  before: Date = null
-  after: Date = null
-  equals: Date = null
-  notEquals: Date = null
-}
 
 """Date with time (isoformat)"""
 scalar DateTime
@@ -1321,7 +1182,7 @@ input DelegateImportArtifactsInput {
   """
   Options controlling import behavior such as forcing re-download. Added in 26.1.0.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
@@ -1506,26 +1367,6 @@ type DeleteUserConfigPayload {
   deleted: Boolean!
 }
 
-"""Added in 26.2.0. Payload for single user soft-delete mutation."""
-type DeleteUserV2Payload {
-  """Whether the deletion was successful."""
-  success: Boolean!
-}
-
-"""
-Added in 26.2.0. Input for soft-deleting multiple users. Soft delete changes user status to DELETED but preserves data.
-"""
-input DeleteUsersV2Input {
-  """List of user UUIDs to soft-delete."""
-  userIds: [UUID!]!
-}
-
-"""Added in 26.2.0. Payload for bulk user soft-delete mutation."""
-type DeleteUsersV2Payload {
-  """Number of users successfully soft-deleted."""
-  deletedCount: Int!
-}
-
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
   id: ID!
@@ -1633,12 +1474,6 @@ type DeploymentPolicy implements Node {
   updatedAt: DateTime!
 }
 
-"""Scope for deployment scheduling history query"""
-input DeploymentScope {
-  """Deployment ID to get history for"""
-  deploymentId: UUID!
-}
-
 """
 Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
@@ -1647,8 +1482,6 @@ enum DeploymentStatus {
   SCALING
   DEPLOYING
   READY
-  DESTROYING
-  DESTROYED
   STOPPING
   STOPPED
 }
@@ -1694,20 +1527,6 @@ enum DeploymentStrategyType {
 }
 
 """
-Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
-"""
-type DomainBasicInfo {
-  """Domain name (primary key)."""
-  name: String!
-
-  """Optional description of the domain."""
-  description: String
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
-"""
 Added in 26.1.0. Domain-level fair share data representing scheduling priority for an entire domain. The fair share factor determines resource allocation relative to other domains.
 """
 type DomainFairShare implements Node {
@@ -1733,7 +1552,7 @@ type DomainFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group, including projects without fair share records (which use default values).
+  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group.
   """
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 }
@@ -1813,49 +1632,8 @@ enum DomainFairShareOrderField {
   CREATED_AT
 }
 
-input DomainFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroup: String!
-}
-
-"""
-Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
-"""
-type DomainLifecycleInfo {
-  """
-  Whether the domain is active. Inactive domains cannot create new projects or perform operations.
-  """
-  isActive: Boolean!
-
-  """Timestamp when the domain was created."""
-  createdAt: DateTime!
-
-  """Timestamp when the domain was last modified."""
-  modifiedAt: DateTime!
-}
-
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0. Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.
-"""
-input DomainProjectV2Scope {
-  """
-  Domain name to scope the query. Only projects belonging to this domain will be returned.
-  """
-  domainName: String!
-}
-
-"""
-Added in 26.2.0. Domain container registry configuration. Contains allowed container registry URLs for this domain.
-"""
-type DomainRegistryInfo {
-  """
-  List of allowed container registry URLs. Empty list means no restrictions on registry access.
-  """
-  allowedDockerRegistries: [String!]!
 }
 
 """
@@ -1883,21 +1661,6 @@ type DomainUsageBucket implements Node {
   Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
   """
   capacitySnapshot: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
-  """
-  averageDailyUsage: ResourceSlot!
-
-  """
-  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
-  """
-  usageCapacityRatio: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
 
   """
   Added in 26.1.0. Project usage buckets belonging to this domain. Returns paginated project-level usage history for all projects in this domain within the same scaling group.
@@ -1944,12 +1707,6 @@ input DomainUsageBucketFilter {
   """
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
-  periodStart: DateFilter = null
-
-  """Filter by usage measurement period end date."""
-  periodEnd: DateFilter = null
-
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainUsageBucketFilter!] = null
 
@@ -1979,140 +1736,18 @@ input DomainUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
-input DomainUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroup: String!
-}
-
 """
-Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
+Added in 26.1.0. Information about a dotfile to be provisioned in a container.
 """
-input DomainUserV2Scope {
-  """
-  Domain name to scope the user query. Only users belonging to this domain will be returned.
-  """
-  domainName: String!
-}
+type DotfileInfo {
+  """The file path where the dotfile will be placed (relative or absolute)."""
+  path: String!
 
-"""
-Added in 26.2.0. Domain entity with structured field groups. Formerly DomainNode. Provides comprehensive domain information organized into logical categories: basic_info (identity), registry (container registries), and lifecycle (status/timestamps). All fields use typed structures instead of JSON scalars. Resource allocation and storage permissions are provided through separate dedicated APIs.
-"""
-type DomainV2 implements Node @key(fields: "id") {
-  """The Globally Unique ID of this object"""
-  id: ID!
+  """The content of the dotfile."""
+  data: String!
 
-  """Basic domain information including name and description."""
-  basicInfo: DomainBasicInfo!
-
-  """Container registry configuration."""
-  registry: DomainRegistryInfo!
-
-  """Lifecycle information including activation status and timestamps."""
-  lifecycle: DomainLifecycleInfo!
-
-  """
-  Fair share records for this domain, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
-  """
-  fairShares(scope: DomainFairShareScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
-
-  """
-  Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
-  """
-  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
-}
-
-"""
-Added in 26.2.0. Paginated connection for domain records. Provides relay-style cursor-based pagination for efficient traversal of domain data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
-"""
-type DomainV2Connection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [DomainV2Edge!]!
-
-  """Total number of domain records matching the query criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type DomainV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: DomainV2!
-}
-
-"""
-Added in 26.2.0. Filter input for querying domains. Supports filtering by name, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input DomainV2Filter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """
-  Filter by active status. True for active domains, False for inactive domains.
-  """
-  isActive: Boolean = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """
-  Filter by last modification timestamp. Supports before, after, and between operations.
-  """
-  modifiedAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [DomainV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [DomainV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [DomainV2Filter!] = null
-}
-
-"""
-Added in 26.2.0. Specifies ordering for domain query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input DomainV2OrderBy {
-  """The field to order by. See DomainV2OrderField for available options."""
-  field: DomainV2OrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically.
-"""
-enum DomainV2OrderField {
-  CREATED_AT
-  MODIFIED_AT
-  NAME
-}
-
-"""
-Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
-"""
-input DomainWeightInputItem {
-  """Name of the domain to update weight for."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
+  """The file permission in octal string format (e.g., '0644')."""
+  perm: String!
 }
 
 """Input for email message settings"""
@@ -2127,17 +1762,6 @@ input EmailSpecInput {
   smtp: SMTPConnectionInput!
   message: EmailMessageInput!
   auth: SMTPAuthInput = null
-}
-
-"""
-Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
-"""
-type EntityTimestamps {
-  """Timestamp when this entity was created."""
-  createdAt: DateTime
-
-  """Timestamp when this entity was last modified."""
-  modifiedAt: DateTime
 }
 
 """
@@ -2242,48 +1866,13 @@ type FairShareCalculationSnapshot {
 }
 
 """
-Added in 26.1.0. Fair share calculation configuration for a resource group. Defines parameters for computing fair share factors across domains, projects, and users.
-"""
-type FairShareScalingGroupSpec {
-  """
-  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. Default is 7 days.
-  """
-  halfLifeDays: Int!
-
-  """
-  Total lookback period in days for usage aggregation. Only usage within this window is considered. Default is 28 days.
-  """
-  lookbackDays: Int!
-
-  """
-  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Default is 1 day.
-  """
-  decayUnitDays: Int!
-
-  """
-  Default weight for entities without explicit weight in this resource group. Default is 1.0.
-  """
-  defaultWeight: Decimal!
-
-  """
-  Added in 26.2.0. Weights for each resource type with default indicators. All resource types from capacity are included. Shows which resources use explicit vs default weights.
-  """
-  resourceWeights: [ResourceWeightEntry!]!
-}
-
-"""
 Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation.
 """
 type FairShareSpec {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. This is the effective weight - either the explicitly set value or the resource group's default_weight.
+  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. Default is 1.0. A weight of 2.0 means this entity is twice as important as one with weight 1.0.
   """
   weight: Decimal!
-
-  """
-  Added in 26.1.0. Whether this entity uses the resource group's default_weight. True means no explicit weight was set and the default is being used. False means an explicit weight value was configured for this entity.
-  """
-  usesDefault: Boolean!
 
   """
   Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
@@ -2301,9 +1890,9 @@ type FairShareSpec {
   decayUnitDays: Int!
 
   """
-  Added in 26.2.0. Weights for each resource type with default indicators. Shows which resources use explicit vs default weights. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
+  Weights for each resource type when calculating normalized usage. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
   """
-  resourceWeights: [ResourceWeightEntry!]!
+  resourceWeights: ResourceSlot!
 }
 
 """Added in 25.14.0"""
@@ -2362,245 +1951,13 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
-"""
-Added in 26.2.0.
-
-Relay-style connection for paginated image queries.
-Includes total count for pagination UI.
-"""
-type ImageConnectionV2 {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ImageV2Edge!]!
-
-  """Total count of images matching the query."""
-  count: Int!
-}
-
-"""
-Added in 26.2.0.
-
-Filter options for images based on various criteria such as status,
-name, and architecture.
-
-Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-"""
-input ImageFilterGQL {
-  status: [ImageStatus!] = null
-  name: StringFilter = null
-  architecture: StringFilter = null
-  AND: [ImageFilterGQL!] = null
-  OR: [ImageFilterGQL!] = null
-  NOT: [ImageFilterGQL!] = null
-}
-
-"""
-Added in 26.2.0.
-
-Identity information for an image.
-Contains the canonical name, namespace, and architecture.
-"""
-type ImageIdentityInfo {
-  """Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."""
-  canonicalName: String!
-
-  """Image namespace/path within the registry (e.g., 'stable/python')."""
-  namespace: String!
-
-  """CPU architecture (e.g., 'x86_64', 'aarch64')."""
-  architecture: String!
-}
-
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
 }
 
-"""
-Added in 26.2.0.
-
-A key-value pair representing a Docker label on the image.
-Labels contain metadata about the image such as maintainer, version, etc.
-"""
-type ImageLabelEntry {
-  """The label key (e.g., 'maintainer')."""
-  key: String!
-
-  """The label value."""
-  value: String!
-}
-
-"""
-Added in 26.2.0.
-
-Metadata information for an image.
-Contains tags, labels, digest, size, status, and creation timestamp.
-"""
-type ImageMetadataInfo {
-  """
-  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
-  """
-  tags: [ImageTagEntry!]!
-
-  """Docker labels."""
-  labels: [ImageLabelEntry!]!
-
-  """Config digest (image hash) for verification."""
-  digest: String
-
-  """Image size in bytes."""
-  sizeBytes: Int!
-
-  """Image status (ALIVE or DELETED)."""
-  status: ImageStatus!
-
-  """Timestamp when the image was created/registered."""
-  createdAt: DateTime
-}
-
 extend type ImageNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0.
-
-Specifies the field and direction for ordering images in queries.
-"""
-input ImageOrderByGQL {
-  field: ImageOrderField!
-  direction: OrderDirection! = ASC
-}
-
-"""
-Added in 26.2.0.
-
-Fields available for ordering image queries.
-"""
-enum ImageOrderField {
-  NAME
-  CREATED_AT
-}
-
-"""
-Added in 26.2.0.
-
-Permission types for image operations.
-"""
-enum ImagePermission {
-  READ_ATTRIBUTE
-  UPDATE_ATTRIBUTE
-  CREATE_CONTAINER
-  FORGET_IMAGE
-}
-
-"""
-Added in 26.2.0.
-
-Permission information for an image.
-Contains the list of permissions the current user has on this image.
-"""
-type ImagePermissionInfo {
-  """List of permissions the user has on this image."""
-  permissions: [ImagePermission!]!
-}
-
-"""
-Added in 26.2.0.
-
-Runtime requirements information for an image.
-Contains resource limits and supported accelerators.
-"""
-type ImageRequirementsInfo {
-  """Resource slot limits (cpu, memory, accelerators, etc.)."""
-  resourceLimits: [ImageResourceLimit!]!
-
-  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
-  supportedAccelerators: [String!]!
-}
-
-"""
-Added in 26.2.0.
-
-Resource limit specification for an image.
-Defines minimum and maximum values for a resource slot.
-"""
-type ImageResourceLimit {
-  """Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."""
-  key: String!
-
-  """Minimum required amount."""
-  min: String!
-
-  """Maximum allowed amount."""
-  max: String!
-}
-
-"""
-Added in 26.2.0.
-
-Status of an image in the system.
-"""
-enum ImageStatus {
-  ALIVE
-  DELETED
-}
-
-"""
-Added in 26.2.0.
-
-A key-value pair representing a parsed tag component.
-Tags are extracted from the image reference (e.g., py311, cuda12.1).
-"""
-type ImageTagEntry {
-  """The tag key (e.g., 'python', 'cuda')."""
-  key: String!
-
-  """The tag value (e.g., '3.11', '12.1')."""
-  value: String!
-}
-
-"""
-Added in 26.2.0.
-
-Represents a container image in Backend.AI.
-
-Images are container specifications that define the runtime environment
-for compute sessions. Each image has identity information, metadata,
-resource requirements, and permission settings.
-
-This is the V2 implementation using Strawberry GraphQL with Relay-style
-connections as part of BEP-1010 migration.
-"""
-type ImageV2 implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Image identity information (name, architecture)."""
-  identity: ImageIdentityInfo!
-
-  """Image metadata (labels, digest, size, status, created_at)."""
-  metadata: ImageMetadataInfo!
-
-  """Runtime requirements (supported_accelerators)."""
-  requirements: ImageRequirementsInfo!
-
-  """Permission info for the current user. May be null."""
-  permission: ImagePermissionInfo
-
-  """UUID of the container registry where this image is stored."""
-  registryId: UUID!
-}
-
-"""An edge in a connection."""
-type ImageV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ImageV2!
 }
 
 """
@@ -2620,7 +1977,7 @@ input ImportArtifactsInput {
   """
   Options controlling import behavior such as forcing re-download. Added in 26.1.0.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptionsGQL! = {force: false}
 }
 
 """
@@ -2663,9 +2020,36 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
-Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
+Added in 26.1.0. A collection of devices of a specific type attached to a kernel. Groups devices by their device type (e.g., 'cuda', 'rocm').
+"""
+type KernelAttachedDeviceEntry {
+  """Type of the device (e.g., 'cuda', 'rocm', 'tpu')."""
+  deviceType: String!
+
+  """List of device instances of this type."""
+  devices: [KernelDeviceModelInfo!]!
+}
+
+"""
+Added in 26.1.0. A collection of all devices attached to a kernel. Organized by device type, each containing multiple device instances.
+"""
+type KernelAttachedDevices {
+  """
+  List of device type entries, each containing attached device instances.
+  """
+  entries: [KernelAttachedDeviceEntry!]!
+}
+
+"""
+Added in 26.1.0. Cluster configuration for a kernel in distributed sessions.
 """
 type KernelClusterInfo {
+  """The clustering mode (e.g., single-node, multi-node)."""
+  clusterMode: String!
+
+  """Total number of nodes in the cluster."""
+  clusterSize: Int!
+
   """The role of this kernel in the cluster (e.g., main, sub)."""
   clusterRole: String!
 
@@ -2679,7 +2063,7 @@ type KernelClusterInfo {
   clusterHostname: String!
 }
 
-"""Added in 26.2.0. Connection type for paginated kernel results."""
+"""Added in 26.1.0. Connection type for paginated kernel results."""
 type KernelConnectionV2 {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -2689,14 +2073,77 @@ type KernelConnectionV2 {
   count: Int!
 }
 
-"""Added in 26.2.0. Filter criteria for querying kernels."""
-input KernelFilter {
-  id: UUIDFilter = null
-  status: KernelStatusFilter = null
-  sessionId: UUIDFilter = null
+"""
+Added in 26.1.0. Information about a specific device model attached to a kernel. Contains device identification and capacity information.
+"""
+type KernelDeviceModelInfo {
+  """Unique identifier for the device instance."""
+  deviceId: String!
+
+  """Model name of the device (e.g., 'NVIDIA A100', 'AMD MI250')."""
+  modelName: String!
+
+  """Device-specific capacity and capability information."""
+  data: JSON!
 }
 
-"""Added in 26.2.0. Lifecycle and status information for a kernel."""
+"""Added in 26.1.0. Filter criteria for querying kernels."""
+input KernelFilter {
+  id: UUID = null
+  status: KernelStatusFilter = null
+  sessionId: UUID = null
+}
+
+"""Added in 26.1.0. Container image information for a kernel."""
+type KernelImageInfo {
+  """
+  The canonical reference of the container image (e.g., registry/repo:tag). May be null for legacy kernels with missing image data.
+  """
+  reference: String
+
+  """The container registry hosting the image."""
+  registry: String
+
+  """The tag of the container image."""
+  tag: String
+
+  """
+  The CPU architecture the image is built for (e.g., x86_64, aarch64). May be null for legacy kernels.
+  """
+  architecture: String
+}
+
+"""Added in 26.1.0. Internal data stored with the kernel for system use."""
+type KernelInternalData {
+  """List of dotfiles to be provisioned in the kernel's filesystem."""
+  dotfiles: [DotfileInfo!]
+
+  """SSH keypair for secure access to the kernel."""
+  sshKeypair: SSHKeypair
+
+  """Path to the model definition file for inference services."""
+  modelDefinitionPath: String
+
+  """Runtime variant identifier (e.g., 'custom')."""
+  runtimeVariant: String
+
+  """Whether sudo is enabled for this session."""
+  sudoSessionEnabled: Boolean
+
+  """Whether to block service ports. If true, no services can be started."""
+  blockServicePorts: Boolean
+
+  """Whether to prevent vfolder mounts (except .logs directory)."""
+  preventVfolderMounts: Boolean
+
+  """Docker credentials for private registry access."""
+  dockerCredentials: JSON
+
+  """List of domain socket paths to proxy into the container."""
+  domainSocketProxies: [String!]
+}
+
+"""Added in 26.1.0. Lifecycle and status information for a kernel."""
 type KernelLifecycleInfo {
   """
   Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
@@ -2707,6 +2154,20 @@ type KernelLifecycleInfo {
   """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
   result: SessionResult!
 
+  """Timestamp when the kernel last changed status."""
+  statusChanged: DateTime
+
+  """Human-readable information about the current status."""
+  statusInfo: String
+
+  """
+  Structured data about the current status including error, scheduler, or lifecycle information.
+  """
+  statusData: KernelStatusData
+
+  """History of status transitions with timestamps."""
+  statusHistory: KernelStatusHistory
+
   """Timestamp when the kernel was created."""
   createdAt: DateTime
 
@@ -2715,59 +2176,122 @@ type KernelLifecycleInfo {
 
   """Scheduled start time for the kernel, if applicable."""
   startsAt: DateTime
+
+  """Timestamp when the kernel was last seen active."""
+  lastSeen: DateTime
 }
 
-"""Added in 26.2.0. Network configuration for a kernel."""
+"""Added in 26.1.0. Additional metadata for a kernel."""
+type KernelMetadataInfo {
+  """URL to call back when kernel status changes."""
+  callbackUrl: String
+
+  """Internal data stored with the kernel for system use."""
+  internalData: KernelInternalData
+}
+
+"""Added in 26.1.0. Metrics and statistics for a kernel."""
+type KernelMetricsInfo {
+  """The number of queries/executions performed by this kernel."""
+  numQueries: Int!
+
+  """
+  The last collected statistics for this kernel including CPU, memory, I/O, and network metrics.
+  """
+  lastStat: KernelStat
+}
+
+"""Added in 26.1.0. Network configuration for a kernel."""
 type KernelNetworkInfo {
+  """The hostname or IP address where the kernel is accessible."""
+  kernelHost: String
+
+  """The port for REPL input stream."""
+  replInPort: Int!
+
+  """The port for REPL output stream."""
+  replOutPort: Int!
+
   """Collection of service ports exposed by this kernel."""
   servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
   preopenPorts: [Int!]
+
+  """Whether the kernel uses host network mode."""
+  useHostNetwork: Boolean!
 }
 
-"""Added in 26.2.0. Ordering specification for kernels."""
+"""Added in 26.1.0. Ordering specification for kernels."""
 input KernelOrderBy {
   field: KernelOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.2.0. Fields available for ordering kernels."""
+"""Added in 26.1.0. Fields available for ordering kernels."""
 enum KernelOrderField {
   CREATED_AT
-  TERMINATED_AT
-  STATUS
-  CLUSTER_MODE
-  CLUSTER_HOSTNAME
-  CLUSTER_IDX
+  ID
 }
 
-"""Added in 26.2.0. Resource allocation information for a kernel."""
+"""Added in 26.1.0. Resource allocation information for a kernel."""
 type KernelResourceInfo {
+  """The scaling group this kernel is assigned to."""
+  scalingGroup: String
+
   """
   The ID of the agent running this kernel. Null if not yet assigned or hidden.
   """
   agentId: String
 
-  """The resource group (scaling group) this kernel is assigned to."""
-  resourceGroupName: String
+  """The network address of the agent. Null if not yet assigned or hidden."""
+  agentAddr: String
 
   """
   The container ID on the agent. Null if container not yet created or hidden.
   """
   containerId: String
 
-  """Resource allocation with requested and used slots."""
-  allocation: ResourceAllocation!
+  """
+  The resource slots currently occupied by this kernel.
+  Contains entries with resource types (e.g., cpu, mem, cuda.shares) and their quantities.
+  """
+  occupiedSlots: ResourceSlot!
+
+  """
+  The resource slots originally requested for this kernel.
+  May differ from occupied_slots due to scheduling adjustments.
+  """
+  requestedSlots: ResourceSlot!
 
   """The fractional resource shares occupied by this kernel."""
-  shares: ResourceSlot!
+  occupiedShares: ResourceSlot!
+
+  """
+  Information about attached devices (e.g., GPUs) allocated to this kernel.
+  """
+  attachedDevices: KernelAttachedDevices
 
   """Additional resource options and configurations for this kernel."""
   resourceOpts: ResourceOpts
 }
 
-"""Added in 26.2.0. Information about the session this kernel belongs to."""
+"""Added in 26.1.0. Runtime configuration for a kernel."""
+type KernelRuntimeInfo {
+  """Environment variables set for this kernel."""
+  environ: [String!]
+
+  """List of virtual folders mounted to this kernel."""
+  vfolderMounts: [VFolderMount!]
+
+  """Bootstrap script executed when the kernel starts."""
+  bootstrapScript: String
+
+  """Startup command executed after bootstrap."""
+  startupCommand: String
+}
+
+"""Added in 26.1.0. Information about the session this kernel belongs to."""
 type KernelSessionInfo {
   """The unique identifier of the session this kernel belongs to."""
   sessionId: UUID!
@@ -2779,58 +2303,167 @@ type KernelSessionInfo {
   name: String
 
   """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
-  sessionType: SessionTypes!
+  sessionType: SessionType!
 }
 
-"""Added in 26.2.0. Status of a kernel in its lifecycle."""
+"""
+Added in 26.1.0. Session-specific status data during kernel lifecycle transitions.
+"""
+type KernelSessionStatusData {
+  """Status string of the session (e.g., 'terminating')."""
+  status: String
+}
+
+"""
+Added in 26.1.0. Collection of kernel resource statistics. Contains utilization metrics for CPU, memory, I/O, network, and accelerators.
+"""
+type KernelStat {
+  """List of metric entries for this kernel."""
+  entries: [KernelStatEntry!]!
+}
+
+"""
+Added in 26.1.0. A single kernel statistic entry with metric key and value. Common keys include: cpu_util, cpu_used, mem, io_read, io_write, net_rx, net_tx.
+"""
+type KernelStatEntry {
+  """Metric key name (e.g., 'cpu_util', 'mem', 'io_read')."""
+  key: String!
+
+  """The metric measurement value."""
+  value: MetricValue!
+}
+
+"""Added in 26.1.0"""
 enum KernelStatus {
   PENDING
   SCHEDULED
   PREPARING
+  BUILDING
+  PULLING
   PREPARED
   CREATING
   RUNNING
+  RESTARTING
+  RESIZING
+  SUSPENDED
   TERMINATING
   TERMINATED
+  ERROR
   CANCELLED
 }
 
-"""Added in 26.2.0. Filter for kernel status."""
+"""
+Added in 26.1.0. Structured status data containing error, scheduler, or lifecycle information. The populated fields depend on the kernel's current status and recent state transitions.
+"""
+type KernelStatusData {
+  """Error information when the kernel is in an error state."""
+  error: KernelStatusErrorInfo
+
+  """Scheduler information during pending/scheduling states."""
+  scheduler: SchedulerInfo
+
+  """Kernel-specific status data during lifecycle transitions."""
+  kernel: KernelStatusDataKernel
+
+  """Session-specific status data during lifecycle transitions."""
+  session: KernelSessionStatusData
+}
+
+"""
+Added in 26.1.0. Kernel-specific status data during lifecycle transitions.
+"""
+type KernelStatusDataKernel {
+  """Exit code of the kernel process. Null if not yet terminated."""
+  exitCode: Int
+}
+
+"""
+Added in 26.1.0. Error information when a kernel enters an error state. Contains details about the source and nature of the error.
+"""
+type KernelStatusErrorInfo {
+  """
+  Source of the error: 'agent' for agent errors, 'other' for other errors.
+  """
+  src: String!
+
+  """
+  ID of the agent where the error occurred. Only present for agent errors in debug mode.
+  """
+  agentId: String
+
+  """Name of the exception class."""
+  name: String!
+
+  """String representation of the exception."""
+  repr: String!
+}
+
+"""Added in 26.1.0. Filter for kernel status."""
 input KernelStatusFilter {
   in: [KernelStatus!] = null
   notIn: [KernelStatus!] = null
 }
 
-"""Added in 26.2.0. User and ownership information for a kernel."""
-type KernelUserInfo {
-  """The UUID of the user who owns this kernel."""
-  userId: UUID
-
-  """The access key used to create this kernel."""
-  accessKey: String
-
-  """The domain this kernel belongs to."""
-  domainName: String
-
-  """The group (project) ID this kernel belongs to."""
-  groupId: UUID
+"""
+Added in 26.1.0. A collection of status history entries for a kernel. Records the progression of status changes throughout the kernel's lifecycle.
+"""
+type KernelStatusHistory {
+  """List of status history entries in chronological order."""
+  entries: [KernelStatusHistoryEntry!]!
 }
 
 """
-Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
+Added in 26.1.0. A single status history entry recording a status transition. Contains the status name and the timestamp when the kernel entered that status.
+"""
+type KernelStatusHistoryEntry {
+  """The kernel status name (e.g., 'PENDING', 'RUNNING', 'TERMINATED')."""
+  status: String!
+
+  """Timestamp when the kernel entered this status."""
+  timestamp: DateTime!
+}
+
+"""
+Added in 26.1.0. User permission and ownership information for a kernel.
+"""
+type KernelUserPermissionInfo {
+  """The UUID of the user who owns this kernel."""
+  userUuid: UUID!
+
+  """The access key used to create this kernel."""
+  accessKey: String!
+
+  """The domain this kernel belongs to."""
+  domainName: String!
+
+  """The group (project) ID this kernel belongs to."""
+  groupId: UUID!
+
+  """The Unix user ID for the kernel's container process."""
+  uid: Int
+
+  """The primary Unix group ID for the kernel's container process."""
+  mainGid: Int
+
+  """Additional Unix group IDs for the kernel's container process."""
+  gids: [Int!]
+}
+
+"""
+Added in 26.1.0. Represents a kernel (compute container) in Backend.AI.
 """
 type KernelV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Startup command executed when the kernel starts."""
-  startupCommand: String
-
   """Information about the session this kernel belongs to."""
   session: KernelSessionInfo!
 
-  """User and ownership information."""
-  userInfo: KernelUserInfo!
+  """User permission and ownership information."""
+  userPermission: KernelUserPermissionInfo!
+
+  """Container image information."""
+  image: KernelImageInfo!
 
   """Network configuration and exposed ports."""
   network: KernelNetworkInfo!
@@ -2841,23 +2474,17 @@ type KernelV2 implements Node {
   """Resource allocation and agent information."""
   resource: KernelResourceInfo!
 
+  """Runtime configuration (environment, scripts)."""
+  runtime: KernelRuntimeInfo!
+
   """Lifecycle status and timestamps."""
   lifecycle: KernelLifecycleInfo!
 
-  """Added in 26.2.0. The agent running this kernel."""
-  agent: AgentV2
+  """Execution metrics and statistics."""
+  metrics: KernelMetricsInfo!
 
-  """Added in 26.2.0. The user who owns this kernel."""
-  user: UserV2
-
-  """Added in 26.2.0. The project this kernel belongs to."""
-  project: ProjectV2
-
-  """Added in 26.2.0. The domain this kernel belongs to."""
-  domain: DomainV2
-
-  """Added in 26.2.0. The resource group this kernel is assigned to."""
-  resourceGroup: ResourceGroup
+  """Additional metadata and internal data."""
+  metadata: KernelMetadataInfo!
 }
 
 """An edge in a connection."""
@@ -2877,6 +2504,49 @@ enum LivenessStatus {
   HEALTHY
   UNHEALTHY
   DEGRADED
+}
+
+"""
+Added in 26.1.0. Statistical aggregation values for a metric over time. Contains min, max, sum, average, difference, and rate calculations.
+"""
+type MetricStat {
+  """Minimum observed value."""
+  min: String
+
+  """Maximum observed value."""
+  max: String
+
+  """Sum of all observed values."""
+  sum: String
+
+  """Average of observed values."""
+  avg: String
+
+  """Difference from previous measurement."""
+  diff: String
+
+  """Rate of change per second."""
+  rate: String
+}
+
+"""
+Added in 26.1.0. A metric measurement with current value, capacity, and statistics. Used for resource utilization metrics like CPU, memory, and I/O.
+"""
+type MetricValue {
+  """Current measured value."""
+  current: String!
+
+  """Maximum capacity for this metric. Null for unbounded metrics."""
+  capacity: String
+
+  """Percentage utilization (current/capacity * 100)."""
+  pct: String
+
+  """Unit hint for display (e.g., 'bytes', 'msec', 'percent')."""
+  unitHint: String
+
+  """Statistical aggregation values over time."""
+  stats: MetricStat
 }
 
 type ModelDeployment implements Node {
@@ -3104,6 +2774,13 @@ input ModelTarget {
   revision: String = null
 }
 
+"""Added in 26.1.0. Permission level for virtual folder mounts."""
+enum MountPermission {
+  READ_ONLY
+  READ_WRITE
+  RW_DELETE
+}
+
 type Mutation {
   """
   Added in 25.14.0.
@@ -3144,6 +2821,17 @@ type Mutation {
 
   """
   Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
+
+  """
+  Added in 25.16.0.
   Create or update user-level app configuration.
   The provided extra_config object will completely replace the existing configuration;
   existing keys not present in the new extra_config will be removed.
@@ -3152,6 +2840,16 @@ type Mutation {
   Users can only modify their own configuration, but admins can modify any user's configuration.
   """
   upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
 
   """
   Added in 25.16.0.
@@ -3269,93 +2967,29 @@ type Mutation {
   """
   createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
 
-  """Create a new notification channel (admin only)"""
-  adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
-
-  """Update a notification channel (admin only)"""
-  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
-
-  """Delete a notification channel (admin only)"""
-  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
-
-  """Validate a notification channel (admin only)"""
-  adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
-
-  """Create a new notification rule (admin only)"""
-  adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
-
-  """Update a notification rule (admin only)"""
-  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
-
-  """Delete a notification rule (admin only)"""
-  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
-
-  """Validate a notification rule (admin only)"""
-  adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
-
-  """
-  Added in 26.2.0.
-  Create or update domain-level app configuration (admin only).
-  The provided extra_config object will completely replace the existing configuration;
-  existing keys not present in the new extra_config will be removed.
-  All users in this domain will be affected by these settings when their configurations are merged,
-  unless they have user-level configurations that override specific keys.
-  """
-  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
-
-  """
-  Added in 26.2.0.
-  Delete domain-level app configuration (admin only).
-  All users in this domain may be affected by this deletion.
-  After deletion, users will only receive their user-level configurations
-  when configurations are merged, with no domain-level defaults.
-  """
-  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
-
   """Create a new notification channel"""
-  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
 
   """Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
 
   """Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
 
   """Validate a notification channel"""
-  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
 
   """Create a new notification rule"""
-  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
 
   """Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
 
   """Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
 
   """Validate a notification rule"""
-  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0.
-  Create or update domain-level app configuration.
-  The provided extra_config object will completely replace the existing configuration;
-  existing keys not present in the new extra_config will be removed.
-  All users in this domain will be affected by these settings when their configurations are merged,
-  unless they have user-level configurations that override specific keys.
-  Requires admin privileges.
-  """
-  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0.
-  Delete domain-level app configuration.
-  All users in this domain may be affected by this deletion.
-  After deletion, users will only receive their user-level configurations
-  when configurations are merged, with no domain-level defaults.
-  Requires admin privileges.
-  """
-  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
 
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
@@ -3452,121 +3086,6 @@ type Mutation {
 
   """Added in 25.19.0. Update the traffic status of a route."""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
-
-  """
-  Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload!
-
-  """
-  Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload!
-
-  """
-  Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
-
-  """
-  Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload!
-
-  """
-  Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload!
-
-  """
-  Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload!
-
-  """
-  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does.
-  """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do.
-  """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
-  """
-  adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
-
-  """
-  Added in 26.2.0. Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).
-  """
-  adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload!
-
-  """
-  Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
-  """
-  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
-  """
-  adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload!
-
-  """
-  Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
-  """
-  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
-
-  """
-  Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
-  """
-  adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
-
-  """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role.
-  """
-  updateUser(input: UpdateUserV2Input!): UpdateUserV2Payload!
-
-  """
-  Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
-  """
-  adminDeleteUser(userId: UUID!): DeleteUserV2Payload!
-
-  """
-  Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
-  """
-  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
-
-  """
-  Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
-  """
-  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload!
-
-  """
-  Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
-  """
-  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 }
 
 """An object with a Globally Unique ID"""
@@ -3706,7 +3225,6 @@ enum NotificationRuleType {
   SESSION_STARTED
   SESSION_TERMINATED
   ARTIFACT_DOWNLOAD_COMPLETED
-  ENDPOINT_LIFECYCLE_CHANGED
 }
 
 """Added in 25.14.0"""
@@ -3762,23 +3280,6 @@ type PageInfo @shareable {
 }
 
 """
-Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
-"""
-type ProjectBasicInfo {
-  """Project name."""
-  name: String!
-
-  """Optional description of the project."""
-  description: String
-
-  """Project type determining its purpose. See ProjectTypeV2 enum."""
-  type: ProjectTypeV2!
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
-"""
 Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
 """
 type ProjectFairShare implements Node {
@@ -3807,7 +3308,7 @@ type ProjectFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group, including users without fair share records (which use default values).
+  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group.
   """
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
 }
@@ -3893,73 +3394,6 @@ enum ProjectFairShareOrderField {
   CREATED_AT
 }
 
-input ProjectFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroup: String!
-}
-
-"""
-Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
-"""
-type ProjectLifecycleInfo {
-  """
-  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
-  """
-  isActive: Boolean
-
-  """Timestamp when the project was created."""
-  createdAt: DateTime
-
-  """Timestamp when the project was last modified."""
-  modifiedAt: DateTime
-}
-
-"""
-Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
-"""
-type ProjectOrganizationInfo {
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """Name of the project resource policy applied to this project."""
-  resourcePolicy: String!
-}
-
-"""
-Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
-"""
-type ProjectStorageInfo {
-  """
-  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
-  """
-  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
-}
-
-"""
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management.
-"""
-enum ProjectTypeV2 {
-  GENERAL
-  MODEL_STORE
-}
-
-"""
-Added in 26.2.0. Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input ProjectTypeV2EnumFilter {
-  """Exact match for project type."""
-  equals: ProjectTypeV2 = null
-
-  """Match any of the provided types."""
-  in: [ProjectTypeV2!] = null
-
-  """Exclude exact type match."""
-  notEquals: ProjectTypeV2 = null
-
-  """Exclude any of the provided types."""
-  notIn: [ProjectTypeV2!] = null
-}
-
 """
 Added in 26.1.0. Project-level usage bucket representing aggregated resource consumption for a specific time period. Usage buckets store historical data used to calculate fair share factors.
 """
@@ -3988,21 +3422,6 @@ type ProjectUsageBucket implements Node {
   Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
   """
   capacitySnapshot: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
-  """
-  averageDailyUsage: ResourceSlot!
-
-  """
-  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
-  """
-  usageCapacityRatio: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
 
   """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
@@ -4054,12 +3473,6 @@ input ProjectUsageBucketFilter {
   """
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
-  periodStart: DateFilter = null
-
-  """Filter by usage measurement period end date."""
-  periodEnd: DateFilter = null
-
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectUsageBucketFilter!] = null
 
@@ -4087,194 +3500,6 @@ input ProjectUsageBucketOrderBy {
   Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
   """
   direction: OrderDirection! = DESC
-}
-
-input ProjectUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroup: String!
-}
-
-"""
-Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
-"""
-input ProjectUserV2Scope {
-  """
-  Project UUID to scope the user query. Only users who are members of this project will be returned.
-  """
-  projectId: UUID!
-}
-
-"""
-Added in 26.2.0. Project entity with structured field groups. Formerly GroupNode. Provides comprehensive project information organized into logical categories: basic_info (identity), organization (domain/policy), storage (vfolders), and lifecycle (status/timestamps). All fields use typed structures instead of JSON scalars. Resource allocation and container registry are provided through separate dedicated APIs.
-"""
-type ProjectV2 implements Node @key(fields: "id") {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Basic project information including name, type, and description."""
-  basicInfo: ProjectBasicInfo!
-
-  """
-  Organizational context including domain membership and resource policy.
-  """
-  organization: ProjectOrganizationInfo!
-
-  """Storage configuration and vfolder host permissions."""
-  storage: ProjectStorageInfo!
-
-  """Lifecycle information including activation status and timestamps."""
-  lifecycle: ProjectLifecycleInfo!
-
-  """
-  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
-  """
-  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
-
-  """
-  Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
-  """
-  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
-}
-
-"""
-Added in 26.2.0. Paginated connection for project records. Provides relay-style cursor-based pagination for efficient traversal of project data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
-"""
-type ProjectV2Connection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ProjectV2Edge!]!
-
-  """Total number of project records matching the query criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ProjectV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ProjectV2!
-}
-
-"""
-Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input ProjectV2Filter {
-  """Filter by project ID (UUID). Supports equals and 'in' operations."""
-  id: UUIDFilter = null
-
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  domainName: StringFilter = null
-
-  """
-  Filter by project type. Supports equals, in, not_equals, and not_in operations.
-  """
-  type: ProjectTypeV2EnumFilter = null
-
-  """
-  Filter by active status. True for active projects, False for inactive projects.
-  """
-  isActive: Boolean = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """
-  Filter by last modification timestamp. Supports before, after, and between operations.
-  """
-  modifiedAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [ProjectV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [ProjectV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [ProjectV2Filter!] = null
-}
-
-"""
-Added in 26.2.0. Specifies ordering for project query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input ProjectV2OrderBy {
-  """The field to order by. See ProjectV2OrderField for available options."""
-  field: ProjectV2OrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically.
-"""
-enum ProjectV2OrderField {
-  CREATED_AT
-  MODIFIED_AT
-  NAME
-}
-
-"""
-Added in 26.1.0. Input item for a single project weight in bulk upsert. Represents one project's weight configuration.
-"""
-input ProjectWeightInputItem {
-  """ID of the project to update weight for."""
-  projectId: UUID!
-
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
-}
-
-"""
-Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
-"""
-input PurgeUserV2Input {
-  """UUID of the user to purge."""
-  userId: UUID!
-}
-
-"""Added in 26.2.0. Payload for single user permanent deletion mutation."""
-type PurgeUserV2Payload {
-  """Whether the purge was successful."""
-  success: Boolean!
-}
-
-"""
-Added in 26.2.0. Input for permanently deleting multiple users. This action is irreversible.
-"""
-input PurgeUsersV2Input {
-  """List of user UUIDs to purge."""
-  userIds: [UUID!]!
-}
-
-"""Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersV2Payload {
-  """Number of users successfully purged."""
-  purgedCount: Int!
-
-  """List of user UUIDs that failed to purge, if any."""
-  failedUserIds: [UUID!]!
 }
 
 type Query {
@@ -4336,6 +3561,17 @@ type Query {
 
   """
   Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig
+
+  """
+  Added in 25.16.0.
   Retrieve user-level app configuration.
   Returns only the configuration set specifically for the user, without merging with domain config.
   This query is useful for checking what values are configured at the user level
@@ -4362,6 +3598,33 @@ type Query {
   """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment
 
+  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
+  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare
+
+  """Added in 26.1.0. List domain fair shares (superadmin only)."""
+  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+
+  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
+  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+
+  """Added in 26.1.0. Get project fair share data (superadmin only)."""
+  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare
+
+  """Added in 26.1.0. List project fair shares (superadmin only)."""
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+
+  """Added in 26.1.0. List project usage buckets (superadmin only)."""
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+
+  """Added in 26.1.0. Get user fair share data (superadmin only)."""
+  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
+
+  """Added in 26.1.0. List user fair shares (superadmin only)."""
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+
+  """Added in 26.1.0. List user usage buckets (superadmin only)."""
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+
   """Added in 25.16.0"""
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
@@ -4373,6 +3636,18 @@ type Query {
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
 
   """List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]!
@@ -4401,211 +3676,11 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
-  """
-  Added in 26.2.0.
-  
-  Retrieve a specific image by its ID.
-  
-  Returns detailed information about the image including its identity,
-  metadata, resource requirements, and permission settings.
-  """
-  imageV2(id: ID!): ImageV2
+  """Added in 25.18.0. List scaling groups for a specific project"""
+  scalingGroupsV2(project: ID!, filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
 
-  """Added in 26.2.0. Query a single kernel by ID."""
-  kernelV2(id: UUID!): KernelV2
-
-  """Added in 26.2.0. List resource groups (admin only)"""
-  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
-
-  """List session scheduling history (admin only)"""
-  adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
-
-  """List deployment history (admin only)"""
-  adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
-
-  """List route history (admin only)"""
-  adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
-
-  """Get a notification channel by ID (admin only)"""
-  adminNotificationChannel(id: ID!): NotificationChannel
-
-  """List notification channels (admin only)"""
-  adminNotificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
-
-  """Get a notification rule by ID (admin only)"""
-  adminNotificationRule(id: ID!): NotificationRule
-
-  """List notification rules (admin only)"""
-  adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
-
-  """
-  Added in 26.2.0.
-  Retrieve domain-level app configuration (admin only).
-  Returns only the configuration set specifically for the domain, without merging.
-  This query is useful for checking what values are configured at the domain level
-  when you want to modify domain or user configurations separately.
-  For actual configuration values to be applied, use mergedAppConfig instead.
-  """
-  adminDomainAppConfig(domainName: String!): AppConfig
-
-  """Added in 26.2.0. Get domain fair share data (admin only)."""
-  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare!
-
-  """Added in 26.2.0. List domain fair shares (admin only)."""
-  adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
-
-  """Added in 26.2.0. Get project fair share data (admin only)."""
-  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare!
-
-  """Added in 26.2.0. List project fair shares (admin only)."""
-  adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
-
-  """Added in 26.2.0. Get user fair share data (admin only)."""
-  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare!
-
-  """Added in 26.2.0. List user fair shares (admin only)."""
-  adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
-
-  """Added in 26.2.0. List domain usage buckets (admin only)."""
-  adminDomainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
-
-  """Added in 26.2.0. List project usage buckets (admin only)."""
-  adminProjectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
-
-  """Added in 26.2.0. List user usage buckets (admin only)."""
-  adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
-
-  """
-  Added in 26.2.0.
-  
-  Query images with optional filtering, ordering, and pagination (admin only).
-  
-  Returns container images available in the system. Images are container
-  specifications that define runtime environments for compute sessions.
-  
-  Use filters to narrow down results by status, name, or architecture.
-  Supports both cursor-based and offset-based pagination.
-  """
-  adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
-
-  """
-  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
-  """
-  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
-
-  """Added in 26.2.0. Query kernels within a specific session."""
-  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
-
-  """
-  Added in 26.2.0. Get domain fair share data within resource group scope.
-  """
-  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare!
-
-  """Added in 26.2.0. List domain fair shares within resource group scope."""
-  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
-
-  """
-  Added in 26.2.0. Get project fair share data within resource group scope.
-  """
-  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare!
-
-  """Added in 26.2.0. List project fair shares within resource group scope."""
-  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
-
-  """Added in 26.2.0. Get user fair share data within resource group scope."""
-  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare!
-
-  """Added in 26.2.0. List user fair shares within resource group scope."""
-  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
-
-  """
-  Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
-
-  """
-  Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
-
-  """
-  Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
-  """
-  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
-
-  """
-  Added in 26.2.0.
-  
-  Query images within a specific container registry with optional filtering,
-  ordering, and pagination.
-  
-  Returns container images that belong to the specified registry.
-  Use filters to narrow down results by status, name, or architecture.
-  Supports both cursor-based and offset-based pagination.
-  """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
-
-  """Added in 26.2.0. Get scheduling history for a specific session."""
-  sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
-
-  """Added in 26.2.0. Get scheduling history for a specific deployment."""
-  deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
-
-  """Added in 26.2.0. Get scheduling history for a specific route."""
-  routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
-
-  """Added in 26.2.0. List resource groups"""
-  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 25.16.0.
-  Retrieve domain-level app configuration.
-  Returns only the configuration set specifically for the domain, without merging.
-  This query is useful for checking what values are configured at the domain level
-  when you want to modify domain or user configurations separately.
-  For actual configuration values to be applied, use mergedAppConfig instead.
-  Requires admin privileges.
-  """
-  domainAppConfig(domainName: String!): AppConfig @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare! @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List domain fair shares (superadmin only)."""
-  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare! @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List project fair shares (superadmin only)."""
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List user fair shares (superadmin only)."""
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List domain usage buckets (superadmin only)."""
-  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @deprecated(reason: "Use admin_domain_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List project usage buckets (superadmin only)."""
-  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @deprecated(reason: "Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Added in 26.1.0. List user usage buckets (superadmin only)."""
-  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @deprecated(reason: "Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Get a notification channel by ID"""
-  notificationChannel(id: ID!): NotificationChannel @deprecated(reason: "Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """List notification channels"""
-  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @deprecated(reason: "Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """Get a notification rule by ID"""
-  notificationRule(id: ID!): NotificationRule @deprecated(reason: "Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """List notification rules"""
-  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @deprecated(reason: "Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  """Added in 25.18.0. List all scaling groups"""
+  allScalingGroupsV2(filter: ScalingGroupFilter = null, orderBy: [ScalingGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ScalingGroupV2Connection!
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
@@ -4618,6 +3693,18 @@ type Query {
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
 
+  """Added in 26.1.0. Query a single kernel by ID."""
+  kernelV2(id: UUID!): KernelV2
+
+  """Added in 26.1.0. Query kernels with pagination and filtering."""
+  kernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
+
+  """Added in 26.1.0. Query a single session by ID."""
+  sessionV2(id: ID!): SessionV2
+
+  """Added in 26.1.0. Query sessions with pagination and filtering."""
+  sessionsV2(filter: SessionFilter = null, orderBy: [SessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionConnectionV2!
+
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route
 
@@ -4625,71 +3712,13 @@ type Query {
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
 
   """List session scheduling history (superadmin only)"""
-  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
 
   """List deployment history (superadmin only)"""
-  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @deprecated(reason: "Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
 
   """List route history (superadmin only)"""
-  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.
-  """
-  adminUserV2(userId: UUID!): UserV2!
-
-  """
-  Added in 26.2.0. List all users with filtering and pagination (admin only). Requires superadmin privileges.
-  """
-  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
-
-  """
-  Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
-  """
-  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
-
-  """
-  Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
-  """
-  myUserV2: UserV2!
-
-  """
-  Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
-  """
-  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
-
-  """
-  Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
-  """
-  domainV2(domainName: String!): DomainV2!
-
-  """
-  Added in 26.2.0. List all domains with filtering and pagination (admin only). Requires superadmin privileges.
-  """
-  adminDomainsV2(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection!
-
-  """Added in 26.2.0. List domains within resource group scope."""
-  rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection!
-
-  """
-  Added in 26.2.0. Get a single project by ID. Returns an error if project is not found.
-  """
-  projectV2(projectId: UUID!): ProjectV2!
-
-  """
-  Added in 26.2.0. List all projects with filtering and pagination (admin only). Requires superadmin privileges.
-  """
-  adminProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
-
-  """
-  Added in 26.2.0. List projects within a specific domain. Requires domain admin privileges or higher.
-  """
-  domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
-
-  """
-  Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
-  """
-  projectDomainV2(projectId: UUID!): DomainV2!
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
 }
 
 """
@@ -4822,17 +3851,6 @@ type ReservoirRegistryEdge {
   node: ReservoirRegistry!
 }
 
-"""Added in 26.2.0. Resource allocation with requested and used slots."""
-type ResourceAllocation {
-  """The resource slots originally requested for this kernel."""
-  requested: ResourceSlot!
-
-  """
-  The resource slots currently used by this kernel. May be null if not yet allocated.
-  """
-  used: ResourceSlot
-}
-
 type ResourceConfig {
   """
   Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
@@ -4857,185 +3875,27 @@ input ResourceConfigInput {
   resourceOpts: ResourceOptsInput = null
 }
 
-"""Added in 26.1.0. Resource group with structured configuration"""
-type ResourceGroup implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """
-  Unique name identifying the resource group.
-  Used as primary key and referenced by agents, sessions, and resource presets.
-  """
-  name: String!
-
-  """Added in 26.2.0. Status information including active and public flags."""
-  status: ResourceGroupStatus!
-
-  """
-  Added in 26.2.0. Metadata including description and creation timestamp.
-  """
-  metadata: ResourceGroupMetadata!
-
-  """Added in 26.2.0. Network configuration for the resource group."""
-  network: ResourceGroupNetworkConfig!
-
-  """
-  Added in 26.2.0. Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.
-  """
-  scheduler: ResourceGroupSchedulerConfig!
-
-  """
-  Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
-  """
-  fairShareSpec: FairShareScalingGroupSpec!
-
-  """
-  Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
-  """
-  resourceInfo: ResourceInfo!
-}
-
-"""Added in 26.2.0. Resource group connection"""
-type ResourceGroupConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ResourceGroupEdge!]!
-  count: Int!
-}
-
-"""Resource group scope for domain-level operations"""
-input ResourceGroupDomainScope {
-  """Resource group name to scope the operation"""
-  resourceGroup: String!
-}
-
-"""An edge in a connection."""
-type ResourceGroupEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ResourceGroup!
-}
-
-"""Added in 26.1.0. Filter for resource groups"""
-input ResourceGroupFilter {
-  name: StringFilter = null
-  AND: [ResourceGroupFilter!] = null
-  OR: [ResourceGroupFilter!] = null
-  NOT: [ResourceGroupFilter!] = null
-}
-
 """Added in 25.19.0"""
 input ResourceGroupInput {
   name: String!
 }
 
-"""Added in 26.2.0. Metadata for a resource group."""
-type ResourceGroupMetadata {
-  """Human-readable description of the resource group."""
-  description: String
-
-  """Timestamp when the resource group was created."""
-  createdAt: DateTime!
-}
-
-"""Added in 26.2.0. Network configuration for a resource group."""
-type ResourceGroupNetworkConfig {
-  """WebSocket proxy address for this resource group."""
-  wsproxyAddr: String
-
-  """
-  Whether to use host network mode for containers in this resource group.
-  """
-  useHostNetwork: Boolean!
-}
-
-"""Added in 26.1.0. Order by specification for resource groups"""
-input ResourceGroupOrderBy {
-  field: ResourceGroupOrderField!
-  direction: OrderDirection! = ASC
-}
-
-"""Added in 26.1.0. Fields available for ordering resource groups"""
-enum ResourceGroupOrderField {
-  NAME
-}
-
-"""Resource group + domain scope for project-level operations"""
-input ResourceGroupProjectScope {
-  """Resource group name to scope the operation"""
-  resourceGroup: String!
-
-  """Domain name to scope the operation"""
-  domainName: String!
-}
-
-"""Added in 26.2.0. Scheduler configuration for a resource group."""
-type ResourceGroupSchedulerConfig {
-  """
-  Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
-  """
-  type: SchedulerType!
-}
-
-"""Added in 26.2.0. Status information for a resource group."""
-type ResourceGroupStatus {
-  """Whether the resource group is active and can accept new sessions."""
-  isActive: Boolean!
-
-  """Whether the resource group is publicly accessible to all users."""
-  isPublic: Boolean!
-}
-
-"""Resource group + domain + project scope for user-level operations"""
-input ResourceGroupUserScope {
-  """Resource group name to scope the operation"""
-  resourceGroup: String!
-
-  """Domain name to scope the operation"""
-  domainName: String!
-
-  """Project ID to scope the operation"""
-  projectId: String!
-}
-
 """
-Added in 26.1.0. Resource information for a resource group. Provides aggregated resource metrics including capacity, used, and free resources.
-"""
-type ResourceInfo {
-  """
-  Total available resources from ALIVE, schedulable agents in this resource group.
-  """
-  capacity: ResourceSlot!
-
-  """
-  Currently occupied resources from active kernels (RUNNING/TERMINATING status).
-  """
-  used: ResourceSlot!
-
-  """Available resources (capacity - used)."""
-  free: ResourceSlot!
-}
-
-"""
-Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
+Added in 26.1.0. A collection of additional resource options. Contains configuration like shared memory and other resource-specific settings.
 """
 type ResourceOpts {
-  """List of resource option entries. Each entry contains a key-value pair."""
+  """List of resource option entries."""
   entries: [ResourceOptsEntry!]!
 }
 
 """
-Added in 26.1.0. A single key-value entry representing a resource option. Contains additional resource configuration such as shared memory settings.
+Added in 26.1.0. A single resource option entry with name and value. Resource options provide additional configuration like shared memory settings.
 """
 type ResourceOptsEntry {
-  """The name of this resource option. Example: 'shmem'."""
+  """The name of this resource option (e.g., 'shmem')."""
   name: String!
 
-  """The value for this resource option. Example: '64m'."""
+  """The value for this resource option (e.g., '64m')."""
   value: String!
 }
 
@@ -5078,9 +3938,9 @@ type ResourceSlotEntry {
   resourceType: String!
 
   """
-  Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction.
+  Quantity of the resource as a decimal string to preserve precision. For 'cpu': number of cores (e.g., '2.0', '0.5'). For 'mem': bytes (e.g., '4294967296' for 4GB). For accelerators: device count or share fraction.
   """
-  quantity: Decimal!
+  quantity: String!
 }
 
 """
@@ -5100,41 +3960,6 @@ Added in 26.1.0. A collection of compute resource allocations for input.
 input ResourceSlotInput {
   """List of resource allocations."""
   entries: [ResourceSlotEntryInput!]!
-}
-
-"""
-Added in 26.2.0. Resource weight with default indicator. Shows whether this resource type's weight was explicitly set or uses default.
-"""
-type ResourceWeightEntry {
-  """
-  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). Matches the resource types available in the scaling group.
-  """
-  resourceType: String!
-
-  """
-  Weight multiplier for this resource type in fair share calculations. Higher weight means more contribution to normalized usage.
-  """
-  weight: Decimal!
-
-  """
-  Whether this resource uses the resource group's default weight. True means no explicit weight was configured for this type.
-  """
-  usesDefault: Boolean!
-}
-
-"""
-Added in 26.1.0. Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.
-"""
-input ResourceWeightEntryInput {
-  """
-  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). Must match the resource types used in the cluster.
-  """
-  resourceType: String!
-
-  """
-  Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
-  """
-  weight: Decimal = null
 }
 
 """
@@ -5305,12 +4130,6 @@ enum RouteOrderField {
   TRAFFIC_RATIO
 }
 
-"""Scope for route scheduling history query"""
-input RouteScope {
-  """Route ID to get history for"""
-  routeId: UUID!
-}
-
 """
 Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
 """
@@ -5346,8 +4165,239 @@ input SMTPConnectionInput {
   timeout: Int! = 30
 }
 
+"""Added in 26.1.0. SSH keypair for secure access."""
+type SSHKeypair {
+  """The public key in OpenSSH format."""
+  publicKey: String!
+
+  """The private key in PEM format."""
+  privateKey: String!
+}
+
+"""Added in 25.18.0. Filter for scaling groups"""
+input ScalingGroupFilter {
+  name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
+  scheduler: String = null
+  useHostNetwork: Boolean = null
+  AND: [ScalingGroupFilter!] = null
+  OR: [ScalingGroupFilter!] = null
+  NOT: [ScalingGroupFilter!] = null
+}
+
+"""Added in 25.18.0. Metadata information for a scaling group"""
+type ScalingGroupMetadata {
+  """Human-readable description of the scaling group's purpose"""
+  description: String!
+
+  """Timestamp when the scaling group was created"""
+  createdAt: DateTime!
+}
+
+"""Added in 25.18.0. Network configuration for a scaling group"""
+type ScalingGroupNetworkConfig {
+  """
+  App-proxy coordinator API server address.
+  Manager uses this address to communicate with the app-proxy coordinator
+  for managing service routes, endpoint registration, and proxying client connections
+  to session services.
+  """
+  wsproxyAddr: String!
+
+  """Authentication token for the App-proxy coordinator API server."""
+  wsproxyApiToken: String!
+
+  """
+  Whether session containers use the host's network namespace
+  instead of isolated container networking.
+  Enables direct host port binding but reduces isolation.
+  """
+  useHostNetwork: Boolean!
+}
+
 extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""Added in 25.18.0. Order by specification for scaling groups"""
+input ScalingGroupOrderBy {
+  field: ScalingGroupOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ScalingGroupOrderField {
+  NAME
+  CREATED_AT
+  IS_ACTIVE
+  IS_PUBLIC
+}
+
+"""Added in 25.18.0. Scheduler configuration for session scheduling"""
+type ScalingGroupSchedulerConfig {
+  """
+  Scheduling algorithm implementation.
+  'fifo' schedules oldest pending sessions first,
+  'lifo' schedules newest first,
+  'drf' (Dominant Resource Fairness) balances resource usage across users.
+  """
+  name: ScalingGroupSchedulerType!
+
+  """
+  Detailed scheduler behavior configuration including session type restrictions,
+  timeouts, agent selection strategy, and resource allocation policies.
+  """
+  options: ScalingGroupSchedulerOptions!
+}
+
+"""Added in 25.18.0. Scheduler configuration options"""
+type ScalingGroupSchedulerOptions {
+  """
+  Session types that can be scheduled in this scaling group.
+  Valid values: 'interactive' , 'batch', 'inference'.
+  Requests for unlisted types are rejected.
+  """
+  allowedSessionTypes: [String!]!
+
+  """
+  Maximum time in seconds a session can wait in PENDING state
+  before automatic cancellation.
+  Zero means no timeout.
+  Used to prevent indefinite resource waiting when no agents are available.
+  """
+  pendingTimeout: Float!
+
+  """
+  Scheduler-specific configuration options.
+  Contents depend on the scheduler implementation (fifo/lifo/drf).
+  Used for advanced scheduling behavior customization.
+  """
+  config: SchedulerConfig!
+
+  """
+  Algorithm for selecting target agents when scheduling sessions.
+  'dispersed' spreads sessions across available agents,
+  'concentrated' packs sessions onto fewer agents,
+  'roundrobin' cycles through agents sequentially.
+  """
+  agentSelectionStrategy: String!
+
+  """
+  Configuration for the agent selection strategy.
+  Structure varies by strategy - for example,
+  concentrated strategy may specify endpoint spreading rules.
+  """
+  agentSelectorConfig: AgentSelectorConfig!
+
+  """
+  Whether inference service replicas should be distributed across different agents
+  instead of co-locating on same agent.
+  When true, forces replica spreading.
+  Applied only when using concentrated agent selection strategy.
+  Improves fault tolerance for model serving.
+  """
+  enforceSpreadingEndpointReplica: Boolean!
+
+  """
+  Whether agents accept session requests that allocate fractional resources
+  (e.g., 0.5 GPU) causing resource fragmentation.
+  When false, agents reject sessions that would prevent future efficient resource allocation.
+  """
+  allowFractionalResourceFragmentation: Boolean!
+
+  """
+  List of route health statuses that trigger automatic cleanup of service routes.
+  Valid values: 'healthy', 'unhealthy', 'degraded'.
+  Default: ['unhealthy'].
+  """
+  routeCleanupTargetStatuses: [String!]!
+}
+
+"""
+Added in 25.18.0. Scheduler type for session scheduling.
+
+- FIFO: First-In-First-Out - Schedules oldest pending sessions first
+- LIFO: Last-In-First-Out - Schedules newest pending sessions first
+- DRF: Dominant Resource Fairness - Balances resource usage across users
+"""
+enum ScalingGroupSchedulerType {
+  FIFO
+  LIFO
+  DRF
+}
+
+"""Added in 25.18.0. Status information for a scaling group"""
+type ScalingGroupStatus {
+  """
+  Whether the scaling group can accept new session creation requests.
+  Inactive scaling groups are excluded from scheduling and cannot start new sessions.
+  """
+  isActive: Boolean!
+
+  """
+  Whether this scaling group is available for regular user sessions
+  (interactive/batch/inference).
+  When false, the scaling group is reserved for internal SYSTEM-type sessions only,
+  such as management or infrastructure sessions.
+  """
+  isPublic: Boolean!
+}
+
+"""Added in 25.18.0. Scaling group with structured configuration"""
+type ScalingGroupV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique name identifying the scaling group.
+  Used as primary key and referenced by agents, sessions, and resource presets.
+  """
+  name: String!
+
+  """
+  Operational status controlling whether this scaling group accepts new sessions
+  and its visibility to users without explicit access grants.
+  """
+  status: ScalingGroupStatus!
+
+  """
+  Administrative metadata including human-readable description
+  and creation timestamp for audit and documentation purposes.
+  """
+  metadata: ScalingGroupMetadata!
+
+  """
+  Network configuration for connecting clients to interactive session services
+  (terminals, notebooks, web apps) through WebSocket proxy infrastructure.
+  """
+  network: ScalingGroupNetworkConfig!
+
+  """
+  Session scheduling configuration controlling queue management,
+  agent selection strategy, resource allocation policies,
+  and session lifecycle timeouts.
+  """
+  scheduler: ScalingGroupSchedulerConfig!
+}
+
+"""Added in 25.18.0. Scaling group connection"""
+type ScalingGroupV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ScalingGroupV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ScalingGroupV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ScalingGroupV2!
 }
 
 type ScalingRule {
@@ -5409,14 +4459,46 @@ type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in 26.1.0. Scheduler-specific configuration options"""
+type SchedulerConfig {
+  """
+  Number of scheduling retries to skip before attempting to schedule a session.
+  Used to prevent repeated scheduling attempts for sessions that previously failed.
+  """
+  numRetriesToSkip: Int!
+}
+
 """
-Added in 26.2.0. Type of scheduler used for session scheduling in a resource group.
+Added in 26.1.0. Scheduler information including retry attempts and predicate results. Contains details about scheduling attempts when a session is pending.
 """
-enum SchedulerType {
-  FIFO
-  LIFO
-  DRF
-  FAIR_SHARE
+type SchedulerInfo {
+  """Number of scheduling attempts made for this session."""
+  retries: Int
+
+  """ISO 8601 timestamp of the last scheduling attempt."""
+  lastTry: String
+
+  """Message from the last scheduling attempt."""
+  msg: String
+
+  """List of predicates that failed during scheduling."""
+  failedPredicates: [SchedulerPredicate!]
+
+  """List of predicates that passed during scheduling."""
+  passedPredicates: [SchedulerPredicate!]
+}
+
+"""
+Added in 26.1.0. A scheduler predicate result from scheduling attempts. Predicates are conditions checked during session scheduling.
+"""
+type SchedulerPredicate {
+  """Name of the predicate (e.g., 'concurrency', 'reserved_time')."""
+  name: String!
+
+  """
+  Message explaining why the predicate failed. Null for passed predicates.
+  """
+  msg: String
 }
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
@@ -5435,10 +4517,6 @@ enum SchedulingResult {
   SUCCESS
   FAILURE
   STALE
-  NEED_RETRY
-  EXPIRED
-  GIVE_UP
-  SKIPPED
 }
 
 """Status of session scheduling transitions"""
@@ -5457,7 +4535,7 @@ enum SchedulingStatus {
 }
 
 """
-Added in 26.2.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
+Added in 26.1.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
 """
 type ServicePortEntry {
   """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
@@ -5476,24 +4554,212 @@ type ServicePortEntry {
   isInference: Boolean!
 }
 
-"""Added in 26.2.0. Protocol type for service ports."""
+"""Added in 26.1.0. Protocol types for service ports."""
 enum ServicePortProtocol {
   HTTP
   TCP
   PREOPEN
   INTERNAL
-  VNC
-  RDP
 }
 
 """
-Added in 26.2.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
+Added in 26.1.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
 """
 type ServicePorts {
   """List of service port entries."""
   entries: [ServicePortEntry!]!
 }
 
+"""Added in 26.1.0. Connection type for paginated session results."""
+type SessionConnectionV2 {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionV2Edge!]!
+  count: Int!
+}
+
+"""Added in 26.1.0. Execution configuration for a session."""
+type SessionExecutionInfo {
+  """Environment variables set for the session."""
+  environ: JSON
+
+  """Bootstrap script executed at session start."""
+  bootstrapScript: String
+
+  """Startup command executed after bootstrap."""
+  startupCommand: String
+
+  """Whether the session uses host network mode."""
+  useHostNetwork: Boolean!
+
+  """URL to call back when session status changes."""
+  callbackUrl: String
+}
+
+"""Added in 26.1.0. Filter criteria for querying sessions."""
+input SessionFilter {
+  id: UUID = null
+  status: SessionStatusFilter = null
+  name: String = null
+  domainName: String = null
+  groupId: UUID = null
+  userUuid: UUID = null
+}
+
+"""Added in 26.1.0. Basic identity information for a session."""
+type SessionIdentityInfo {
+  """Unique identifier of the session."""
+  id: ID!
+
+  """Client-provided creation ID for idempotent session creation."""
+  creationId: String!
+
+  """Human-readable name of the session."""
+  name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+}
+
+"""Added in 26.1.0. Container image information for a session."""
+type SessionImageInfo {
+  """List of container image references used by the session."""
+  images: [String!]
+
+  """Image tag if specified."""
+  tag: String
+}
+
+"""Added in 26.1.0. Lifecycle status and timestamps for a session."""
+type SessionLifecycleInfo {
+  """Current status of the session."""
+  status: SessionStatus!
+
+  """Result of the session execution (success, failure, etc.)."""
+  result: SessionResult!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Timestamp when the session was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the session, if applicable."""
+  startsAt: DateTime
+
+  """Timestamp when the status was last changed."""
+  statusChanged: DateTime
+
+  """Timeout in seconds for batch sessions."""
+  batchTimeout: Int
+
+  """Additional information about the current status."""
+  statusInfo: String
+
+  """Structured status data including scheduler information."""
+  statusData: SessionStatusDataContainer
+
+  """History of status transitions with timestamps."""
+  statusHistory: SessionStatusHistory
+}
+
+"""Added in 26.1.0. Metadata information for a session."""
+type SessionMetadataInfo {
+  """Human-readable name of the session."""
+  name: String!
+
+  """Domain to which this session belongs."""
+  domainName: String!
+
+  """Group/project ID that owns this session."""
+  groupId: UUID!
+
+  """User UUID who created this session."""
+  userUuid: UUID!
+
+  """Access key used to create this session."""
+  accessKey: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Optional user-provided tag for the session."""
+  tag: String
+}
+
+"""Added in 26.1.0. Metrics and statistics for a session."""
+type SessionMetricsInfo {
+  """The number of queries/executions performed in this session."""
+  numQueries: Int!
+
+  """The last collected statistics for this session."""
+  lastStat: SessionStat
+}
+
+"""Added in 26.1.0. Virtual folder mount information for a session."""
+type SessionMountInfo {
+  """List of virtual folders mounted to this session."""
+  vfolderMounts: [VFolderMount!]
+}
+
+"""Added in 26.1.0. Network configuration for a session."""
+type SessionNetworkInfo {
+  """Type of network used by the session."""
+  networkType: String
+
+  """ID of the network if applicable."""
+  networkId: String
+}
+
+"""Added in 26.1.0. Ordering specification for sessions."""
+input SessionOrderBy {
+  field: SessionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.1.0. Fields available for ordering sessions."""
+enum SessionOrderField {
+  CREATED_AT
+  ID
+  NAME
+}
+
+"""Added in 26.1.0. Resource allocation information for a session."""
+type SessionResourceInfo {
+  """Cluster mode for distributed sessions (single-node, multi-node)."""
+  clusterMode: String!
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int!
+
+  """Currently occupied resource slots."""
+  occupyingSlots: ResourceSlot!
+
+  """Originally requested resource slots."""
+  requestedSlots: ResourceSlot!
+
+  """Name of the scaling group where the session is running."""
+  scalingGroupName: String
+
+  """Target scaling group names for scheduling."""
+  targetSgroupNames: [String!]
+
+  """IDs of agents running the session's kernels."""
+  agentIds: [String!]
+}
+
+"""Added in 26.1.0. Result status of a session execution."""
 enum SessionResult {
   UNDEFINED
   SUCCESS
@@ -5563,17 +4829,122 @@ enum SessionSchedulingHistoryOrderField {
   UPDATED_AT
 }
 
-"""Scope for session scheduling history query"""
-input SessionScope {
-  """Session ID to get history for"""
-  sessionId: UUID!
+"""Added in 26.1.0. Collection of session statistics."""
+type SessionStat {
+  """List of statistic entries."""
+  entries: [SessionStatEntry!]!
 }
 
-enum SessionTypes {
+"""Added in 26.1.0. A single statistic entry for session metrics."""
+type SessionStatEntry {
+  """Name of the statistic."""
+  name: String!
+
+  """Current value."""
+  current: String!
+
+  """Maximum capacity if applicable."""
+  capacity: String
+
+  """Unit hint for display."""
+  unitHint: String
+}
+
+"""Added in 26.1.0"""
+enum SessionStatus {
+  PENDING
+  SCHEDULED
+  PREPARING
+  PULLING
+  PREPARED
+  CREATING
+  RUNNING
+  RESTARTING
+  RUNNING_DEGRADED
+  TERMINATING
+  TERMINATED
+  ERROR
+  CANCELLED
+}
+
+"""Added in 26.1.0. Container for session status data."""
+type SessionStatusDataContainer {
+  """Scheduler-related status information."""
+  scheduler: SchedulerInfo
+
+  """Raw status data as JSON."""
+  raw: JSON
+}
+
+"""Added in 26.1.0. Filter for session status."""
+input SessionStatusFilter {
+  in: [SessionStatus!] = null
+  notIn: [SessionStatus!] = null
+}
+
+"""Added in 26.1.0. History of session status transitions."""
+type SessionStatusHistory {
+  """List of status history entries."""
+  entries: [SessionStatusHistoryEntry!]!
+}
+
+"""Added in 26.1.0. A single entry in session status history."""
+type SessionStatusHistoryEntry {
+  """The status value."""
+  status: String!
+
+  """When this status was recorded."""
+  timestamp: DateTime!
+}
+
+"""Added in 26.1.0. Type of compute session."""
+enum SessionType {
   INTERACTIVE
   BATCH
   INFERENCE
   SYSTEM
+}
+
+"""Added in 26.1.0. Represents a compute session in Backend.AI."""
+type SessionV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Basic identity information for the session."""
+  identity: SessionIdentityInfo!
+
+  """Metadata including domain, group, and user information."""
+  metadata: SessionMetadataInfo!
+
+  """Resource allocation and cluster information."""
+  resource: SessionResourceInfo!
+
+  """Container image information."""
+  image: SessionImageInfo!
+
+  """Virtual folder mounts information."""
+  mounts: SessionMountInfo!
+
+  """Execution configuration (environment, scripts)."""
+  execution: SessionExecutionInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: SessionLifecycleInfo!
+
+  """Execution metrics and statistics."""
+  metrics: SessionMetricsInfo!
+
+  """Network configuration."""
+  network: SessionNetworkInfo!
+}
+
+"""An edge in a connection."""
+type SessionV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionV2!
 }
 
 """
@@ -5880,84 +5251,6 @@ type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
-"""
-Added in 26.1.0. Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.
-"""
-input UpdateResourceGroupFairShareSpecInput {
-  """Name of the resource group to update."""
-  resourceGroup: String!
-
-  """
-  Half-life for exponential decay in days. Leave null to keep existing value.
-  """
-  halfLifeDays: Int = null
-
-  """Total lookback period in days. Leave null to keep existing value."""
-  lookbackDays: Int = null
-
-  """
-  Granularity of decay buckets in days. Leave null to keep existing value.
-  """
-  decayUnitDays: Int = null
-
-  """Default weight for entities. Leave null to keep existing value."""
-  defaultWeight: Decimal = null
-
-  """
-  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
-  """
-  resourceWeights: [ResourceWeightEntryInput!] = null
-}
-
-"""
-Added in 26.1.0. Payload for resource group fair share spec update mutation.
-"""
-type UpdateResourceGroupFairShareSpecPayload {
-  """The updated resource group with new fair share configuration."""
-  resourceGroup: ResourceGroup!
-}
-
-"""
-Added in 26.2.0. Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).
-"""
-input UpdateResourceGroupInput {
-  """Name of the resource group to update."""
-  resourceGroup: String!
-
-  """
-  Whether the resource group is active. Leave null to keep existing value.
-  """
-  isActive: Boolean = null
-
-  """
-  Whether the resource group is public. Leave null to keep existing value.
-  """
-  isPublic: Boolean = null
-
-  """Human-readable description. Leave null to keep existing value."""
-  description: String = null
-
-  """App proxy address. Leave null to keep existing value."""
-  appProxyAddr: String = null
-
-  """App proxy API token. Leave null to keep existing value."""
-  appproxyApiToken: String = null
-
-  """Whether to use host network mode. Leave null to keep existing value."""
-  useHostNetwork: Boolean = null
-
-  """
-  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
-  """
-  schedulerType: SchedulerType = null
-}
-
-"""Added in 26.2.0. Payload for resource group update mutation."""
-type UpdateResourceGroupPayload {
-  """The updated resource group with new configuration."""
-  resourceGroup: ResourceGroup!
-}
-
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput {
   """The ID of the route to update."""
@@ -5971,65 +5264,6 @@ input UpdateRouteTrafficStatusInput {
 type UpdateRouteTrafficStatusPayload {
   """The updated route."""
   route: Route!
-}
-
-"""
-Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
-"""
-input UpdateUserV2Input {
-  """New username."""
-  username: String = null
-
-  """New password."""
-  password: String = null
-
-  """New full display name."""
-  fullName: String = null
-
-  """New description."""
-  description: String = null
-
-  """New account status."""
-  status: UserStatusV2 = null
-
-  """New user role."""
-  role: UserRoleV2 = null
-
-  """New domain assignment."""
-  domainName: String = null
-
-  """New project (group) assignments. Replaces existing assignments."""
-  groupIds: [UUID!] = null
-
-  """New allowed client IP addresses or CIDR ranges."""
-  allowedClientIp: [String!] = null
-
-  """Set password change requirement."""
-  needPasswordChange: Boolean = null
-
-  """New user resource policy name."""
-  resourcePolicy: String = null
-
-  """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean = null
-
-  """Set the primary API access key."""
-  mainAccessKey: String = null
-
-  """New container user ID."""
-  containerUid: Int = null
-
-  """New container primary group ID."""
-  containerMainGid: Int = null
-
-  """New container supplementary group IDs."""
-  containerGids: [Int!] = null
-}
-
-"""Added in 26.2.0. Payload for user update mutation."""
-type UpdateUserV2Payload {
-  """The updated user."""
-  user: UserV2!
 }
 
 """Added in 25.16.0. Input for updating VFS storage"""
@@ -6067,55 +5301,6 @@ type UpsertDomainConfigPayload {
 }
 
 """
-Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
-"""
-input UpsertDomainFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
-
-  """Name of the domain to update weight for."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
-}
-
-"""Added in 26.1.0. Payload for domain fair share weight upsert mutation."""
-type UpsertDomainFairShareWeightPayload {
-  """The updated or created domain fair share record."""
-  domainFairShare: DomainFairShare!
-}
-
-"""
-Added in 26.1.0. Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
-"""
-input UpsertProjectFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
-
-  """UUID of the project to update weight for."""
-  projectId: UUID!
-
-  """Name of the domain the project belongs to."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
-}
-
-"""
-Added in 26.1.0. Payload for project fair share weight upsert mutation.
-"""
-type UpsertProjectFairShareWeightPayload {
-  """The updated or created project fair share record."""
-  projectFairShare: ProjectFairShare!
-}
-
-"""
 Added in 25.16.0.
 Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
@@ -6135,34 +5320,6 @@ Contains the resulting configuration that was stored.
 """
 type UpsertUserConfigPayload {
   appConfig: AppConfig!
-}
-
-"""
-Added in 26.1.0. Input for upserting user fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
-"""
-input UpsertUserFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
-
-  """UUID of the project the user belongs to."""
-  projectId: UUID!
-
-  """UUID of the user to update weight for."""
-  userUuid: UUID!
-
-  """Name of the domain the user belongs to."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
-}
-
-"""Added in 26.1.0. Payload for user fair share weight upsert mutation."""
-type UpsertUserFairShareWeightPayload {
-  """The updated or created user fair share record."""
-  userFairShare: UserFairShare!
 }
 
 """
@@ -6308,72 +5465,8 @@ enum UserFairShareOrderField {
   CREATED_AT
 }
 
-input UserFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroup: String!
-
-  """
-  Project ID that the user belongs to (required for user-level fair shares).
-  """
-  projectId: UUID!
-}
-
 extend type UserNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
-"""
-enum UserRoleV2 {
-  USER
-  ADMIN
-  SUPERADMIN
-  MONITOR
-}
-
-"""
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input UserRoleV2EnumFilter {
-  """Exact match for user role."""
-  equals: UserRoleV2 = null
-
-  """Match any of the provided roles."""
-  in: [UserRoleV2!] = null
-
-  """Exclude exact role match."""
-  notEquals: UserRoleV2 = null
-
-  """Exclude any of the provided roles."""
-  notIn: [UserRoleV2!] = null
-}
-
-"""
-Added in 26.2.0. User account status. ACTIVE: User can log in and use the system. INACTIVE: User account is disabled but preserved. DELETED: User has been soft-deleted. BEFORE_VERIFICATION: User account is pending email verification.
-"""
-enum UserStatusV2 {
-  ACTIVE
-  INACTIVE
-  DELETED
-  BEFORE_VERIFICATION
-}
-
-"""
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
-"""
-input UserStatusV2EnumFilter {
-  """Exact match for user status."""
-  equals: UserStatusV2 = null
-
-  """Match any of the provided statuses."""
-  in: [UserStatusV2!] = null
-
-  """Exclude exact status match."""
-  notEquals: UserStatusV2 = null
-
-  """Exclude any of the provided statuses."""
-  notIn: [UserStatusV2!] = null
 }
 
 """
@@ -6407,21 +5500,6 @@ type UserUsageBucket implements Node {
   Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors.
   """
   capacitySnapshot: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
-  """
-  averageDailyUsage: ResourceSlot!
-
-  """
-  Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
-  """
-  usageCapacityRatio: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
 }
 
 """
@@ -6471,12 +5549,6 @@ input UserUsageBucketFilter {
   """
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
-  periodStart: DateFilter = null
-
-  """Filter by usage measurement period end date."""
-  periodEnd: DateFilter = null
-
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserUsageBucketFilter!] = null
 
@@ -6504,258 +5576,6 @@ input UserUsageBucketOrderBy {
   Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
   """
   direction: OrderDirection! = DESC
-}
-
-input UserUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroup: String!
-
-  """Project ID that the user belongs to (required for user-level usage)."""
-  projectId: UUID!
-}
-
-"""
-Added in 26.2.0. User entity with structured field groups. Provides comprehensive user information organized into logical categories: basic_info (profile), status (account state), organization (permissions), security (auth settings), container (execution settings), and timestamps.
-"""
-type UserV2 implements Node @key(fields: "id") {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Basic profile information including username, email, and display name."""
-  basicInfo: UserV2BasicInfo!
-
-  """Account status and password-related flags."""
-  status: UserV2StatusInfo!
-
-  """Organizational context including domain, role, and resource policy."""
-  organization: UserV2OrganizationInfo!
-
-  """Security settings including IP restrictions and TOTP configuration."""
-  security: UserV2SecurityInfo!
-
-  """Container execution settings including UID/GID mappings."""
-  container: UserV2ContainerSettings!
-
-  """Creation and modification timestamps."""
-  timestamps: EntityTimestamps!
-
-  """
-  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
-  """
-  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
-
-  """
-  Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
-  """
-  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
-}
-
-"""
-Added in 26.2.0. Basic user profile information. Contains identity and descriptive fields for the user account.
-"""
-type UserV2BasicInfo {
-  """
-  Unique username for login. May be null if only email-based login is used.
-  """
-  username: String
-
-  """User's email address. Used for login and notifications."""
-  email: String!
-
-  """User's full display name."""
-  fullName: String
-
-  """Optional description or notes about the user."""
-  description: String
-}
-
-"""
-Added in 26.2.0. Paginated connection for user records. Provides relay-style cursor-based pagination for efficient traversal of user data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
-"""
-type UserV2Connection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [UserV2Edge!]!
-
-  """Total number of user records matching the query criteria."""
-  count: Int!
-}
-
-"""
-Added in 26.2.0. Container execution settings for the user. Defines UID/GID mappings for containers created by this user.
-"""
-type UserV2ContainerSettings {
-  """
-  User ID (UID) to use inside containers. If null, system default is used.
-  """
-  containerUid: Int
-
-  """
-  Primary group ID (GID) to use inside containers. If null, system default is used.
-  """
-  containerMainGid: Int
-
-  """Additional supplementary group IDs for container processes."""
-  containerGids: [Int!]
-}
-
-"""An edge in a connection."""
-type UserV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: UserV2!
-}
-
-"""
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input UserV2Filter {
-  """Filter by user UUID. Supports equals and 'in' operations."""
-  uuid: UUIDFilter = null
-
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """
-  Filter by email address. Supports equals, contains, startsWith, and endsWith.
-  """
-  email: StringFilter = null
-
-  """
-  Filter by account status. Supports equals, in, not_equals, and not_in operations.
-  """
-  status: UserStatusV2EnumFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  domainName: StringFilter = null
-
-  """
-  Filter by user role. Supports equals, in, not_equals, and not_in operations.
-  """
-  role: UserRoleV2EnumFilter = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
-  createdAt: DateTimeFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
-  AND: [UserV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
-  OR: [UserV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
-  NOT: [UserV2Filter!] = null
-}
-
-"""
-Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input UserV2OrderBy {
-  """The field to order by. See UserV2OrderField for available options."""
-  field: UserV2OrderField!
-
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
-"""
-enum UserV2OrderField {
-  CREATED_AT
-  MODIFIED_AT
-  USERNAME
-  EMAIL
-  STATUS
-}
-
-"""
-Added in 26.2.0. User's organizational context and permissions. Contains domain membership, role, and resource policy information.
-"""
-type UserV2OrganizationInfo {
-  """Name of the domain this user belongs to."""
-  domainName: String
-
-  """User's role determining access permissions. See UserRoleV2 enum."""
-  role: UserRoleV2
-
-  """Name of the user resource policy applied to this user."""
-  resourcePolicy: String!
-
-  """Primary API access key for this user."""
-  mainAccessKey: String
-}
-
-"""
-Added in 26.2.0. User security settings and authentication configuration. Contains IP restrictions, TOTP settings, and privilege flags.
-"""
-type UserV2SecurityInfo {
-  """
-  List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses. Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1').
-  """
-  allowedClientIp: [String!]
-
-  """
-  Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled.
-  """
-  totpActivated: Boolean
-
-  """Timestamp when TOTP was activated."""
-  totpActivatedAt: DateTime
-
-  """Whether this user can create sudo (privileged) sessions."""
-  sudoSessionEnabled: Boolean!
-}
-
-"""
-Added in 26.2.0. User account status information. Contains current status and password-related flags.
-"""
-type UserV2StatusInfo {
-  """
-  Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field.
-  """
-  status: UserStatusV2!
-
-  """
-  Additional information about the current status, such as reason for deactivation.
-  """
-  statusInfo: String
-
-  """If true, user must change password on next login."""
-  needPasswordChange: Boolean
-}
-
-"""
-Added in 26.1.0. Input item for a single user weight in bulk upsert. Represents one user's weight configuration within a project.
-"""
-input UserWeightInputItem {
-  """UUID of the user to update weight for."""
-  userUuid: UUID!
-
-  """ID of the project this user's fair share belongs to."""
-  projectId: UUID!
-
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
 }
 
 """Added in 25.16.0. VFS Storage configuration"""
@@ -6787,30 +5607,36 @@ type VFSStorageEdge {
 }
 
 """
-Added in 26.2.0. Storage host permission configuration. Defines what operations are allowed for a specific storage host.
+Added in 26.1.0. Information about a mounted virtual folder. Contains mount path, permissions, and usage mode details.
 """
-type VFolderHostPermissionEntry {
-  """Storage host identifier (e.g., 'default', 'storage-01')."""
-  host: String!
+type VFolderMount {
+  """Name of the virtual folder."""
+  name: String!
 
-  """
-  List of permissions granted for this host. See VFolderHostPermissionV2 enum for available permissions.
-  """
-  permissions: [VFolderHostPermissionV2!]!
+  """Unique identifier of the virtual folder."""
+  vfid: String!
+
+  """Subpath within the virtual folder to mount."""
+  vfsubpath: String!
+
+  """Path on the host where the virtual folder is stored."""
+  hostPath: String!
+
+  """Path inside the container where the folder is mounted."""
+  kernelPath: String!
+
+  """Permission level for this mount (ro, rw, wd)."""
+  mountPerm: MountPermission!
+
+  """Usage mode of the virtual folder (general, model, data)."""
+  usageMode: VFolderUsageMode!
 }
 
-"""
-Added in 26.2.0. Atomic permissions for virtual folders on a storage host.
-"""
-enum VFolderHostPermissionV2 {
-  CREATE_VFOLDER
-  MODIFY_VFOLDER
-  DELETE_VFOLDER
-  MOUNT_IN_SESSION
-  UPLOAD_FILE
-  DOWNLOAD_FILE
-  INVITE_OTHERS
-  SET_USER_PERM
+"""Added in 26.1.0. Usage mode of a virtual folder."""
+enum VFolderUsageMode {
+  GENERAL
+  MODEL
+  DATA
 }
 
 """Input for validate notification channel mutation"""
@@ -6846,7 +5672,7 @@ input WebhookSpecInput {
 
 scalar _Any
 
-union _Entity = ComputeSessionNode | DomainNode | DomainV2 | GroupNode | ImageNode | ProjectV2 | ScalingGroupNode | UserNode | UserV2 | VirtualFolderNode
+union _Entity = ComputeSessionNode | DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
 
 type _Service {
   sdl: String!
