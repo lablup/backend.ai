@@ -291,7 +291,7 @@ class SessionV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The candidate resource groups considered during scheduling."
     )
-    async def target_resource_groups(self) -> ResourceGroupConnection:
+    async def target_resource_groups(self) -> ResourceGroupConnection | None:
         raise NotImplementedError
 
     @strawberry.field(  # type: ignore[misc]
