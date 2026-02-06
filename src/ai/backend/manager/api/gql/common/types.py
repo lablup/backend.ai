@@ -8,7 +8,27 @@ from typing import Any
 
 import strawberry
 
-from ai.backend.common.types import ServicePortProtocols
+from ai.backend.common.types import (
+    ServicePortProtocols,
+    SessionResult,
+    SessionTypes,
+)
+
+
+# ========== Common Enums ==========
+
+
+SessionTypesGQL = strawberry.enum(
+    SessionTypes,
+    name="SessionType",
+    description="Added in 26.2.0. Type of compute session.",
+)
+
+SessionResultGQL = strawberry.enum(
+    SessionResult,
+    name="SessionResult",
+    description="Added in 26.2.0. Result status of a session execution.",
+)
 
 
 @strawberry.enum(
