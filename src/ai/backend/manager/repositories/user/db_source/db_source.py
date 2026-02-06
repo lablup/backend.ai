@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -20,15 +20,9 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
-from ai.backend.manager.data.user.types import (
-    BulkUserCreateResultData,
-    BulkUserUpdateResultData,
-    UserCreateResultData,
-    UserData,
-    UserSearchResult,
-)
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef, ScopeType
+from ai.backend.manager.data.user.types import UserCreateResultData, UserData, UserSearchResult
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -44,6 +38,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
+    GroupRow,
     ProjectType,
     association_groups_users,
     groups,
@@ -77,19 +72,16 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreatorError, Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.permission_controller.creators import (
-    AssociationScopesEntitiesCreatorSpec,
-    UserRoleCreatorSpec,
-)
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
@@ -101,8 +93,6 @@ from ai.backend.manager.repositories.user.purgers import (
 )
 from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
-from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -122,7 +112,7 @@ class UserDBSource:
         Get user by UUID without ownership validation.
         Admin-only operation.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
 
@@ -134,7 +124,7 @@ class UserDBSource:
         Get user by email with ownership validation.
         Returns None if user not found or access denied.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
+        async with self._db.begin_session() as session:
             user_row = await self._get_user_by_email(session, email)
             return UserData.from_row(user_row)
 
@@ -163,9 +153,28 @@ class UserDBSource:
                 raise UserConflict(
                     f"User with email {email} or username {user_name} already exists."
                 )
-            # Insert user (integrity_error_checks on UserCreatorSpec handles constraint violations)
-            result = await execute_creator(db_session, creator)
-            row = result.row
+
+            # Collect project IDs to join (including model store project)
+            project_ids = await self._get_project_scope_ids_for_user(
+                db_session, domain_name, [UUID(gid) for gid in group_ids or []]
+            )
+            project_scope_refs = [ScopeId(ScopeType.PROJECT, str(pid)) for pid in project_ids]
+
+            try:
+                # Insert user with RBAC scope associations (domain + projects)
+                rbac_creator = RBACEntityCreator(
+                    spec=creator.spec,
+                    element_type=RBACElementType.USER,
+                    scope_ref=ScopeId(ScopeType.DOMAIN, domain_name),
+                    additional_scope_refs=project_scope_refs,
+                )
+                result = await execute_rbac_entity_creator(db_session, rbac_creator)
+                row = result.row
+            except sa.exc.IntegrityError as e:
+                error_msg = str(e)
+                raise UserCreationBadRequest(
+                    f"Failed to create user due to database constraint violation: {error_msg}"
+                ) from e
 
             if not row:
                 raise UserCreationFailure("Failed to create user")
@@ -201,154 +210,19 @@ class UserDBSource:
             row.main_access_key = kp_data.access_key
             created_user.main_access_key = kp_data.access_key
 
-            # Add user to groups including model store project
-            if created_user.domain_name:
-                await self._add_user_to_groups(
-                    db_session, created_user.uuid, created_user.domain_name, group_ids or []
-                )
+            # Add user to groups (using already-resolved project_ids)
+            if project_ids:
+                await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
 
+            # Create RBAC role and map user to role
+            # Note: Entity-Scope association is handled by RBACEntityCreator above
             role = await self._role_manager.create_system_role(db_session, created_user)
             user_role_creator = Creator(
                 spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
             )
-            await self._role_manager.map_user_to_role(db_session, user_role_creator)
-            entity_scope_creator = Creator(
-                spec=AssociationScopesEntitiesCreatorSpec(
-                    scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
-                    object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
-                )
-            )
-            await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
+            await execute_creator(db_session, user_role_creator)
 
         return UserCreateResultData(created_user, kp_data)
-
-    async def _create_single_user_with_keypair_and_groups(
-        self,
-        db_session: SASession,
-        item: UserCreateSpec,
-    ) -> UserData:
-        """Create a single user with keypair, group assignments, and role mappings.
-
-        This is a helper method used by bulk_create_users_validated to create
-        each individual user within a savepoint.
-
-        Args:
-            db_session: The database session to use.
-            item: The user creation specification including group assignments.
-
-        Returns:
-            The created user data.
-
-        Raises:
-            UserCreationBadRequest: If the domain does not exist.
-            UserConflict: If email or username already exists.
-            UserCreationFailure: If user creation fails.
-        """
-        spec = cast(UserCreatorSpec, item.creator.spec)
-
-        # Validate domain
-        if not await self._check_domain_exists(db_session, spec.domain_name):
-            raise UserCreationBadRequest(f"Domain '{spec.domain_name}' does not exist")
-
-        # Validate no duplicate
-        if await self._check_user_exists_with_email_or_username(
-            db_session, email=spec.email, username=spec.username
-        ):
-            raise UserConflict(f"Email '{spec.email}' or username '{spec.username}' already exists")
-
-        # Create user
-        result = await execute_creator(db_session, item.creator)
-        row = result.row
-        if not row:
-            raise UserCreationFailure(f"Failed to create user {spec.email}")
-
-        created_user = row.to_data()
-
-        # Create default keypair with RBAC scope association
-        keypair_creator = KeyPairCreator(
-            is_active=(created_user.status == UserStatus.ACTIVE),
-            is_admin=created_user.role in ["superadmin", "admin"],
-            resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-            rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-        )
-        generated = generate_keypair_data()
-        kp_spec = KeyPairCreatorSpec(
-            creator=keypair_creator,
-            generated_data=generated,
-            user_id=created_user.id,
-            email=created_user.email,
-        )
-        rbac_kp_creator = RBACEntityCreator(
-            spec=kp_spec,
-            element_type=RBACElementType.KEYPAIR,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.USER,
-                element_id=str(created_user.uuid),
-            ),
-        )
-        kp_result = await execute_rbac_entity_creator(db_session, rbac_kp_creator)
-        kp_data = kp_result.row.to_data()
-
-        # Update user main_access_key
-        row.main_access_key = kp_data.access_key
-        created_user.main_access_key = kp_data.access_key
-
-        # Add user to groups
-        if created_user.domain_name:
-            await self._add_user_to_groups(
-                db_session,
-                created_user.uuid,
-                created_user.domain_name,
-                item.group_ids or [],
-            )
-
-        # Create system role and mappings
-        role = await self._role_manager.create_system_role(db_session, created_user)
-        user_role_creator = Creator(
-            spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
-        )
-        await self._role_manager.map_user_to_role(db_session, user_role_creator)
-        entity_scope_creator = Creator(
-            spec=AssociationScopesEntitiesCreatorSpec(
-                scope_id=ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
-                object_id=ObjectId(EntityType.USER, str(created_user.uuid)),
-            )
-        )
-        await self._role_manager.map_entity_to_scope(db_session, entity_scope_creator)
-
-        return created_user
-
-    async def bulk_create_users_validated(
-        self,
-        items: list[UserCreateSpec],
-    ) -> BulkUserCreateResultData:
-        """Create multiple users with partial failure support.
-
-        Each user is created in a savepoint - if one fails, others can still succeed.
-
-        Args:
-            items: List of UserCreateSpec for each user to create.
-        """
-        if not items:
-            return BulkUserCreateResultData(successes=[], failures=[])
-
-        successes: list[UserData] = []
-        failures: list[BulkCreatorError[UserRow]] = []
-
-        async with self._db.begin_session() as db_session:
-            for idx, item in enumerate(items):
-                spec = cast(UserCreatorSpec, item.creator.spec)
-                try:
-                    async with db_session.begin_nested():
-                        created_user = await self._create_single_user_with_keypair_and_groups(
-                            db_session, item
-                        )
-                        successes.append(created_user)
-                except Exception as e:
-                    log.warning("Failed to create user {}: {}", spec.email, str(e))
-                    failures.append(BulkCreatorError(spec=spec, exception=e, index=idx))
-
-        return BulkUserCreateResultData(successes=successes, failures=failures)
 
     async def update_user_validated(
         self,
@@ -418,123 +292,14 @@ class UserDBSource:
 
             # Handle group updates
             group_ids = updater_spec.group_ids_value
+            if prev_role != updated_user.role and group_ids is None:
+                await self._clear_user_groups(conn, updated_user.uuid)
+
             if group_ids is not None:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
             return UserData.from_row(updated_user)
-
-    async def bulk_update_users_validated(
-        self,
-        items: list[UserUpdateSpec],
-    ) -> BulkUserUpdateResultData:
-        """Update multiple users with partial failure support.
-
-        Each user is updated in a savepoint - if one fails, others can still succeed.
-        Uses UUID-based lookup and reuses the same validation logic as update_user_validated.
-
-        Args:
-            items: List of UserUpdateSpec for each user to update.
-        """
-        if not items:
-            return BulkUserUpdateResultData(successes=[], failures=[])
-
-        successes: list[UserData] = []
-        failures: list[BulkUpdaterError[UserRow]] = []
-
-        async with self._db.begin() as conn:
-            for idx, item in enumerate(items):
-                try:
-                    async with conn.begin_nested():
-                        updated_user = await self._update_single_user_validated(
-                            conn, item.user_id, item.updater_spec
-                        )
-                        successes.append(updated_user)
-                except Exception as e:
-                    log.warning("Failed to update user {}: {}", item.user_id, str(e))
-                    failures.append(
-                        BulkUpdaterError(spec=item.updater_spec, exception=e, index=idx)
-                    )
-
-        return BulkUserUpdateResultData(successes=successes, failures=failures)
-
-    async def _update_single_user_validated(
-        self,
-        conn: AsyncConnection,
-        user_id: UUID,
-        updater_spec: UserUpdaterSpec,
-    ) -> UserData:
-        """Update a single user with full validation.
-
-        Extracted from update_user_validated to be reused by both
-        single and bulk update operations.
-        """
-        to_update = updater_spec.build_values()
-
-        # Get current user data for validation (by UUID)
-        current_user = await self._get_user_by_uuid_with_conn(conn, user_id)
-
-        # Check if new username is already taken by another user
-        new_username = updater_spec.username.optional_value()
-        if new_username and new_username != current_user.username:
-            username_exists = await self._check_username_exists_for_other_user(
-                conn, username=new_username, exclude_email=current_user.email
-            )
-            if username_exists:
-                raise UserModificationBadRequest(
-                    f"Username '{new_username}' is already taken by another user."
-                )
-
-        # Check if new domain_name exists
-        new_domain_name = updater_spec.domain_name.optional_value()
-        if new_domain_name and new_domain_name != current_user.domain_name:
-            domain_exists = await self._check_domain_exists(conn, new_domain_name)
-            if not domain_exists:
-                raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
-
-        # Check if new resource_policy exists
-        new_resource_policy = updater_spec.resource_policy.optional_value()
-        if new_resource_policy and new_resource_policy != current_user.resource_policy:
-            policy_exists = await self._check_resource_policy_exists(conn, new_resource_policy)
-            if not policy_exists:
-                raise UserModificationBadRequest(
-                    f"Resource policy '{new_resource_policy}' does not exist."
-                )
-
-        # Handle main_access_key validation
-        main_access_key = updater_spec.main_access_key.optional_value()
-        if main_access_key:
-            await self._validate_and_update_main_access_key(
-                conn, current_user.email, main_access_key
-            )
-
-        # Update user
-        if updater_spec.password.optional_value():
-            to_update["password_changed_at"] = sa.func.now()
-        status = updater_spec.status.optional_value()
-        if status is not None and status != current_user.status:
-            to_update["status_info"] = "admin-requested"
-        update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
-        )
-        result = await conn.execute(update_query)
-        updated_user = result.first()
-        if not updated_user:
-            raise UserModificationFailure("Failed to update user")
-
-        # Handle role changes
-        prev_role = current_user.role
-        role = updater_spec.role.optional_value()
-        if role is not None and role != prev_role:
-            await self._sync_keypair_roles(conn, updated_user.uuid, role)
-
-        # Handle group updates
-        group_ids = updater_spec.group_ids_value
-        if group_ids is not None:
-            await self._update_user_groups(
-                conn, updated_user.uuid, updated_user.domain_name, group_ids
-            )
-        return UserData.from_row(updated_user)
 
     async def soft_delete_user_validated(self, email: str) -> None:
         """
@@ -557,18 +322,6 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             user_uuid = await self._get_user_uuid_by_email(session, email)
 
-            # Delete all user data in proper order using purger pattern
-            await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
-            await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
-            await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
-            await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
-
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
-
-    async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
-        """Completely purge user and all associated data by UUID."""
-        async with self._db.begin_session() as session:
             # Delete all user data in proper order using purger pattern
             await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
             await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
@@ -781,44 +534,38 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return cast(UserRow, res)
 
-    async def _get_user_by_uuid_with_conn(self, conn: AsyncConnection, user_uuid: UUID) -> UserRow:
-        """Private method to get user by UUID using connection."""
-        result = await conn.execute(sa.select(users).where(users.c.uuid == user_uuid))
-        res = result.first()
-        if res is None:
-            raise UserNotFound(f"User with UUID {user_uuid} not found.")
-        return cast(UserRow, res)
+    async def _get_project_scope_ids_for_user(
+        self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
+    ) -> list[UUID]:
+        """Get project scope ids for user including model store project."""
+        # Check for model store project
+        rows = await db_session.scalars(
+            sa.select(GroupRow.id).where(
+                sa.or_(
+                    sa.and_(
+                        GroupRow.domain_name == domain_name,
+                        sa.or_(
+                            GroupRow.id.in_(project_ids),
+                            GroupRow.type == ProjectType.MODEL_STORE,
+                        ),
+                    ),
+                ),
+            )
+        )
+        gids_to_join = rows.all()
+        return list(gids_to_join)
 
     async def _add_user_to_groups(
-        self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
+        self, db_session: SASession, user_uuid: UUID, project_ids: Iterable[UUID]
     ) -> None:
-        """Private method to add user to groups including model store project."""
-        # Check for model store project
-        model_store_query = sa.select(groups.c.id).where(groups.c.type == ProjectType.MODEL_STORE)
-        model_store_project = (await db_session.execute(model_store_query)).first()
+        """Add user to groups using pre-resolved project IDs.
 
-        gids_to_join = list(group_ids)
-        if model_store_project:
-            gids_to_join.append(model_store_project.id)
-
-        if gids_to_join:
-            query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.id.in_(gids_to_join))
-            )
-            grps = (await db_session.execute(query)).all()
-            if grps:
-                group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
-                group_insert_query = sa.insert(association_groups_users).values(group_data)
-                await db_session.execute(group_insert_query)
-            else:
-                log.warning(
-                    "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
-                )
-        else:
-            log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
+        Note: RBAC scope associations are handled by RBACEntityCreator in create_user_validated().
+        This method only handles the association_groups_users table.
+        """
+        group_data = [{"user_id": user_uuid, "group_id": pid} for pid in project_ids]
+        if group_data:
+            await db_session.execute(sa.insert(association_groups_users).values(group_data))
 
     async def _validate_and_update_main_access_key(
         self, conn: AsyncConnection, email: str, main_access_key: str
