@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -141,7 +140,7 @@ async def fetch_admin_users(
 
 async def fetch_domain_users(
     info: Info[StrawberryGQLContext],
-    domain_name: str,
+    scope: DomainUserSearchScope,
     filter: UserFilterGQL | None = None,
     order_by: list[UserOrderByGQL] | None = None,
     before: str | None = None,
@@ -155,7 +154,7 @@ async def fetch_domain_users(
 
     Args:
         info: Strawberry GraphQL context.
-        domain_name: Domain name to scope the query.
+        scope: Domain scope specifying which domain to query.
         filter: Optional additional filter criteria.
         order_by: Optional ordering specification.
         before: Cursor for backward pagination.
@@ -186,8 +185,7 @@ async def fetch_domain_users(
         base_conditions=None,
     )
 
-    # Create scope and execute via processor
-    scope = DomainUserSearchScope(domain_name=domain_name)
+    # Execute via processor with domain scope
     action_result = await processors.user.search_users_by_domain.wait_for_complete(
         SearchUsersByDomainAction(scope=scope, querier=querier)
     )
@@ -210,7 +208,7 @@ async def fetch_domain_users(
 
 async def fetch_project_users(
     info: Info[StrawberryGQLContext],
-    project_id: UUID,
+    scope: ProjectUserSearchScope,
     filter: UserFilterGQL | None = None,
     order_by: list[UserOrderByGQL] | None = None,
     before: str | None = None,
@@ -224,7 +222,7 @@ async def fetch_project_users(
 
     Args:
         info: Strawberry GraphQL context.
-        project_id: Project UUID to scope the query.
+        scope: Project scope specifying which project to query.
         filter: Optional additional filter criteria.
         order_by: Optional ordering specification.
         before: Cursor for backward pagination.
@@ -255,8 +253,7 @@ async def fetch_project_users(
         base_conditions=None,
     )
 
-    # Create scope and execute via processor
-    scope = ProjectUserSearchScope(project_id=project_id)
+    # Execute via processor with project scope
     action_result = await processors.user.search_users_by_project.wait_for_complete(
         SearchUsersByProjectAction(scope=scope, querier=querier)
     )
