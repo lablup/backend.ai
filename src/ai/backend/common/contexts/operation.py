@@ -5,7 +5,7 @@ from contextvars import ContextVar
 _client_operation_var: ContextVar[str] = ContextVar("client_operation", default="")
 
 
-def current_client_operation() -> str:
+def get_client_operation() -> str:
     """
     Return the current client operation name from the context.
     Returns an empty string if no operation context has been established,
