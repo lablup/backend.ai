@@ -272,20 +272,16 @@ class TestUserRepository:
         return str(group_id)
 
     @pytest.fixture
-    async def sample_user_with_group(
+    def sample_user_creator(
         self,
-        user_repository: UserRepository,
         sample_domain: str,
         user_resource_policy: str,
-        default_keypair_resource_policy: str,
-        sample_group_id: str,
-    ) -> UserWithGroup:
-        """Create a test user with group association."""
-        password_info = create_test_password_info("test_password")
+    ) -> Creator[UserRow]:
+        """Create a Creator for a test user."""
         spec = UserCreatorSpec(
             username=f"testuser-{uuid.uuid4().hex[:8]}",
             email=f"test-{uuid.uuid4().hex[:8]}@example.com",
-            password=password_info,
+            password=create_test_password_info("test_password"),
             need_password_change=False,
             full_name="Test User",
             description="Test Description",
@@ -300,9 +296,19 @@ class TestUserRepository:
             container_main_gid=None,
             container_gids=None,
         )
-        creator = Creator(spec=spec)
+        return Creator(spec=spec)
+
+    @pytest.fixture
+    async def sample_user_with_group(
+        self,
+        user_repository: UserRepository,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+        sample_user_creator: Creator[UserRow],
+    ) -> UserWithGroup:
+        """Create a test user with group association."""
         created_result = await user_repository.create_user_validated(
-            creator,
+            sample_user_creator,
             group_ids=[sample_group_id],
         )
         return UserWithGroup(
@@ -501,35 +507,13 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_domain: str,
-        user_resource_policy: str,
         default_keypair_resource_policy: str,
         sample_group_id: str,
+        sample_user_creator: Creator[UserRow],
     ) -> None:
         """Test that create_user_validated correctly creates group associations."""
-        password_info = create_test_password_info("new_password")
-        spec = UserCreatorSpec(
-            username=f"newuser-{uuid.uuid4().hex[:8]}",
-            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
-            password=password_info,
-            need_password_change=False,
-            full_name="New User",
-            description="New User Description",
-            status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
-            role=UserRole.USER,
-            resource_policy=user_resource_policy,
-            allowed_client_ip=None,
-            totp_activated=False,
-            sudo_session_enabled=False,
-            container_uid=None,
-            container_main_gid=None,
-            container_gids=None,
-        )
-        creator = Creator(spec=spec)
-
         result = await user_repository.create_user_validated(
-            creator,
+            sample_user_creator,
             group_ids=[sample_group_id],
         )
 
