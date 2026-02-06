@@ -6,7 +6,7 @@ from uuid import UUID
 
 import strawberry
 
-from .enums import UserRoleEnum, UserStatusEnum
+from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
 
 # Create User Inputs
 
@@ -30,8 +30,10 @@ class CreateUserV2InputGQL:
     need_password_change: bool = strawberry.field(
         description="If true, user must change password on first login."
     )
-    status: UserStatusEnum = strawberry.field(description="Initial account status.")
-    role: UserRoleEnum = strawberry.field(description="User role determining access permissions.")
+    status: UserStatusV2EnumGQL = strawberry.field(description="Initial account status.")
+    role: UserRoleV2EnumGQL = strawberry.field(
+        description="User role determining access permissions."
+    )
     full_name: str | None = strawberry.field(
         default=None,
         description="User's full display name.",
@@ -118,11 +120,11 @@ class UpdateUserV2InputGQL:
         default=None,
         description="New description.",
     )
-    status: UserStatusEnum | None = strawberry.field(
+    status: UserStatusV2EnumGQL | None = strawberry.field(
         default=None,
         description="New account status.",
     )
-    role: UserRoleEnum | None = strawberry.field(
+    role: UserRoleV2EnumGQL | None = strawberry.field(
         default=None,
         description="New user role.",
     )

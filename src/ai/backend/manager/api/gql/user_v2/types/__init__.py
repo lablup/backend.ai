@@ -1,8 +1,8 @@
 """User V2 GraphQL types package."""
 
 from .enums import (
-    UserRoleEnum,
-    UserStatusEnum,
+    UserRoleV2EnumGQL,
+    UserStatusV2EnumGQL,
 )
 from .filters import (
     UserRoleV2EnumFilterGQL,
@@ -49,8 +49,8 @@ from .scopes import (
 
 __all__ = [
     # Enums
-    "UserStatusEnum",
-    "UserRoleEnum",
+    "UserStatusV2EnumGQL",
+    "UserRoleV2EnumGQL",
     # Nested Types
     "UserBasicInfoGQL",
     "UserStatusInfoGQL",
