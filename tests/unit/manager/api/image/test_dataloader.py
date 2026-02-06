@@ -14,7 +14,7 @@ class TestLoadImagesByIds:
     """Tests for load_images_by_ids function."""
 
     @staticmethod
-    def create_mock_image(image_id: uuid.UUID) -> MagicMock:
+    def create_mock_image(image_id: ImageID) -> MagicMock:
         return MagicMock(spec=ImageDataWithDetails, id=image_id)
 
     @staticmethod

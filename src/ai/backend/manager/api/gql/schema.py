@@ -117,8 +117,11 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_image_aliases,
     admin_images_v2,
     container_registry_images_v2,
+    image_alias,
+    image_scoped_aliases,
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
@@ -260,6 +263,7 @@ class Query:
     reservoir_registries = reservoir_registries
     image_v2 = image_v2
     kernel_v2 = kernel_v2
+    image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_session_scheduling_histories = admin_session_scheduling_histories
@@ -281,6 +285,7 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
+    admin_image_aliases = admin_image_aliases
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -295,6 +300,8 @@ class Query:
     rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
+    # Image Scoped APIs
+    image_scoped_aliases = image_scoped_aliases
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories

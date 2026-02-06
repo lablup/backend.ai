@@ -2360,6 +2360,75 @@ type HuggingFaceRegistryEdge {
 """
 Added in 26.2.0.
 
+Represents an alias for a container image.
+Aliases provide alternative names for images.
+"""
+type ImageAlias implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The alias string for the image."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Relay-style connection for paginated image alias queries.
+Includes total count for pagination UI.
+"""
+type ImageAliasConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ImageAliasEdge!]!
+
+  """Total count of aliases matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ImageAliasEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ImageAlias!
+}
+
+"""
+Added in 26.2.0.
+
+Filter options for image aliases.
+Supports filtering by alias string.
+"""
+input ImageAliasFilterGQL {
+  alias: StringFilter = null
+}
+
+"""
+Added in 26.2.0.
+
+Specifies the field and direction for ordering image aliases in queries.
+"""
+input ImageAliasOrderByGQL {
+  field: ImageAliasOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.2.0.
+
+Fields available for ordering image alias queries.
+"""
+enum ImageAliasOrderField {
+  ALIAS
+}
+
+"""
+Added in 26.2.0.
+
 Relay-style connection for paginated image queries.
 Includes total count for pagination UI.
 """
@@ -2536,6 +2605,16 @@ type ImageResourceLimit {
 """
 Added in 26.2.0.
 
+Scope for querying aliases within a specific image.
+"""
+input ImageScope {
+  """UUID of the image to scope the query to."""
+  imageId: UUID!
+}
+
+"""
+Added in 26.2.0.
+
 Status of an image in the system.
 """
 enum ImageStatus {
@@ -2587,6 +2666,9 @@ type ImageV2 implements Node {
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
+
+  """Added in 26.2.0. Aliases for this image."""
+  aliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageAliasConnection!
 }
 
 """An edge in a connection."""
@@ -4409,6 +4491,15 @@ type Query {
   """Added in 26.2.0. Query a single kernel by ID."""
   kernelV2(id: UUID!): KernelV2
 
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image alias by its ID.
+  
+  Returns the alias information including the alias string.
+  """
+  imageAlias(id: ID!): ImageAlias
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
 
@@ -4488,6 +4579,17 @@ type Query {
   """
   adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 
+  """
+  Added in 26.2.0.
+  
+  Query image aliases with optional filtering, ordering, and pagination.
+  
+  Returns image aliases that provide alternative names for container images.
+  Use filters to search by alias string.
+  Supports both cursor-based and offset-based pagination.
+  """
+  adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 
@@ -4539,6 +4641,17 @@ type Query {
   Supports both cursor-based and offset-based pagination.
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2!
+
+  """
+  Added in 26.2.0.
+  
+  Query image aliases within a specific image with optional filtering,
+  ordering, and pagination.
+  
+  Returns image aliases that belong to the specified image.
+  Supports both cursor-based and offset-based pagination.
+  """
+  imageScopedAliases(scope: ImageScope!, filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!

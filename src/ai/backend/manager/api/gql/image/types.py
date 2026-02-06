@@ -12,12 +12,15 @@ from datetime import datetime
 from typing import Any, Self
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
+    ImageAliasData,
     ImageData,
     ImageDataWithDetails,
     ImageStatus,
@@ -30,7 +33,12 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.image.options import ImageConditions, ImageOrders
+from ai.backend.manager.repositories.image.options import (
+    ImageAliasConditions,
+    ImageAliasOrders,
+    ImageConditions,
+    ImageOrders,
+)
 
 # =============================================================================
 # Enums
@@ -137,6 +145,24 @@ class ImageTagEntryGQL:
     @classmethod
     def from_dict_item(cls, key: str, value: str) -> Self:
         return cls(key=key, value=value)
+
+
+@strawberry.type(
+    name="ImageAlias",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Represents an alias for a container image.
+    Aliases provide alternative names for images.
+    """),
+)
+class ImageAliasGQL(Node):
+    id: NodeID[uuid.UUID]
+    alias: str = strawberry.field(description="The alias string for the image.")
+
+    @classmethod
+    def from_data(cls, data: ImageAliasData) -> Self:
+        return cls(id=data.id, alias=data.alias)
 
 
 # =============================================================================
@@ -302,6 +328,8 @@ class ImagePermissionInfoGQL:
     """),
 )
 class ImageV2GQL(Node):
+    _image_id: strawberry.Private[ImageID]
+
     id: NodeID[uuid.UUID]
 
     # Sub-info types
@@ -323,6 +351,32 @@ class ImageV2GQL(Node):
         description="UUID of the container registry where this image is stored."
     )
 
+    @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
+    async def aliases(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: ImageAliasFilterGQL | None = None,
+        order_by: list[ImageAliasOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+    ) -> ImageAliasConnectionGQL:
+        """Get the aliases for this image with pagination, filtering, and ordering."""
+        from .fetcher import fetch_image_aliases
+
+        base_conditions = [ImageAliasConditions.by_image_ids([self._image_id])]
+        return await fetch_image_aliases(
+            info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            base_conditions=base_conditions,
+        )
+
     @classmethod
     def from_data(
         cls,
@@ -340,6 +394,7 @@ class ImageV2GQL(Node):
         """
         return cls(
             id=data.id,
+            _image_id=data.id,
             identity=ImageIdentityInfoGQL.from_data(data),
             metadata=ImageMetadataInfoGQL.from_data(data),
             requirements=ImageRequirementsInfoGQL.from_data(data),
@@ -366,6 +421,7 @@ class ImageV2GQL(Node):
         """
         return cls(
             id=data.id,
+            _image_id=data.id,
             identity=ImageIdentityInfoGQL.from_detailed_data(data),
             metadata=ImageMetadataInfoGQL.from_detailed_data(data),
             requirements=ImageRequirementsInfoGQL.from_detailed_data(data),
@@ -414,6 +470,18 @@ class ContainerRegistryScopeGQL:
     registry_id: uuid.UUID = strawberry.field(
         description="UUID of the container registry to scope the query to."
     )
+
+
+@strawberry.input(
+    name="ImageScope",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Scope for querying aliases within a specific image.
+    """),
+)
+class ImageScopeGQL:
+    image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
 
 
 @strawberry.input(
@@ -527,3 +595,87 @@ class ImageOrderByGQL(GQLOrderBy):
                 return ImageOrders.name(ascending)
             case ImageOrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
+
+
+# =============================================================================
+# Image Alias Types
+# =============================================================================
+
+# Edge type using strawberry.relay.Edge
+ImageAliasEdgeGQL = Edge[ImageAliasGQL]
+
+
+@strawberry.type(
+    name="ImageAliasConnection",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Relay-style connection for paginated image alias queries.
+    Includes total count for pagination UI.
+    """),
+)
+class ImageAliasConnectionGQL(Connection[ImageAliasGQL]):
+    count: int = strawberry.field(description="Total count of aliases matching the query.")
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Filter options for image aliases.
+    Supports filtering by alias string.
+    """)
+)
+class ImageAliasFilterGQL(GQLFilter):
+    alias: StringFilter | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions from this filter."""
+        field_conditions: list[QueryCondition] = []
+
+        if self.alias:
+            alias_condition = self.alias.build_query_condition(
+                contains_factory=ImageAliasConditions.by_alias_contains,
+                equals_factory=ImageAliasConditions.by_alias_equals,
+                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
+                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
+            )
+            if alias_condition:
+                field_conditions.append(alias_condition)
+
+        return field_conditions
+
+
+@strawberry.enum(
+    name="ImageAliasOrderField",
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Fields available for ordering image alias queries.
+    """),
+)
+class ImageAliasOrderFieldGQL(enum.Enum):
+    ALIAS = "ALIAS"
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Specifies the field and direction for ordering image aliases in queries.
+    """)
+)
+class ImageAliasOrderByGQL(GQLOrderBy):
+    field: ImageAliasOrderFieldGQL
+    direction: OrderDirection = OrderDirection.ASC
+
+    def to_query_order(self) -> QueryOrder:
+        """Convert to repository QueryOrder."""
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case ImageAliasOrderFieldGQL.ALIAS:
+                return ImageAliasOrders.alias(ascending)

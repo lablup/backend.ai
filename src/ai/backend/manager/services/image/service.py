@@ -80,6 +80,10 @@ from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
 )
+from ai.backend.manager.services.image.actions.search_aliases import (
+    SearchAliasesAction,
+    SearchAliasesActionResult,
+)
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
     SearchImagesActionResult,
@@ -441,3 +445,16 @@ class ImageService:
             action.resource_limit,
         )
         return SetImageResourceLimitByIdActionResult(image_data=image_data)
+
+    async def search_aliases(self, action: SearchAliasesAction) -> SearchAliasesActionResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        """
+        result = await self._image_repository.search_aliases(action.querier)
+        return SearchAliasesActionResult(
+            data=result.items,
+            image_ids=result.image_ids,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

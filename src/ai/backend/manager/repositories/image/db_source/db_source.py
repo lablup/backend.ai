@@ -2,23 +2,22 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from uuid import UUID
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
+    ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
     ImageListResult,
@@ -433,12 +432,35 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        Returns ImageAliasListResult with items and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageAliasRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageAliasRow.to_dataclass() for row in result.rows]
+            image_ids = [ImageID(row.ImageAliasRow.image_id) for row in result.rows]
+            return ImageAliasListResult(
+                items=items,
+                image_ids=image_ids,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
     async def rescan_images(
         self,
         registry_or_image: str | None = None,
         project: str | None = None,
+        *,
         reporter: ProgressReporter | None = None,
     ) -> RescanImagesResult:
+        """
+        Rescan container registries and update images table.
+        Wraps the rescan_images function from models/image/row.py.
+        """
         return await rescan_images(
             self._db,
             registry_or_image,

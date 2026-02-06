@@ -14,14 +14,19 @@ from strawberry import ID, Info
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
-from ai.backend.manager.repositories.image.options import ImageConditions
+from ai.backend.manager.repositories.image.options import ImageAliasConditions, ImageConditions
 
-from .fetcher import fetch_image, fetch_images
+from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .types import (
     ContainerRegistryScopeGQL,
+    ImageAliasConnectionGQL,
+    ImageAliasFilterGQL,
+    ImageAliasGQL,
+    ImageAliasOrderByGQL,
     ImageConnectionV2GQL,
     ImageFilterGQL,
     ImageOrderByGQL,
+    ImageScopeGQL,
     ImageV2GQL,
 )
 
@@ -106,6 +111,95 @@ async def container_registry_images_v2(
     # Add registry scope as base condition
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
     return await fetch_images(
+        info,
+        filter,
+        order_by,
+        before,
+        after,
+        first,
+        last,
+        limit,
+        offset,
+        base_conditions=base_conditions,
+    )
+
+
+# Image Alias Query Fields
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Query image aliases with optional filtering, ordering, and pagination.
+
+    Returns image aliases that provide alternative names for container images.
+    Use filters to search by alias string.
+    Supports both cursor-based and offset-based pagination.
+    """)
+)
+async def admin_image_aliases(
+    info: Info[StrawberryGQLContext],
+    filter: ImageAliasFilterGQL | None = None,
+    order_by: list[ImageAliasOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ImageAliasConnectionGQL:
+    check_admin_only()
+    return await fetch_image_aliases(
+        info,
+        filter,
+        order_by,
+        before,
+        after,
+        first,
+        last,
+        limit,
+        offset,
+    )
+
+
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Retrieve a specific image alias by its ID.
+
+    Returns the alias information including the alias string.
+    """)
+)
+async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageAliasGQL | None:
+    return await fetch_image_alias(info, UUID(id))
+
+
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip("""
+    Added in 26.2.0.
+
+    Query image aliases within a specific image with optional filtering,
+    ordering, and pagination.
+
+    Returns image aliases that belong to the specified image.
+    Supports both cursor-based and offset-based pagination.
+    """)
+)
+async def image_scoped_aliases(
+    info: Info[StrawberryGQLContext],
+    scope: ImageScopeGQL,
+    filter: ImageAliasFilterGQL | None = None,
+    order_by: list[ImageAliasOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ImageAliasConnectionGQL:
+    # Add image scope as base condition
+    base_conditions = [ImageAliasConditions.by_image_ids([ImageID(scope.image_id)])]
+    return await fetch_image_aliases(
         info,
         filter,
         order_by,
