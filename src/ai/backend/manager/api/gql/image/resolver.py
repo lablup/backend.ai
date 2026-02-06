@@ -124,6 +124,7 @@ async def container_registry_images_v2(
     )
 
 
+
 # Image Alias Query Fields
 @strawberry.field(  # type: ignore[misc]
     description=dedent_strip("""
