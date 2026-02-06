@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -20,21 +19,21 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 async def session_v2(
     info: Info[StrawberryGQLContext],
     id: ID,
-) -> Optional[SessionV2GQL]:
+) -> SessionV2GQL | None:
     return await fetch_session(info, UUID(id))
 
 
 @strawberry.field(description="Added in 26.1.0. Query sessions with pagination and filtering.")
 async def sessions_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[SessionFilterGQL] = None,
-    order_by: Optional[list[SessionOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: SessionFilterGQL | None = None,
+    order_by: list[SessionOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> SessionConnectionV2GQL:
     return await fetch_sessions(
         info,

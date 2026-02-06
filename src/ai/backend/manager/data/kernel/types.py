@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -134,8 +134,8 @@ class KernelStatus(CIStrEnum):
 @dataclass
 class RelatedSessionInfo:
     session_id: str  # Session UUID
-    creation_id: Optional[str]
-    name: Optional[str]
+    creation_id: str | None
+    name: str | None
     session_type: SessionTypes
 
 
@@ -155,17 +155,17 @@ class UserPermission:
     access_key: str
     domain_name: str
     group_id: UUID
-    uid: Optional[int]
-    main_gid: Optional[int]
-    gids: Optional[list[int]]
+    uid: int | None
+    main_gid: int | None
+    gids: list[int] | None
 
 
 @dataclass
 class ResourceInfo:
-    scaling_group: Optional[str]
-    agent: Optional[str]
-    agent_addr: Optional[str]
-    container_id: Optional[str]
+    scaling_group: str | None
+    agent: str | None
+    agent_addr: str | None
+    container_id: str | None
     occupied_slots: ResourceSlot
     requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
@@ -175,31 +175,31 @@ class ResourceInfo:
 
 @dataclass
 class ImageInfo:
-    identifier: Optional[ImageIdentifier]
-    registry: Optional[str]
-    tag: Optional[str]
-    architecture: Optional[str]
+    identifier: ImageIdentifier | None
+    registry: str | None
+    tag: str | None
+    architecture: str | None
 
 
 @dataclass
 class RuntimeConfig:
-    environ: Optional[list[str]]
-    mounts: Optional[list[str]]  # legacy
-    mount_map: Optional[dict[str, Any]]  # legacy
-    vfolder_mounts: Optional[list[dict[str, Any]]]
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
+    environ: list[str] | None
+    mounts: list[str] | None  # legacy
+    mount_map: dict[str, Any] | None  # legacy
+    vfolder_mounts: list[dict[str, Any]] | None
+    bootstrap_script: str | None
+    startup_command: str | None
 
 
 @dataclass
 class NetworkConfig:
-    kernel_host: Optional[str]
+    kernel_host: str | None
     repl_in_port: int
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
-    service_ports: Optional[list[dict[str, Any]]]
-    preopen_ports: Optional[list[int]]
+    service_ports: list[dict[str, Any]] | None
+    preopen_ports: list[int] | None
     use_host_network: bool
 
 
@@ -207,27 +207,27 @@ class NetworkConfig:
 class LifecycleStatus:
     status: KernelStatus
     result: SessionResult
-    created_at: Optional[datetime]
-    terminated_at: Optional[datetime]
-    starts_at: Optional[datetime]
-    status_changed: Optional[datetime]
-    status_info: Optional[str]
-    status_data: Optional[Mapping[str, Any]]
-    status_history: Optional[dict[str, Any]]
-    last_seen: Optional[datetime]
+    created_at: datetime | None
+    terminated_at: datetime | None
+    starts_at: datetime | None
+    status_changed: datetime | None
+    status_info: str | None
+    status_data: Mapping[str, Any] | None
+    status_history: dict[str, Any] | None
+    last_seen: datetime | None
 
 
 @dataclass
 class Metrics:
     num_queries: int
-    last_stat: Optional[dict[str, Any]]
-    container_log: Optional[bytes]
+    last_stat: dict[str, Any] | None
+    container_log: bytes | None
 
 
 @dataclass
 class Metadata:
-    callback_url: Optional[str]
-    internal_data: Optional[dict[str, Any]]
+    callback_url: str | None
+    internal_data: dict[str, Any] | None
 
 
 @dataclass
@@ -277,11 +277,11 @@ class KernelSchedulingHistoryData:
     session_id: SessionId
 
     phase: str  # ScheduleType value
-    from_status: Optional[KernelSchedulingPhase]
-    to_status: Optional[KernelSchedulingPhase]
+    from_status: KernelSchedulingPhase | None
+    to_status: KernelSchedulingPhase | None
 
     result: SchedulingResult
-    error_code: Optional[str]
+    error_code: str | None
     message: str
 
     attempts: int

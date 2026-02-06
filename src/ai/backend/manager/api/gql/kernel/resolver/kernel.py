@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 import strawberry
@@ -21,7 +20,7 @@ from ai.backend.manager.errors.kernel import TooManyKernelsFound
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> Optional[KernelV2GQL]:
+) -> KernelV2GQL | None:
     result = await fetch_kernels(info, filter=KernelFilterGQL(id=id), limit=1)
     if len(result.edges) >= 2:
         raise TooManyKernelsFound
@@ -33,14 +32,14 @@ async def kernel_v2(
 @strawberry.field(description="Added in 26.1.0. Query kernels with pagination and filtering.")
 async def kernels_v2(
     info: Info[StrawberryGQLContext],
-    filter: Optional[KernelFilterGQL] = None,
-    order_by: Optional[list[KernelOrderByGQL]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    filter: KernelFilterGQL | None = None,
+    order_by: list[KernelOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> KernelConnectionV2GQL:
     return await fetch_kernels(
         info,

@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,7 +58,7 @@ class SessionRepository:
         self._db = db
 
     @session_repository_resilience.apply()
-    async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
+    async def get_session_owner(self, session_id: str | SessionId) -> UserData | None:
         async with self._db.begin_readonly_session() as db_sess:
             query = (
                 sa.select(UserRow)
@@ -77,7 +77,7 @@ class SessionRepository:
         owner_access_key: AccessKey,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
-        eager_loading_op: Optional[list] = None,
+        eager_loading_op: list | None = None,
     ) -> SessionRow:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session(
@@ -114,7 +114,7 @@ class SessionRepository:
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates.c.template)
@@ -129,7 +129,7 @@ class SessionRepository:
     async def get_template_info_by_id(
         self,
         template_id: uuid.UUID,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(session_templates)
@@ -201,7 +201,7 @@ class SessionRepository:
         self,
         registry_hostname: str,
         registry_project: str,
-    ) -> Optional[ContainerRegistryRow]:
+    ) -> ContainerRegistryRow | None:
         async with self._db.begin_readonly_session() as db_session:
             query = (
                 sa.select(ContainerRegistryRow)
@@ -254,7 +254,7 @@ class SessionRepository:
         image_visibility: str,
         image_owner_id: str,
         image_name: str,
-    ) -> Optional[ImageRow]:
+    ) -> ImageRow | None:
         async with self._db.begin_readonly_session() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
@@ -272,7 +272,7 @@ class SessionRepository:
         self,
         domain_name: str,
         group_id: uuid.UUID,
-    ) -> Optional[str]:
+    ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(groups.c.name)
@@ -287,7 +287,7 @@ class SessionRepository:
     async def get_scaling_group_wsproxy_addr(
         self,
         scaling_group_name: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(scaling_groups.c.wsproxy_addr)
@@ -302,7 +302,7 @@ class SessionRepository:
     async def get_session_by_id(
         self,
         session_id: str | SessionId,
-    ) -> Optional[SessionRow]:
+    ) -> SessionRow | None:
         async with self._db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
@@ -317,8 +317,8 @@ class SessionRepository:
     async def modify_session(
         self,
         updater: Updater[SessionRow],
-        session_name: Optional[str] = None,
-    ) -> Optional[SessionRow]:
+        session_name: str | None = None,
+    ) -> SessionRow | None:
         session_id = updater.pk_value
 
         async with self._db.begin_session() as db_session:
@@ -385,10 +385,10 @@ class SessionRepository:
         requester_access_key: AccessKey,
         user_role: UserRole,
         domain_name: str,
-        keypair_resource_policy: Optional[dict],
+        keypair_resource_policy: dict | None,
         query_domain_name: str,
-        group_name: Optional[str],
-        query_on_behalf_of: Optional[AccessKey] = None,
+        group_name: str | None,
+        query_on_behalf_of: AccessKey | None = None,
     ):
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
