@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
-from ai.backend.common.contexts.operation import get_client_operation
+from ai.backend.common.contexts.operation import current_client_operation
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.middlewares.request_id import (
     OPERATION_HEADER,
@@ -52,7 +52,7 @@ async def test_request_id_middleware_without_request_id(aiohttp_client: Any) -> 
 
 async def test_request_id_middleware_with_operation_header(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
-        assert get_client_operation() == "createSession"
+        assert current_client_operation() == "createSession"
         return web.Response(text="ok")
 
     app = web.Application()
@@ -66,7 +66,7 @@ async def test_request_id_middleware_with_operation_header(aiohttp_client: Any) 
 
 async def test_request_id_middleware_without_operation_header(aiohttp_client: Any) -> None:
     async def test_handler(request: web.Request) -> web.Response:
-        assert get_client_operation() == ""
+        assert current_client_operation() == ""
         return web.Response(text="ok")
 
     app = web.Application()

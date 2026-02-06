@@ -94,6 +94,30 @@ class TestAPIMetricMiddlewareWithOperation:
         assert call_kwargs["error_code"] is not None
         assert call_kwargs["client_operation"] == "should_be_ignored"
 
+    async def test_invalid_operation_header_is_sanitized(self, aiohttp_client: Any) -> None:
+        mock_metric = MagicMock()
+
+        async def test_handler(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        app = web.Application(
+            middlewares=[
+                request_id_middleware,
+                build_api_metric_middleware(mock_metric),
+            ]
+        )
+        app.router.add_get("/test", test_handler)
+
+        client = await aiohttp_client(app)
+        resp = await client.get(
+            "/test", headers={OPERATION_HEADER: "invalid operation with spaces"}
+        )
+        assert resp.status == 200
+
+        mock_metric.observe_request.assert_called_once()
+        call_kwargs = mock_metric.observe_request.call_args.kwargs
+        assert call_kwargs["client_operation"] == ""
+
     async def test_metric_middleware_without_request_id_middleware(
         self, aiohttp_client: Any
     ) -> None:
