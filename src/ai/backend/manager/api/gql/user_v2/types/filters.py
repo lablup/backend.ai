@@ -119,7 +119,7 @@ class UserProjectNestedFilter:
 @strawberry.input(
     name="UserStatusEnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserStatusV2EnumGQL fields. "
+        "Added in 26.2.0. Filter for UserStatusV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
@@ -148,7 +148,7 @@ class UserStatusEnumFilterGQL:
 @strawberry.input(
     name="UserRoleEnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserRoleV2EnumGQL fields. "
+        "Added in 26.2.0. Filter for UserRoleV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
