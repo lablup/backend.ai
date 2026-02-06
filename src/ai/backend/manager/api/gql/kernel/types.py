@@ -13,7 +13,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import SessionResult, SessionTypes
+from ai.backend.common.types import AgentId, SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
@@ -35,6 +35,9 @@ from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 
 @strawberry.enum(
@@ -396,8 +399,6 @@ class KernelV2GQL(Node):
         agent_id = self.resource.agent_id
         if agent_id is None:
             return None
-        from ai.backend.common.types import AgentId
-
         detail = await info.context.data_loaders.agent_loader.load(AgentId(agent_id))
         if detail is None:
             return None
@@ -410,7 +411,6 @@ class KernelV2GQL(Node):
         user_id = self.user_info.user_id
         if user_id is None:
             return None
-        from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
         result = await info.context.processors.user.get_user.wait_for_complete(
             GetUserAction(user_uuid=user_id)
@@ -424,8 +424,6 @@ class KernelV2GQL(Node):
         group_id = self.user_info.group_id
         if group_id is None:
             return None
-        from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
-
         result = await info.context.processors.group.get_project.wait_for_complete(
             GetProjectAction(project_id=group_id)
         )
@@ -438,8 +436,6 @@ class KernelV2GQL(Node):
         domain_name = self.user_info.domain_name
         if domain_name is None:
             return None
-        from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-
         result = await info.context.processors.domain.get_domain.wait_for_complete(
             GetDomainAction(domain_name=domain_name)
         )
