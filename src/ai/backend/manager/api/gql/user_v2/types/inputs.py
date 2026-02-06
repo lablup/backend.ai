@@ -12,13 +12,13 @@ from .enums import UserRoleEnum, UserStatusEnum
 
 
 @strawberry.input(
-    name="CreateUserInputV2",
+    name="CreateUserV2Input",
     description=(
         "Added in 26.2.0. Input for creating a new user. "
         "Required fields: email, username, password, domain_name, need_password_change, status, role."
     ),
 )
-class CreateUserInputGQL:
+class CreateUserV2InputGQL:
     """Input for creating a single user."""
 
     email: str = strawberry.field(
@@ -75,29 +75,31 @@ class CreateUserInputGQL:
 
 
 @strawberry.input(
-    name="BulkCreateUserInputV2",
+    name="BulkCreateUserV2Input",
     description=(
         "Added in 26.2.0. Input for bulk creating multiple users. "
         "Each user has individual specifications."
     ),
 )
-class BulkCreateUserInputGQL:
+class BulkCreateUserV2InputGQL:
     """Input for bulk creating users with individual specs."""
 
-    users: list[CreateUserInputGQL] = strawberry.field(description="List of user creation inputs.")
+    users: list[CreateUserV2InputGQL] = strawberry.field(
+        description="List of user creation inputs."
+    )
 
 
 # Update User Inputs
 
 
 @strawberry.input(
-    name="UpdateUserInputV2",
+    name="UpdateUserV2Input",
     description=(
         "Added in 26.2.0. Input for updating user information. "
         "All fields are optional - only provided fields will be updated."
     ),
 )
-class UpdateUserInputGQL:
+class UpdateUserV2InputGQL:
     """Input for updating user information. All fields optional."""
 
     username: str | None = strawberry.field(
@@ -170,13 +172,13 @@ class UpdateUserInputGQL:
 
 
 @strawberry.input(
-    name="DeleteUsersInputV2",
+    name="DeleteUsersV2Input",
     description=(
         "Added in 26.2.0. Input for soft-deleting multiple users. "
         "Soft delete changes user status to DELETED but preserves data."
     ),
 )
-class DeleteUsersInputGQL:
+class DeleteUsersV2InputGQL:
     """Input for soft-deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to soft-delete.")
@@ -186,26 +188,26 @@ class DeleteUsersInputGQL:
 
 
 @strawberry.input(
-    name="PurgeUserInputV2",
+    name="PurgeUserV2Input",
     description=(
         "Added in 26.2.0. Input for permanently deleting a user and all associated data. "
         "This action is irreversible."
     ),
 )
-class PurgeUserInputGQL:
+class PurgeUserV2InputGQL:
     """Input for permanently deleting a single user."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to purge.")
 
 
 @strawberry.input(
-    name="PurgeUsersInputV2",
+    name="PurgeUsersV2Input",
     description=(
         "Added in 26.2.0. Input for permanently deleting multiple users. "
         "This action is irreversible."
     ),
 )
-class PurgeUsersInputGQL:
+class PurgeUsersV2InputGQL:
     """Input for permanently deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to purge.")

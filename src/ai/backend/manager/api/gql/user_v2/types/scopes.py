@@ -8,7 +8,7 @@ import strawberry
 
 
 @strawberry.input(
-    name="DomainUserScope",
+    name="DomainUserV2Scope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific domain. "
         "Used to restrict user queries to a particular domain context."
@@ -23,7 +23,7 @@ class DomainUserScopeGQL:
 
 
 @strawberry.input(
-    name="ProjectUserScope",
+    name="ProjectUserV2Scope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific project. "
         "Used to restrict user queries to members of a particular project."
