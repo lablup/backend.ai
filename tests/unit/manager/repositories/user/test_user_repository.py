@@ -261,6 +261,42 @@ class TestUserRepository:
             await session.commit()
         return str(group_id)
 
+    @pytest.fixture
+    async def sample_user_with_group(
+        self,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+    ) -> tuple[str, uuid.UUID, str]:
+        """Create a test user with group association and return (email, uuid, group_id)."""
+        password_info = create_test_password_info("test_password")
+        spec = UserCreatorSpec(
+            username=f"testuser-{uuid.uuid4().hex[:8]}",
+            email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="Test User",
+            description="Test Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+        created_result = await user_repository.create_user_validated(
+            creator,
+            group_ids=[sample_group_id],
+        )
+        return created_result.user.email, created_result.user.uuid, sample_group_id
+
     @pytest.mark.asyncio
     async def test_get_by_email_validated_success(
         self,
@@ -451,10 +487,7 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_domain: str,
-        user_resource_policy: str,
-        default_keypair_resource_policy: str,
-        sample_group_id: str,
+        sample_user_with_group: tuple[str, uuid.UUID, str],
     ) -> None:
         """
         Regression test: Changing user role should NOT delete group associations.
@@ -465,33 +498,7 @@ class TestUserRepository:
 
         See: PR fix for role change incorrectly clearing user groups
         """
-        # Arrange: Create a user with group association
-        password_info = create_test_password_info("test_password")
-        spec = UserCreatorSpec(
-            username=f"roletest-{uuid.uuid4().hex[:8]}",
-            email=f"roletest-{uuid.uuid4().hex[:8]}@example.com",
-            password=password_info,
-            need_password_change=False,
-            full_name="Role Test User",
-            description="User for role change test",
-            status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
-            role=UserRole.USER,
-            resource_policy=user_resource_policy,
-            allowed_client_ip=None,
-            totp_activated=False,
-            sudo_session_enabled=False,
-            container_uid=None,
-            container_main_gid=None,
-            container_gids=None,
-        )
-        creator = Creator(spec=spec)
-        created_result = await user_repository.create_user_validated(
-            creator,
-            group_ids=[sample_group_id],
-        )
-        user_email = created_result.user.email
-        user_uuid = created_result.user.uuid
+        user_email, user_uuid, group_id = sample_user_with_group
 
         # Verify user has group association before role change
         async with db_with_cleanup.begin_session() as session:
@@ -525,7 +532,7 @@ class TestUserRepository:
                 "Group associations should be preserved after role change. "
                 "If this fails, the bug where role changes delete groups has regressed."
             )
-            assert str(final_group_list[0].group_id) == sample_group_id
+            assert str(final_group_list[0].group_id) == group_id
 
     @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
