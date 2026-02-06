@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
@@ -52,6 +53,15 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass(frozen=True)
+class UserWithGroup:
+    """Test data for a user with group association."""
+
+    email: str
+    user_uuid: uuid.UUID
+    group_id: str
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -269,8 +279,8 @@ class TestUserRepository:
         user_resource_policy: str,
         default_keypair_resource_policy: str,
         sample_group_id: str,
-    ) -> tuple[str, uuid.UUID, str]:
-        """Create a test user with group association and return (email, uuid, group_id)."""
+    ) -> UserWithGroup:
+        """Create a test user with group association."""
         password_info = create_test_password_info("test_password")
         spec = UserCreatorSpec(
             username=f"testuser-{uuid.uuid4().hex[:8]}",
@@ -295,7 +305,11 @@ class TestUserRepository:
             creator,
             group_ids=[sample_group_id],
         )
-        return created_result.user.email, created_result.user.uuid, sample_group_id
+        return UserWithGroup(
+            email=created_result.user.email,
+            user_uuid=created_result.user.uuid,
+            group_id=sample_group_id,
+        )
 
     @pytest.mark.asyncio
     async def test_get_by_email_validated_success(
@@ -487,7 +501,7 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_user_with_group: tuple[str, uuid.UUID, str],
+        sample_user_with_group: UserWithGroup,
     ) -> None:
         """
         Regression test: Changing user role should NOT delete group associations.
@@ -498,12 +512,12 @@ class TestUserRepository:
 
         See: PR fix for role change incorrectly clearing user groups
         """
-        user_email, user_uuid, group_id = sample_user_with_group
-
         # Verify user has group association before role change
         async with db_with_cleanup.begin_session() as session:
             initial_groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_uuid)
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
+                )
             )
             initial_group_count = len(list(initial_groups))
             assert initial_group_count == 1, "User should have 1 group association initially"
@@ -512,9 +526,9 @@ class TestUserRepository:
         updater_spec = UserUpdaterSpec(
             role=OptionalState.update(UserRole.SUPERADMIN),
         )
-        updater = Updater(spec=updater_spec, pk_value=user_email)
+        updater = Updater(spec=updater_spec, pk_value=sample_user_with_group.email)
         result = await user_repository.update_user_validated(
-            email=user_email,
+            email=sample_user_with_group.email,
             updater=updater,
         )
 
@@ -525,14 +539,16 @@ class TestUserRepository:
         # Assert: Group associations should be PRESERVED (not deleted)
         async with db_with_cleanup.begin_session() as session:
             final_groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_uuid)
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
+                )
             )
             final_group_list = list(final_groups)
             assert len(final_group_list) == 1, (
                 "Group associations should be preserved after role change. "
                 "If this fails, the bug where role changes delete groups has regressed."
             )
-            assert str(final_group_list[0].group_id) == group_id
+            assert str(final_group_list[0].group_id) == sample_user_with_group.group_id
 
     @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
