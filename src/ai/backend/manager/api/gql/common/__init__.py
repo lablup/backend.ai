@@ -15,6 +15,8 @@ from .types import (
     ResourceOptsInput,
     ServicePortEntryGQL,
     ServicePortsGQL,
+    SessionResultGQL,
+    SessionTypesGQL,
 )
 
 __all__ = [
@@ -29,4 +31,6 @@ __all__ = [
     "ResourceOptsInput",
     "ServicePortEntryGQL",
     "ServicePortsGQL",
+    "SessionResultGQL",
+    "SessionTypesGQL",
 ]
