@@ -406,26 +406,56 @@ class KernelV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The user who owns this kernel."
     )
-    async def user(self) -> UserV2GQL | None:
-        raise NotImplementedError
+    async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
+        user_id = self.user_info.user_id
+        if user_id is None:
+            return None
+        from ai.backend.manager.services.user.actions.get_user import GetUserAction
+
+        result = await info.context.processors.user.get_user.wait_for_complete(
+            GetUserAction(user_uuid=user_id)
+        )
+        return UserV2GQL.from_data(result.user)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The project this kernel belongs to."
     )
-    async def project(self) -> ProjectV2GQL | None:
-        raise NotImplementedError
+    async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
+        group_id = self.user_info.group_id
+        if group_id is None:
+            return None
+        from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
+
+        result = await info.context.processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=group_id)
+        )
+        return ProjectV2GQL.from_data(result.data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this kernel belongs to."
     )
-    async def domain(self) -> DomainV2GQL | None:
-        raise NotImplementedError
+    async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
+        domain_name = self.user_info.domain_name
+        if domain_name is None:
+            return None
+        from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+
+        result = await info.context.processors.domain.get_domain.wait_for_complete(
+            GetDomainAction(domain_name=domain_name)
+        )
+        return DomainV2GQL.from_data(result.data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The resource group this kernel is assigned to."
     )
-    async def resource_group(self) -> ResourceGroupGQL | None:
-        raise NotImplementedError
+    async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
+        rg_name = self.resource.resource_group_name
+        if rg_name is None:
+            return None
+        data = await info.context.data_loaders.resource_group_loader.load(rg_name)
+        if data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(data)
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
