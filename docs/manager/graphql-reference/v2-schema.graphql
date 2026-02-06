@@ -5620,12 +5620,12 @@ type SessionConnectionV2 {
 
 """Added in 26.2.0. Filter criteria for querying sessions."""
 input SessionFilter {
-  id: UUID = null
+  id: UUIDFilter = null
   status: SessionStatusFilter = null
   name: String = null
   domainName: String = null
-  groupId: UUID = null
-  userUuid: UUID = null
+  groupId: UUIDFilter = null
+  userUuid: UUIDFilter = null
 }
 
 """Added in 26.2.0. Basic identity information for a session."""
@@ -5641,9 +5641,6 @@ type SessionIdentityInfo {
 
   """Type of the session (interactive, batch, inference)."""
   sessionType: SessionType!
-
-  """Scheduling priority of the session."""
-  priority: Int!
 }
 
 """Added in 26.2.0. Lifecycle status and timestamps for a session."""
@@ -5669,17 +5666,14 @@ type SessionMetadataInfo {
   """Human-readable name of the session."""
   name: String!
 
-  """Domain to which this session belongs."""
-  domainName: String!
-
-  """Group/project ID that owns this session."""
-  groupId: UUID!
-
-  """User UUID who created this session."""
-  userUuid: UUID!
-
   """Access key used to create this session."""
   accessKey: String!
+
+  """Cluster mode for distributed sessions (single-node, multi-node)."""
+  clusterMode: String!
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int!
 
   """Type of the session (interactive, batch, inference)."""
   sessionType: SessionType!
@@ -5718,26 +5712,14 @@ enum SessionOrderField {
 
 """Added in 26.2.0. Resource allocation information for a session."""
 type SessionResourceInfo {
-  """Cluster mode for distributed sessions (single-node, multi-node)."""
-  clusterMode: String!
+  """Resource allocation with requested and occupied slots."""
+  allocation: ResourceAllocation!
 
-  """Number of nodes in the cluster."""
-  clusterSize: Int!
+  """The resource group (scaling group) this session is assigned to."""
+  resourceGroupName: String
 
-  """Currently occupied resource slots."""
-  occupyingSlots: ResourceSlot!
-
-  """Originally requested resource slots."""
-  requestedSlots: ResourceSlot!
-
-  """Name of the scaling group where the session is running."""
-  scalingGroupName: String
-
-  """Target scaling group names for scheduling."""
-  targetSgroupNames: [String!]
-
-  """IDs of agents running the session's kernels."""
-  agentIds: [String!]
+  """Candidate resource group names considered during scheduling."""
+  targetResourceGroupNames: [String!]
 }
 
 """Added in 26.2.0. Result status of a session execution."""
@@ -5816,13 +5798,11 @@ input SessionScope {
   sessionId: UUID!
 }
 
-"""Added in 26.2.0"""
+"""Added in 26.2.0. Status of a session in its lifecycle."""
 enum SessionStatus {
   PENDING
-  DEPRIORITIZING
   SCHEDULED
   PREPARING
-  PULLING
   PREPARED
   CREATING
   RUNNING
@@ -5867,6 +5847,26 @@ type SessionV2 implements Node {
 
   """Network configuration."""
   network: SessionNetworkInfo!
+
+  """Added in 26.2.0. The domain this session belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The user who owns this session."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this session belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The resource group this session is assigned to."""
+  resourceGroup: ResourceGroup
+
+  """
+  Added in 26.2.0. The candidate resource groups considered during scheduling.
+  """
+  targetResourceGroups: ResourceGroupConnection!
+
+  """Added in 26.2.0. The kernels belonging to this session."""
+  kernels: KernelConnectionV2!
 }
 
 """An edge in a connection."""
