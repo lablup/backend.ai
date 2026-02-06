@@ -132,7 +132,7 @@ BEP numbers start from 1000.
 | [1042](BEP-1042-mypy-strict-mode-migration.md) | MyPy Strict Mode Migration | HyeokJin Kim | Draft |
 | [1043](BEP-1043-scope-types.md) | Scope Types Description | Sanghun Lee | Draft |
 | [1044](BEP-1044-multi-agent-device-split.md) | Multi-Agent Device Split | Hyunhoi Koo | Draft |
-| [1045](BEP-1045-prometheus-client-extraction-and-querier-interface.md) | Prometheus Client Extraction and Querier Interface | BoKeum Kim | Draft |
+| [1045](BEP-1045-prometheus-client-extraction-and-querier-interface-abstraction.md) | Prometheus Client Extraction and Querier Interface Abstraction | BoKeum Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
