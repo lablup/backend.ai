@@ -36,7 +36,7 @@ from .deployment import (
     load_routes_by_ids,
 )
 from .huggingface_registry import load_huggingface_registries_by_ids
-from .image import load_alias_by_ids, load_aliases_by_image_ids, load_images_by_ids
+from .image import load_alias_by_ids, load_images_by_ids
 from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
@@ -188,10 +188,3 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ImageAliasData | None]:
         """Load a single alias by its own ID (ImageAliasRow.id)."""
         return DataLoader(load_fn=partial(load_alias_by_ids, self._processors.image))
-
-    @cached_property
-    def image_aliases_loader(
-        self,
-    ) -> DataLoader[ImageID, list[ImageAliasData]]:
-        """Load all aliases belonging to an image by the image's ID (ImageRow.id)."""
-        return DataLoader(load_fn=partial(load_aliases_by_image_ids, self._processors.image))
