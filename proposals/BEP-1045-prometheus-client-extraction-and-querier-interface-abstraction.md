@@ -187,7 +187,6 @@ class ContainerUtilizationMetricService:
     _prometheus_client: PrometheusClient
 
     async def fetch_metric(self, action: ContainerMetricAction) -> ContainerMetricActionResult:
-        preset = get_preset_for_metric(action.metric_name)
         querier = ContainerMetricQuerier(
             metric_name=action.metric_name,
             value_type=action.labels.value_type,
@@ -195,8 +194,9 @@ class ContainerUtilizationMetricService:
             ...
         )
         time_range = QueryTimeRange(start=action.start, end=action.end, step=action.step)
+        # Legacy: preset is hardcoded until MetricPreset system is implemented
         result = await self._prometheus_client.query_range(
-            preset, querier, time_range, window=self._rate_interval
+            CONTAINER_METRIC_PRESET, querier, time_range, window=self._rate_interval
         )
         # ... transform result
 ```
