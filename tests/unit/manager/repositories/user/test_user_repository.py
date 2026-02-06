@@ -497,21 +497,49 @@ class TestUserRepository:
         assert result.description == "Updated Description"
 
     @pytest.mark.asyncio
-    async def test_sample_user_with_group_has_group_association(
+    async def test_create_user_validated_creates_group_association(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_user_with_group: UserWithGroup,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
     ) -> None:
-        """Verify that sample_user_with_group fixture creates user with group association."""
+        """Test that create_user_validated correctly creates group associations."""
+        password_info = create_test_password_info("new_password")
+        spec = UserCreatorSpec(
+            username=f"newuser-{uuid.uuid4().hex[:8]}",
+            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="New User",
+            description="New User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+
+        result = await user_repository.create_user_validated(
+            creator,
+            group_ids=[sample_group_id],
+        )
+
         async with db_with_cleanup.begin_session() as session:
             groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
-                )
+                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == result.user.uuid)
             )
             group_list = list(groups)
             assert len(group_list) == 1
-            assert str(group_list[0].group_id) == sample_user_with_group.group_id
+            assert str(group_list[0].group_id) == sample_group_id
 
     @pytest.mark.asyncio
     async def test_update_user_role_preserves_group_associations(
