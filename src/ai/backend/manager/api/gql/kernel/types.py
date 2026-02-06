@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import SessionResult, SessionTypes
@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -416,8 +416,14 @@ class KernelV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The resource group this kernel is assigned to."
     )
-    async def resource_group(self) -> ResourceGroupGQL | None:
-        raise NotImplementedError
+    async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
+        rg_name = self.resource.resource_group_name
+        if rg_name is None:
+            return None
+        data = await info.context.data_loaders.resource_group_loader.load(rg_name)
+        if data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(data)
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
