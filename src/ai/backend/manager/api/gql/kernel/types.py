@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.types import SessionResult, SessionTypes
@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -404,8 +404,16 @@ class KernelV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The project this kernel belongs to."
     )
-    async def project(self) -> ProjectV2GQL | None:
-        raise NotImplementedError
+    async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
+        group_id = self.user_info.group_id
+        if group_id is None:
+            return None
+        from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
+
+        result = await info.context.processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=group_id)
+        )
+        return ProjectV2GQL.from_data(result.data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this kernel belongs to."
