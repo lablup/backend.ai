@@ -21,7 +21,7 @@ from ai.backend.common.types import (
     name="SessionType",
     description="Added in 26.2.0. Type of compute session.",
 )
-class SessionTypesGQL(StrEnum):
+class SessionTypeGQL(StrEnum):
     """GraphQL enum for session types."""
 
     INTERACTIVE = "interactive"
@@ -30,7 +30,7 @@ class SessionTypesGQL(StrEnum):
     SYSTEM = "system"
 
     @classmethod
-    def from_internal(cls, internal: SessionTypes) -> SessionTypesGQL:
+    def from_internal(cls, internal: SessionTypes) -> SessionTypeGQL:
         """Convert internal SessionTypes to GraphQL enum."""
         match internal:
             case SessionTypes.INTERACTIVE:
@@ -45,13 +45,13 @@ class SessionTypesGQL(StrEnum):
     def to_internal(self) -> SessionTypes:
         """Convert GraphQL enum to internal SessionTypes."""
         match self:
-            case SessionTypesGQL.INTERACTIVE:
+            case SessionTypeGQL.INTERACTIVE:
                 return SessionTypes.INTERACTIVE
-            case SessionTypesGQL.BATCH:
+            case SessionTypeGQL.BATCH:
                 return SessionTypes.BATCH
-            case SessionTypesGQL.INFERENCE:
+            case SessionTypeGQL.INFERENCE:
                 return SessionTypes.INFERENCE
-            case SessionTypesGQL.SYSTEM:
+            case SessionTypeGQL.SYSTEM:
                 return SessionTypes.SYSTEM
 
 

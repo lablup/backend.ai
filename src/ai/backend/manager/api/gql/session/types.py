@@ -13,7 +13,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
     SessionResultGQL,
-    SessionTypesGQL,
+    SessionTypeGQL,
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.kernel.types import KernelConnectionV2GQL, ResourceAllocationGQL
@@ -167,7 +167,7 @@ class SessionIdentityInfoGQL:
         description="Client-provided creation ID for idempotent session creation."
     )
     name: str = strawberry.field(description="Human-readable name of the session.")
-    session_type: SessionTypesGQL = strawberry.field(
+    session_type: SessionTypeGQL = strawberry.field(
         description="Type of the session (interactive, batch, inference)."
     )
 
@@ -183,7 +183,7 @@ class SessionMetadataInfoGQL:
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
-    session_type: SessionTypesGQL = strawberry.field(
+    session_type: SessionTypeGQL = strawberry.field(
         description="Type of the session (interactive, batch, inference)."
     )
     priority: int = strawberry.field(description="Scheduling priority of the session.")
