@@ -17,6 +17,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchResult,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -121,8 +122,8 @@ class DeploymentController:
         )
         creator = RBACEntityCreator(
             spec=spec,
-            scope_type=ScopeType.USER,
-            scope_id=str(draft.metadata.created_user),
+            scope_ref=ScopeId(scope_type=ScopeType.USER, scope_id=str(draft.metadata.created_user)),
+            additional_scope_refs=[],
             entity_type=EntityType.MODEL_DEPLOYMENT,
         )
         return await self._deployment_repository.create_endpoint_legacy(creator)

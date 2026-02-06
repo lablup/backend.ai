@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -27,19 +28,22 @@ TRow = TypeVar("TRow", bound=Base)
 
 @dataclass
 class RBACEntityCreator[TRow: Base]:
-    """Creator for a single scope-scoped entity.
+    """Creator for a single entity with scope associations for RBAC.
+
+    Creates an entity row and associates it with one or more permission scopes.
+    The primary scope is required; additional scopes are optional.
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
-        scope_type: The scope type the entity belongs to.
-        scope_id: The scope ID the entity belongs to.
         entity_type: The entity type for RBAC association.
+        scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
+        additional_scope_refs: Additional scope references for multi-scope entities.
     """
 
     spec: CreatorSpec[TRow]
-    scope_type: ScopeType
-    scope_id: str
     entity_type: EntityType
+    scope_ref: ScopeId
+    additional_scope_refs: Sequence[ScopeId] = field(default_factory=list)
 
 
 @dataclass
@@ -86,17 +90,19 @@ async def execute_rbac_entity_creator[TRow: Base](
     # 2. Flush to get DB-generated ID
     await db_sess.flush()
 
-    # 3. Extract RBAC info and insert association
+    # 3. Extract RBAC info and insert associations for all scopes
     instance_state = inspect(row)
     pk_value = instance_state.identity[0]
-    db_sess.add(
-        AssociationScopesEntitiesRow(
-            scope_type=creator.scope_type,
-            scope_id=creator.scope_id,
-            entity_type=creator.entity_type,
-            entity_id=str(pk_value),
-        ),
-    )
+    all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
+    for scope_ref in all_scope_refs:
+        db_sess.add(
+            AssociationScopesEntitiesRow(
+                scope_type=scope_ref.scope_type,
+                scope_id=scope_ref.scope_id,
+                entity_type=creator.entity_type,
+                entity_id=str(pk_value),
+            ),
+        )
 
     return RBACEntityCreatorResult(row=row)
 
@@ -108,7 +114,7 @@ async def execute_rbac_entity_creator[TRow: Base](
 
 @dataclass
 class RBACBulkEntityCreator[TRow: Base]:
-    """Bulk creator for multiple scope-scoped entities.
+    """Bulk creator for multiple entities with a single shared scope.
 
     Attributes:
         specs: Sequence of CreatorSpec implementations.

@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.manager.data.permission.id import ScopeId as ScopeRef
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
@@ -132,8 +133,8 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
-                scope_type=ScopeType.USER,
-                scope_id=user_id,
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
@@ -179,8 +180,8 @@ class TestRBACEntityCreatorBasic:
             )
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project_id,
+                scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             await execute_rbac_entity_creator(db_sess, creator)
@@ -208,8 +209,8 @@ class TestRBACEntityCreatorBasic:
                 )
                 creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                     spec=spec,
-                    scope_type=ScopeType.USER,
-                    scope_id=user_id,
+                    scope_ref=ScopeRef(ScopeType.USER, user_id),
+                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
                 )
                 result = await execute_rbac_entity_creator(db_sess, creator)
@@ -224,6 +225,60 @@ class TestRBACEntityCreatorBasic:
             )
             assert entity_count == 5
             assert assoc_count == 5
+
+    async def test_create_entity_with_multiple_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> None:
+        """Test creating an entity with multiple scope associations."""
+        user_id = str(uuid.uuid4())
+        project_id = str(uuid.uuid4())
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleCreatorSpec(
+                name="multi-scope-entity",
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+            creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
+                spec=spec,
+                scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
+                additional_scope_refs=[ScopeRef(ScopeType.USER, user_id)],
+                entity_type=EntityType.VFOLDER,
+            )
+            result = await execute_rbac_entity_creator(db_sess, creator)
+
+            # Verify result
+            assert isinstance(result, RBACEntityCreatorResult)
+            assert result.row.name == "multi-scope-entity"
+
+            # Verify one main row was inserted
+            entity_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(RBACEntityCreatorTestRow)
+            )
+            assert entity_count == 1
+
+            # Verify TWO associations were created (PROJECT + USER)
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 2
+
+            # Verify association details
+            assoc_rows = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
+            scope_types = {row.scope_type for row in assoc_rows}
+            scope_ids = {row.scope_id for row in assoc_rows}
+
+            assert ScopeType.PROJECT in scope_types
+            assert ScopeType.USER in scope_types
+            assert project_id in scope_ids
+            assert user_id in scope_ids
+
+            # All associations should point to the same entity
+            entity_ids = {row.entity_id for row in assoc_rows}
+            assert len(entity_ids) == 1
+            assert str(result.row.id) in entity_ids
 
 
 class TestRBACEntityCreatorIdempotent:
@@ -252,8 +307,8 @@ class TestRBACEntityCreatorIdempotent:
             )
             creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec1,
-                scope_type=ScopeType.USER,
-                scope_id=user_id,
+                scope_ref=ScopeRef(ScopeType.USER, user_id),
+                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
             )
             result1 = await execute_rbac_entity_creator(db_sess, creator1)
@@ -445,8 +500,8 @@ class TestRBACEntityCreatorCompositePK:
                 spec = CompositePKCreatorSpec(tenant_id=1, item_id=1, name="test")
                 creator = RBACEntityCreator(
                     spec=spec,
-                    scope_type=ScopeType.USER,
-                    scope_id="user-123",
+                    scope_ref=ScopeRef(ScopeType.USER, "user-123"),
+                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
                 )
 

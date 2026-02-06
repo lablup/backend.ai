@@ -38,6 +38,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
@@ -1144,8 +1145,11 @@ class ScheduleDBSource:
             # Use RBACEntityCreator to create session with RBAC scope association
             rbac_creator = RBACEntityCreator(
                 spec=SessionRowCreatorSpec(row=session),
-                scope_type=ScopeType.USER,
-                scope_id=str(session_data.user_uuid),
+                scope_ref=ScopeId(
+                    scope_type=ScopeType.USER,
+                    scope_id=str(session_data.group_id),
+                ),
+                additional_scope_refs=[],
                 entity_type=EntityType.SESSION,
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
