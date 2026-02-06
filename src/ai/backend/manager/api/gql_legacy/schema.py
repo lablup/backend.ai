@@ -20,6 +20,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.contexts.client_operation import get_client_operation
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -3357,6 +3358,7 @@ class GQLMetricMiddleware:
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+        client_operation = get_client_operation()
         start = time.perf_counter()
         try:
             res = next(root, info, **args)
@@ -3365,6 +3367,7 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                client_operation=client_operation,
                 error_code=None,
                 success=True,
                 duration=time.perf_counter() - start,
@@ -3375,6 +3378,7 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                client_operation=client_operation,
                 error_code=e.error_code(),
                 success=False,
                 duration=time.perf_counter() - start,
@@ -3386,6 +3390,7 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                client_operation=client_operation,
                 error_code=ErrorCode.default(),
                 success=False,
                 duration=time.perf_counter() - start,

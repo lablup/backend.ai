@@ -104,6 +104,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.middlewares.client_operation import client_operation_middleware
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
@@ -1468,6 +1469,7 @@ def build_root_app(
     app = web.Application(
         middlewares=[
             request_id_middleware,
+            client_operation_middleware,
             exception_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
