@@ -998,3 +998,31 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class PrometheusConnectionError(BackendAIError):
+    """Exception raised when a connection to Prometheus fails."""
+
+    error_type = "https://api.backend.ai/probs/prometheus-connection-error"
+    error_title = "Failed to connect to Prometheus."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
+class FailedToGetMetric(BackendAIError):
+    """Exception raised when a metric cannot be retrieved."""
+
+    error_type = "https://api.backend.ai/probs/failed-to-get-metric"
+    error_title = "Failed to get metric."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

@@ -1,8 +1,11 @@
 import enum
 from dataclasses import dataclass, field
+from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel
+
+from ai.backend.common.dto.clients.prometheus.response import MetricResponseInfo
 
 
 class ValueType(enum.StrEnum):
@@ -33,6 +36,20 @@ class ContainerMetricResponseInfo:
     owner_project_id: str | None
     owner_user_id: str | None
     session_id: str | None
+
+    @classmethod
+    def from_metric_response_info(cls, info: MetricResponseInfo) -> Self:
+        return cls(
+            value_type=info.value_type,
+            container_metric_name=info.container_metric_name,
+            agent_id=info.agent_id,
+            instance=info.instance,
+            job=info.job,
+            kernel_id=info.kernel_id,
+            owner_project_id=info.owner_project_id,
+            owner_user_id=info.owner_user_id,
+            session_id=info.session_id,
+        )
 
 
 @dataclass
