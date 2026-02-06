@@ -22,6 +22,10 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     to_global_id,
 )
+from ai.backend.manager.api.gql.common.types import (
+    ResourceOptsGQL,
+    ResourceOptsInput,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
@@ -163,41 +167,6 @@ class ModelRuntimeConfig:
             inference_runtime_config=data.inference_runtime_config,
             environ=environ_gql,
         )
-
-
-@strawberry.type(
-    name="ResourceOptsEntry",
-    description=(
-        "Added in 26.1.0. A single key-value entry representing a resource option. "
-        "Contains additional resource configuration such as shared memory settings."
-    ),
-)
-class ResourceOptsEntryGQL:
-    """Single resource option entry with name and value."""
-
-    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
-    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
-
-
-@strawberry.type(
-    name="ResourceOpts",
-    description=(
-        "Added in 26.1.0. A collection of additional resource options for a deployment. "
-        "Contains key-value pairs for resource configuration like shared memory."
-    ),
-)
-class ResourceOptsGQL:
-    """Resource options containing multiple key-value entries."""
-
-    entries: list[ResourceOptsEntryGQL] = strawberry.field(
-        description="List of resource option entries. Each entry contains a key-value pair."
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, str]) -> ResourceOptsGQL:
-        """Convert a Mapping to GraphQL type."""
-        entries = [ResourceOptsEntryGQL(name=k, value=v) for k, v in data.items()]
-        return cls(entries=entries)
 
 
 @strawberry.type
@@ -451,27 +420,6 @@ class ResourceSlotInput:
 
     entries: list[ResourceSlotEntryInput] = strawberry.field(
         description="List of resource allocations."
-    )
-
-
-@strawberry.input(
-    description=("Added in 26.1.0. A single key-value entry representing a resource option.")
-)
-class ResourceOptsEntryInput:
-    """Single resource option entry input with name and value."""
-
-    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
-    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
-
-
-@strawberry.input(
-    description=("Added in 26.1.0. A collection of additional resource options for input.")
-)
-class ResourceOptsInput:
-    """Resource options input containing multiple key-value entries."""
-
-    entries: list[ResourceOptsEntryInput] = strawberry.field(
-        description="List of resource option entries."
     )
 
 

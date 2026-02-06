@@ -121,6 +121,7 @@ from .image import (
     container_registry_images_v2,
     image_v2,
 )
+from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -258,6 +259,7 @@ class Query:
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
     image_v2 = image_v2
+    kernel_v2 = kernel_v2
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_session_scheduling_histories = admin_session_scheduling_histories
@@ -278,6 +280,9 @@ class Query:
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
+    admin_kernels_v2 = admin_kernels_v2
+    # Session Scoped APIs
+    session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
     rg_domain_fair_share = rg_domain_fair_share
     rg_domain_fair_shares = rg_domain_fair_shares

@@ -230,7 +230,7 @@ class NetworkConfig:
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
-    service_ports: dict[str, Any] | None
+    service_ports: list[dict[str, Any]] | None
     preopen_ports: list[int] | None
     use_host_network: bool
 

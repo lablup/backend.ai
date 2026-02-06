@@ -3136,6 +3136,8 @@ enum DeploymentStatus
   SCALING @join__enumValue(graph: STRAWBERRY)
   DEPLOYING @join__enumValue(graph: STRAWBERRY)
   READY @join__enumValue(graph: STRAWBERRY)
+  DESTROYING @join__enumValue(graph: STRAWBERRY)
+  DESTROYED @join__enumValue(graph: STRAWBERRY)
   STOPPING @join__enumValue(graph: STRAWBERRY)
   STOPPED @join__enumValue(graph: STRAWBERRY)
 }
@@ -4921,6 +4923,25 @@ schema (one of the key benefits of GraphQL).
 scalar JSONString
   @join__type(graph: GRAPHENE)
 
+"""
+Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
+"""
+type KernelClusterInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The role of this kernel in the cluster (e.g., main, sub)."""
+  clusterRole: String!
+
+  """The index of this kernel within the cluster (0-based)."""
+  clusterIdx: Int!
+
+  """The local rank of this kernel for distributed computing."""
+  localRank: Int!
+
+  """The hostname assigned to this kernel within the cluster network."""
+  clusterHostname: String!
+}
+
 """Added in 24.09.0."""
 type KernelConnection
   @join__type(graph: GRAPHENE)
@@ -4935,6 +4956,18 @@ type KernelConnection
   count: Int
 }
 
+"""Added in 26.2.0. Connection type for paginated kernel results."""
+type KernelConnectionV2
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelV2Edge!]!
+  count: Int!
+}
+
 """Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
 type KernelEdge
   @join__type(graph: GRAPHENE)
@@ -4944,6 +4977,49 @@ type KernelEdge
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 26.2.0. Filter criteria for querying kernels."""
+input KernelFilter
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUIDFilter = null
+  status: KernelStatusFilter = null
+  sessionId: UUIDFilter = null
+}
+
+"""Added in 26.2.0. Lifecycle and status information for a kernel."""
+type KernelLifecycleInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
+  Indicates the kernel's position in its lifecycle.
+  """
+  status: KernelStatus!
+
+  """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
+  result: SessionResult!
+
+  """Timestamp when the kernel was created."""
+  createdAt: DateTime
+
+  """Timestamp when the kernel was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the kernel, if applicable."""
+  startsAt: DateTime
+}
+
+"""Added in 26.2.0. Network configuration for a kernel."""
+type KernelNetworkInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Collection of service ports exposed by this kernel."""
+  servicePorts: ServicePorts
+
+  """List of ports that are pre-opened for this kernel."""
+  preopenPorts: [Int!]
 }
 
 """Added in 24.09.0."""
@@ -4986,6 +5062,168 @@ type KernelNode implements Node
   live_stat: JSONString
   abusing_report: JSONString
   preopen_ports: [Int]
+}
+
+"""Added in 26.2.0. Ordering specification for kernels."""
+input KernelOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: KernelOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.2.0. Fields available for ordering kernels."""
+enum KernelOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  TERMINATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_HOSTNAME @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_IDX @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.2.0. Resource allocation information for a kernel."""
+type KernelResourceInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The ID of the agent running this kernel. Null if not yet assigned or hidden.
+  """
+  agentId: String
+
+  """The resource group (scaling group) this kernel is assigned to."""
+  resourceGroupName: String
+
+  """
+  The container ID on the agent. Null if container not yet created or hidden.
+  """
+  containerId: String
+
+  """Resource allocation with requested and used slots."""
+  allocation: ResourceAllocation!
+
+  """The fractional resource shares occupied by this kernel."""
+  shares: ResourceSlot!
+
+  """Additional resource options and configurations for this kernel."""
+  resourceOpts: ResourceOpts
+}
+
+"""Added in 26.2.0. Information about the session this kernel belongs to."""
+type KernelSessionInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The unique identifier of the session this kernel belongs to."""
+  sessionId: UUID!
+
+  """The creation ID used when creating the session."""
+  creationId: String
+
+  """The name of the session."""
+  name: String
+
+  """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
+  sessionType: SessionTypes!
+}
+
+"""Added in 26.2.0. Status of a kernel in its lifecycle."""
+enum KernelStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  SCHEDULED @join__enumValue(graph: STRAWBERRY)
+  PREPARING @join__enumValue(graph: STRAWBERRY)
+  PREPARED @join__enumValue(graph: STRAWBERRY)
+  CREATING @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.2.0. Filter for kernel status."""
+input KernelStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [KernelStatus!] = null
+  notIn: [KernelStatus!] = null
+}
+
+"""Added in 26.2.0. User and ownership information for a kernel."""
+type KernelUserInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The UUID of the user who owns this kernel."""
+  userId: UUID
+
+  """The access key used to create this kernel."""
+  accessKey: String
+
+  """The domain this kernel belongs to."""
+  domainName: String
+
+  """The group (project) ID this kernel belongs to."""
+  groupId: UUID
+}
+
+"""
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
+"""
+type KernelV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Startup command executed when the kernel starts."""
+  startupCommand: String
+
+  """Information about the session this kernel belongs to."""
+  session: KernelSessionInfo!
+
+  """User and ownership information."""
+  userInfo: KernelUserInfo!
+
+  """Network configuration and exposed ports."""
+  network: KernelNetworkInfo!
+
+  """Cluster configuration for distributed computing."""
+  cluster: KernelClusterInfo!
+
+  """Resource allocation and agent information."""
+  resource: KernelResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: KernelLifecycleInfo!
+
+  """Added in 26.2.0. The agent running this kernel."""
+  agent: AgentV2
+
+  """Added in 26.2.0. The user who owns this kernel."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this kernel belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The domain this kernel belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The resource group this kernel is assigned to."""
+  resourceGroup: ResourceGroup
+}
+
+"""An edge in a connection."""
+type KernelV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelV2!
 }
 
 type KeyPair implements Item
@@ -8322,6 +8560,9 @@ type Query
   """
   imageV2(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
 
+  """Added in 26.2.0. Query a single kernel by ID."""
+  kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
@@ -8395,6 +8636,14 @@ type Query
   Supports both cursor-based and offset-based pagination.
   """
   adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
+  """
+  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query kernels within a specific session."""
+  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
@@ -8790,6 +9039,19 @@ type ReservoirRegistryEdge
 
   """The item at the end of the edge"""
   node: ReservoirRegistry!
+}
+
+"""Added in 26.2.0. Resource allocation with requested and used slots."""
+type ResourceAllocation
+  @join__type(graph: STRAWBERRY)
+{
+  """The resource slots originally requested for this kernel."""
+  requested: ResourceSlot!
+
+  """
+  The resource slots currently used by this kernel. May be null if not yet allocated.
+  """
+  used: ResourceSlot
 }
 
 type ResourceConfig
@@ -9720,6 +9982,50 @@ type ServiceConfigNode implements Node
   schema: JSONString!
 }
 
+"""
+Added in 26.2.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
+"""
+type ServicePortEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
+  name: String!
+
+  """Protocol type for this service port (http, tcp, preopen, internal)."""
+  protocol: ServicePortProtocol!
+
+  """Port numbers inside the container."""
+  containerPorts: [Int!]!
+
+  """Mapped port numbers on the host. May be null if not yet assigned."""
+  hostPorts: [Int]!
+
+  """Whether this port is used for inference endpoints."""
+  isInference: Boolean!
+}
+
+"""Added in 26.2.0. Protocol type for service ports."""
+enum ServicePortProtocol
+  @join__type(graph: STRAWBERRY)
+{
+  HTTP @join__enumValue(graph: STRAWBERRY)
+  TCP @join__enumValue(graph: STRAWBERRY)
+  PREOPEN @join__enumValue(graph: STRAWBERRY)
+  INTERNAL @join__enumValue(graph: STRAWBERRY)
+  VNC @join__enumValue(graph: STRAWBERRY)
+  RDP @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
+"""
+type ServicePorts
+  @join__type(graph: STRAWBERRY)
+{
+  """List of service port entries."""
+  entries: [ServicePortEntry!]!
+}
+
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -9752,6 +10058,14 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
+
+enum SessionResult
+  @join__type(graph: STRAWBERRY)
+{
+  UNDEFINED @join__enumValue(graph: STRAWBERRY)
+  SUCCESS @join__enumValue(graph: STRAWBERRY)
+  FAILURE @join__enumValue(graph: STRAWBERRY)
+}
 
 """Session scheduling history record"""
 type SessionSchedulingHistory implements Node
@@ -9835,6 +10149,15 @@ input SessionScope
 {
   """Session ID to get history for"""
   sessionId: UUID!
+}
+
+enum SessionTypes
+  @join__type(graph: STRAWBERRY)
+{
+  INTERACTIVE @join__enumValue(graph: STRAWBERRY)
+  BATCH @join__enumValue(graph: STRAWBERRY)
+  INFERENCE @join__enumValue(graph: STRAWBERRY)
+  SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
 type SetQuotaScope

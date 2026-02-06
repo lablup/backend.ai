@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec, UUIDInMatchSpec
+    from ai.backend.manager.api.gql.kernel.types import KernelStatusInMatchSpec
+
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -174,8 +180,68 @@ class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
+    def by_id(kernel_id: KernelId) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id == kernel_id
+
+        return inner
+
+    @staticmethod
+    def by_ids(kernel_ids: Collection[KernelId]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.id != KernelId(spec.value)
+            return KernelRow.id == KernelId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            kernel_ids = [KernelId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.id.notin_(kernel_ids)
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.session_id.in_(session_ids)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for session_id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.session_id != SessionId(spec.value)
+            return KernelRow.session_id == SessionId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for session_id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            session_ids = [SessionId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.session_id.notin_(session_ids)
             return KernelRow.session_id.in_(session_ids)
 
         return inner
@@ -188,11 +254,52 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_status_filter_in(spec: KernelStatusInMatchSpec) -> QueryCondition:
+        """Factory for status IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.status.notin_(spec.values)
+            return KernelRow.status.in_(spec.values)
+
+        return inner
+
+    @staticmethod
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         """Filter kernels by scaling group."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at > subquery
 
         return inner
 
@@ -265,6 +372,36 @@ class KernelOrders:
         if ascending:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.created_at.asc()
+        return KernelRow.created_at.desc()
+
+    @staticmethod
+    def terminated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.terminated_at.asc()
+        return KernelRow.terminated_at.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.status.asc()
+        return KernelRow.status.desc()
+
+    @staticmethod
+    def cluster_mode(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_mode.asc()
+        return KernelRow.cluster_mode.desc()
+
+    @staticmethod
+    def cluster_hostname(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_hostname.asc()
+        return KernelRow.cluster_hostname.desc()
 
 
 class UserConditions:

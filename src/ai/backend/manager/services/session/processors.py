@@ -99,6 +99,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search_kernel import (
+    SearchKernelsAction,
+    SearchKernelsActionResult,
+)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -147,6 +151,7 @@ class SessionProcessors(AbstractProcessorPackage):
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
+    search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
@@ -182,6 +187,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.match_sessions = ActionProcessor(service.match_sessions, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.restart_session = ActionProcessor(service.restart_session, action_monitors)
+        self.search_kernels = ActionProcessor(service.search_kernels, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
@@ -215,6 +221,7 @@ class SessionProcessors(AbstractProcessorPackage):
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
             RestartSessionAction.spec(),
+            SearchKernelsAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             UploadFilesAction.spec(),
