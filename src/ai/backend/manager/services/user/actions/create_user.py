@@ -34,8 +34,8 @@ class CreateUserActionResult(BaseActionResult):
 
 
 @dataclass
-class BulkUserCreateItem:
-    """Individual user creation item for bulk operations."""
+class UserCreateSpec:
+    """Specification for creating a single user, including group assignments."""
 
     creator: Creator[UserRow]
     group_ids: list[str] | None = None
@@ -45,7 +45,7 @@ class BulkUserCreateItem:
 class BulkCreateUserAction(UserAction):
     """Action for bulk creating multiple users."""
 
-    items: list[BulkUserCreateItem]
+    items: list[UserCreateSpec]
 
     @override
     def entity_id(self) -> str | None:
