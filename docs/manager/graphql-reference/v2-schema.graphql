@@ -5659,6 +5659,9 @@ type SessionLifecycleInfo {
 
   """Scheduled start time for the session, if applicable."""
   startsAt: DateTime
+
+  """Batch execution timeout in seconds. Applicable to batch sessions."""
+  batchTimeout: Int
 }
 
 """Added in 26.2.0. Metadata information for a session."""
