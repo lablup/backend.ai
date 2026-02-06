@@ -497,6 +497,23 @@ class TestUserRepository:
         assert result.description == "Updated Description"
 
     @pytest.mark.asyncio
+    async def test_sample_user_with_group_has_group_association(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user_with_group: UserWithGroup,
+    ) -> None:
+        """Verify that sample_user_with_group fixture creates user with group association."""
+        async with db_with_cleanup.begin_session() as session:
+            groups = await session.scalars(
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
+                )
+            )
+            group_list = list(groups)
+            assert len(group_list) == 1
+            assert str(group_list[0].group_id) == sample_user_with_group.group_id
+
+    @pytest.mark.asyncio
     async def test_update_user_role_preserves_group_associations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -512,16 +529,6 @@ class TestUserRepository:
 
         See: PR fix for role change incorrectly clearing user groups
         """
-        # Verify user has group association before role change
-        async with db_with_cleanup.begin_session() as session:
-            initial_groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
-                )
-            )
-            initial_group_count = len(list(initial_groups))
-            assert initial_group_count == 1, "User should have 1 group association initially"
-
         # Act: Update user role from USER to SUPERADMIN without providing group_ids
         updater_spec = UserUpdaterSpec(
             role=OptionalState.update(UserRole.SUPERADMIN),
