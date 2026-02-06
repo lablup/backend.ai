@@ -10,6 +10,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
@@ -38,6 +39,7 @@ from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
+    rescan_images,
     scan_single_image,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -447,3 +449,21 @@ class ImageDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def rescan_images(
+        self,
+        registry_or_image: str | None = None,
+        project: str | None = None,
+        *,
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
+        """
+        Rescan container registries and update images table.
+        Wraps the rescan_images function from models/image/row.py.
+        """
+        return await rescan_images(
+            self._db,
+            registry_or_image,
+            project,
+            reporter=reporter,
+        )
