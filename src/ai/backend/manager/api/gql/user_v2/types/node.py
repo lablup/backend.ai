@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import UserRoleEnum, UserStatusEnum
+from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
 from .nested import (
     EntityTimestampsGQL,
     UserBasicInfoGQL,
@@ -277,13 +277,13 @@ class UserV2GQL(Node):
                 description=data.description,
             ),
             status=UserStatusInfoGQL(
-                status=UserStatusEnum(data.status),
+                status=UserStatusV2EnumGQL(data.status),
                 status_info=data.status_info,
                 need_password_change=data.need_password_change,
             ),
             organization=UserOrganizationInfoGQL(
                 domain_name=data.domain_name,
-                role=UserRoleEnum(data.role.value) if data.role else None,
+                role=UserRoleV2EnumGQL(data.role.value) if data.role else None,
                 resource_policy=data.resource_policy,
                 main_access_key=data.main_access_key,
             ),
