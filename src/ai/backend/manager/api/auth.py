@@ -62,6 +62,7 @@ from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx, UserContext
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InvalidAuthParameters,
@@ -873,18 +874,6 @@ def superadmin_required_for_method(
     set_handler_attr(wrapped, "auth_required", True)
     set_handler_attr(wrapped, "auth_scope", "superadmin")
     return wrapped
-
-
-# Deferred import to break circular dependency:
-#   This module (api.auth) is imported by api.session for auth_required decorator.
-#   Meanwhile, ProcessorsCtx lives in dto.context which transitively imports
-#   api.session through: dto.context -> services.processors -> repositories
-#   -> repositories.session.repository -> api.session -> api.auth (partially loaded).
-#   Placing this import after auth_required ensures the decorator is already
-#   defined when the circular chain resolves back here.
-# TODO: Move find_dependency_sessions from api.session to repository layer
-#       to eliminate this circular dependency entirely.
-from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx, UserContext  # noqa: E402
 
 
 class AuthAPIHandler:
