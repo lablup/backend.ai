@@ -156,22 +156,20 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         finally:
             all_updates.reset(all_updates_token)
 
-    def _determine_image_scope(
+    def _determine_additional_image_scopes(
         self,
         labels: dict[str, str],
-    ) -> ScopeId:
-        """Determine the RBAC scope of an image based on its labels.
-
-        For customized images (those with an owner label), the scope is set to
-        the USER scope of the owner. For non-customized images, the scope is set
-        to the CONTAINER_REGISTRY scope, delegating access control to the
-        registry's domain/project mappings.
+    ) -> list[ScopeId]:
         """
+        Parse the customized image owner label and return a USER scope
+        if present, allowing user-level access restriction for customized images.
+        """
+        result: list[ScopeId] = []
         owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
         if owner_label is not None:
             _, _, scope_id = owner_label.partition(":")
-            return ScopeId(scope_type=ScopeType.USER, scope_id=scope_id)
-        return ScopeId(scope_type=ScopeType.CONTAINER_REGISTRY, scope_id=str(self.registry_info.id))
+            result.append(ScopeId(scope_type=ScopeType.USER, scope_id=scope_id))
+        return result
 
     async def commit_rescan_result(self) -> list[ImageData]:
         scanned_images: list[ImageData] = []
@@ -224,7 +222,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    scope = self._determine_image_scope(update["labels"])
                     rbac_creator = RBACEntityCreator(
                         spec=ImageRowCreatorSpec(
                             name=parsed_img.canonical,
@@ -242,8 +239,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
                         ),
-                        scope_id=scope.scope_id,
-                        scope_type=scope.scope_type,
+                        scope_ref=ScopeId(
+                            scope_type=ScopeType.CONTAINER_REGISTRY,
+                            scope_id=str(self.registry_info.id),
+                        ),
+                        additional_scope_refs=self._determine_additional_image_scopes(
+                            update["labels"]
+                        ),
                         entity_type=EntityType.IMAGE,
                     )
                     result = await execute_rbac_entity_creator(session, rbac_creator)
