@@ -10,11 +10,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.api.gql.fair_share.types import (
-    UserFairShareConnection,
-    UserFairShareFilter,
-    UserFairShareOrderBy,
-)
+from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     UserUsageBucketConnection,
     UserUsageBucketFilter,
@@ -90,59 +86,29 @@ class UserV2GQL(Node):
 
     @strawberry.field(  # type: ignore[misc]
         description=(
-            "Fair share records for this user, filtered by resource group and project. "
-            "Returns fair share policy specifications and calculation snapshots."
+            "Fair share record for this user in the specified resource group and project. "
+            "Returns the scheduling priority configuration for this user. "
+            "Always returns an object, even if no explicit configuration exists "
+            "(in which case default values are used)."
         )
     )
-    async def fair_shares(
+    async def fair_share(
         self,
         info: Info,
         scope: UserFairShareScopeGQL,
-        filter: UserFairShareFilter | None = None,
-        order_by: list[UserFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> UserFairShareConnection:
+    ) -> UserFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.user import (
-            fetch_rg_user_fair_shares,
-        )
-        from ai.backend.manager.repositories.fair_share.options import (
-            UserFairShareConditions,
-        )
-        from ai.backend.manager.repositories.fair_share.types import (
-            UserFairShareSearchScope,
+            fetch_single_user_fair_share,
         )
 
-        # Create repository scope with context information
         if self.organization.domain_name is None:
-            raise InvalidAPIParameters("User must belong to a domain to query fair shares")
-        repository_scope = UserFairShareSearchScope(
-            resource_group=scope.resource_group,
-            domain_name=self.organization.domain_name,
-            project_id=scope.project_id,
-        )
+            raise InvalidAPIParameters("User must belong to a domain to query fair share")
 
-        # Entity-specific filter only
-        base_conditions = [
-            UserFairShareConditions.by_user_uuid(UUID(str(self.id))),
-        ]
-
-        return await fetch_rg_user_fair_shares(
+        return await fetch_single_user_fair_share(
             info=info,
-            scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=base_conditions,
+            resource_group=scope.resource_group,
+            project_id=scope.project_id,
+            user_uuid=UUID(str(self.id)),
         )
 
     @strawberry.field(  # type: ignore[misc]

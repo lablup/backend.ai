@@ -2006,9 +2006,9 @@ type DomainV2 implements Node @key(fields: "id") {
   lifecycle: DomainLifecycleInfo!
 
   """
-  Fair share records for this domain, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: DomainFairShareScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+  fairShare(scope: DomainFairShareScope!): DomainFairShare!
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
@@ -4203,9 +4203,9 @@ type ProjectV2 implements Node @key(fields: "id") {
   lifecycle: ProjectLifecycleInfo!
 
   """
-  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+  fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
@@ -6648,9 +6648,9 @@ type UserV2 implements Node @key(fields: "id") {
   timestamps: EntityTimestamps!
 
   """
-  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+  fairShare(scope: UserFairShareScope!): UserFairShare!
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.

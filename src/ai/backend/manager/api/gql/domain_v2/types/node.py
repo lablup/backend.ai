@@ -8,11 +8,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.manager.api.gql.fair_share.types import (
-    DomainFairShareConnection,
-    DomainFairShareFilter,
-    DomainFairShareOrderBy,
-)
+from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketConnection,
     DomainUsageBucketFilter,
@@ -71,55 +67,25 @@ class DomainV2GQL(Node):
 
     @strawberry.field(  # type: ignore[misc]
         description=(
-            "Fair share records for this domain, filtered by resource group. "
-            "Returns fair share policy specifications and calculation snapshots."
+            "Fair share record for this domain in the specified resource group. "
+            "Returns the scheduling priority configuration for this domain. "
+            "Always returns an object, even if no explicit configuration exists "
+            "(in which case default values are used)."
         )
     )
-    async def fair_shares(
+    async def fair_share(
         self,
         info: Info,
         scope: DomainFairShareScopeGQL,
-        filter: DomainFairShareFilter | None = None,
-        order_by: list[DomainFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> DomainFairShareConnection:
+    ) -> DomainFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
-            fetch_rg_domain_fair_shares,
-        )
-        from ai.backend.manager.repositories.fair_share.options import (
-            DomainFairShareConditions,
-        )
-        from ai.backend.manager.repositories.fair_share.types import (
-            DomainFairShareSearchScope,
+            fetch_single_domain_fair_share,
         )
 
-        # Create repository scope with context information
-        repository_scope = DomainFairShareSearchScope(
-            resource_group=scope.resource_group,
-        )
-
-        # Entity-specific filter only
-        base_conditions = [
-            DomainFairShareConditions.by_domain_name(str(self.id)),
-        ]
-
-        return await fetch_rg_domain_fair_shares(
+        return await fetch_single_domain_fair_share(
             info=info,
-            scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=base_conditions,
+            resource_group=scope.resource_group,
+            domain_name=str(self.id),
         )
 
     @strawberry.field(  # type: ignore[misc]
