@@ -20,7 +20,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.contexts.client_operation import get_client_operation
+from ai.backend.common.contexts.operation import get_client_operation
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,

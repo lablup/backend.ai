@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from ai.backend.common.contexts.client_operation import with_client_operation
+from ai.backend.common.contexts.operation import with_client_operation
 from ai.backend.manager.api.gql_legacy.schema import GQLMetricMiddleware
 
 
