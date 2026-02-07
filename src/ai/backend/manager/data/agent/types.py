@@ -107,7 +107,7 @@ class AgentNetworkInfo:
 class AgentResourceInfo:
     slot_key_and_units: dict[SlotName, SlotTypes]
     available_slots: ResourceSlot
-    compute_plugins: Mapping[DeviceName, Mapping[str, str]]
+    compute_plugins: Mapping[DeviceName, Mapping[str, str | bool]]
 
 
 @dataclass
