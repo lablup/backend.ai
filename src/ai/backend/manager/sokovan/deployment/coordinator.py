@@ -272,7 +272,7 @@ class DeploymentCoordinator:
                     message=e.reason,
                     from_status=from_status,
                     to_status=failure_status,
-                    error_code=None,  # DeploymentExecutionError doesn't have error_code
+                    error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.deployment_info.id, records),
                 )
                 for e in result.errors

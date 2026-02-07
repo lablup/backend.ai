@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID
 
+from ai.backend.common.exception import BackendAIError
+
 from .exceptions import (
     NestedPhaseError,
     StepWithoutPhaseError,
@@ -188,15 +190,18 @@ class TransitionRecorder[EntityIdT: UUID]:
                 started_at=started_at,
                 ended_at=datetime.now(UTC),
                 detail=success_detail,
+                error_code=None,
             )
             self._current_phase.steps.append(step_record)
         except Exception as e:
+            error_code = str(e.error_code()) if isinstance(e, BackendAIError) else None
             step_record = StepRecord(
                 name=name,
                 status=StepStatus.FAILED,
                 started_at=started_at,
                 ended_at=datetime.now(UTC),
                 detail=str(e),
+                error_code=error_code,
             )
             self._current_phase.steps.append(step_record)
             raise

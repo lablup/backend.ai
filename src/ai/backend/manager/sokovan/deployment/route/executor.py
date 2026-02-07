@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
@@ -35,6 +36,20 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+def _extract_error_code(exception: BaseException) -> str | None:
+    """Extract error code from exception if available.
+
+    Args:
+        exception: The exception to extract error code from.
+
+    Returns:
+        Error code string if exception is BackendAIError, None otherwise.
+    """
+    if isinstance(exception, BackendAIError):
+        return str(exception.error_code())
+    return None
 
 
 class RouteExecutor:
@@ -90,6 +105,7 @@ class RouteExecutor:
                         route_info=route,
                         reason="Failed to provision",
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -167,6 +183,7 @@ class RouteExecutor:
                         route_info=route,
                         reason=e.error_title,
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -218,6 +235,7 @@ class RouteExecutor:
                         route_info=route,
                         reason=e.error_title,
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
