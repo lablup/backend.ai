@@ -126,42 +126,6 @@ class RoleConditions:
 
         return inner
 
-    @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
-        """Filter roles by scope type.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_type == scope_type
-
-        return inner
-
-    @staticmethod
-    def by_scope_id(scope_id: str) -> QueryCondition:
-        """Filter roles by scope ID.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_id == scope_id
-
-        return inner
-
-    @staticmethod
-    def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
-        """Filter roles having permission for entity type.
-
-        Requires JOIN with ObjectPermissionRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
-
-        return inner
-
 
 class RoleOrders:
     """Query orders for roles."""
@@ -657,6 +621,12 @@ class PermissionGroupOrders:
             return PermissionGroupRow.scope_type.asc()
         return PermissionGroupRow.scope_type.desc()
 
+    @staticmethod
+    def scope_id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionGroupRow.scope_id.asc()
+        return PermissionGroupRow.scope_id.desc()
+
 
 class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""
@@ -665,6 +635,17 @@ class ScopedPermissionConditions:
     def by_permission_group_id(permission_group_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.permission_group_id == permission_group_id
+
+        return inner
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        """Filter scoped permissions by role (via permission_group subquery)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.permission_group_id.in_(
+                sa.select(PermissionGroupRow.id).where(PermissionGroupRow.role_id == role_id)
+            )
 
         return inner
 

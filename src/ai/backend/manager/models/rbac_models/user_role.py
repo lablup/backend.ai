@@ -15,7 +15,6 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.manager.data.permission.role import (
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
 )
 from ai.backend.manager.models.base import (
@@ -67,13 +66,6 @@ class UserRoleRow(Base):  # type: ignore[misc]
         back_populates="role_assignments",
         primaryjoin=_get_user_row_join_condition,
     )
-
-    def to_data(self) -> UserRoleAssignmentData:
-        return UserRoleAssignmentData(
-            user_id=self.user_id,
-            role_id=self.role_id,
-            granted_by=self.granted_by,
-        )
 
     @classmethod
     def from_input(cls, input: UserRoleAssignmentInput) -> UserRoleRow:

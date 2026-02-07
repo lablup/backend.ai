@@ -28,7 +28,9 @@ from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     RoleListResult,
     RolePermissionsUpdateInput,
+    UserRoleAssignmentData,
     UserRoleAssignmentInput,
+    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import (
@@ -469,20 +471,30 @@ class PermissionDBSource:
                 raise ObjectNotFound(f"Role with ID {purger.pk_value} does not exist.")
             return result.row
 
-    async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
+    async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
         async with self._db.begin_session() as db_session:
             user_role_row = UserRoleRow.from_input(data)
             try:
                 db_session.add(user_role_row)
                 await db_session.flush()
                 await db_session.refresh(user_role_row)
-                return user_role_row
             except IntegrityError as e:
                 raise RoleAlreadyAssigned(
                     f"Role {data.role_id} is already assigned to user {data.user_id}."
                 ) from e
 
-    async def revoke_role(self, data: UserRoleRevocationInput) -> uuid.UUID:
+            # Fetch role data
+            role_row = await db_session.get(RoleRow, data.role_id)
+            if role_row is None:
+                raise RoleNotFound(f"Role {data.role_id} not found.")
+
+            return UserRoleAssignmentData(
+                user_id=user_role_row.user_id,
+                role=role_row.to_data(),
+                granted_by=user_role_row.granted_by,
+            )
+
+    async def revoke_role(self, data: UserRoleRevocationInput) -> UserRoleRevocationData:
         async with self._db.begin_session() as db_session:
             stmt = (
                 sa.select(UserRoleRow)
@@ -497,9 +509,20 @@ class PermissionDBSource:
                 )
 
             user_role_id = user_role_row.id
+
+            # Fetch role data before deleting
+            role_row = await db_session.get(RoleRow, data.role_id)
+            if role_row is None:
+                raise RoleNotFound(f"Role {data.role_id} not found.")
+
             await db_session.delete(user_role_row)
             await db_session.flush()
-            return user_role_id
+
+            return UserRoleRevocationData(
+                user_role_id=user_role_id,
+                user_id=data.user_id,
+                role=role_row.to_data(),
+            )
 
     async def update_role_permissions(
         self,
@@ -814,26 +837,9 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
     ) -> RoleListResult:
-        """Searches roles with pagination and filtering.
-
-        Uses LEFT JOIN with PermissionGroupRow and ObjectPermissionRow to support
-        scope-based and entity-based filtering. The JOINs are always performed to
-        simplify the implementation, with distinct() used to prevent duplicates.
-        """
+        """Searches roles with pagination and filtering."""
         async with self._db.begin_readonly_session() as db_sess:
-            # Build query with LEFT JOINs to support scope and entity filtering
-            query = (
-                sa.select(RoleRow)
-                .outerjoin(
-                    PermissionGroupRow,
-                    RoleRow.id == PermissionGroupRow.role_id,
-                )
-                .outerjoin(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .distinct()
-            )
+            query = sa.select(RoleRow)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -891,7 +897,7 @@ class PermissionDBSource:
                 scope,
             )
 
-            items = [row.PermissionRow.to_data() for row in result.rows]
+            items = [row.to_data() for row in result.rows]
 
             return ScopedPermissionListResult(
                 items=items,

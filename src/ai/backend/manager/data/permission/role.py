@@ -19,10 +19,7 @@ from .types import EntityType, OperationType, RoleSource
 
 @dataclass(frozen=True)
 class RoleData:
-    """
-    Information about a role.
-    If detailed information is needed, use RoleDetailData.
-    """
+    """Information about a role."""
 
     id: uuid.UUID
     name: str
@@ -100,7 +97,7 @@ class UserRoleAssignmentInput:
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
     user_id: uuid.UUID
-    role_id: uuid.UUID
+    role: RoleData
     granted_by: uuid.UUID | None = None
 
 
@@ -144,7 +141,7 @@ class UserRoleRevocationInput:
 class UserRoleRevocationData:
     user_role_id: uuid.UUID
     user_id: uuid.UUID
-    role_id: uuid.UUID
+    role: RoleData
 
 
 @dataclass(frozen=True)

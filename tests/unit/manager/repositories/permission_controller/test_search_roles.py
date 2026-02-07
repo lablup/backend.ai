@@ -13,9 +13,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.manager.api.gql.base import StringMatchSpec
-from ai.backend.manager.data.permission.types import (
-    ScopeType,
-)
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -38,11 +35,6 @@ class CreatedRole:
     role_id: uuid.UUID
     role_name: str
     created_at: datetime
-
-
-@dataclass
-class RoleWithDomainScope:
-    role_id: uuid.UUID
 
 
 class TestSearchRoles:
@@ -104,44 +96,6 @@ class TestSearchRoles:
                 )
 
         return created
-
-    @pytest.fixture
-    async def role_with_domain_scope(
-        self,
-        db_with_rbac_tables: ExtendedAsyncSAEngine,
-        created_roles: list[CreatedRole],
-    ) -> RoleWithDomainScope:
-        """Attach a DOMAIN-scoped permission group to the first role."""
-        async with db_with_rbac_tables.begin_session() as db_sess:
-            perm_group = PermissionGroupRow(
-                role_id=created_roles[0].role_id,
-                scope_type=ScopeType.DOMAIN,
-                scope_id="domain-1",
-            )
-            db_sess.add(perm_group)
-            await db_sess.flush()
-
-        return RoleWithDomainScope(role_id=created_roles[0].role_id)
-
-    async def test_search_roles_with_scope_id_and_scope_type_filter(
-        self,
-        repository: PermissionControllerRepository,
-        role_with_domain_scope: RoleWithDomainScope,
-    ) -> None:
-        """Filter by both scope_type and scope_id should return only matching roles."""
-        querier = BatchQuerier(
-            conditions=[
-                RoleConditions.by_scope_type(ScopeType.DOMAIN),
-                RoleConditions.by_scope_id("domain-1"),
-            ],
-            orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
-        )
-
-        result = await repository.search_roles(querier)
-
-        assert result.total_count == 1
-        assert result.items[0].id == role_with_domain_scope.role_id
 
     async def test_search_roles_with_name_filter(
         self,

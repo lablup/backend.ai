@@ -294,7 +294,7 @@ class RBACAPIHandler:
         # Build response
         resp = AssignRoleResponse(
             user_id=action_result.data.user_id,
-            role_id=action_result.data.role_id,
+            role_id=action_result.data.role.id,
             granted_by=action_result.data.granted_by,
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
@@ -326,7 +326,7 @@ class RBACAPIHandler:
         # Build response
         resp = RevokeRoleResponse(
             user_id=action_result.data.user_id,
-            role_id=action_result.data.role_id,
+            role_id=action_result.data.role.id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
