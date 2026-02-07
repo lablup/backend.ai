@@ -45,7 +45,9 @@ class VFSStorageService:
         Create a new VFS storage.
         """
         log.info("Creating VFS storage with data: {}", action.creator)
-        storage_data = await self._vfs_storage_repository.create(action.creator)
+        storage_data = await self._vfs_storage_repository.create(
+            action.creator, action.meta_creator
+        )
         return CreateVFSStorageActionResult(result=storage_data)
 
     async def update(self, action: UpdateVFSStorageAction) -> UpdateVFSStorageActionResult:

@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.data.artifact_storages.types import ArtifactStorageData
+from ai.backend.manager.models.artifact_storages import ArtifactStorageRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
+from ai.backend.manager.services.artifact_storage.actions.base import ArtifactStorageAction
 
 
 @dataclass
-class UpdateVFSStorageAction(VFSStorageAction):
-    updater: Updater[VFSStorageRow]
+class UpdateArtifactStorageAction(ArtifactStorageAction):
+    updater: Updater[ArtifactStorageRow]
 
     @override
     def entity_id(self) -> str | None:
@@ -25,8 +25,8 @@ class UpdateVFSStorageAction(VFSStorageAction):
 
 
 @dataclass
-class UpdateVFSStorageActionResult(BaseActionResult):
-    result: VFSStorageData
+class UpdateArtifactStorageActionResult(BaseActionResult):
+    result: ArtifactStorageData
 
     @override
     def entity_id(self) -> str | None:
