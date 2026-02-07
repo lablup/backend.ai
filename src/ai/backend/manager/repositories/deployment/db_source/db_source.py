@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import EntityType, FieldType
+from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -240,6 +241,9 @@ class DeploymentDBSource:
         spec = cast(DeploymentCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, spec.metadata.domain, spec.metadata.project_id)
+            await self._check_endpoint_name_exists(
+                db_sess, spec.metadata.domain, spec.metadata.project_id, spec.metadata.name
+            )
 
             # Create endpoint with RBAC scope association
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
@@ -284,6 +288,7 @@ class DeploymentDBSource:
         spec = cast(LegacyEndpointCreatorSpec, creator.spec)
         async with self._begin_session_read_committed() as db_sess:
             await self._check_group_exists(db_sess, spec.domain, spec.project)
+            await self._check_endpoint_name_exists(db_sess, spec.domain, spec.project, spec.name)
 
             # Create endpoint with RBAC scope association
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
@@ -324,6 +329,35 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         if result.first() is None:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
+
+    async def _check_endpoint_name_exists(
+        self,
+        db_sess: SASession,
+        domain_name: str,
+        project_id: uuid.UUID,
+        name: str,
+    ) -> None:
+        """Check if endpoint name already exists in the project.
+
+        Raises:
+            DeploymentNameAlreadyExists: If an endpoint with the same name exists.
+        """
+        query = (
+            sa.select(EndpointRow.id)
+            .where(
+                sa.and_(
+                    EndpointRow.domain == domain_name,
+                    EndpointRow.project == project_id,
+                    EndpointRow.name == name,
+                )
+            )
+            .limit(1)
+        )
+        result = await db_sess.execute(query)
+        if result.first() is not None:
+            raise DeploymentNameAlreadyExists(
+                f"Deployment with name '{name}' already exists in this project"
+            )
 
     async def get_image_id(self, image: ImageIdentifier) -> uuid.UUID:
         """Get image ID from ImageIdentifier.
