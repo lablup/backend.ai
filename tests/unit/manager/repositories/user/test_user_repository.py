@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
@@ -422,6 +423,176 @@ class TestUserRepository:
 
         with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator, group_ids=[])
+
+    @pytest.fixture
+    async def model_store_project_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: str,
+        project_resource_policy: str,
+    ) -> uuid.UUID:
+        """Create a model store project and return its id."""
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as session:
+            group = GroupRow(
+                id=project_id,
+                name=f"model-store-{uuid.uuid4().hex[:8]}",
+                description="Model Store Project",
+                is_active=True,
+                domain_name=sample_domain,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                integration_id=None,
+                resource_policy=project_resource_policy,
+                type=ProjectType.MODEL_STORE,
+            )
+            session.add(group)
+            await session.commit()
+        return project_id
+
+    async def test_create_user_validated_creates_domain_scope_association(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> None:
+        """Test that user creation creates domain scope association via RBACEntityCreator."""
+        password_info = create_test_password_info("new_password")
+        spec = UserCreatorSpec(
+            username=f"newuser-{uuid.uuid4().hex[:8]}",
+            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="New User",
+            description="New User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+
+        result = await user_repository.create_user_validated(creator, group_ids=[])
+
+        # Verify domain scope association was created
+        async with db_with_cleanup.begin_session() as session:
+            domain_assoc = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
+                    AssociationScopesEntitiesRow.scope_id == sample_domain,
+                )
+            )
+            assert domain_assoc is not None
+
+    async def test_create_user_validated_creates_project_scope_associations(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+    ) -> None:
+        """Test that user creation creates project scope associations for requested groups."""
+        password_info = create_test_password_info("new_password")
+        spec = UserCreatorSpec(
+            username=f"newuser-{uuid.uuid4().hex[:8]}",
+            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="New User",
+            description="New User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+
+        result = await user_repository.create_user_validated(creator, group_ids=[sample_group_id])
+
+        # Verify project scope association was created
+        async with db_with_cleanup.begin_session() as session:
+            project_assoc = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == sample_group_id,
+                )
+            )
+            assert project_assoc is not None
+
+    async def test_create_user_validated_auto_includes_model_store_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        model_store_project_id: uuid.UUID,
+    ) -> None:
+        """Test that user creation automatically includes model store project in scope associations."""
+        password_info = create_test_password_info("new_password")
+        spec = UserCreatorSpec(
+            username=f"newuser-{uuid.uuid4().hex[:8]}",
+            email=f"newuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="New User",
+            description="New User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        creator = Creator(spec=spec)
+
+        # Create user without explicitly specifying the model store project
+        result = await user_repository.create_user_validated(creator, group_ids=[])
+
+        # Verify model store project scope association was automatically created
+        async with db_with_cleanup.begin_session() as session:
+            model_store_assoc = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(model_store_project_id),
+                )
+            )
+            assert model_store_assoc is not None
+
+            # Also verify user was added to the model store group
+            group_assoc = await session.scalar(
+                sa.select(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == result.user.uuid,
+                    AssocGroupUserRow.group_id == model_store_project_id,
+                )
+            )
+            assert group_assoc is not None
 
     @pytest.mark.asyncio
     async def test_update_user_validated_success(
