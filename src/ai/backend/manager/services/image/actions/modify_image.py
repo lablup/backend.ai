@@ -8,6 +8,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
@@ -32,6 +33,30 @@ class ModifyImageAction(ImageAction):
 
 @dataclass
 class ModifyImageActionResult(BaseActionResult):
+    image: ImageData
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.image.id)
+
+
+@dataclass
+class ModifyImageByIdAction(ImageAction):
+    image_id: ImageID
+    updater_spec: ImageUpdaterSpec
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.image_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "modify_by_id"
+
+
+@dataclass
+class ModifyImageByIdActionResult(BaseActionResult):
     image: ImageData
 
     @override

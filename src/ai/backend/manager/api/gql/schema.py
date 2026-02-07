@@ -119,10 +119,15 @@ from .huggingface_registry import (
 from .image import (
     admin_image_aliases,
     admin_images_v2,
+    alias_image,
+    clear_image_resource_limit,
     container_registry_images_v2,
+    dealias_image,
+    forget_image,
     image_alias,
     image_scoped_aliases,
     image_v2,
+    purge_image,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .notification import (
@@ -443,6 +448,12 @@ class Mutation:
     admin_delete_users = admin_delete_users
     admin_purge_user = admin_purge_user
     admin_purge_users = admin_purge_users
+    # Image
+    forget_image = forget_image
+    purge_image = purge_image
+    alias_image = alias_image
+    dealias_image = dealias_image
+    clear_image_resource_limit = clear_image_resource_limit
 
 
 @strawberry.type
