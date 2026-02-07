@@ -52,6 +52,8 @@ from ai.backend.manager.services.fair_share.processors import FairShareProcessor
 from ai.backend.manager.services.fair_share.service import FairShareService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.group_config.processors import GroupConfigProcessors
+from ai.backend.manager.services.group_config.service import GroupConfigService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -149,6 +151,7 @@ class Services:
     export: ExportService
     fair_share: FairShareService
     group: GroupService
+    group_config: GroupConfigService
     user: UserService
     image: ImageService
     container_registry: ContainerRegistryService
@@ -209,6 +212,9 @@ class Services:
             args.config_provider,
             args.valkey_stat_client,
             repositories.group,
+        )
+        group_config_service = GroupConfigService(
+            repositories.group_config.repository,
         )
         user_service = UserService(
             args.storage_manager,
@@ -364,6 +370,7 @@ class Services:
             export=export_service,
             fair_share=fair_share_service,
             group=group_service,
+            group_config=group_config_service,
             user=user_service,
             image=image_service,
             container_registry=container_registry_service,
@@ -409,6 +416,7 @@ class Processors(AbstractProcessorPackage):
     export: ExportProcessors
     fair_share: FairShareProcessors
     group: GroupProcessors
+    group_config: GroupConfigProcessors
     user: UserProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
@@ -448,6 +456,7 @@ class Processors(AbstractProcessorPackage):
         export_processors = ExportProcessors(services.export, action_monitors)
         fair_share_processors = FairShareProcessors(services.fair_share, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
+        group_config_processors = GroupConfigProcessors(services.group_config, action_monitors)
         user_processors = UserProcessors(services.user, action_monitors)
         image_processors = ImageProcessors(services.image, action_monitors)
         container_registry_processors = ContainerRegistryProcessors(
@@ -517,6 +526,7 @@ class Processors(AbstractProcessorPackage):
             export=export_processors,
             fair_share=fair_share_processors,
             group=group_processors,
+            group_config=group_config_processors,
             user=user_processors,
             image=image_processors,
             container_registry=container_registry_processors,
@@ -557,6 +567,7 @@ class Processors(AbstractProcessorPackage):
             *self.export.supported_actions(),
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
+            *self.group_config.supported_actions(),
             *self.user.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
