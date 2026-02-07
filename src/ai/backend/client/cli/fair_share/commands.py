@@ -1275,6 +1275,18 @@ def rg_domain_usage() -> None:
 @pass_ctx_obj
 @click.argument("resource_group", type=str)
 @click.option("--domain-name", type=str, default=None, help="Filter by domain name")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -1282,6 +1294,8 @@ def rg_domain_usage_list_cmd(
     ctx: CLIContext,
     resource_group: str,
     domain_name: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
     limit: int,
     offset: int,
     as_json: bool,
@@ -1296,14 +1310,22 @@ def rg_domain_usage_list_cmd(
         OrderDirection,
         SearchDomainUsageBucketsRequest,
     )
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter
 
     with Session() as api_session:
         try:
             filter_cond = None
-            if domain_name:
+            if domain_name or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
                 filter_cond = DomainUsageBucketFilter(
-                    domain_name=StringFilter(equals=domain_name),
+                    domain_name=StringFilter(equals=domain_name) if domain_name else None,
+                    period_start=period_start_filter,
                 )
 
             order_spec = DomainUsageBucketOrder(
@@ -1363,6 +1385,18 @@ def rg_project_usage() -> None:
 @click.argument("resource_group", type=str)
 @click.argument("domain_name", type=str)
 @click.option("--project-id", type=str, default=None, help="Filter by project ID (UUID)")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -1371,6 +1405,8 @@ def rg_project_usage_list_cmd(
     resource_group: str,
     domain_name: str,
     project_id: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
     limit: int,
     offset: int,
     as_json: bool,
@@ -1385,14 +1421,22 @@ def rg_project_usage_list_cmd(
         ProjectUsageBucketOrderField,
         SearchProjectUsageBucketsRequest,
     )
-    from ai.backend.common.dto.manager.query import UUIDFilter
+    from ai.backend.common.dto.manager.query import DateRangeFilter, UUIDFilter
 
     with Session() as api_session:
         try:
             filter_cond = None
-            if project_id:
+            if project_id or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
                 filter_cond = ProjectUsageBucketFilter(
-                    project_id=UUIDFilter(equals=UUID(project_id)),
+                    project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
+                    period_start=period_start_filter,
                 )
 
             order_spec = ProjectUsageBucketOrder(
@@ -1456,6 +1500,18 @@ def rg_user_usage() -> None:
 @click.argument("domain_name", type=str)
 @click.argument("project_id", type=str)
 @click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
 @click.option("--limit", type=int, default=20, help="Maximum number of records to return")
 @click.option("--offset", type=int, default=0, help="Offset for pagination")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -1465,6 +1521,8 @@ def rg_user_usage_list_cmd(
     domain_name: str,
     project_id: str,
     user_uuid: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
     limit: int,
     offset: int,
     as_json: bool,
@@ -1479,14 +1537,22 @@ def rg_user_usage_list_cmd(
         UserUsageBucketOrder,
         UserUsageBucketOrderField,
     )
-    from ai.backend.common.dto.manager.query import UUIDFilter
+    from ai.backend.common.dto.manager.query import DateRangeFilter, UUIDFilter
 
     with Session() as api_session:
         try:
             filter_cond = None
-            if user_uuid:
+            if user_uuid or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
                 filter_cond = UserUsageBucketFilter(
-                    user_uuid=UUIDFilter(equals=UUID(user_uuid)),
+                    user_uuid=UUIDFilter(equals=UUID(user_uuid)) if user_uuid else None,
+                    period_start=period_start_filter,
                 )
 
             order_spec = UserUsageBucketOrder(

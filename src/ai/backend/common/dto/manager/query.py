@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import Field
 
@@ -30,6 +30,33 @@ class DateTimeRangeFilter(BaseRequestModel):
             "Include only records created on or before this datetime. "
             "Should be in ISO 8601 format (e.g., '2024-12-31T23:59:59Z'). "
             "If not specified, there is no upper bound on the datetime range."
+        ),
+    )
+
+
+class DateRangeFilter(BaseRequestModel):
+    """
+    Filters records by a date range.
+
+    Both boundaries are inclusive. You can specify just 'after', just 'before',
+    or both to define the range. Records matching the boundary values are included.
+    This filter is used for date fields like period_start in usage buckets.
+    """
+
+    after: date | None = Field(
+        default=None,
+        description=(
+            "Include only records with dates on or after this date. "
+            "Should be in ISO 8601 date format (e.g., '2024-01-01'). "
+            "If not specified, there is no lower bound on the date range."
+        ),
+    )
+    before: date | None = Field(
+        default=None,
+        description=(
+            "Include only records with dates on or before this date. "
+            "Should be in ISO 8601 date format (e.g., '2024-12-31'). "
+            "If not specified, there is no upper bound on the date range."
         ),
     )
 
