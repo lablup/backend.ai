@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RuntimeVariant,
 )
@@ -61,6 +62,20 @@ from .types import (
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 REGISTER_ENDPOINT_TIMEOUT_SEC = 30
+
+
+def _extract_error_code(exception: BaseException) -> str | None:
+    """Extract error code from exception if available.
+
+    Args:
+        exception: The exception to extract error code from.
+
+    Returns:
+        Error code string if exception is BackendAIError, None otherwise.
+    """
+    if isinstance(exception, BackendAIError):
+        return str(exception.error_code())
+    return None
 
 
 class DeploymentExecutor:
@@ -147,6 +162,7 @@ class DeploymentExecutor:
                             deployment_info=deployment,
                             reason=str(result),
                             error_detail="Failed to register endpoint",
+                            error_code=_extract_error_code(result),
                         )
                     )
                 else:
@@ -202,6 +218,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason="Mismatched active routes",
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -247,6 +264,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason=str(e),
                         error_detail="Failed to scale deployment",
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -319,6 +337,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason=str(result),
                         error_detail="Failed to calculate desired replicas",
+                        error_code=_extract_error_code(result),
                     )
                 )
             elif result is None:
@@ -389,6 +408,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason="Failed to unregister endpoint",
                         error_detail=str(result),
+                        error_code=_extract_error_code(result),
                     )
                 )
             else:

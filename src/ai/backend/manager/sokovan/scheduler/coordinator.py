@@ -1228,6 +1228,7 @@ class ScheduleCoordinator:
                     message=f"{handler_name} {scheduling_result.value.lower()}",
                     from_status=info.from_status,
                     to_status=transition.session,
+                    error_code=info.error_code,
                     sub_steps=extract_sub_steps_for_entity(info.session_id, records),
                 )
                 for info in session_infos
@@ -1302,6 +1303,7 @@ class ScheduleCoordinator:
                 message=info.reason or f"{handler_name} skipped",
                 from_status=info.from_status,
                 to_status=info.from_status,  # No status change
+                error_code=info.error_code,
                 sub_steps=extract_sub_steps_for_entity(info.session_id, records),
             )
             for info in session_infos

@@ -24,6 +24,7 @@ class DeploymentExecutionError:
     deployment_info: DeploymentInfo
     reason: str
     error_detail: str
+    error_code: str | None = None
 
 
 @dataclass
