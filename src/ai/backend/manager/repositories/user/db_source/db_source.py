@@ -271,9 +271,6 @@ class UserDBSource:
 
             # Handle group updates
             group_ids = updater_spec.group_ids_value
-            if prev_role != updated_user.role and group_ids is None:
-                await self._clear_user_groups(conn, updated_user.uuid)
-
             if group_ids is not None:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
