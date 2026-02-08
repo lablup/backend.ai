@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 
-from .base import ScalingGroupAction
+from .user_group_base import ScalingGroupUserGroupAction
 
 
 @dataclass
-class AssociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
+class AssociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to associate a scaling group with multiple user groups (projects)."""
 
     bulk_creator: BulkCreator[ScalingGroupForProjectRow]

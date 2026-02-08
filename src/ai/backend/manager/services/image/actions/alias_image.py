@@ -5,11 +5,11 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageAliasData
-from ai.backend.manager.services.image.actions.base import ImageAction
+from ai.backend.manager.services.image.actions.alias_base import ImageAliasAction
 
 
 @dataclass
-class AliasImageAction(ImageAction):
+class AliasImageAction(ImageAliasAction):
     """
     Deprecated. Use AliasImageByIdAction instead.
     """
@@ -39,7 +39,7 @@ class AliasImageActionResult(BaseActionResult):
 
 
 @dataclass
-class AliasImageByIdAction(ImageAction):
+class AliasImageByIdAction(ImageAliasAction):
     image_id: ImageID
     alias: str
 

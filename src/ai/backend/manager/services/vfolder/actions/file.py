@@ -12,11 +12,11 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.types import FileInfo
 
-from .base import VFolderAction
+from .base import VFolderDirectoryAction, VFolderFileAction
 
 
 @dataclass
-class CreateUploadSessionAction(VFolderAction):
+class CreateUploadSessionAction(VFolderFileAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -48,7 +48,7 @@ class CreateUploadSessionActionResult(BaseActionResult):
 
 
 @dataclass
-class CreateDownloadSessionAction(VFolderAction):
+class CreateDownloadSessionAction(VFolderFileAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -80,7 +80,7 @@ class CreateDownloadSessionActionResult(BaseActionResult):
 
 
 @dataclass
-class ListFilesAction(VFolderAction):
+class ListFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -107,7 +107,7 @@ class ListFilesActionResult(BaseActionResult):
 
 
 @dataclass
-class RenameFileAction(VFolderAction):
+class RenameFileAction(VFolderFileAction):
     user_uuid: uuid.UUID
     keypair_resource_policy: Mapping[str, Any]
 
@@ -136,7 +136,7 @@ class RenameFileActionResult(BaseActionResult):
 
 
 @dataclass
-class DeleteFilesAction(VFolderAction):
+class DeleteFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -163,7 +163,7 @@ class DeleteFilesActionResult(BaseActionResult):
 
 
 @dataclass
-class DeleteFilesAsyncAction(VFolderAction):
+class DeleteFilesAsyncAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -191,7 +191,7 @@ class DeleteFilesAsyncActionResult(BaseActionResult):
 
 
 @dataclass
-class MkdirAction(VFolderAction):
+class MkdirAction(VFolderDirectoryAction):
     user_id: uuid.UUID
     vfolder_uuid: uuid.UUID
 

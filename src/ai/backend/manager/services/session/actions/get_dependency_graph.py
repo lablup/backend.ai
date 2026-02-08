@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -12,6 +13,11 @@ from ai.backend.manager.services.session.base import SessionAction
 class GetDependencyGraphAction(SessionAction):
     root_session_name: str
     owner_access_key: AccessKey
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION_DEPENDENCY_GRAPH
 
     @override
     def entity_id(self) -> str | None:

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
@@ -27,6 +28,11 @@ class UpdateFairShareSpecAction(ScalingGroupAction):
     Validates resource_weights against capacity and filters out
     resource types no longer available.
     """
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.RESOURCE_GROUP_FAIR_SHARE
 
     resource_group: str
     half_life_days: int | None = None

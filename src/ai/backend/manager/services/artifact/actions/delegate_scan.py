@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -23,6 +24,11 @@ class DelegateScanArtifactsAction(ArtifactAction):
     order: ModelSortKey | None
     delegatee_target: DelegateeTarget | None
     limit: int | None
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.ARTIFACT_SCAN
 
     @override
     def entity_id(self) -> str | None:

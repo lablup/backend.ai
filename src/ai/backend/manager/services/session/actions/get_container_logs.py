@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import AccessKey, KernelId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -13,6 +14,11 @@ class GetContainerLogsAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
     kernel_id: KernelId | None
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION_CONTAINER_LOG
 
     @override
     def entity_id(self) -> str | None:

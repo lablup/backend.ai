@@ -5,11 +5,11 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData, ResourceLimitInput
-from ai.backend.manager.services.image.actions.base import ImageAction
+from ai.backend.manager.services.image.actions.resource_limit_base import ImageResourceLimitAction
 
 
 @dataclass
-class SetImageResourceLimitByIdAction(ImageAction):
+class SetImageResourceLimitByIdAction(ImageResourceLimitAction):
     image_id: ImageID
     resource_limit: ResourceLimitInput
 

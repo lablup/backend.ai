@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
 from ai.backend.manager.repositories.base.purger import BatchPurger
 
-from .base import ScalingGroupAction
+from .keypair_base import ScalingGroupKeypairAction
 
 
 @dataclass
-class DisassociateScalingGroupWithKeypairsAction(ScalingGroupAction):
+class DisassociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
     """Action to disassociate a scaling group from multiple keypairs."""
 
     purger: BatchPurger[ScalingGroupForKeypairsRow]

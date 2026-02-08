@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import (
@@ -18,6 +19,11 @@ class SearchAutoScalingRulesAction(ModelServiceAction):
     """Action to search endpoint auto scaling rules."""
 
     querier: BatchQuerier
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.DEPLOYMENT_AUTO_SCALING_RULE
 
     @override
     @classmethod
