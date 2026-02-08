@@ -53,6 +53,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.service.base import ServicesContext
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+        RevisionGeneratorRegistry,
+    )
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
     from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
     from ai.backend.manager.types import DistributedLockFactory
@@ -102,6 +105,7 @@ class RootContext(BaseContext):
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
+    revision_generator_registry: RevisionGeneratorRegistry
     route_controller: RouteController
     leader_election: ValkeyLeaderElection
 

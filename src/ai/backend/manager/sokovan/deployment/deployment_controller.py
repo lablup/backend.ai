@@ -35,7 +35,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -55,6 +54,7 @@ class DeploymentControllerArgs:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
+    revision_generator_registry: RevisionGeneratorRegistry
 
 
 class DeploymentController:
@@ -76,9 +76,7 @@ class DeploymentController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
-        self._revision_generator_registry = RevisionGeneratorRegistry(
-            RevisionGeneratorRegistryArgs(deployment_repository=self._deployment_repository)
-        )
+        self._revision_generator_registry = args.revision_generator_registry
 
     async def create_deployment(
         self,
@@ -108,7 +106,6 @@ class DeploymentController:
         model_revision = await generator.generate_revision(
             draft_revision=draft.draft_model_revision,
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
-            model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
             default_architecture=default_architecture,
         )
         await self._scheduling_controller.validate_session_spec(
