@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history.types import (
@@ -26,13 +28,13 @@ class SearchSessionScopedHistoryAction(SchedulingHistoryAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "session:scoped-history"
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION_SCOPED_HISTORY
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:

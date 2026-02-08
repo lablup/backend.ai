@@ -117,21 +117,27 @@ class TestEntityType:
         expected = {*EntityType._resource_types(), EntityType.USER}
         assert member_accessible == expected
 
-    def test_all_entity_types_are_categorized(self) -> None:
-        """Test that all EntityType values are in either _scope_types or _resource_types."""
-        all_entity_types = set(EntityType)
+    def test_rbac_entity_types_are_categorized(self) -> None:
+        """Test that RBAC scope and resource types have no overlap and cover the original 12 types."""
         scope_types = EntityType._scope_types()
         resource_types = EntityType._resource_types()
-
-        # All entity types should be in either scope or resource types
-        categorized_types = scope_types.union(resource_types)
-        uncategorized = all_entity_types - categorized_types
-
-        assert len(uncategorized) == 0, f"Uncategorized entity types found: {uncategorized}"
 
         # Verify no overlap between scope and resource types
         overlap = scope_types.intersection(resource_types)
         assert len(overlap) == 0, f"Entity types found in both scope and resource: {overlap}"
 
-        # Verify all types are accounted for
-        assert all_entity_types == categorized_types
+        # Verify scope types are exactly 3
+        assert scope_types == {EntityType.USER, EntityType.PROJECT, EntityType.DOMAIN}
+
+        # Verify resource types are exactly 9
+        assert resource_types == {
+            EntityType.VFOLDER,
+            EntityType.IMAGE,
+            EntityType.SESSION,
+            EntityType.ARTIFACT,
+            EntityType.ARTIFACT_REGISTRY,
+            EntityType.APP_CONFIG,
+            EntityType.NOTIFICATION_CHANNEL,
+            EntityType.NOTIFICATION_RULE,
+            EntityType.MODEL_DEPLOYMENT,
+        }

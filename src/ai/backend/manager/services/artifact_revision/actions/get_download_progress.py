@@ -6,6 +6,7 @@ from typing import override
 
 from ai.backend.common.data.artifact.types import CombinedDownloadProgress
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
@@ -19,8 +20,8 @@ class GetDownloadProgressAction(ArtifactRevisionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_download_progress"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

@@ -1,8 +1,6 @@
 from abc import abstractmethod
 from typing import TypeVar, override
 
-from ai.backend.common.data.permission.types import OperationType
-
 from .base import BaseAction, BaseActionResult
 from .types import FieldData
 
@@ -23,11 +21,6 @@ class BaseSingleEntityAction(BaseAction):
         target exists as a field of another entity.
         Returns None if this entity is not a field.
         """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def permission_operation_type(cls) -> OperationType:
         raise NotImplementedError
 
 

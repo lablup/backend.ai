@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 
@@ -18,8 +19,8 @@ class AssociateScalingGroupWithDomainsAction(ScalingGroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "associate_with_domains"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     def entity_id(self) -> str | None:

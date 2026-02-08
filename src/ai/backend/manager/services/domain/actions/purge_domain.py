@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.services.domain.actions.base import DomainAction
 
@@ -17,8 +18,8 @@ class PurgeDomainAction(DomainAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass

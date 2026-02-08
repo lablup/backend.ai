@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.services.user.actions.base import UserAction
 from ai.backend.manager.types import OptionalState
@@ -19,8 +20,8 @@ class PurgeUserAction(UserAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass

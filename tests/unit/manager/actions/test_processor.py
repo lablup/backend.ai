@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action import (
     BaseAction,
@@ -15,7 +16,7 @@ from ai.backend.manager.actions.action import (
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -31,12 +32,12 @@ class MockAction(BaseAction):
         return self.id
 
     @classmethod
-    def entity_type(cls) -> str:
-        return _MOCK_ACTION_TYPE
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION
 
     @classmethod
-    def operation_type(cls) -> str:
-        return _MOCK_OPERATION_TYPE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.user.actions.base import UserAction
 
 
@@ -13,8 +14,8 @@ class AdminMonthStatsAction(UserAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "admin_month_stats"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

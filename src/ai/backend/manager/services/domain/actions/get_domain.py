@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.services.domain.actions.base import DomainAction
 
@@ -29,8 +30,8 @@ class GetDomainAction(DomainAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

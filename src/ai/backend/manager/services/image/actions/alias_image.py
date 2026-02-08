@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.services.image.actions.base import ImageAction
 
@@ -23,8 +24,8 @@ class AliasImageAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "alias"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -48,8 +49,8 @@ class AliasImageByIdAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "alias_by_id"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

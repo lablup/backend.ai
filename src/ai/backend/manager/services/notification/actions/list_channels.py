@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -18,8 +19,8 @@ class SearchChannelsAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search_channels"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
@@ -17,8 +18,8 @@ class SearchDeploymentsAction(DeploymentBaseAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search_deployments"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

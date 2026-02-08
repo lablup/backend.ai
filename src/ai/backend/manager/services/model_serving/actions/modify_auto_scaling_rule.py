@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData
 from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -20,8 +21,8 @@ class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "modify"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

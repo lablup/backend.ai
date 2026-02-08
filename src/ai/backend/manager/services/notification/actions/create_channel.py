@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.notification.creators import NotificationChannelCreatorSpec
@@ -22,8 +23,8 @@ class CreateChannelAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create_channel"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     def entity_id(self) -> str | None:

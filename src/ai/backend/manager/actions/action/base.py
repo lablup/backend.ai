@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TypeVar
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
 
 
 class BaseAction(ABC):
@@ -18,12 +19,12 @@ class BaseAction(ABC):
 
     @classmethod
     @abstractmethod
-    def entity_type(cls) -> str:
+    def entity_type(cls) -> EntityType:
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def operation_type(cls) -> str:
+    def operation_type(cls) -> ActionOperationType:
         raise NotImplementedError
 
     @classmethod

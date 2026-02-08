@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.actions.action.base import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
 
 from .base import ExportAction
@@ -25,8 +26,8 @@ class ExportSessionsCSVAction(ExportAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "export_sessions_csv"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     def entity_id(self) -> str | None:

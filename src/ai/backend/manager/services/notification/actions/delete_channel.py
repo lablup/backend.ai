@@ -5,6 +5,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import NotificationAction
 
@@ -17,8 +18,8 @@ class DeleteChannelAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_channel"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
     def entity_id(self) -> str | None:

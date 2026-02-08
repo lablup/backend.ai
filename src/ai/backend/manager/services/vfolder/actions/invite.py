@@ -6,7 +6,9 @@ from typing import (
     override,
 )
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
@@ -15,8 +17,8 @@ from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 class VFolderInvitationAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder_invitation"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_INVITATION
 
 
 @dataclass
@@ -34,8 +36,8 @@ class InviteVFolderAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "invite"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -58,8 +60,8 @@ class AcceptInvitationAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "accept"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -82,8 +84,8 @@ class RejectInvitationAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "reject"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -108,8 +110,8 @@ class UpdateInvitationAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -131,8 +133,8 @@ class ListInvitationAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -157,8 +159,8 @@ class LeaveInvitedVFolderAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "leave"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -181,8 +183,8 @@ class RevokeInvitedVFolderAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "revoke"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -207,8 +209,8 @@ class UpdateInvitedVFolderMountPermissionAction(VFolderInvitationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_permission"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

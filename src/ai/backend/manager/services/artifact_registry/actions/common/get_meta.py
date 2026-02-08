@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
@@ -18,8 +19,8 @@ class GetArtifactRegistryMetaAction(ArtifactRegistryAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_meta"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

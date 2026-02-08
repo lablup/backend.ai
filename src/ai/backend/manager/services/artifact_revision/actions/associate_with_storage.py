@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
@@ -20,8 +21,8 @@ class AssociateWithStorageAction(ArtifactRevisionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "associate_with_storage"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

@@ -6,7 +6,6 @@ from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import ScopePermissionCheckInput
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -22,8 +21,8 @@ class ScopeActionRBACValidator(ScopeActionValidator):
 
     @override
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
-        entity_type = EntityType(action.entity_type())
-        scope_type = ScopeType(action.scope_type())
+        entity_type = action.entity_type()
+        scope_type = action.scope_type()
         scope_id = action.scope_id()
         user = current_user()
         if user is None:
@@ -32,7 +31,7 @@ class ScopeActionRBACValidator(ScopeActionValidator):
         await self._repository.check_permission_in_scope(
             ScopePermissionCheckInput(
                 user_id=user.user_id,
-                operation=action.permission_operation_type(),
+                operation=action.operation_type().to_permission_operation(),
                 target_entity_type=entity_type,
                 target_scope_id=ScopeId(
                     scope_type=scope_type,

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryCreatorMeta
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
@@ -20,8 +21,8 @@ class CreateHuggingFaceRegistryAction(ArtifactRegistryAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create_huggingface_registry"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

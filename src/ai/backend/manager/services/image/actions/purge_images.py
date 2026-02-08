@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.actions.base import ImageAction
 from ai.backend.manager.services.image.types import ImageRefData
@@ -21,8 +22,8 @@ class PurgeImageAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass
@@ -61,8 +62,8 @@ class PurgeImagesAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge_multi"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass
@@ -86,8 +87,8 @@ class PurgeImageByIdAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge_by_id"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass

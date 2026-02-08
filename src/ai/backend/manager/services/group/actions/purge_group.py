@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.group.actions.base import GroupAction
 
 
@@ -16,8 +17,8 @@ class PurgeGroupAction(GroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 @dataclass

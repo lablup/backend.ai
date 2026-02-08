@@ -8,6 +8,7 @@ import yarl
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
@@ -56,8 +57,8 @@ class CreateFromTemplateAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create_from_template"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

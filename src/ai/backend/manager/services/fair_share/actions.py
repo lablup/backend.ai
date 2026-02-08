@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
@@ -34,8 +36,8 @@ class DomainFairShareAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "domain_fair_share"
+    def entity_type(cls) -> EntityType:
+        return EntityType.DOMAIN_FAIR_SHARE
 
 
 @dataclass
@@ -47,8 +49,8 @@ class GetDomainFairShareAction(DomainFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def entity_id(self) -> str | None:
@@ -76,8 +78,8 @@ class SearchDomainFairSharesAction(DomainFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -109,8 +111,8 @@ class SearchRGDomainFairSharesAction(DomainFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -138,8 +140,8 @@ class ProjectFairShareAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "project_fair_share"
+    def entity_type(cls) -> EntityType:
+        return EntityType.PROJECT_FAIR_SHARE
 
 
 @dataclass
@@ -151,8 +153,8 @@ class GetProjectFairShareAction(ProjectFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def entity_id(self) -> str | None:
@@ -180,8 +182,8 @@ class SearchProjectFairSharesAction(ProjectFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -213,8 +215,8 @@ class SearchRGProjectFairSharesAction(ProjectFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -242,8 +244,8 @@ class UserFairShareAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "user_fair_share"
+    def entity_type(cls) -> EntityType:
+        return EntityType.USER_FAIR_SHARE
 
 
 @dataclass
@@ -256,8 +258,8 @@ class GetUserFairShareAction(UserFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def entity_id(self) -> str | None:
@@ -285,8 +287,8 @@ class SearchUserFairSharesAction(UserFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -318,8 +320,8 @@ class SearchRGUserFairSharesAction(UserFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:
@@ -351,8 +353,8 @@ class UpsertDomainFairShareWeightAction(DomainFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:
@@ -381,8 +383,8 @@ class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:
@@ -412,8 +414,8 @@ class UpsertUserFairShareWeightAction(UserFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:
@@ -451,8 +453,8 @@ class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "bulk_upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:
@@ -488,8 +490,8 @@ class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "bulk_upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:
@@ -526,8 +528,8 @@ class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "bulk_upsert_weight"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:

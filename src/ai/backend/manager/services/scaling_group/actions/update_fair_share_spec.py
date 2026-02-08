@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 
 from .base import ScalingGroupAction
@@ -36,8 +37,8 @@ class UpdateFairShareSpecAction(ScalingGroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_fair_share_spec"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str:

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
@@ -33,8 +34,8 @@ class SearchRGDomainsAction(DomainAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

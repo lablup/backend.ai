@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.agent.actions.base import AgentAction
 
 
@@ -14,8 +15,8 @@ class GetTotalResourcesAction(AgentAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_total_resources"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

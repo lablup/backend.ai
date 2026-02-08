@@ -7,6 +7,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.group.types import (
@@ -28,8 +29,8 @@ class SearchProjectsAction(GroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -45,8 +46,8 @@ class SearchProjectsByDomainAction(GroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -62,8 +63,8 @@ class SearchProjectsByUserAction(GroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -78,8 +79,8 @@ class GetProjectAction(GroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 # Result types

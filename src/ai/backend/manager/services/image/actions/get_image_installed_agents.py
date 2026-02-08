@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
@@ -17,8 +18,8 @@ class GetImageInstalledAgentsAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_installed_agents"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

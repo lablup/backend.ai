@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import AppConfigAction
 
@@ -19,8 +21,8 @@ class GetMergedAppConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "app_config_user"
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_USER
 
     @override
     def entity_id(self) -> str | None:
@@ -28,8 +30,8 @@ class GetMergedAppConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_merged_app_config"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
