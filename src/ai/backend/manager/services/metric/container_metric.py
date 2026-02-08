@@ -5,8 +5,9 @@ from typing import (
 
 import aiohttp
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
 
+from ai.backend.common.dto.clients.prometheus.response import LabelValueResponse, MetricResponse
+from ai.backend.common.exception import FailedToGetMetric
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     UTILIZATION_METRIC_INTERVAL,
@@ -20,7 +21,6 @@ from .actions.container import (
     ContainerMetricMetadataAction,
     ContainerMetricMetadataActionResult,
 )
-from .exceptions import FailedToGetMetric
 from .types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -31,49 +31,6 @@ from .types import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class LabelValueResponse(BaseModel):
-    status: str
-    data: list[str]
-
-
-class MetricResponseInfo(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
-    value_type: str
-    name: str | None = Field(
-        default=None, validation_alias="__name__"
-    )  # "backendai_container_utilization"
-    agent_id: str | None = Field(default=None)
-    container_metric_name: str | None = Field(default=None)
-    instance: str | None = Field(default=None)
-    job: str | None = Field(default=None)
-    kernel_id: str | None = Field(default=None)
-    owner_project_id: str | None = Field(default=None)
-    owner_user_id: str | None = Field(default=None)
-    session_id: str | None = Field(default=None)
-
-    def to_response_info(self) -> ContainerMetricResponseInfo:
-        return ContainerMetricResponseInfo(
-            value_type=self.value_type,
-            agent_id=self.agent_id,
-            container_metric_name=self.container_metric_name,
-            instance=self.instance,
-            job=self.job,
-            kernel_id=self.kernel_id,
-            owner_project_id=self.owner_project_id,
-            owner_user_id=self.owner_user_id,
-            session_id=self.session_id,
-        )
-
-
-type MetricResponseValue = tuple[float, str]  # (timestamp, value)
-
-
-class MetricResponse(BaseModel):
-    metric: MetricResponseInfo
-    values: list[MetricResponseValue]
 
 
 class ContainerUtilizationMetricService:
@@ -220,7 +177,7 @@ class ContainerUtilizationMetricService:
         return ContainerMetricActionResult(
             result=[
                 ContainerMetricResult(
-                    metric=m.metric.to_response_info(),
+                    metric=ContainerMetricResponseInfo.from_metric_response_info(m.metric),
                     values=[MetricResultValue(*value) for value in m.values],
                 )
                 for m in metrics

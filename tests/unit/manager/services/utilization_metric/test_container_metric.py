@@ -9,6 +9,7 @@ from uuid import UUID
 import aiohttp
 import pytest
 
+from ai.backend.common.exception import FailedToGetMetric
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -19,7 +20,6 @@ from ai.backend.manager.services.metric.actions.container import (
 from ai.backend.manager.services.metric.container_metric import (
     ContainerUtilizationMetricService,
 )
-from ai.backend.manager.services.metric.exceptions import FailedToGetMetric
 from ai.backend.manager.services.metric.types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
