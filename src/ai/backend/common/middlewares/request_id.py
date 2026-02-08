@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 
+from ai.backend.common.contexts.operation import with_client_operation
 from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.logging.utils import with_log_context_fields
 
@@ -11,14 +12,17 @@ type Handler = Callable[
 ]
 
 REQUEST_ID_HEADER = "X-BackendAI-RequestID"
+OPERATION_HEADER = "X-BackendAI-Operation"
 
 
 @web.middleware
 async def request_id_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     _handler = handler
     request_id: str | None = request.headers.get(REQUEST_ID_HEADER, None)
+    operation: str = request.headers.get(OPERATION_HEADER, "")
     with (
         with_request_id(request_id),
         with_log_context_fields({"request_id": request_id}),
+        with_client_operation(operation),
     ):
         return await _handler(request)
