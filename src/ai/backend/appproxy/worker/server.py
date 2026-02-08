@@ -568,6 +568,66 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         sd_loop.close()
 
 
+@asynccontextmanager
+async def traefik_metrics_sd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """
+    Register Traefik's /metrics endpoint with Service Discovery.
+    """
+    # Non-Traefik mode: nothing to register
+    if (root_ctx.local_config.proxy_worker.frontend_mode != FrontendServerMode.TRAEFIK) or (
+        root_ctx.local_config.proxy_worker.traefik is None
+    ):
+        yield
+        return
+
+    traefik_config = root_ctx.local_config.proxy_worker.traefik
+    worker_authority = root_ctx.local_config.proxy_worker.authority
+
+    # Create a dedicated SD client for Traefik metrics registration
+    sd_type = root_ctx.local_config.service_discovery.type
+    service_discovery: ServiceDiscovery
+    match sd_type:
+        case ServiceDiscoveryType.REDIS:
+            redis_profile_target = RedisProfileTarget.from_dict(
+                root_ctx.local_config.redis.to_dict()
+            )
+            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            service_discovery = await RedisServiceDiscovery.create(
+                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+            )
+        case _:
+            raise RuntimeError(f"Unsupported service discovery type: {sd_type}")
+
+    announce_addr = root_ctx.local_config.proxy_worker.announce_addr
+    if announce_addr is None:
+        raise MissingAnnounceAddressError("Announce address is not configured")
+    sd_loop = ServiceDiscoveryLoop(
+        sd_type,
+        service_discovery,
+        ServiceMetadata(
+            display_name=f"traefik-{worker_authority}",
+            service_group="appproxy-worker-traefik",
+            version=__version__,
+            endpoint=ServiceEndpoint(
+                address=announce_addr.host,
+                port=traefik_config.api_port,
+                protocol="http",
+                prometheus_address=f"{announce_addr.host}:{traefik_config.api_port}",
+            ),
+            labels={
+                "service_type": "traefik",
+                "worker_authority": worker_authority,
+                "frontend_mode": traefik_config.frontend_mode.value,
+            },
+        ),
+    )
+
+    try:
+        yield
+    finally:
+        sd_loop.close()
+
+
 async def metrics(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     root_ctx: RootContext = request.app["_root.context"]
@@ -742,6 +802,7 @@ def build_root_app(
                 http_client_pool_ctx,
                 health_probe_ctx,
                 service_discovery_ctx,
+                traefik_metrics_sd_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
