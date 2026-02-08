@@ -6206,6 +6206,41 @@
         "title": "SearchUserFairSharesRequest",
         "type": "object"
       },
+      "DateRangeFilter": {
+        "description": "Filters records by a date range.\n\nBoth boundaries are inclusive. You can specify just 'after', just 'before',\nor both to define the range. Records matching the boundary values are included.\nThis filter is used for date fields like period_start in usage buckets.",
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Include only records with dates on or after this date. Should be in ISO 8601 date format (e.g., '2024-01-01'). If not specified, there is no lower bound on the date range.",
+            "title": "After"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Include only records with dates on or before this date. Should be in ISO 8601 date format (e.g., '2024-12-31'). If not specified, there is no upper bound on the date range.",
+            "title": "Before"
+          }
+        },
+        "title": "DateRangeFilter",
+        "type": "object"
+      },
       "DomainUsageBucketFilter": {
         "description": "Filter for domain usage bucket queries.",
         "properties": {
@@ -6232,6 +6267,18 @@
             ],
             "default": null,
             "description": "Filter by domain name"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by period start date"
           }
         },
         "title": "DomainUsageBucketFilter",
@@ -6351,6 +6398,18 @@
             ],
             "default": null,
             "description": "Filter by domain name"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by period start date"
           }
         },
         "title": "ProjectUsageBucketFilter",
@@ -6482,6 +6541,18 @@
             ],
             "default": null,
             "description": "Filter by domain name"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by period start date"
           }
         },
         "title": "UserUsageBucketFilter",
