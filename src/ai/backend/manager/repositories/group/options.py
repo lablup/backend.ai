@@ -11,8 +11,11 @@ import sqlalchemy as sa
 
 from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 __all__ = (
@@ -327,6 +330,111 @@ class GroupConditions:
 
         return inner
 
+    # ==================== User Nested Filters ====================
+
+    @staticmethod
+    def _exists_user(
+        *user_conditions: sa.sql.expression.ColumnElement[bool],
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        """EXISTS subquery: Group → User (via M:N AssocGroupUserRow)."""
+        subq = (
+            sa.select(sa.literal(1))
+            .select_from(
+                sa.join(
+                    AssocGroupUserRow.__table__,
+                    UserRow.__table__,
+                    AssocGroupUserRow.user_id == UserRow.uuid,
+                )
+            )
+            .where(AssocGroupUserRow.group_id == GroupRow.id)
+        )
+        for cond in user_conditions:
+            subq = subq.where(cond)
+        return sa.exists(subq)
+
+    @staticmethod
+    def by_user_username_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.username.ilike(f"%{spec.value}%")
+            else:
+                cond = UserRow.username.like(f"%{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return GroupConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_username_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = sa.func.lower(UserRow.username) == spec.value.lower()
+            else:
+                cond = UserRow.username == spec.value
+            if spec.negated:
+                cond = sa.not_(cond)
+            return GroupConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_email_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.email.ilike(f"%{spec.value}%")
+            else:
+                cond = UserRow.email.like(f"%{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return GroupConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_email_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = sa.func.lower(UserRow.email) == spec.value.lower()
+            else:
+                cond = UserRow.email == spec.value
+            if spec.negated:
+                cond = sa.not_(cond)
+            return GroupConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if is_active:
+                return GroupConditions._exists_user(UserRow.status == UserStatus.ACTIVE)
+            return GroupConditions._exists_user(UserRow.status != UserStatus.ACTIVE)
+
+        return inner
+
+    @staticmethod
+    def exists_user_combined(user_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple user conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .select_from(
+                    sa.join(
+                        AssocGroupUserRow.__table__,
+                        UserRow.__table__,
+                        AssocGroupUserRow.user_id == UserRow.uuid,
+                    )
+                )
+                .where(AssocGroupUserRow.group_id == GroupRow.id)
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class GroupOrders:
     """Query orders for sorting groups/projects."""
@@ -367,6 +475,12 @@ class GroupOrders:
             return GroupRow.type.asc()
         return GroupRow.type.desc()
 
+    @staticmethod
+    def is_active(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return GroupRow.is_active.asc()
+        return GroupRow.is_active.desc()
+
     # ==================== Domain Nested Orders ====================
 
     @staticmethod
@@ -394,4 +508,35 @@ class GroupOrders:
     @staticmethod
     def by_domain_created_at(ascending: bool = True) -> QueryOrder:
         subq = GroupOrders._scalar_domain(DomainRow.created_at)
+        return subq.asc() if ascending else subq.desc()
+
+    # ==================== User Nested Orders ====================
+
+    @staticmethod
+    def _scalar_user_min(
+        column: sa.ColumnElement[Any] | sa.orm.InstrumentedAttribute[Any],
+    ) -> sa.ScalarSelect[Any]:
+        """Scalar subquery with MIN for M:N relationship (Group → User)."""
+        return (
+            sa.select(sa.func.min(column))
+            .select_from(
+                sa.join(
+                    AssocGroupUserRow.__table__,
+                    UserRow.__table__,
+                    AssocGroupUserRow.user_id == UserRow.uuid,
+                )
+            )
+            .where(AssocGroupUserRow.group_id == GroupRow.id)
+            .correlate(GroupRow)
+            .scalar_subquery()
+        )
+
+    @staticmethod
+    def by_user_username(ascending: bool = True) -> QueryOrder:
+        subq = GroupOrders._scalar_user_min(UserRow.username)
+        return subq.asc() if ascending else subq.desc()
+
+    @staticmethod
+    def by_user_email(ascending: bool = True) -> QueryOrder:
+        subq = GroupOrders._scalar_user_min(UserRow.email)
         return subq.asc() if ascending else subq.desc()
