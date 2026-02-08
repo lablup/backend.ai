@@ -31,7 +31,7 @@ The Fair Share scheduler (BEP-1026) compounds these problems by applying Python 
 
 ## Current Design
 
-> Details: [current-design.md](BEP-1047-resource-slot-db-normalization/current-design.md)
+> Details: [current-design.md](BEP-1047/current-design.md)
 
 8 tables store resource slots as JSONB (`kernels`, `agents`, `*_usage_buckets`, `*_fair_shares`). Slot type definitions are scattered across etcd, `INTRINSIC_SLOTS`, `KNOWN_SLOT_METADATA`, and the `SlotTypes` enum.
 
@@ -43,7 +43,7 @@ Normalize JSONB resource slots into relational tables with `(entity_id, slot_nam
 
 ### Phase 1: Foundation Tables (Non-Destructive)
 
-> Details: [phase-1-foundation-tables.md](BEP-1047-resource-slot-db-normalization/phase-1-foundation-tables.md)
+> Details: [phase-1-foundation-tables.md](BEP-1047/phase-1-foundation-tables.md)
 
 Add new normalized tables alongside existing JSONB columns. No existing behavior changes.
 
@@ -57,13 +57,13 @@ Key design decisions: composite PKs (no UUID), `NUMERIC(24,6)` for all amounts, 
 
 ### Phase 2: Scheduler Integration
 
-> Details: [phase-2-scheduler-integration.md](BEP-1047-resource-slot-db-normalization/phase-2-scheduler-integration.md)
+> Details: [phase-2-scheduler-integration.md](BEP-1047/phase-2-scheduler-integration.md)
 
 Connect the new tables to the kernel lifecycle (create → running → terminate) with dual-write. Replace Python aggregation loops with SQL `GROUP BY` queries. Validate JSONB vs normalized data via background task, then cut over.
 
 ### Phase 3: Usage Bucket Optimization
 
-> Details: [phase-3-usage-bucket-optimization.md](BEP-1047-resource-slot-db-normalization/phase-3-usage-bucket-optimization.md)
+> Details: [phase-3-usage-bucket-optimization.md](BEP-1047/phase-3-usage-bucket-optimization.md)
 
 Two options under consideration:
 - **Option A**: JSONB SQL aggregation functions (no schema change, less efficient)
@@ -73,7 +73,7 @@ Option B stores amount and duration separately instead of pre-multiplied resourc
 
 ## Migration / Compatibility
 
-> Details: [migration-compatibility.md](BEP-1047-resource-slot-db-normalization/migration-compatibility.md)
+> Details: [migration-compatibility.md](BEP-1047/migration-compatibility.md)
 
 | Phase | Strategy | Risk |
 |-------|----------|------|

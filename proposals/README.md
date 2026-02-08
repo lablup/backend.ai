@@ -51,33 +51,15 @@ Version format: `YY.Sprint.Patch` (e.g., 26.1.0 = Year 2026, Sprint 1, Patch 0)
 
 ## Writing Guide
 
-### Section Guidelines
+For section structure, Decision Log lifecycle, AI context blocks,
+and document segmentation details, see the `/bep-guide` skill.
 
-| Section | Purpose | Tips |
-|---------|---------|------|
-| Related Issues | Link to JIRA/GitHub issues | Always include tracking issues |
-| Motivation | Explain why this change is needed | Focus on the problem, not the solution |
-| Current Design | Describe what exists today | Include code snippets if helpful |
-| Proposed Design | Describe the new design | Be specific, include interfaces |
-| Migration / Compatibility | Backward compatibility plan | List breaking changes explicitly |
-| Implementation Plan | Phased implementation steps | Break into manageable phases |
-| Open Questions | Unresolved items | Update as questions are resolved |
-| References | Related documents and links | Include related BEPs |
+### Quick Reference
 
-### Best Practices
-
-1. **Be Specific**: Include code examples, interface definitions, and concrete details
-2. **Consider Compatibility**: Always document breaking changes and migration paths
-3. **Phase Implementation**: Break large changes into smaller, reviewable phases
-4. **Track Questions**: Keep Open Questions updated as discussions progress
-5. **Link Issues**: Always link related JIRA and GitHub issues
-
-### Template Examples
-
-The template (`BEP-0000-template.md`) includes examples for each section. When creating a new BEP:
-1. Copy the template
-2. Replace example content with your actual content
-3. Remove the "Example:" blocks after writing your content
+1. Copy `proposals/BEP-0000-template.md`
+2. Fill metadata (Author, Status, Created, Created-Version)
+3. Write sections in order: Motivation → Current → Proposed → Migration → Plan
+4. Submit PR on branch `bep/XXXX-short-title`
 
 ## BEP Number Registry
 
@@ -99,6 +81,7 @@ BEP numbers start from 1000.
 | [1008](BEP-1008-RBAC.md) | RBAC | HyeokJin Kim | Draft |
 | [1009](BEP-1009-model-serving-registry.md) | Model Serving Registry | HyeokJin Kim | Draft |
 | [1010](BEP-1010-new-gql.md) | New GQL | - | Accepted |
+| 1011 | _(skipped)_ | | |
 | [1012](BEP-1012-RBAC.md) | RBAC (detailed) | Sanghun Lee | Draft |
 | [1013](BEP-1013-GraphQL-schema-for-new-model-service.md) | GraphQL Schema for New Model Service | Bokeum Kim | Accepted |
 | [1014](BEP-1014-preemption-of-low-priority-sessions.md) | Preemption of Low Priority Sessions | Joongi Kim | Draft |
@@ -120,7 +103,7 @@ BEP numbers start from 1000.
 | [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Draft |
 | [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
 | [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
-| [1033](BEP-1033/) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
+| [1033](BEP-1033-sokovan-handler-test-scenarios.md) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
 | [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | Gyubong Lee | Draft |
 | [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Rejected |
@@ -139,18 +122,60 @@ BEP numbers start from 1000.
 
 ## File Structure
 
-- **Main document**: Always place at root as `BEP-XXXX-title.md`
-- **Supporting files** (images, schemas, references): Place in `BEP-XXXX-title/` directory
+### Single-File BEP (< 500 lines)
+
+For short proposals, use a single markdown file:
 
 ```
 proposals/
-├── BEP-1002-agent-architecture.md      # Main document
+└── BEP-1018-simple-proposal.md         # All content in one file
+```
+
+### Segmented BEP (>= 500 lines)
+
+When a BEP exceeds ~500 lines or covers 3+ distinct components, split into a **main document + sub-documents**. Each sub-document should represent one independent work unit.
+
+**Segmentation criteria** (any one triggers):
+- Total document exceeds ~500 lines
+- Proposed Design has 3+ distinct components
+- Implementation Plan has 3+ independent phases
+- Document covers multiple subsystems
+
+```
+proposals/
+├── BEP-XXXX-title.md              # Main: overview + motivation + index (< 200 lines)
+└── BEP-XXXX/                     # Sub-documents and supporting files
+    ├── component-a.md             # Component A detailed design (one work unit)
+    ├── component-b.md             # Component B detailed design (one work unit)
+    ├── migration.md               # Migration plan (if complex)
+    └── diagrams/                  # Images, schemas
+```
+
+**Directory naming rule**: Use BEP number only (e.g., `BEP-1002/`), not the full title.
+
+**Registry link rule**: Always link to the main `.md` file, not the directory.
+
+**Main document role**: Concise entry point serving as overview — metadata, motivation, document index table, Decision Log, and Open Questions. Keep under ~200 lines.
+
+**Sub-document rules**:
+- Each sub-document = one work unit (implementable independently)
+- Keep each under ~300 lines
+- Self-contained: include enough context to understand without reading others
+- Use descriptive file names: `data-model.md`, `config-schema.md`, `event-registration.md`
+- Cross-reference other sub-documents by relative link
+- Open Questions go in the main document only (single source of truth)
+
+### Supporting Files Only
+
+For BEPs that are single-file but need images or schemas:
+
+```
+proposals/
+├── BEP-1002-agent-architecture.md      # Main document (single file)
 ├── BEP-1002/                           # Supporting files only
 │   ├── agent-architecture.png
 │   └── kernel-flow.png
-├── BEP-1012-RBAC.md                    # Main document
-├── BEP-1012-RBAC/                      # Supporting files only
-│   ├── api/
-│   └── refs/
-└── BEP-1018-simple-proposal.md         # No supporting files needed
+└── BEP-1012-RBAC.md                    # Main document (single file)
 ```
+
+For detailed writing workflow, see `/bep-guide` skill.

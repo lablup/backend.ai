@@ -12,6 +12,7 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 
 **Skills (Invoke with `/skill-name`):**
 
+Design: `/bep-guide`
 Development: `/repository-guide`, `/service-guide`, `/api-guide`, `/tdd-guide`
 Utilities: `/cli-executor`, `/db-status`, `/db-migrate`
 
@@ -52,7 +53,7 @@ pants test --changed-since=HEAD~1 --changed-dependents=transitive
 
 **README-First:** Always read component README (`src/ai/backend/{component}/README.md`) before making changes.
 
-**BEP-First:** For significant features, check `proposals/README.md` for existing BEP or create new one.
+**BEP-First:** For significant features, use `/bep-guide` skill. Check `proposals/README.md` for existing BEP or create new one.
 
 **TDD:** Write tests first. Use `/tdd-guide` skill for workflow. See `tests/CLAUDE.md` for test strategies.
 

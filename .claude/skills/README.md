@@ -2,6 +2,12 @@
 
 This directory contains Claude Code skills for Backend.AI development tasks.
 
+## Design & Planning
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| `/bep-guide` | BEP creation workflow, document segmentation, overview+index pattern | Writing new BEPs, structuring long proposals |
+
 ## Development Guides
 
 | Skill | Purpose | Use When |
@@ -28,7 +34,11 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 ## Skill Integration
 
 **Feature Development Flow:**
-repository-guide → service-guide → api-guide → cli-sdk-guide
+```
+bep-guide → ┬→ repository-guide ─┐
+            ├→ service-guide ────┼→ integrate → cli-sdk-guide
+            └→ api-guide ────────┘
+```
 
 **Testing Flow:**
 tdd-guide → repository/service/api layer tests
