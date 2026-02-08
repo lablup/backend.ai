@@ -5,6 +5,8 @@ from .enums import (
     UserStatusEnum,
 )
 from .filters import (
+    UserDomainNestedFilter,
+    UserProjectNestedFilter,
     UserRoleEnumFilter,
     UserStatusEnumFilter,
     UserV2Filter,
@@ -63,6 +65,8 @@ __all__ = [
     "UserV2Edge",
     "UserV2Connection",
     # Filters
+    "UserDomainNestedFilter",
+    "UserProjectNestedFilter",
     "UserV2Filter",
     "UserV2OrderField",
     "UserV2OrderBy",
