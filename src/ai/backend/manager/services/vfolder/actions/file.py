@@ -9,6 +9,7 @@ from typing import (
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.types import FileInfo
 
 from .base import VFolderAction
@@ -30,8 +31,8 @@ class CreateUploadSessionAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upload"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -62,8 +63,8 @@ class CreateDownloadSessionAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "download"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
@@ -91,8 +92,8 @@ class ListFilesAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -121,8 +122,8 @@ class RenameFileAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "rename"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -148,8 +149,8 @@ class DeleteFilesAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -175,8 +176,8 @@ class DeleteFilesAsyncAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_files_async"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -204,8 +205,8 @@ class MkdirAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "mkdir"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

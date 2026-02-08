@@ -3,6 +3,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.role import RoleDetailData
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
@@ -17,8 +18,8 @@ class GetRoleDetailAction(RoleAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_detail"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

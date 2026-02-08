@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
 )
@@ -31,8 +32,8 @@ class CreateRoleAction(RoleAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

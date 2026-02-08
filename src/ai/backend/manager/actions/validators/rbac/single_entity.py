@@ -6,7 +6,6 @@ from ai.backend.manager.actions.action.single_entity import BaseSingleEntityActi
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.role import SingleEntityPermissionCheckInput
-from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -22,7 +21,7 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
 
     @override
     async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
-        entity_type = EntityType(action.entity_type())
+        entity_type = action.entity_type()
         entity_id = action.target_entity_id()
         user = current_user()
         if user is None:
@@ -31,7 +30,7 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
         await self._repository.check_permission_of_entity(
             SingleEntityPermissionCheckInput(
                 user_id=user.user_id,
-                operation=action.permission_operation_type(),
+                operation=action.operation_type().to_permission_operation(),
                 target_object_id=ObjectId(
                     entity_type=entity_type,
                     entity_id=entity_id,

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction
 
 
@@ -10,5 +11,5 @@ class ScalingGroupAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "scaling_group"
+    def entity_type(cls) -> EntityType:
+        return EntityType.RESOURCE_GROUP

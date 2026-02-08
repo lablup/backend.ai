@@ -11,6 +11,7 @@ from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
 
@@ -29,8 +30,8 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "check_multi"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

@@ -6,6 +6,7 @@ from pydantic import AnyUrl
 
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
@@ -40,8 +41,8 @@ class DryRunModelServiceAction(ModelServiceAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "start"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

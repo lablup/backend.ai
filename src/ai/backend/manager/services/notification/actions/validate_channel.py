@@ -5,6 +5,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import NotificationAction
 
@@ -18,8 +19,8 @@ class ValidateChannelAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "validate_channel"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> str | None:

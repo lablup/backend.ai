@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
@@ -16,7 +17,7 @@ from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityActionResult,
 )
 from ai.backend.manager.actions.action.types import FieldData
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
@@ -37,15 +38,15 @@ from ai.backend.manager.services.vfolder.types import (
 class VFolderAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
 
 
 class VFolderScopeAction(BaseScopeAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
 
 
 class VFolderScopeActionResult(BaseScopeActionResult):
@@ -55,8 +56,8 @@ class VFolderScopeActionResult(BaseScopeActionResult):
 class VFolderSingleEntityAction(BaseSingleEntityAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
 
     @override
     def field_data(self) -> FieldData | None:
@@ -81,7 +82,7 @@ class CreateVFolderAction(VFolderScopeAction):
     cloneable: bool
 
     _scope_id: str
-    _scope_type: str
+    _scope_type: ScopeType
 
     # User identifier
     # TODO: Distinguish between creator and owner
@@ -95,16 +96,11 @@ class CreateVFolderAction(VFolderScopeAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.CREATE
-
-    @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
@@ -133,8 +129,8 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
         return str(self.id)
 
     @override
-    def scope_type(self) -> str:
-        return self.quota_scope_id.scope_type.value
+    def scope_type(self) -> ScopeType:
+        return ScopeType(self.quota_scope_id.scope_type.value)
 
     @override
     def scope_id(self) -> str:
@@ -153,13 +149,8 @@ class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.UPDATE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def target_entity_id(self) -> str:
@@ -190,13 +181,8 @@ class GetVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def target_entity_id(self) -> str:
@@ -222,7 +208,7 @@ class GetVFolderActionResult(VFolderSingleEntityActionResult):
 @dataclass
 class ListVFolderAction(VFolderScopeAction):
     user_uuid: uuid.UUID
-    _scope_type: str
+    _scope_type: ScopeType
     _scope_id: str
 
     @override
@@ -231,16 +217,11 @@ class ListVFolderAction(VFolderScopeAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
-
-    @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
@@ -252,7 +233,7 @@ class ListVFolderAction(VFolderScopeAction):
 class ListVFolderActionResult(VFolderScopeActionResult):
     user_uuid: uuid.UUID
     vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
-    _scope_type: str
+    _scope_type: ScopeType
     _scope_id: str
 
     @override
@@ -260,7 +241,7 @@ class ListVFolderActionResult(VFolderScopeActionResult):
         return str(self.user_uuid)
 
     @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
@@ -281,13 +262,8 @@ class MoveToTrashVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "move_to_trash"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.SOFT_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
     def target_entity_id(self) -> str:
@@ -319,13 +295,8 @@ class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "restore"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.SOFT_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def target_entity_id(self) -> str:
@@ -357,13 +328,8 @@ class DeleteForeverVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_forever"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
@@ -393,13 +359,8 @@ class PurgeVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
@@ -435,13 +396,8 @@ class ForceDeleteVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "force_delete"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
@@ -478,13 +434,8 @@ class CloneVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "clone"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     def target_entity_id(self) -> str:
@@ -533,13 +484,8 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_task_logs"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def target_entity_id(self) -> str:

@@ -3,6 +3,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.user.actions.base import UserAction
 
@@ -19,8 +20,8 @@ class GetUserAction(UserAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

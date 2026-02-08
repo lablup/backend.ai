@@ -70,6 +70,7 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
+    # === RBAC scope/resource types (original 12) ===
     USER = "user"
     PROJECT = "project"
     DOMAIN = "domain"
@@ -84,6 +85,131 @@ class EntityType(enum.StrEnum):
     NOTIFICATION_CHANNEL = "notification_channel"
     NOTIFICATION_RULE = "notification_rule"
     MODEL_DEPLOYMENT = "model_deployment"
+
+    # === Standalone entity types ===
+    AGENT = "agent"
+    AUTH = "auth"
+    AUDIT_LOG = "audit_log"
+    CONTAINER_METRIC = "container_metric"
+    CONTAINER_METRIC_METADATA = "container_metric_metadata"
+    CONTAINER_REGISTRY = "container_registry"
+    DEPLOYMENT = "deployment"
+    ERROR_LOG = "error_log"
+    EXPORT = "export"
+    GROUP = "group"
+    MODEL_SERVICE = "model_service"
+    NOTIFICATION = "notification"
+    OBJECT_PERMISSION = "object_permission"
+    OBJECT_STORAGE = "object_storage"
+    PERMISSION = "permission"
+    RESOURCE_GROUP = "resource_group"
+    RESOURCE_PRESET = "resource_preset"
+    ROLE = "role"
+    STORAGE_NAMESPACE = "storage_namespace"
+    VFS_STORAGE = "vfs_storage"
+
+    # === Parent:child sub-entity types (`:` separator) ===
+    # Domain/Project/User sub-resources
+    DOMAIN_FAIR_SHARE = "domain:fair_share"
+    PROJECT_FAIR_SHARE = "project:fair_share"
+    USER_FAIR_SHARE = "user:fair_share"
+    DOMAIN_USAGE_BUCKET = "domain:usage_bucket"
+    PROJECT_USAGE_BUCKET = "project:usage_bucket"
+    USER_USAGE_BUCKET = "user:usage_bucket"
+    KEYPAIR_RESOURCE_POLICY = "keypair:resource_policy"
+    PROJECT_RESOURCE_POLICY = "project:resource_policy"
+    USER_RESOURCE_POLICY = "user:resource_policy"
+    # App config sub
+    APP_CONFIG_DOMAIN = "app_config:domain"
+    APP_CONFIG_USER = "app_config:user"
+    # Session sub
+    SESSION_KERNEL = "session:kernel"
+    SESSION_FILE = "session:file"
+    SESSION_DIRECTORY = "session:directory"
+    SESSION_APP_SERVICE = "session:app_service"
+    SESSION_COMMIT = "session:commit"
+    SESSION_STATUS_HISTORY = "session:status_history"
+    SESSION_ABUSING_REPORT = "session:abusing_report"
+    SESSION_CONTAINER_LOG = "session:container_log"
+    SESSION_DEPENDENCY_GRAPH = "session:dependency_graph"
+    SESSION_DIRECT_ACCESS = "session:direct_access"
+    SESSION_HISTORY = "session:history"
+    SESSION_SCOPED_HISTORY = "session:scoped_history"
+    # Deployment sub
+    DEPLOYMENT_REPLICA = "deployment:replica"
+    DEPLOYMENT_ROUTE = "deployment:route"
+    DEPLOYMENT_ACCESS_TOKEN = "deployment:access_token"
+    DEPLOYMENT_AUTO_SCALING_RULE = "deployment:auto_scaling_rule"
+    DEPLOYMENT_MODEL_REVISION = "deployment:model_revision"
+    DEPLOYMENT_REVISION = "deployment:revision"
+    DEPLOYMENT_POLICY = "deployment:policy"
+    DEPLOYMENT_HISTORY = "deployment:history"
+    DEPLOYMENT_SCOPED_HISTORY = "deployment:scoped_history"
+    DEPLOYMENT_ERROR = "deployment:error"
+    DEPLOYMENT_TOKEN = "deployment:token"
+    # Image sub
+    IMAGE_ALIAS = "image:alias"
+    IMAGE_TAG = "image:tag"
+    IMAGE_PRELOAD = "image:preload"
+    IMAGE_SCAN = "image:scan"
+    IMAGE_AGENT = "image:agent"
+    IMAGE_RESOURCE_LIMIT = "image:resource_limit"
+    # Artifact sub
+    ARTIFACT_REVISION = "artifact:revision"
+    ARTIFACT_SCAN = "artifact:scan"
+    ARTIFACT_MODEL = "artifact:model"
+    ARTIFACT_IMPORT = "artifact:import"
+    ARTIFACT_DOWNLOAD = "artifact:download"
+    ARTIFACT_README = "artifact:readme"
+    ARTIFACT_VERIFICATION = "artifact:verification"
+    ARTIFACT_REVISION_STORAGE_LINK = "artifact:revision:storage_link"
+    # VFolder sub
+    VFOLDER_FILE = "vfolder:file"
+    VFOLDER_DIRECTORY = "vfolder:directory"
+    VFOLDER_INVITATION = "vfolder:invitation"
+    # Resource group sub
+    RESOURCE_GROUP_DOMAIN = "resource_group:domain"
+    RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
+    RESOURCE_GROUP_USER_GROUP = "resource_group:user_group"
+    RESOURCE_GROUP_FAIR_SHARE = "resource_group:fair_share"
+    RESOURCE_GROUP_RESOURCE = "resource_group:resource"
+    # Role sub
+    ROLE_ASSIGNMENT = "role:assignment"
+    ROLE_USER = "role:user"
+    ROLE_ENTITY = "role:entity"
+    ROLE_SCOPE = "role:scope"
+    ROLE_PERMISSION = "role:permission"
+    ROLE_ENTITY_TYPE = "role:entity_type"
+    ROLE_SCOPE_TYPE = "role:scope_type"
+    # Container registry sub
+    CONTAINER_REGISTRY_IMAGE = "container_registry:image"
+    # Route sub
+    ROUTE_HISTORY = "route:history"
+    ROUTE_SCOPED_HISTORY = "route:scoped_history"
+    # Auth sub
+    AUTH_TOKEN = "auth:token"
+    AUTH_ACCOUNT = "auth:account"
+    AUTH_SESSION = "auth:session"
+    AUTH_PASSWORD = "auth:password"
+    AUTH_PROFILE = "auth:profile"
+    AUTH_SSH_KEYPAIR = "auth:ssh_keypair"
+    # Notification sub
+    NOTIFICATION_EVENT = "notification:event"
+    NOTIFICATION_CHANNEL_VALIDATION = "notification:channel_validation"
+    NOTIFICATION_RULE_VALIDATION = "notification:rule_validation"
+    # Group sub
+    GROUP_USAGE = "group:usage"
+    # User sub
+    USER_STATS = "user:stats"
+    # Agent sub
+    AGENT_WATCHER = "agent:watcher"
+    AGENT_REGISTRY = "agent:registry"
+    # Resource preset sub
+    RESOURCE_PRESET_CHECK = "resource_preset:check"
+    # Permission sub
+    PERMISSION_CHECK = "permission:check"
+    # Export sub
+    EXPORT_REPORT = "export:report"
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:
@@ -158,6 +284,7 @@ class FieldType(enum.StrEnum):
 
 
 class ScopeType(enum.StrEnum):
+    # === Organization/permission scopes (original) ===
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
@@ -167,6 +294,15 @@ class ScopeType(enum.StrEnum):
     CONTAINER_REGISTRY = "container_registry"
     ARTIFACT_REGISTRY = "artifact_registry"
     STORAGE_HOST = "storage_host"
+
+    # === Entity-level scopes ===
+    SESSION = "session"
+    DEPLOYMENT = "deployment"
+    VFOLDER = "vfolder"
+    IMAGE = "image"
+    ARTIFACT = "artifact"
+    ARTIFACT_REVISION = "artifact_revision"
+    ROLE = "role"
 
 
 GLOBAL_SCOPE_ID = "global"

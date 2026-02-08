@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import (
     ImageIdentifier,
     ImageStatus,
@@ -22,8 +23,8 @@ class GetImageByIdAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_by_id"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -46,8 +47,8 @@ class GetImageByIdentifierAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_by_identifier"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -74,8 +75,8 @@ class GetImagesByCanonicalsAction(ImageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_by_canonicals"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

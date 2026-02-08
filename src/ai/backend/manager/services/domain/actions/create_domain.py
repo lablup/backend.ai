@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -19,8 +20,8 @@ class CreateDomainAction(DomainAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

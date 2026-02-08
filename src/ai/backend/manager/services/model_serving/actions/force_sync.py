@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
 
 
@@ -14,8 +15,8 @@ class ForceSyncAction(ModelServiceAction):
         return None
 
     @classmethod
-    def operation_type(cls) -> str:
-        return "sync"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

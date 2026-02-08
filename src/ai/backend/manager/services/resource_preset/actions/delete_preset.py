@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
@@ -18,8 +19,8 @@ class DeleteResourcePresetAction(ResourcePresetAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass

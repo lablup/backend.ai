@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
 )
@@ -20,8 +21,8 @@ class SearchAutoScalingRulesAction(ModelServiceAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search_auto_scaling_rules"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:

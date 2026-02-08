@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
 from ai.backend.manager.repositories.base.purger import BatchPurger
 
@@ -18,8 +19,8 @@ class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "disassociate_with_user_groups"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
     def entity_id(self) -> str | None:

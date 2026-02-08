@@ -3,6 +3,7 @@ from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
@@ -22,11 +23,11 @@ class DestroySessionAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
+    def operation_type(cls) -> ActionOperationType:
         # TODO: Handle this
         # if self.recursive:
         #     return "destroy_multi"
-        return "destroy"
+        return ActionOperationType.DELETE
 
 
 @dataclass

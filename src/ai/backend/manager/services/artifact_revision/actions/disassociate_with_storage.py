@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
@@ -18,8 +19,8 @@ class DisassociateWithStorageAction(ArtifactRevisionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "disassociate_with_storage"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass

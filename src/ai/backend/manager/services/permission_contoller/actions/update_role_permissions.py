@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.role import RoleDetailData, RolePermissionsUpdateInput
 
 
@@ -17,13 +19,13 @@ class UpdateRolePermissionsAction(BaseAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "role"
+    def entity_type(cls) -> EntityType:
+        return EntityType.ROLE
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_permissions"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
 
@@ -20,8 +22,8 @@ class GetUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "app_config_user"
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_USER
 
     @override
     def entity_id(self) -> str | None:
@@ -29,8 +31,8 @@ class GetUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_user_config"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
@@ -53,8 +55,8 @@ class UpsertUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "app_config_user"
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_USER
 
     @override
     def entity_id(self) -> str | None:
@@ -62,8 +64,8 @@ class UpsertUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upsert_user_config"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -85,8 +87,8 @@ class DeleteUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "app_config_user"
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_USER
 
     @override
     def entity_id(self) -> str | None:
@@ -94,8 +96,8 @@ class DeleteUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_user_config"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass

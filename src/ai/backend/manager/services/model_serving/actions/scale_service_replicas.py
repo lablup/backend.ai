@@ -6,6 +6,7 @@ from pydantic.dataclasses import dataclass
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
 )
@@ -34,8 +35,8 @@ class ScaleServiceReplicasAction(ModelServiceAction):
         return None
 
     @classmethod
-    def operation_type(cls) -> str:
-        return "scale"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

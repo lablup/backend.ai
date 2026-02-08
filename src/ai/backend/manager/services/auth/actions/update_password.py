@@ -5,6 +5,7 @@ from typing import override
 from aiohttp import web
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
 
@@ -24,8 +25,8 @@ class UpdatePasswordAction(AuthAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_password"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @property
     def hook_params(self) -> dict[str, str]:

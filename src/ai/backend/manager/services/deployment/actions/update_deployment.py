@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import Updater
@@ -20,8 +21,8 @@ class UpdateDeploymentAction(DeploymentBaseAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

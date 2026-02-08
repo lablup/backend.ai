@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -21,8 +22,8 @@ class ModifyProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "modify"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

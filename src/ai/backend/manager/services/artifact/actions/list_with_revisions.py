@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactFilterOptions,
@@ -27,8 +28,8 @@ class ListArtifactsWithRevisionsAction(ArtifactAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_with_revisions"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

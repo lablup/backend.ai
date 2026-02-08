@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
@@ -18,8 +19,8 @@ class ImportArtifactBatchAction(ArtifactRevisionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "import_batch"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
