@@ -6,7 +6,7 @@
 
 - **Schema**: `CREATE TABLE` only — no existing tables are modified
 - **Data**: Seed `resource_slot_types` from `INTRINSIC_SLOTS` + `KNOWN_SLOT_METADATA`
-- **Backfill**: Populate `agent_resource_capacity` from `agents.available_slots` / `agents.occupied_slots`
+- **Backfill**: Populate `agent_resources` from `agents.available_slots` / `agents.occupied_slots`
 - **Backfill**: Populate `resource_allocations` from `kernels.requested_slots` / `kernels.occupied_slots`
 - **Risk**: Zero — existing code paths are unaffected
 

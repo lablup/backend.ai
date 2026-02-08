@@ -50,7 +50,7 @@ Add new normalized tables alongside existing JSONB columns. No existing behavior
 | Table | Purpose | PK |
 |-------|---------|-----|
 | `resource_slot_types` | Slot type registry (replaces etcd + hardcoded defs) | `slot_name` |
-| `agent_resource_capacity` | Agent resource inventory | `(agent_id, slot_name)` |
+| `agent_resources` | Agent resource inventory | `(agent_id, slot_name)` |
 | `resource_allocations` | Per-kernel resource allocations | `(kernel_id, slot_name)` |
 
 Key design decisions: composite PKs (no UUID), `NUMERIC(24,6)` for all amounts, `used` nullable (NULL vs 0 semantics), `ON DELETE CASCADE`.
@@ -89,7 +89,7 @@ etcd slot type definitions migrate incrementally: DB takes precedence (Phase 1) 
 
 1. Alembic migration: create 3 new tables
 2. Seed `resource_slot_types` from `INTRINSIC_SLOTS` + `KNOWN_SLOT_METADATA`
-3. Backfill `agent_resource_capacity` and `resource_allocations` from existing JSONB
+3. Backfill `agent_resources` and `resource_allocations` from existing JSONB
 4. Row models and repository layer
 5. Tests: schema validation, backfill correctness, SQL aggregation
 
