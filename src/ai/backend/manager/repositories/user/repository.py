@@ -19,7 +19,12 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserCreateResultData, UserData, UserSearchResult
+from ai.backend.manager.data.user.types import (
+    BulkUserCreateResultData,
+    UserCreateResultData,
+    UserData,
+    UserSearchResult,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
@@ -29,6 +34,7 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
+from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -81,6 +87,16 @@ class UserRepository:
         Create a new user with default keypair and group associations.
         """
         return await self._db_source.create_user_validated(creator, group_ids)
+
+    @user_repository_resilience.apply()
+    async def bulk_create_users_validated(
+        self,
+        items: list[UserCreateSpec],
+    ) -> BulkUserCreateResultData:
+        """
+        Create multiple users with partial failure support.
+        """
+        return await self._db_source.bulk_create_users_validated(items)
 
     @user_repository_resilience.apply()
     async def update_user_validated(

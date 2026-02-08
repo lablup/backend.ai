@@ -11514,7 +11514,7 @@ enum UserRoleV2
 }
 
 """
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserRoleV2EnumFilter
   @join__type(graph: STRAWBERRY)
@@ -11545,7 +11545,7 @@ enum UserStatusV2
 }
 
 """
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserStatusV2EnumFilter
   @join__type(graph: STRAWBERRY)

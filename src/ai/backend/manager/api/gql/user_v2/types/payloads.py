@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import strawberry
 
 from .node import UserV2GQL
-
-if TYPE_CHECKING:
-    pass
-
 
 # Create User Payloads
 
@@ -20,7 +15,7 @@ if TYPE_CHECKING:
     name="CreateUserV2Payload",
     description="Added in 26.2.0. Payload for user creation mutation.",
 )
-class CreateUserV2Payload:
+class CreateUserV2PayloadGQL:
     """Payload for single user creation."""
 
     user: UserV2GQL = strawberry.field(description="The newly created user.")
@@ -34,7 +29,7 @@ class CreateUserV2Payload:
     name="BulkCreateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
-class BulkCreateUsersPayload:
+class BulkCreateUsersV2PayloadGQL:
     """Payload for bulk user creation."""
 
     created_count: int = strawberry.field(description="Number of users successfully created.")
@@ -48,7 +43,7 @@ class BulkCreateUsersPayload:
     name="UpdateUserV2Payload",
     description="Added in 26.2.0. Payload for user update mutation.",
 )
-class UpdateUserV2Payload:
+class UpdateUserV2PayloadGQL:
     """Payload for user update."""
 
     user: UserV2GQL = strawberry.field(description="The updated user.")
@@ -61,7 +56,7 @@ class UpdateUserV2Payload:
     name="DeleteUserV2Payload",
     description="Added in 26.2.0. Payload for single user soft-delete mutation.",
 )
-class DeleteUserPayload:
+class DeleteUserV2PayloadGQL:
     """Payload for single user soft-delete."""
 
     success: bool = strawberry.field(description="Whether the deletion was successful.")
@@ -71,7 +66,7 @@ class DeleteUserPayload:
     name="DeleteUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
 )
-class DeleteUsersPayload:
+class DeleteUsersV2PayloadGQL:
     """Payload for bulk user soft-delete."""
 
     deleted_count: int = strawberry.field(description="Number of users successfully soft-deleted.")
@@ -84,7 +79,7 @@ class DeleteUsersPayload:
     name="PurgeUserV2Payload",
     description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
 )
-class PurgeUserPayload:
+class PurgeUserV2PayloadGQL:
     """Payload for single user permanent deletion."""
 
     success: bool = strawberry.field(description="Whether the purge was successful.")
@@ -94,7 +89,7 @@ class PurgeUserPayload:
     name="PurgeUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
 )
-class PurgeUsersPayload:
+class PurgeUsersV2PayloadGQL:
     """Payload for bulk user permanent deletion."""
 
     purged_count: int = strawberry.field(description="Number of users successfully purged.")

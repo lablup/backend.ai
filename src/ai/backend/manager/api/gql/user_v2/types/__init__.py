@@ -1,24 +1,24 @@
 """User V2 GraphQL types package."""
 
 from .enums import (
-    UserRoleEnum,
-    UserStatusEnum,
+    UserRoleV2EnumGQL,
+    UserStatusV2EnumGQL,
 )
 from .filters import (
-    UserRoleEnumFilter,
-    UserStatusEnumFilter,
-    UserV2Filter,
-    UserV2OrderBy,
-    UserV2OrderField,
-    UserV2Scope,
+    UserRoleV2EnumFilterGQL,
+    UserStatusV2EnumFilterGQL,
+    UserV2FilterGQL,
+    UserV2OrderByGQL,
+    UserV2OrderFieldGQL,
+    UserV2ScopeGQL,
 )
 from .inputs import (
-    BulkCreateUserV2Input,
-    CreateUserV2Input,
-    DeleteUsersV2Input,
-    PurgeUsersV2Input,
-    PurgeUserV2Input,
-    UpdateUserV2Input,
+    BulkCreateUserV2InputGQL,
+    CreateUserV2InputGQL,
+    DeleteUsersV2InputGQL,
+    PurgeUsersV2InputGQL,
+    PurgeUserV2InputGQL,
+    UpdateUserV2InputGQL,
 )
 from .nested import (
     EntityTimestampsGQL,
@@ -34,23 +34,23 @@ from .node import (
     UserV2GQL,
 )
 from .payloads import (
-    BulkCreateUsersPayload,
-    CreateUserV2Payload,
-    DeleteUserPayload,
-    DeleteUsersPayload,
-    PurgeUserPayload,
-    PurgeUsersPayload,
-    UpdateUserV2Payload,
+    BulkCreateUsersV2PayloadGQL,
+    CreateUserV2PayloadGQL,
+    DeleteUsersV2PayloadGQL,
+    DeleteUserV2PayloadGQL,
+    PurgeUsersV2PayloadGQL,
+    PurgeUserV2PayloadGQL,
+    UpdateUserV2PayloadGQL,
 )
 from .scopes import (
-    DomainUserScope,
-    ProjectUserScope,
+    DomainUserScopeGQL,
+    ProjectUserScopeGQL,
 )
 
 __all__ = [
     # Enums
-    "UserStatusEnum",
-    "UserRoleEnum",
+    "UserStatusV2EnumGQL",
+    "UserRoleV2EnumGQL",
     # Nested Types
     "UserBasicInfoGQL",
     "UserStatusInfoGQL",
@@ -63,28 +63,28 @@ __all__ = [
     "UserV2Edge",
     "UserV2Connection",
     # Filters
-    "UserV2Filter",
-    "UserV2OrderField",
-    "UserV2OrderBy",
-    "UserV2Scope",
-    "UserStatusEnumFilter",
-    "UserRoleEnumFilter",
+    "UserV2FilterGQL",
+    "UserV2OrderFieldGQL",
+    "UserV2OrderByGQL",
+    "UserV2ScopeGQL",
+    "UserStatusV2EnumFilterGQL",
+    "UserRoleV2EnumFilterGQL",
     # Scopes
-    "DomainUserScope",
-    "ProjectUserScope",
+    "DomainUserScopeGQL",
+    "ProjectUserScopeGQL",
     # Inputs
-    "CreateUserV2Input",
-    "BulkCreateUserV2Input",
-    "UpdateUserV2Input",
-    "DeleteUsersV2Input",
-    "PurgeUserV2Input",
-    "PurgeUsersV2Input",
+    "CreateUserV2InputGQL",
+    "BulkCreateUserV2InputGQL",
+    "UpdateUserV2InputGQL",
+    "DeleteUsersV2InputGQL",
+    "PurgeUserV2InputGQL",
+    "PurgeUsersV2InputGQL",
     # Payloads
-    "CreateUserV2Payload",
-    "BulkCreateUsersPayload",
-    "UpdateUserV2Payload",
-    "DeleteUserPayload",
-    "DeleteUsersPayload",
-    "PurgeUserPayload",
-    "PurgeUsersPayload",
+    "CreateUserV2PayloadGQL",
+    "BulkCreateUsersV2PayloadGQL",
+    "UpdateUserV2PayloadGQL",
+    "DeleteUserV2PayloadGQL",
+    "DeleteUsersV2PayloadGQL",
+    "PurgeUserV2PayloadGQL",
+    "PurgeUsersV2PayloadGQL",
 ]

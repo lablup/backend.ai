@@ -15,12 +15,12 @@ from ai.backend.manager.api.gql.user_v2.fetcher import (
     fetch_project_users,
 )
 from ai.backend.manager.api.gql.user_v2.types import (
-    DomainUserScope,
-    ProjectUserScope,
+    DomainUserScopeGQL,
+    ProjectUserScopeGQL,
     UserV2Connection,
-    UserV2Filter,
+    UserV2FilterGQL,
     UserV2GQL,
-    UserV2OrderBy,
+    UserV2OrderByGQL,
 )
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
@@ -65,8 +65,8 @@ async def admin_user_v2(
 )  # type: ignore[misc]
 async def admin_users_v2(
     info: Info[StrawberryGQLContext],
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -111,9 +111,9 @@ async def admin_users_v2(
 )  # type: ignore[misc]
 async def domain_users_v2(
     info: Info[StrawberryGQLContext],
-    scope: DomainUserScope,
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    scope: DomainUserScopeGQL,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -162,9 +162,9 @@ async def domain_users_v2(
 )  # type: ignore[misc]
 async def project_users_v2(
     info: Info[StrawberryGQLContext],
-    scope: ProjectUserScope,
-    filter: UserV2Filter | None = None,
-    order_by: list[UserV2OrderBy] | None = None,
+    scope: ProjectUserScopeGQL,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
