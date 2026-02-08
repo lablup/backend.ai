@@ -134,6 +134,7 @@ BEP numbers start from 1000.
 | [1044](BEP-1044-multi-agent-device-split.md) | Multi-Agent Device Split | Hyunhoi Koo | Draft |
 | [1045](BEP-1045-prometheus-client-extraction-and-querier-interface-abstraction.md) | Prometheus Client Extraction and Querier Interface Abstraction | BoKeum Kim | Draft |
 | [1046](BEP-1046-unified-service-discovery.md) | Unified Service Discovery with DB-backed Service Catalog | HyeokJin Kim | Draft |
+| [1047](BEP-1047-resource-slot-db-normalization.md) | Resource Slot DB Normalization | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
