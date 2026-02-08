@@ -7,6 +7,7 @@ from datetime import tzinfo
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, Final, TypeVar
 
+import jwt
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from pydantic import (
@@ -26,6 +27,12 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
+from ai.backend.common.exception import (
+    JWTDecodeError,
+    JWTExpiredError,
+    JWTInvalidSignatureError,
+    JWTPayloadValidationError,
+)
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
@@ -509,3 +516,73 @@ class DelimiterSeparatedList(list[TItem]):
 class CommaSeparatedStrList(DelimiterSeparatedList[str]):
     delimiter = ","
     min_length = None
+
+
+class PydanticJWTValidator[TModel: BaseModel]:
+    """
+    Generic JWT validator with pydantic model-based payload validation.
+
+    This validator decodes JWT tokens and validates their payload against
+    a specified pydantic model, providing type-safe access to token claims.
+
+    Usage:
+        class MyTokenData(BaseModel):
+            user_id: str
+            role: str
+
+        validator = PydanticJWTValidator(
+            secret="my-secret-key",
+            model=MyTokenData,
+        )
+        token_data = validator.validate("eyJ...")  # Returns MyTokenData instance
+
+    Args:
+        secret: Secret key for JWT signature verification
+        model: Pydantic model class to validate and parse the JWT payload
+        algorithms: List of allowed JWT algorithms (default: ["HS256"])
+    """
+
+    def __init__(
+        self,
+        *,
+        secret: str,
+        model: type[TModel],
+        algorithms: list[str] | None = None,
+    ) -> None:
+        self._secret = secret
+        self._model = model
+        self._algorithms = algorithms or ["HS256"]
+
+    def validate(self, token: str) -> TModel:
+        """
+        Validate JWT token and return parsed payload as pydantic model instance.
+
+        Args:
+            token: Encoded JWT token string
+
+        Returns:
+            Pydantic model instance containing validated token claims
+
+        Raises:
+            JWTExpiredError: If the token has expired
+            JWTInvalidSignatureError: If signature verification fails
+            JWTDecodeError: If the token cannot be decoded
+            JWTPayloadValidationError: If payload fails pydantic model validation
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                self._secret,
+                algorithms=self._algorithms,
+            )
+        except jwt.ExpiredSignatureError as e:
+            raise JWTExpiredError() from e
+        except jwt.InvalidSignatureError as e:
+            raise JWTInvalidSignatureError() from e
+        except jwt.DecodeError as e:
+            raise JWTDecodeError(extra_msg=str(e)) from e
+
+        try:
+            return self._model.model_validate(payload)
+        except ValidationError as e:
+            raise JWTPayloadValidationError(extra_msg=str(e)) from e
