@@ -4,11 +4,11 @@ from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
 
 
 @dataclass
-class SyncReplicaAction(DeploymentBaseAction):
+class SyncReplicaAction(DeploymentReplicaBaseAction):
     """Action to sync replicas for an existing deployment."""
 
     deployment_id: UUID

@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 
-from .base import ScalingGroupAction
+from .keypair_base import ScalingGroupKeypairAction
 
 
 @dataclass
-class AssociateScalingGroupWithKeypairsAction(ScalingGroupAction):
+class AssociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
     """Action to associate a scaling group with multiple keypairs."""
 
     bulk_creator: BulkCreator[ScalingGroupForKeypairsRow]

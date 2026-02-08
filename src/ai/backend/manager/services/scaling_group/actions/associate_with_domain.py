@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 
-from .base import ScalingGroupAction
+from .domain_base import ScalingGroupDomainAction
 
 
 @dataclass
-class AssociateScalingGroupWithDomainsAction(ScalingGroupAction):
+class AssociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to associate a scaling group with multiple domains."""
 
     bulk_creator: BulkCreator[ScalingGroupForDomainRow]

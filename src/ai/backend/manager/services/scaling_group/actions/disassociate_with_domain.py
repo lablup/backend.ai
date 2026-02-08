@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.purger import BatchPurger
 
-from .base import ScalingGroupAction
+from .domain_base import ScalingGroupDomainAction
 
 
 @dataclass
-class DisassociateScalingGroupWithDomainsAction(ScalingGroupAction):
+class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to disassociate a scaling group from multiple domains."""
 
     purger: BatchPurger[ScalingGroupForDomainRow]

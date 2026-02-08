@@ -5,11 +5,11 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelReplicaData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
 
 
 @dataclass
-class SearchReplicasAction(DeploymentBaseAction):
+class SearchReplicasAction(DeploymentReplicaBaseAction):
     querier: BatchQuerier
 
     @override

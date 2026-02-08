@@ -20,7 +20,7 @@ class UpdateRolePermissionsAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROLE
+        return EntityType.ROLE_PERMISSION
 
     @override
     @classmethod

@@ -5,11 +5,11 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.services.image.actions.base import ImageAction
+from ai.backend.manager.services.image.actions.resource_limit_base import ImageResourceLimitAction
 
 
 @dataclass
-class ClearImageCustomResourceLimitAction(ImageAction):
+class ClearImageCustomResourceLimitAction(ImageResourceLimitAction):
     """
     Deprecated. Use ClearImageCustomResourceLimitByIdAction instead.
     """
@@ -37,7 +37,7 @@ class ClearImageCustomResourceLimitActionResult(BaseActionResult):
 
 
 @dataclass
-class ClearImageCustomResourceLimitByIdAction(ImageAction):
+class ClearImageCustomResourceLimitByIdAction(ImageResourceLimitAction):
     image_id: ImageID
 
     @override

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.scaling_group.types import ResourceInfo
@@ -13,6 +14,11 @@ from .base import ScalingGroupAction
 @dataclass
 class GetResourceInfoAction(ScalingGroupAction):
     """Action to get resource information for a scaling group."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.RESOURCE_GROUP_RESOURCE
 
     scaling_group: str
 

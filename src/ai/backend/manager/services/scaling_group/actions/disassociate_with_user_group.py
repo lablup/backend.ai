@@ -8,11 +8,11 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
 from ai.backend.manager.repositories.base.purger import BatchPurger
 
-from .base import ScalingGroupAction
+from .user_group_base import ScalingGroupUserGroupAction
 
 
 @dataclass
-class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
+class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to disassociate a single scaling group from a user group (project)."""
 
     purger: BatchPurger[ScalingGroupForProjectRow]

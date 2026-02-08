@@ -42,6 +42,20 @@ class VFolderAction(BaseAction):
         return EntityType.VFOLDER
 
 
+class VFolderFileAction(VFolderAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_FILE
+
+
+class VFolderDirectoryAction(VFolderAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_DIRECTORY
+
+
 class VFolderScopeAction(BaseScopeAction):
     @override
     @classmethod

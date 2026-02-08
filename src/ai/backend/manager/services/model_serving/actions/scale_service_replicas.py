@@ -4,6 +4,7 @@ from typing import Self, override
 from pydantic import model_validator
 from pydantic.dataclasses import dataclass
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -17,6 +18,11 @@ class ScaleServiceReplicasAction(ModelServiceAction):
     max_session_count_per_model_session: int
     service_id: uuid.UUID
     to: int
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.DEPLOYMENT_REPLICA
 
     @model_validator(mode="after")
     def validate_replica_count(self) -> Self:
