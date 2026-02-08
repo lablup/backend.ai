@@ -1834,6 +1834,19 @@ extend type DomainNode @key(fields: "id") {
 }
 
 """
+Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
+"""
+input DomainProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.
 """
 input DomainProjectV2Scope {
@@ -1980,6 +1993,24 @@ input DomainUsageScope {
 }
 
 """
+Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
+"""
+input DomainUserNestedFilter {
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
 input DomainUserV2Scope {
@@ -2040,13 +2071,18 @@ type DomainV2Edge {
 }
 
 """
-Added in 26.2.0. Filter input for querying domains. Supports filtering by name, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input DomainV2Filter {
   """
   Filter by domain name. Supports equals, contains, startsWith, and endsWith.
   """
   name: StringFilter = null
+
+  """
+  Filter by domain description. Supports equals, contains, startsWith, and endsWith.
+  """
+  description: StringFilter = null
 
   """
   Filter by active status. True for active domains, False for inactive domains.
@@ -2062,6 +2098,16 @@ input DomainV2Filter {
   Filter by last modification timestamp. Supports before, after, and between operations.
   """
   modifiedAt: DateTimeFilter = null
+
+  """
+  Filter by nested project conditions. Returns domains that have at least one project matching all specified conditions.
+  """
+  project: DomainProjectNestedFilter = null
+
+  """
+  Filter by nested user conditions. Returns domains that have at least one user matching all specified conditions.
+  """
+  user: DomainUserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainV2Filter!] = null
@@ -2089,12 +2135,16 @@ input DomainV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically.
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum DomainV2OrderField {
   CREATED_AT
   MODIFIED_AT
   NAME
+  IS_ACTIVE
+  PROJECT_NAME
+  USER_USERNAME
+  USER_EMAIL
 }
 
 """
