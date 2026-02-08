@@ -310,6 +310,11 @@ type AgentV2 implements Node {
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int!
+
+  """
+  Added in 26.2.0. List of kernels running on this agent with pagination support.
+  """
+  kernels(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
 }
 
 """
