@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -3357,18 +3358,10 @@ class GQLMetricMiddleware:
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+
         start = time.perf_counter()
         try:
             res = next(root, info, **args)
-            graph_ctx.metric_observer.observe_request(
-                operation_type=operation_type,
-                field_name=field_name,
-                parent_type=parent_type,
-                operation_name=operation_name,
-                error_code=None,
-                success=True,
-                duration=time.perf_counter() - start,
-            )
         except BackendAIError as e:
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,
@@ -3379,8 +3372,8 @@ class GQLMetricMiddleware:
                 success=False,
                 duration=time.perf_counter() - start,
             )
-            raise e
-        except BaseException as e:
+            raise
+        except BaseException:
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,
                 field_name=field_name,
@@ -3390,7 +3383,58 @@ class GQLMetricMiddleware:
                 success=False,
                 duration=time.perf_counter() - start,
             )
-            raise e
+            raise
+
+        if asyncio.iscoroutine(res):
+
+            async def _timed_coro() -> Any:
+                coro_start = time.perf_counter()
+                try:
+                    result = await res
+                except BackendAIError as e:
+                    graph_ctx.metric_observer.observe_request(
+                        operation_type=operation_type,
+                        field_name=field_name,
+                        parent_type=parent_type,
+                        operation_name=operation_name,
+                        error_code=e.error_code(),
+                        success=False,
+                        duration=time.perf_counter() - coro_start,
+                    )
+                    raise
+                except BaseException:
+                    graph_ctx.metric_observer.observe_request(
+                        operation_type=operation_type,
+                        field_name=field_name,
+                        parent_type=parent_type,
+                        operation_name=operation_name,
+                        error_code=ErrorCode.default(),
+                        success=False,
+                        duration=time.perf_counter() - coro_start,
+                    )
+                    raise
+                graph_ctx.metric_observer.observe_request(
+                    operation_type=operation_type,
+                    field_name=field_name,
+                    parent_type=parent_type,
+                    operation_name=operation_name,
+                    error_code=None,
+                    success=True,
+                    duration=time.perf_counter() - coro_start,
+                )
+                return result
+
+            return _timed_coro()
+
+        graph_ctx.metric_observer.observe_request(
+            operation_type=operation_type,
+            field_name=field_name,
+            parent_type=parent_type,
+            operation_name=operation_name,
+            error_code=None,
+            success=True,
+            duration=time.perf_counter() - start,
+        )
         return res
 
 
