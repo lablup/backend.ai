@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
+from typing import Any
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -326,6 +329,146 @@ class UserConditions:
 
         return inner
 
+    # ==================== Domain Nested Filters ====================
+
+    @staticmethod
+    def _exists_domain(
+        *domain_conditions: sa.sql.expression.ColumnElement[bool],
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        """EXISTS subquery: User → Domain (via FK domain_name)."""
+        subq = sa.select(sa.literal(1)).where(DomainRow.name == UserRow.domain_name)
+        for cond in domain_conditions:
+            subq = subq.where(cond)
+        return sa.exists(subq)
+
+    @staticmethod
+    def by_domain_description_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = DomainRow.description.ilike(f"%{spec.value}%")
+            else:
+                cond = DomainRow.description.like(f"%{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return UserConditions._exists_domain(cond)
+
+        return inner
+
+    @staticmethod
+    def by_domain_description_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = sa.func.lower(DomainRow.description) == spec.value.lower()
+            else:
+                cond = DomainRow.description == spec.value
+            if spec.negated:
+                cond = sa.not_(cond)
+            return UserConditions._exists_domain(cond)
+
+        return inner
+
+    @staticmethod
+    def by_domain_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserConditions._exists_domain(DomainRow.is_active == is_active)
+
+        return inner
+
+    @staticmethod
+    def exists_domain_combined(domain_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple domain conditions into single EXISTS subquery.
+
+        Accepts conditions from DomainV2Filter.build_conditions() directly.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(DomainRow.name == UserRow.domain_name)
+            for cond in domain_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
+    # ==================== Project Nested Filters (M:N) ====================
+
+    @staticmethod
+    def _exists_project(
+        *project_conditions: sa.sql.expression.ColumnElement[bool],
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        """EXISTS subquery: User → Project (via M:N AssocGroupUserRow)."""
+        subq = (
+            sa.select(sa.literal(1))
+            .select_from(
+                sa.join(
+                    AssocGroupUserRow.__table__,
+                    GroupRow.__table__,
+                    AssocGroupUserRow.group_id == GroupRow.id,
+                )
+            )
+            .where(AssocGroupUserRow.user_id == UserRow.uuid)
+        )
+        for cond in project_conditions:
+            subq = subq.where(cond)
+        return sa.exists(subq)
+
+    @staticmethod
+    def by_project_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = GroupRow.name.ilike(f"%{spec.value}%")
+            else:
+                cond = GroupRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return UserConditions._exists_project(cond)
+
+        return inner
+
+    @staticmethod
+    def by_project_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = sa.func.lower(GroupRow.name) == spec.value.lower()
+            else:
+                cond = GroupRow.name == spec.value
+            if spec.negated:
+                cond = sa.not_(cond)
+            return UserConditions._exists_project(cond)
+
+        return inner
+
+    @staticmethod
+    def by_project_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserConditions._exists_project(GroupRow.is_active == is_active)
+
+        return inner
+
+    @staticmethod
+    def exists_project_combined(project_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple project conditions into single EXISTS subquery.
+
+        Accepts conditions from ProjectV2Filter.build_conditions() directly.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .select_from(
+                    sa.join(
+                        AssocGroupUserRow.__table__,
+                        GroupRow.__table__,
+                        AssocGroupUserRow.group_id == GroupRow.id,
+                    )
+                )
+                .where(AssocGroupUserRow.user_id == UserRow.uuid)
+            )
+            for cond in project_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class UserOrders:
     """Query orders for sorting users."""
@@ -371,3 +514,53 @@ class UserOrders:
         if ascending:
             return UserRow.domain_name.asc()
         return UserRow.domain_name.desc()
+
+    # ==================== Domain Nested Orders ====================
+
+    @staticmethod
+    def _scalar_domain(
+        column: sa.ColumnElement[Any] | sa.orm.InstrumentedAttribute[Any],
+    ) -> sa.ScalarSelect[Any]:
+        """Scalar subquery selecting a Domain column correlated to current User."""
+        return (
+            sa.select(column)
+            .where(DomainRow.name == UserRow.domain_name)
+            .correlate(UserRow)
+            .scalar_subquery()
+        )
+
+    @staticmethod
+    def by_domain_name(ascending: bool = True) -> QueryOrder:
+        subq = UserOrders._scalar_domain(DomainRow.name)
+        return subq.asc() if ascending else subq.desc()
+
+    @staticmethod
+    def by_domain_created_at(ascending: bool = True) -> QueryOrder:
+        subq = UserOrders._scalar_domain(DomainRow.created_at)
+        return subq.asc() if ascending else subq.desc()
+
+    # ==================== Project Nested Orders (M:N → MIN aggregation) ====================
+
+    @staticmethod
+    def _scalar_project_min(
+        column: sa.ColumnElement[Any] | sa.orm.InstrumentedAttribute[Any],
+    ) -> sa.ScalarSelect[Any]:
+        """Scalar subquery with MIN for M:N relationship."""
+        return (
+            sa.select(sa.func.min(column))
+            .select_from(
+                sa.join(
+                    AssocGroupUserRow.__table__,
+                    GroupRow.__table__,
+                    AssocGroupUserRow.group_id == GroupRow.id,
+                )
+            )
+            .where(AssocGroupUserRow.user_id == UserRow.uuid)
+            .correlate(UserRow)
+            .scalar_subquery()
+        )
+
+    @staticmethod
+    def by_project_name(ascending: bool = True) -> QueryOrder:
+        subq = UserOrders._scalar_project_min(GroupRow.name)
+        return subq.asc() if ascending else subq.desc()
