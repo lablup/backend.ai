@@ -1,7 +1,13 @@
 """ProjectV2 GraphQL types package."""
 
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
-from .filters import ProjectV2Filter, ProjectV2OrderBy, ProjectV2OrderField
+from .filters import (
+    ProjectDomainNestedFilter,
+    ProjectUserNestedFilter,
+    ProjectV2Filter,
+    ProjectV2OrderBy,
+    ProjectV2OrderField,
+)
 from .nested import (
     ProjectBasicInfoGQL,
     ProjectLifecycleInfoGQL,
@@ -17,6 +23,8 @@ __all__ = [
     "ProjectTypeEnum",
     "VFolderHostPermissionEnum",
     # Filters and OrderBy
+    "ProjectDomainNestedFilter",
+    "ProjectUserNestedFilter",
     "ProjectV2Filter",
     "ProjectV2OrderBy",
     "ProjectV2OrderField",

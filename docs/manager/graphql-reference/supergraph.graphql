@@ -7518,6 +7518,21 @@ type ProjectBasicInfo
 }
 
 """
+Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
+"""
+input ProjectDomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
 """
 type ProjectFairShare implements Node
@@ -7896,6 +7911,26 @@ input ProjectUsageScope
 }
 
 """
+Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
+"""
+input ProjectUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
 input ProjectUserV2Scope
@@ -8008,6 +8043,16 @@ input ProjectV2Filter
   """
   modifiedAt: DateTimeFilter = null
 
+  """
+  Filter by nested domain conditions. Returns projects whose domain matches all specified conditions.
+  """
+  domain: ProjectDomainNestedFilter = null
+
+  """
+  Filter by nested user conditions. Returns projects that have at least one user matching all specified conditions.
+  """
+  user: ProjectUserNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectV2Filter!] = null
 
@@ -8036,7 +8081,7 @@ input ProjectV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically.
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum ProjectV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -8044,6 +8089,11 @@ enum ProjectV2OrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  TYPE @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
