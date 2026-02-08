@@ -613,8 +613,6 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
-            if kwargs.get("project") is not None:
-                kwargs["project"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(root, info, *args, **kwargs)
 
