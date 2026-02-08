@@ -54,6 +54,7 @@ class AgentPermissionGQL(StrEnum):
 )
 class AgentOrderFieldGQL(StrEnum):
     ID = "id"
+    STATUS = "status"
     FIRST_CONTACT = "first_contact"
     SCALING_GROUP = "scaling_group"
     SCHEDULABLE = "schedulable"
@@ -145,6 +146,8 @@ class AgentOrderByGQL(GQLOrderBy):
         match self.field:
             case AgentOrderFieldGQL.ID:
                 return AgentOrders.id(ascending)
+            case AgentOrderFieldGQL.STATUS:
+                return AgentOrders.status(ascending)
             case AgentOrderFieldGQL.FIRST_CONTACT:
                 return AgentOrders.first_contact(ascending)
             case AgentOrderFieldGQL.SCALING_GROUP:
