@@ -13,11 +13,7 @@ CREATE TABLE resource_slot_types (
     slot_name     VARCHAR(64)  PRIMARY KEY,
     slot_type     VARCHAR(16)  NOT NULL,  -- count, bytes, unique, unified
     display_name  VARCHAR(128),
-    display_unit  VARCHAR(32),
-    display_icon  VARCHAR(32),
-    number_format JSONB,                  -- {binary: bool, round_length: int}
     rank          INTEGER      NOT NULL DEFAULT 0,
-    is_intrinsic  BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -27,44 +23,43 @@ CREATE TABLE resource_slot_types (
 
 - `slot_name` as natural PK (matches existing `SlotName` string keys)
 - `rank` for display ordering (replaces `agent_selection_resource_priority` config)
-- `is_intrinsic` marks `cpu` and `mem` as non-removable
 - Absorbs `KNOWN_SLOT_METADATA` and `INTRINSIC_SLOTS` into a single source of truth
 
 ### Seed Data
 
 From `INTRINSIC_SLOTS` + `KNOWN_SLOT_METADATA`:
 
-| slot_name | slot_type | display_name | display_unit | rank | is_intrinsic |
-|-----------|-----------|-------------|-------------|------|-------------|
-| cpu | count | CPU | Core | 40 | true |
-| mem | bytes | RAM | GiB | 50 | true |
-| cuda.device | count | GPU | GPU | 10 | false |
-| cuda.shares | count | fGPU | fGPU | 20 | false |
-| rocm.device | count | GPU | GPU | 30 | false |
-| tpu.device | count | TPU | GPU | 35 | false |
+| slot_name | slot_type | display_name | rank |
+|-----------|-----------|-------------|------|
+| cpu | count | CPU | 40 |
+| mem | bytes | Memory | 50 |
+| cuda.device | count | GPU (CUDA) | 10 |
+| cuda.shares | count | GPU (fGPU) | 20 |
+| rocm.device | count | GPU (ROCm) | 30 |
+| tpu.device | count | TPU | 35 |
 
-## 1.2 `agent_resource_capacity` — Agent Resource Inventory
+## 1.2 `agent_resources` — Agent Resource Inventory
 
 ```sql
-CREATE TABLE agent_resource_capacity (
+CREATE TABLE agent_resources (
     agent_id       VARCHAR(64)    NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     slot_name      VARCHAR(64)    NOT NULL REFERENCES resource_slot_types(slot_name),
-    total_amount   NUMERIC(24,6)  NOT NULL,
-    used_amount    NUMERIC(24,6),  -- NULL = not yet assigned, 0 = assigned but idle
+    capacity       NUMERIC(24,6)  NOT NULL,
+    used           NUMERIC(24,6),  -- NULL = not yet assigned, 0 = assigned but idle
     created_at     TIMESTAMPTZ    NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ    NOT NULL DEFAULT now(),
     PRIMARY KEY (agent_id, slot_name)
 );
 
-CREATE INDEX ix_arc_slot_name ON agent_resource_capacity (slot_name);
-CREATE INDEX ix_arc_agent_avail ON agent_resource_capacity (agent_id, slot_name, total_amount, used_amount);
+CREATE INDEX ix_agent_resources_slot_name ON agent_resources (slot_name);
+CREATE INDEX ix_agent_resources_agent_avail ON agent_resources (agent_id, slot_name, capacity, used);
 ```
 
 ### Design Decisions
 
 - **Composite PK** `(agent_id, slot_name)` — no UUID needed since no FK references this table
 - **`NUMERIC(24,6)`** — supports `mem` byte values up to 10^18 (exabyte) with 6 decimal places for fractional CPU/GPU
-- **`used_amount` nullable** — `NULL` semantics differ from `0` (uninitialized vs zero usage)
+- **`used` nullable** — `NULL` semantics differ from `0` (uninitialized vs zero usage)
 - **`ON DELETE CASCADE`** — agent deletion automatically cleans up capacity rows
 
 ## 1.3 `resource_allocations` — Kernel-Level Allocations
