@@ -6397,6 +6397,19 @@ enum UsageBucketOrderField {
 }
 
 """
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserDomainNestedFilter {
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.
 """
 type UserFairShare implements Node {
@@ -6524,6 +6537,19 @@ input UserFairShareScope {
 
 extend type UserNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
 }
 
 """
@@ -6815,7 +6841,7 @@ type UserV2Edge {
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter {
   """Filter by user UUID. Supports equals and 'in' operations."""
@@ -6851,6 +6877,16 @@ input UserV2Filter {
   """
   createdAt: DateTimeFilter = null
 
+  """
+  Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
+  """
+  domain: UserDomainNestedFilter = null
+
+  """
+  Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
+  """
+  project: UserProjectNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
 
@@ -6877,7 +6913,7 @@ input UserV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name (MIN aggregation).
 """
 enum UserV2OrderField {
   CREATED_AT
@@ -6885,6 +6921,8 @@ enum UserV2OrderField {
   USERNAME
   EMAIL
   STATUS
+  DOMAIN_NAME
+  PROJECT_NAME
 }
 
 """

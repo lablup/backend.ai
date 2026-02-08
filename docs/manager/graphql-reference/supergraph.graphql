@@ -11258,6 +11258,21 @@ type UserConnection
   count: Int
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserDomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge
   @join__type(graph: GRAPHENE)
@@ -11520,6 +11535,21 @@ type UserNode implements Node
 
   """Added in 25.5.0."""
   project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
+}
+
+"""
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
 }
 
 type UserResourcePolicy
@@ -11902,7 +11932,7 @@ type UserV2Edge
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
@@ -11940,6 +11970,16 @@ input UserV2Filter
   """
   createdAt: DateTimeFilter = null
 
+  """
+  Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
+  """
+  domain: UserDomainNestedFilter = null
+
+  """
+  Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
+  """
+  project: UserProjectNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
 
@@ -11968,7 +12008,7 @@ input UserV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name (MIN aggregation).
 """
 enum UserV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -11978,6 +12018,8 @@ enum UserV2OrderField
   USERNAME @join__enumValue(graph: STRAWBERRY)
   EMAIL @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """
