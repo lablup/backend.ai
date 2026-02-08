@@ -20,13 +20,115 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.domain.options import DomainConditions, DomainOrders
+from ai.backend.manager.repositories.group.options import GroupConditions
+from ai.backend.manager.repositories.user.options import UserConditions
+
+
+@strawberry.input(
+    name="DomainProjectNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for projects belonging to a domain. "
+        "Filters domains that have at least one project matching all specified conditions."
+    ),
+)
+class DomainProjectNestedFilter:
+    """Nested filter for projects within a domain."""
+
+    name: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by project name. Supports equals, contains, startsWith, and endsWith.",
+    )
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by project active status.",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions for project nested filter.
+
+        Returns:
+            List containing a single EXISTS condition wrapping all project sub-conditions,
+            or empty list if no filters specified.
+        """
+        raw_conditions: list[QueryCondition] = []
+        if self.name:
+            condition = self.name.build_query_condition(
+                contains_factory=lambda spec: GroupConditions.by_name_contains(spec),
+                equals_factory=lambda spec: GroupConditions.by_name_equals(spec),
+                starts_with_factory=lambda spec: GroupConditions.by_name_starts_with(spec),
+                ends_with_factory=lambda spec: GroupConditions.by_name_ends_with(spec),
+            )
+            if condition:
+                raw_conditions.append(condition)
+        if self.is_active is not None:
+            raw_conditions.append(GroupConditions.by_is_active(self.is_active))
+        if not raw_conditions:
+            return []
+        return [DomainConditions.exists_project_combined(raw_conditions)]
+
+
+@strawberry.input(
+    name="DomainUserNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for users belonging to a domain. "
+        "Filters domains that have at least one user matching all specified conditions."
+    ),
+)
+class DomainUserNestedFilter:
+    """Nested filter for users within a domain."""
+
+    username: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by username. Supports equals, contains, startsWith, and endsWith.",
+    )
+    email: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by email. Supports equals, contains, startsWith, and endsWith.",
+    )
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by user active status. True for active users (status=ACTIVE), False for inactive.",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        """Build query conditions for user nested filter.
+
+        Returns:
+            List containing a single EXISTS condition wrapping all user sub-conditions,
+            or empty list if no filters specified.
+        """
+        raw_conditions: list[QueryCondition] = []
+        if self.username:
+            condition = self.username.build_query_condition(
+                contains_factory=lambda spec: UserConditions.by_username_contains(spec),
+                equals_factory=lambda spec: UserConditions.by_username_equals(spec),
+                starts_with_factory=lambda spec: UserConditions.by_username_starts_with(spec),
+                ends_with_factory=lambda spec: UserConditions.by_username_ends_with(spec),
+            )
+            if condition:
+                raw_conditions.append(condition)
+        if self.email:
+            condition = self.email.build_query_condition(
+                contains_factory=lambda spec: UserConditions.by_email_contains(spec),
+                equals_factory=lambda spec: UserConditions.by_email_equals(spec),
+                starts_with_factory=lambda spec: UserConditions.by_email_starts_with(spec),
+                ends_with_factory=lambda spec: UserConditions.by_email_ends_with(spec),
+            )
+            if condition:
+                raw_conditions.append(condition)
+        if self.is_active is not None:
+            raw_conditions.append(UserConditions.by_is_active(self.is_active))
+        if not raw_conditions:
+            return []
+        return [DomainConditions.exists_user_combined(raw_conditions)]
 
 
 @strawberry.input(
     name="DomainV2Filter",
     description=(
         "Added in 26.2.0. Filter input for querying domains. "
-        "Supports filtering by name, active status, and timestamps. "
+        "Supports filtering by name, description, active status, timestamps, "
+        "and nested project/user filters. "
         "Multiple filters can be combined using AND, OR, and NOT logical operators."
     ),
 )
@@ -36,6 +138,12 @@ class DomainV2Filter(GQLFilter):
     name: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by domain name. Supports equals, contains, startsWith, and endsWith.",
+    )
+    description: StringFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Filter by domain description. Supports equals, contains, startsWith, and endsWith."
+        ),
     )
     is_active: bool | None = strawberry.field(
         default=None,
@@ -48,6 +156,20 @@ class DomainV2Filter(GQLFilter):
     modified_at: DateTimeFilter | None = strawberry.field(
         default=None,
         description="Filter by last modification timestamp. Supports before, after, and between operations.",
+    )
+    project: DomainProjectNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Filter by nested project conditions. "
+            "Returns domains that have at least one project matching all specified conditions."
+        ),
+    )
+    user: DomainUserNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Filter by nested user conditions. "
+            "Returns domains that have at least one user matching all specified conditions."
+        ),
     )
 
     AND: list[DomainV2Filter] | None = strawberry.field(
@@ -82,6 +204,16 @@ class DomainV2Filter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        if self.description:
+            condition = self.description.build_query_condition(
+                contains_factory=lambda spec: DomainConditions.by_description_contains(spec),
+                equals_factory=lambda spec: DomainConditions.by_description_equals(spec),
+                starts_with_factory=lambda spec: DomainConditions.by_description_starts_with(spec),
+                ends_with_factory=lambda spec: DomainConditions.by_description_ends_with(spec),
+            )
+            if condition:
+                conditions.append(condition)
+
         if self.is_active is not None:
             conditions.append(DomainConditions.by_is_active(self.is_active))
 
@@ -100,6 +232,12 @@ class DomainV2Filter(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        if self.project:
+            conditions.extend(self.project.build_conditions())
+
+        if self.user:
+            conditions.extend(self.user.build_conditions())
 
         # Handle logical operators
         if self.AND:
@@ -129,13 +267,21 @@ class DomainV2Filter(GQLFilter):
         "Added in 26.2.0. Fields available for ordering domain query results. "
         "CREATED_AT: Order by creation timestamp. "
         "MODIFIED_AT: Order by last modification timestamp. "
-        "NAME: Order by domain name alphabetically."
+        "NAME: Order by domain name alphabetically. "
+        "IS_ACTIVE: Order by active status. "
+        "PROJECT_NAME: Order by project name (MIN aggregation). "
+        "USER_USERNAME: Order by username (MIN aggregation). "
+        "USER_EMAIL: Order by user email (MIN aggregation)."
     ),
 )
 class DomainV2OrderField(StrEnum):
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
     NAME = "name"
+    IS_ACTIVE = "is_active"
+    PROJECT_NAME = "project_name"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
 
 
 @strawberry.input(
@@ -172,3 +318,11 @@ class DomainV2OrderBy(GQLOrderBy):
                 return DomainOrders.modified_at(ascending)
             case DomainV2OrderField.NAME:
                 return DomainOrders.name(ascending)
+            case DomainV2OrderField.IS_ACTIVE:
+                return DomainOrders.is_active(ascending)
+            case DomainV2OrderField.PROJECT_NAME:
+                return DomainOrders.by_project_name(ascending)
+            case DomainV2OrderField.USER_USERNAME:
+                return DomainOrders.by_user_username(ascending)
+            case DomainV2OrderField.USER_EMAIL:
+                return DomainOrders.by_user_email(ascending)

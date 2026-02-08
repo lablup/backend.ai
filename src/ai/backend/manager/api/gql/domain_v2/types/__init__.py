@@ -1,6 +1,12 @@
 """DomainV2 GraphQL types package."""
 
-from .filters import DomainV2Filter, DomainV2OrderBy, DomainV2OrderField
+from .filters import (
+    DomainProjectNestedFilter,
+    DomainUserNestedFilter,
+    DomainV2Filter,
+    DomainV2OrderBy,
+    DomainV2OrderField,
+)
 from .nested import (
     DomainBasicInfoGQL,
     DomainLifecycleInfoGQL,
@@ -10,6 +16,8 @@ from .node import DomainV2Connection, DomainV2Edge, DomainV2GQL
 
 __all__ = [
     # Filter and OrderBy
+    "DomainProjectNestedFilter",
+    "DomainUserNestedFilter",
     "DomainV2Filter",
     "DomainV2OrderBy",
     "DomainV2OrderField",

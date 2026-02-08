@@ -190,6 +190,15 @@ class UserConditions:
     # ==================== Status Filters ====================
 
     @staticmethod
+    def by_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if is_active:
+                return UserRow.status == UserStatus.ACTIVE
+            return UserRow.status != UserStatus.ACTIVE
+
+        return inner
+
+    @staticmethod
     def by_status_equals(status: UserStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRow.status == status
