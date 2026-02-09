@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import SessionResult, SessionTypes
+from ai.backend.common.types import AgentId, SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -392,32 +392,61 @@ class KernelV2GQL(Node):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The agent running this kernel."
     )
-    async def agent(self) -> AgentV2GQL | None:
-        raise NotImplementedError
+    async def agent(self, info: Info[StrawberryGQLContext]) -> AgentV2GQL | None:
+        if self.resource.agent_id is None:
+            return None
+        agent_data = await info.context.data_loaders.agent_loader.load(
+            AgentId(self.resource.agent_id)
+        )
+        if agent_data is None:
+            return None
+        return AgentV2GQL.from_agent_detail_data(agent_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The user who owns this kernel."
     )
-    async def user(self) -> UserV2GQL | None:
-        raise NotImplementedError
+    async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
+        if self.user_info.user_id is None:
+            return None
+        user_data = await info.context.data_loaders.user_loader.load(self.user_info.user_id)
+        if user_data is None:
+            return None
+        return UserV2GQL.from_data(user_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The project this kernel belongs to."
     )
-    async def project(self) -> ProjectV2GQL | None:
-        raise NotImplementedError
+    async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
+        if self.user_info.group_id is None:
+            return None
+        project_data = await info.context.data_loaders.project_loader.load(self.user_info.group_id)
+        if project_data is None:
+            return None
+        return ProjectV2GQL.from_data(project_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this kernel belongs to."
     )
-    async def domain(self) -> DomainV2GQL | None:
-        raise NotImplementedError
+    async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
+        if self.user_info.domain_name is None:
+            return None
+        domain_data = await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The resource group this kernel is assigned to."
     )
-    async def resource_group(self) -> ResourceGroupGQL | None:
-        raise NotImplementedError
+    async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
+        if self.resource.resource_group_name is None:
+            return None
+        resource_group_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource.resource_group_name
+        )
+        if resource_group_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(resource_group_data)
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
