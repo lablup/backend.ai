@@ -7,11 +7,16 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 
 
@@ -68,6 +73,13 @@ class DomainFairShareConditions:
 
         return inner
 
+    @staticmethod
+    def by_domain_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.is_active == is_active
+
+        return inner
+
 
 class DomainFairShareOrders:
     """Query orders for DomainFairShareRow."""
@@ -85,6 +97,11 @@ class DomainFairShareOrders:
     @staticmethod
     def by_created_at(ascending: bool = True) -> QueryOrder:
         col = DomainFairShareRow.created_at
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_domain_is_active(ascending: bool = True) -> QueryOrder:
+        col = DomainRow.is_active
         return col.asc() if ascending else col.desc()
 
 
@@ -155,6 +172,55 @@ class ProjectFairShareConditions:
 
         return inner
 
+    @staticmethod
+    def by_project_name_contains(name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.name.like(f"%{name}%")
+
+        return inner
+
+    @staticmethod
+    def by_project_name_equals(name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.name == name
+
+        return inner
+
+    @staticmethod
+    def by_project_name_starts_with(name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.name.like(f"{name}%")
+
+        return inner
+
+    @staticmethod
+    def by_project_name_ends_with(name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.name.like(f"%{name}")
+
+        return inner
+
+    @staticmethod
+    def by_project_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.is_active == is_active
+
+        return inner
+
+    @staticmethod
+    def by_project_type_equals(project_type: ProjectType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.type == project_type
+
+        return inner
+
+    @staticmethod
+    def by_project_type_in(project_types: Collection[ProjectType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.type.in_(project_types)
+
+        return inner
+
 
 class ProjectFairShareOrders:
     """Query orders for ProjectFairShareRow."""
@@ -167,6 +233,16 @@ class ProjectFairShareOrders:
     @staticmethod
     def by_created_at(ascending: bool = True) -> QueryOrder:
         col = ProjectFairShareRow.created_at
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_project_name(ascending: bool = True) -> QueryOrder:
+        col = GroupRow.name
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_project_is_active(ascending: bool = True) -> QueryOrder:
+        col = GroupRow.is_active
         return col.asc() if ascending else col.desc()
 
 
@@ -251,6 +327,71 @@ class UserFairShareConditions:
 
         return inner
 
+    @staticmethod
+    def by_user_username_contains(username: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.username.like(f"%{username}%")
+
+        return inner
+
+    @staticmethod
+    def by_user_username_equals(username: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.username == username
+
+        return inner
+
+    @staticmethod
+    def by_user_username_starts_with(username: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.username.like(f"{username}%")
+
+        return inner
+
+    @staticmethod
+    def by_user_username_ends_with(username: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.username.like(f"%{username}")
+
+        return inner
+
+    @staticmethod
+    def by_user_email_contains(email: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.email.like(f"%{email}%")
+
+        return inner
+
+    @staticmethod
+    def by_user_email_equals(email: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.email == email
+
+        return inner
+
+    @staticmethod
+    def by_user_email_starts_with(email: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.email.like(f"{email}%")
+
+        return inner
+
+    @staticmethod
+    def by_user_email_ends_with(email: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.email.like(f"%{email}")
+
+        return inner
+
+    @staticmethod
+    def by_user_is_active(is_active: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if is_active:
+                return UserRow.status == UserStatus.ACTIVE
+            return UserRow.status != UserStatus.ACTIVE
+
+        return inner
+
 
 class UserFairShareOrders:
     """Query orders for UserFairShareRow."""
@@ -263,4 +404,14 @@ class UserFairShareOrders:
     @staticmethod
     def by_created_at(ascending: bool = True) -> QueryOrder:
         col = UserFairShareRow.created_at
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_user_username(ascending: bool = True) -> QueryOrder:
+        col = UserRow.username
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_user_email(ascending: bool = True) -> QueryOrder:
+        col = UserRow.email
         return col.asc() if ascending else col.desc()
