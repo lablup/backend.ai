@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 
 
@@ -18,7 +18,7 @@ class MetricPreset:
     labels: Mapping[str, str] = field(default_factory=dict)
 
     # Group by labels (injected into {group_by} placeholder)
-    group_by: frozenset[str] = field(default_factory=frozenset)
+    group_by: Set[str] = field(default_factory=frozenset)
 
     # Window (injected into {window} placeholder)
     window: str = ""
