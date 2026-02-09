@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
@@ -15,6 +15,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.fair_share.types import ProjectFairShareData
+from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -31,11 +32,9 @@ from .common import (
     FairShareSpecGQL,
     ResourceSlotGQL,
 )
-from .user import (
-    UserFairShareConnection,
-    UserFairShareFilter,
-    UserFairShareOrderBy,
-)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 
 
 @strawberry.type(
@@ -65,45 +64,18 @@ class ProjectFairShareGQL(Node):
     )
 
     @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.1.0. List user fair shares belonging to this project. "
-            "Returns fair share data for all users within this project and scaling group, "
-            "including users without fair share records (which use default values)."
-        )
+        description=("Added in 26.2.0. The project entity associated with this fair share record.")
     )
-    async def user_fair_shares(
+    async def project(
         self,
         info: Info,
-        filter: UserFairShareFilter | None = None,
-        order_by: list[UserFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> UserFairShareConnection:
-        from ai.backend.manager.api.gql.fair_share.fetcher import fetch_rg_user_fair_shares
-        from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
+    ) -> Annotated[
+        ProjectV2GQL,
+        strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.project_v2.fetcher.project import fetch_project
 
-        scope = UserFairShareSearchScope(
-            resource_group=self.resource_group,
-            domain_name=self.domain_name,
-            project_id=self.project_id,
-        )
-
-        return await fetch_rg_user_fair_shares(
-            info=info,
-            scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-        )
+        return await fetch_project(info=info, project_id=self.project_id)
 
     @classmethod
     def from_dataclass(cls, data: ProjectFairShareData) -> ProjectFairShareGQL:
@@ -165,6 +137,122 @@ class ProjectFairShareConnection(Connection[ProjectFairShareGQL]):
         self.count = count
 
 
+@strawberry.enum(
+    name="ProjectFairShareTypeEnum",
+    description="Added in 26.2.0. Project type enum for fair share filtering.",
+)
+class ProjectFairShareTypeEnum(StrEnum):
+    """Project type enum for fair share context."""
+
+    GENERAL = "general"
+    MODEL_STORE = "model-store"
+
+
+@strawberry.input(
+    name="ProjectFairShareTypeEnumFilter",
+    description=(
+        "Added in 26.2.0. Filter for project type enum in fair share queries. "
+        "Supports equals, in, not_equals, and not_in operations."
+    ),
+)
+class ProjectFairShareTypeEnumFilter:
+    """Filter for project type enum fields in fair share context."""
+
+    equals: ProjectFairShareTypeEnum | None = strawberry.field(
+        default=None,
+        description="Exact match for project type.",
+    )
+    in_: list[ProjectFairShareTypeEnum] | None = strawberry.field(
+        name="in",
+        default=None,
+        description="Match any of the provided types.",
+    )
+    not_equals: ProjectFairShareTypeEnum | None = strawberry.field(
+        default=None,
+        description="Exclude exact type match.",
+    )
+    not_in: list[ProjectFairShareTypeEnum] | None = strawberry.field(
+        default=None,
+        description="Exclude any of the provided types.",
+    )
+
+
+@strawberry.input(
+    name="ProjectFairShareProjectNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for project entity fields in project fair share queries. "
+        "Allows filtering by project properties such as name, active status, and type."
+    ),
+)
+class ProjectFairShareProjectNestedFilter:
+    """Nested filter for project entity within project fair share."""
+
+    name: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by project name. Supports equals, contains, startsWith, and endsWith.",
+    )
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by project active status.",
+    )
+    type: ProjectFairShareTypeEnumFilter | None = strawberry.field(
+        default=None,
+        description="Filter by project type (GENERAL, MODEL_STORE).",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.name:
+            name_condition = self.name.build_query_condition(
+                contains_factory=lambda spec: ProjectFairShareConditions.by_project_name_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: ProjectFairShareConditions.by_project_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: ProjectFairShareConditions.by_project_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: ProjectFairShareConditions.by_project_name_ends_with(
+                    spec.value
+                ),
+            )
+            if name_condition:
+                conditions.append(name_condition)
+        if self.is_active is not None:
+            conditions.append(ProjectFairShareConditions.by_project_is_active(self.is_active))
+        if self.type:
+            if self.type.equals is not None:
+                conditions.append(
+                    ProjectFairShareConditions.by_project_type_equals(
+                        ProjectType(self.type.equals.value)
+                    )
+                )
+            if self.type.in_ is not None:
+                conditions.append(
+                    ProjectFairShareConditions.by_project_type_in([
+                        ProjectType(t.value) for t in self.type.in_
+                    ])
+                )
+            if self.type.not_equals is not None:
+                conditions.append(
+                    negate_conditions([
+                        ProjectFairShareConditions.by_project_type_equals(
+                            ProjectType(self.type.not_equals.value)
+                        )
+                    ])
+                )
+            if self.type.not_in is not None:
+                conditions.append(
+                    negate_conditions([
+                        ProjectFairShareConditions.by_project_type_in([
+                            ProjectType(t.value) for t in self.type.not_in
+                        ])
+                    ])
+                )
+        return conditions
+
+
 @strawberry.input(
     name="ProjectFairShareFilter",
     description=(
@@ -196,6 +284,13 @@ class ProjectFairShareFilter(GQLFilter):
         description=(
             "Filter by domain name. This filters projects belonging to a specific domain. "
             "Supports equals, contains, startsWith, and endsWith operations."
+        ),
+    )
+    project: ProjectFairShareProjectNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.2.0. Nested filter for project entity properties. "
+            "Allows filtering by project name, active status, and type."
         ),
     )
 
@@ -256,6 +351,9 @@ class ProjectFairShareFilter(GQLFilter):
             if dn_condition:
                 conditions.append(dn_condition)
 
+        if self.project:
+            conditions.extend(self.project.build_conditions())
+
         if self.AND:
             for sub_filter in self.AND:
                 conditions.extend(sub_filter.build_conditions())
@@ -282,12 +380,16 @@ class ProjectFairShareFilter(GQLFilter):
     description=(
         "Added in 26.1.0. Fields available for ordering project fair share query results. "
         "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
-        "CREATED_AT: Order by record creation timestamp."
+        "CREATED_AT: Order by record creation timestamp. "
+        "PROJECT_NAME: Order alphabetically by project name (added in 26.2.0). "
+        "PROJECT_IS_ACTIVE: Order by project active status (added in 26.2.0)."
     ),
 )
 class ProjectFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    PROJECT_NAME = "project_name"
+    PROJECT_IS_ACTIVE = "project_is_active"
 
 
 @strawberry.input(
@@ -320,6 +422,10 @@ class ProjectFairShareOrderBy(GQLOrderBy):
                 return ProjectFairShareOrders.by_fair_share_factor(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
                 return ProjectFairShareOrders.by_created_at(ascending)
+            case ProjectFairShareOrderField.PROJECT_NAME:
+                return ProjectFairShareOrders.by_project_name(ascending)
+            case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
+                return ProjectFairShareOrders.by_project_is_active(ascending)
 
 
 # Mutation Input/Payload Types

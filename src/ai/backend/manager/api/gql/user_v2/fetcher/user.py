@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -22,6 +23,7 @@ from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -40,6 +42,31 @@ def get_user_pagination_spec() -> PaginationSpec:
         forward_condition_factory=UserConditions.by_cursor_forward,
         backward_condition_factory=UserConditions.by_cursor_backward,
     )
+
+
+async def fetch_user(
+    info: Info[StrawberryGQLContext],
+    user_uuid: UUID,
+) -> UserV2GQL:
+    """Fetch a single user by UUID.
+
+    Args:
+        info: Strawberry GraphQL context.
+        user_uuid: UUID of the user to retrieve.
+
+    Returns:
+        UserV2GQL object.
+
+    Raises:
+        UserNotFound: If the user does not exist.
+    """
+    processors = info.context.processors
+
+    action_result = await processors.user.get_user.wait_for_complete(
+        GetUserAction(user_uuid=user_uuid)
+    )
+
+    return UserV2GQL.from_data(action_result.user)
 
 
 async def fetch_admin_users(

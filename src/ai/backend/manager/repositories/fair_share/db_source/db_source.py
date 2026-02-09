@@ -50,6 +50,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -184,7 +185,9 @@ class FairShareDBSource:
     ) -> DomainFairShareSearchResult:
         """Search domain fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DomainFairShareRow)
+            query = sa.select(DomainFairShareRow).outerjoin(
+                DomainRow, DomainFairShareRow.domain_name == DomainRow.name
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
             # Collect unique resource groups and fetch their specs and capacities
@@ -234,6 +237,7 @@ class FairShareDBSource:
                     DomainFairShareRow,
                 )
                 .select_from(ScalingGroupForDomainRow)
+                .join(DomainRow, ScalingGroupForDomainRow.domain == DomainRow.name)
                 .outerjoin(
                     DomainFairShareRow,
                     sa.and_(
@@ -397,7 +401,9 @@ class FairShareDBSource:
     ) -> ProjectFairShareSearchResult:
         """Search project fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ProjectFairShareRow)
+            query = sa.select(ProjectFairShareRow).outerjoin(
+                GroupRow, ProjectFairShareRow.project_id == GroupRow.id
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
             # Collect unique resource groups and fetch their specs and capacities
@@ -749,7 +755,9 @@ class FairShareDBSource:
     ) -> UserFairShareSearchResult:
         """Search user fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(UserFairShareRow)
+            query = sa.select(UserFairShareRow).outerjoin(
+                UserRow, UserFairShareRow.user_uuid == UserRow.uuid
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
             # Collect unique resource groups and fetch their specs and capacities
@@ -808,6 +816,7 @@ class FairShareDBSource:
                 )
                 .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
                 .join(DomainRow, GroupRow.domain_name == DomainRow.name)
+                .join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(

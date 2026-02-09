@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
@@ -31,6 +31,9 @@ from .common import (
     FairShareSpecGQL,
     ResourceSlotGQL,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 
 
 @strawberry.type(
@@ -59,6 +62,20 @@ class UserFairShareGQL(Node):
     updated_at: datetime = strawberry.field(
         description="Timestamp when this record was last updated."
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The user entity associated with this fair share record.")
+    )
+    async def user(
+        self,
+        info: Info,
+    ) -> Annotated[
+        UserV2GQL,
+        strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.user_v2.fetcher.user import fetch_user
+
+        return await fetch_user(info=info, user_uuid=self.user_uuid)
 
     @classmethod
     def from_dataclass(cls, data: UserFairShareData) -> UserFairShareGQL:
@@ -122,6 +139,70 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
 
 
 @strawberry.input(
+    name="UserFairShareUserNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for user entity fields in user fair share queries. "
+        "Allows filtering by user properties such as username, email, and active status."
+    ),
+)
+class UserFairShareUserNestedFilter:
+    """Nested filter for user entity within user fair share."""
+
+    username: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by username. Supports equals, contains, startsWith, and endsWith.",
+    )
+    email: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by email. Supports equals, contains, startsWith, and endsWith.",
+    )
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by user active status (based on user status field).",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.username:
+            username_condition = self.username.build_query_condition(
+                contains_factory=lambda spec: UserFairShareConditions.by_user_username_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: UserFairShareConditions.by_user_username_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: UserFairShareConditions.by_user_username_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: UserFairShareConditions.by_user_username_ends_with(
+                    spec.value
+                ),
+            )
+            if username_condition:
+                conditions.append(username_condition)
+        if self.email:
+            email_condition = self.email.build_query_condition(
+                contains_factory=lambda spec: UserFairShareConditions.by_user_email_contains(
+                    spec.value
+                ),
+                equals_factory=lambda spec: UserFairShareConditions.by_user_email_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: UserFairShareConditions.by_user_email_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: UserFairShareConditions.by_user_email_ends_with(
+                    spec.value
+                ),
+            )
+            if email_condition:
+                conditions.append(email_condition)
+        if self.is_active is not None:
+            conditions.append(UserFairShareConditions.by_user_is_active(self.is_active))
+        return conditions
+
+
+@strawberry.input(
     name="UserFairShareFilter",
     description=(
         "Added in 26.1.0. Filter input for querying user fair shares. "
@@ -160,6 +241,13 @@ class UserFairShareFilter(GQLFilter):
         description=(
             "Filter by domain name. This filters users belonging to a specific domain. "
             "Supports equals, contains, startsWith, and endsWith operations."
+        ),
+    )
+    user: UserFairShareUserNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.2.0. Nested filter for user entity properties. "
+            "Allows filtering by username, email, and active status."
         ),
     )
 
@@ -220,6 +308,9 @@ class UserFairShareFilter(GQLFilter):
             if dn_condition:
                 conditions.append(dn_condition)
 
+        if self.user:
+            conditions.extend(self.user.build_conditions())
+
         if self.AND:
             for sub_filter in self.AND:
                 conditions.extend(sub_filter.build_conditions())
@@ -246,12 +337,16 @@ class UserFairShareFilter(GQLFilter):
     description=(
         "Added in 26.1.0. Fields available for ordering user fair share query results. "
         "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
-        "CREATED_AT: Order by record creation timestamp."
+        "CREATED_AT: Order by record creation timestamp. "
+        "USER_USERNAME: Order alphabetically by username (added in 26.2.0). "
+        "USER_EMAIL: Order alphabetically by email (added in 26.2.0)."
     ),
 )
 class UserFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
 
 
 @strawberry.input(
@@ -284,6 +379,10 @@ class UserFairShareOrderBy(GQLOrderBy):
                 return UserFairShareOrders.by_fair_share_factor(ascending)
             case UserFairShareOrderField.CREATED_AT:
                 return UserFairShareOrders.by_created_at(ascending)
+            case UserFairShareOrderField.USER_USERNAME:
+                return UserFairShareOrders.by_user_username(ascending)
+            case UserFairShareOrderField.USER_EMAIL:
+                return UserFairShareOrders.by_user_email(ascending)
 
 
 # Mutation Input/Payload Types

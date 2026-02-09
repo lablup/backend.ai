@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 
 import strawberry
 from strawberry import ID, Info
@@ -30,11 +30,9 @@ from .common import (
     FairShareSpecGQL,
     ResourceSlotGQL,
 )
-from .project import (
-    ProjectFairShareConnection,
-    ProjectFairShareFilter,
-    ProjectFairShareOrderBy,
-)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 
 
 @strawberry.type(
@@ -63,44 +61,18 @@ class DomainFairShareGQL(Node):
     )
 
     @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.1.0. List project fair shares belonging to this domain. "
-            "Returns fair share data for all projects within this domain and scaling group, "
-            "including projects without fair share records (which use default values)."
-        )
+        description=("Added in 26.2.0. The domain entity associated with this fair share record.")
     )
-    async def project_fair_shares(
+    async def domain(
         self,
         info: Info,
-        filter: ProjectFairShareFilter | None = None,
-        order_by: list[ProjectFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> ProjectFairShareConnection:
-        from ai.backend.manager.api.gql.fair_share.fetcher import fetch_rg_project_fair_shares
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
+    ) -> Annotated[
+        DomainV2GQL,
+        strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.domain_v2.fetcher.domain import fetch_domain
 
-        scope = ProjectFairShareSearchScope(
-            resource_group=self.resource_group,
-            domain_name=self.domain_name,
-        )
-
-        return await fetch_rg_project_fair_shares(
-            info=info,
-            scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-        )
+        return await fetch_domain(info=info, domain_name=self.domain_name)
 
     @classmethod
     def from_dataclass(cls, data: DomainFairShareData) -> DomainFairShareGQL:
@@ -162,6 +134,28 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
 
 
 @strawberry.input(
+    name="DomainFairShareDomainNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. "
+        "Allows filtering by domain properties such as active status."
+    ),
+)
+class DomainFairShareDomainNestedFilter:
+    """Nested filter for domain entity within domain fair share."""
+
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by domain active status.",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.is_active is not None:
+            conditions.append(DomainFairShareConditions.by_domain_is_active(self.is_active))
+        return conditions
+
+
+@strawberry.input(
     name="DomainFairShareFilter",
     description=(
         "Added in 26.1.0. Filter input for querying domain fair shares. "
@@ -184,6 +178,13 @@ class DomainFairShareFilter(GQLFilter):
         description=(
             "Filter by domain name. Domains are organizational units containing projects and users. "
             "Supports equals, contains, startsWith, and endsWith operations."
+        ),
+    )
+    domain: DomainFairShareDomainNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.2.0. Nested filter for domain entity properties. "
+            "Allows filtering by domain active status."
         ),
     )
 
@@ -232,6 +233,9 @@ class DomainFairShareFilter(GQLFilter):
             if dn_condition:
                 conditions.append(dn_condition)
 
+        if self.domain:
+            conditions.extend(self.domain.build_conditions())
+
         if self.AND:
             for sub_filter in self.AND:
                 conditions.extend(sub_filter.build_conditions())
@@ -259,13 +263,15 @@ class DomainFairShareFilter(GQLFilter):
         "Added in 26.1.0. Fields available for ordering domain fair share query results. "
         "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
         "DOMAIN_NAME: Order alphabetically by domain name. "
-        "CREATED_AT: Order by record creation timestamp."
+        "CREATED_AT: Order by record creation timestamp. "
+        "DOMAIN_IS_ACTIVE: Order by domain active status (added in 26.2.0)."
     ),
 )
 class DomainFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     DOMAIN_NAME = "domain_name"
     CREATED_AT = "created_at"
+    DOMAIN_IS_ACTIVE = "domain_is_active"
 
 
 @strawberry.input(
@@ -300,6 +306,8 @@ class DomainFairShareOrderBy(GQLOrderBy):
                 return DomainFairShareOrders.by_domain_name(ascending)
             case DomainFairShareOrderField.CREATED_AT:
                 return DomainFairShareOrders.by_created_at(ascending)
+            case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                return DomainFairShareOrders.by_domain_is_active(ascending)
 
 
 # Mutation Input/Payload Types
