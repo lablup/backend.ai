@@ -239,7 +239,37 @@ GraphQL Resolver → check_admin_only (if admin) → Processor → Service → R
 - NEVER put optional fields in Scope - use Filter instead
 - Scope fields must all be required (no default values, no Optional types)
 
+### Cross-Entity Reference Resolvers
+
+When a GQL node references another entity node, use `strawberry.lazy()` to avoid circular imports. Strawberry requires runtime type resolution, so `TYPE_CHECKING` imports alone are insufficient.
+
+**Pattern:**
+```python
+# 1. TYPE_CHECKING: for static analysis (mypy)
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+
+# 2. Return type: Annotated with strawberry.lazy() for runtime resolution
+# 3. Function body: runtime import + DataLoader
+async def domain(self, info: Info[StrawberryGQLContext]) -> Annotated[
+    DomainV2GQL,
+    strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+]:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    data = await info.context.data_loaders.domain_loader.load(self.domain_name)
+    return DomainV2GQL.from_data(data)
+```
+
+**Optional return type:** `| None` must be **outside** `Annotated[]`:
+```python
+) -> Annotated[DomainV2GQL, strawberry.lazy("...")] | None:  # ✅
+) -> Annotated[DomainV2GQL | None, strawberry.lazy("...")]:   # ❌ lazy cannot resolve union
+```
+
+**DataLoaders** (`info.context.data_loaders`): Use DataLoaders instead of individual fetch functions to prevent N+1 queries. See `api/gql/data_loader/data_loaders.py` for available loaders.
+
 **See examples:**
+- `api/gql/fair_share/types/domain.py` - Cross-entity reference with DataLoader
 - `api/gql/domain_v2/types/node.py` - DomainV2GQL with fair_shares/usage_buckets
 - `api/gql/fair_share/types/*.py` - Scope and Filter patterns
 

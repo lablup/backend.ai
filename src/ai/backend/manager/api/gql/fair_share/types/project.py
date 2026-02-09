@@ -13,7 +13,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import ProjectFairShareData
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.repositories.base import (
@@ -68,14 +68,20 @@ class ProjectFairShareGQL(Node):
     )
     async def project(
         self,
-        info: Info,
-    ) -> Annotated[
-        ProjectV2GQL,
-        strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
-    ]:
-        from ai.backend.manager.api.gql.project_v2.fetcher.project import fetch_project
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 
-        return await fetch_project(info=info, project_id=self.project_id)
+        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        if project_data is None:
+            return None
+        return ProjectV2GQL.from_data(project_data)
 
     @classmethod
     def from_dataclass(cls, data: ProjectFairShareData) -> ProjectFairShareGQL:
