@@ -4,8 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field
 class MetricResponseInfo(BaseModel):
     """Metric information from Prometheus response."""
 
-    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
-
     value_type: str
     name: str | None = Field(default=None, validation_alias="__name__")
     agent_id: str | None = Field(default=None)
@@ -16,6 +14,8 @@ class MetricResponseInfo(BaseModel):
     owner_project_id: str | None = Field(default=None)
     owner_user_id: str | None = Field(default=None)
     session_id: str | None = Field(default=None)
+
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
 
 
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
@@ -31,10 +31,10 @@ class MetricResponse(BaseModel):
 class PrometheusQueryData(BaseModel):
     """Data field from Prometheus query_range response."""
 
-    model_config = ConfigDict(populate_by_name=True)
-
     result_type: str = Field(validation_alias="resultType")
     result: list[MetricResponse]
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class PrometheusQueryRangeResponse(BaseModel):
