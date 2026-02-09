@@ -41,7 +41,11 @@ class TestMetricPresetRender:
                 id="group_by_deduplicated",
                 template="sum(my_metric{{{labels}}}) by ({group_by})",
                 labels={},
-                group_by=frozenset({"a", "b", "a"}),  # noqa: B033
+                group_by=frozenset([
+                    "a",
+                    "b",
+                    "a",
+                ]),  # list allows duplicates, frozenset deduplicates
                 window="",
                 expected="sum(my_metric{}) by (a,b)",
             ),

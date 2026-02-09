@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -13,7 +14,7 @@ class MetricQuerier(ABC):
     """
 
     @abstractmethod
-    def labels(self) -> dict[str, str]:
+    def labels(self) -> Mapping[str, str]:
         """Return the labels to be used in the Prometheus query."""
         ...
 
@@ -33,7 +34,7 @@ class ContainerMetricQuerier(MetricQuerier):
     user_id: UUID | None = None
     project_id: UUID | None = None
 
-    def labels(self) -> dict[str, str]:
+    def labels(self) -> Mapping[str, str]:
         """Return the labels for the container metric query."""
         result: dict[str, str] = {
             "container_metric_name": self.metric_name,
@@ -51,22 +52,22 @@ class ContainerMetricQuerier(MetricQuerier):
             result["project_id"] = str(self.project_id)
         return result
 
-    def group_by_labels(self) -> tuple[str, ...]:
+    def group_by_labels(self) -> frozenset[str]:
         """Return the labels to group by in the query.
 
         Returns labels that are set (not None), plus 'value_type' which is always included.
         """
-        result = ["value_type"]
+        result: set[str] = {"value_type"}
 
         if self.agent_id is not None:
-            result.append("agent_id")
+            result.add("agent_id")
         if self.kernel_id is not None:
-            result.append("kernel_id")
+            result.add("kernel_id")
         if self.session_id is not None:
-            result.append("session_id")
+            result.add("session_id")
         if self.user_id is not None:
-            result.append("user_id")
+            result.add("user_id")
         if self.project_id is not None:
-            result.append("project_id")
+            result.add("project_id")
 
-        return tuple(result)
+        return frozenset(result)
