@@ -12,7 +12,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import DomainFairShareData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -65,14 +65,20 @@ class DomainFairShareGQL(Node):
     )
     async def domain(
         self,
-        info: Info,
-    ) -> Annotated[
-        DomainV2GQL,
-        strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
-    ]:
-        from ai.backend.manager.api.gql.domain_v2.fetcher.domain import fetch_domain
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 
-        return await fetch_domain(info=info, domain_name=self.domain_name)
+        domain_data = await info.context.data_loaders.domain_loader.load(self.domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
 
     @classmethod
     def from_dataclass(cls, data: DomainFairShareData) -> DomainFairShareGQL:

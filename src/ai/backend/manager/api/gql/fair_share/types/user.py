@@ -13,7 +13,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import UserFairShareData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -68,14 +68,20 @@ class UserFairShareGQL(Node):
     )
     async def user(
         self,
-        info: Info,
-    ) -> Annotated[
-        UserV2GQL,
-        strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
-    ]:
-        from ai.backend.manager.api.gql.user_v2.fetcher.user import fetch_user
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
 
-        return await fetch_user(info=info, user_uuid=self.user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
+        if user_data is None:
+            return None
+        return UserV2GQL.from_data(user_data)
 
     @classmethod
     def from_dataclass(cls, data: UserFairShareData) -> UserFairShareGQL:
