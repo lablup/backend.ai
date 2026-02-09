@@ -2299,6 +2299,11 @@ type FairShareCalculationSnapshot {
   Timestamp when this fair share calculation was performed. Fair share factors are recalculated periodically by the scheduler.
   """
   lastCalculatedAt: DateTime!
+
+  """
+  Added in 26.2.0. Average daily decayed resource usage during the lookback period. Calculated as total_decayed_usage divided by lookback duration in days. For each resource type, this represents the average decayed amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
+  """
+  averageDailyDecayedUsage: ResourceSlot!
 }
 
 """
