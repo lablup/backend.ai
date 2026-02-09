@@ -158,6 +158,7 @@ Backends handle actual proxy implementation:
 - Advanced routing rules
 - Middleware chains
 - Enterprise features
+- See [Traefik Integration Guide](../../../../docs/app-proxy/traefik-integration.md) for detailed configuration
 
 ### Load Balancing Strategies
 
@@ -424,6 +425,7 @@ See [README.md](./README.md) for development setup instructions.
 
 - [Coordinator README](./coordinator/README.md) - Coordinator details
 - [Worker README](./worker/README.md) - Worker details
+- [Traefik Integration Guide](../../../../docs/app-proxy/traefik-integration.md) - Traefik mode configuration and setup
 - [Manager Component](../manager/README.md) - API gateway
 - [Agent Component](../agent/README.md) - Container management
 - [Overall Architecture](../README.md) - System-wide architecture
