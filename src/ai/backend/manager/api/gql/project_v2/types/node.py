@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
@@ -26,6 +26,9 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.user_v2.types.filters import UserV2Filter, UserV2OrderBy
+    from ai.backend.manager.api.gql.user_v2.types.node import UserV2Connection
     from ai.backend.manager.data.group.types import GroupData
 
 
@@ -143,6 +146,68 @@ class ProjectV2GQL(Node):
             limit=limit,
             offset=offset,
             base_conditions=base_conditions,
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="The domain this project belongs to.",
+    )
+    async def domain(
+        self,
+        info: Info,
+    ) -> Annotated[
+        DomainV2GQL,
+        strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+        from ai.backend.manager.errors.resource import DomainNotFound
+
+        data = await info.context.data_loaders.domain_loader.load(self.organization.domain_name)
+        if data is None:
+            raise DomainNotFound(self.organization.domain_name)
+        return DomainV2GQL.from_data(data)
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Users who are members of this project.",
+    )
+    async def users(
+        self,
+        info: Info,
+        filter: Annotated[
+            UserV2Filter, strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                UserV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        UserV2Connection,
+        strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
+    ]:
+        from ai.backend.manager.api.gql.user_v2.fetcher.user import fetch_project_users
+        from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
+
+        scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
+        return await fetch_project_users(
+            info=info,
+            scope=scope,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
     @classmethod

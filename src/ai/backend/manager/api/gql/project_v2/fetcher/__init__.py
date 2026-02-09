@@ -5,6 +5,7 @@ from .project import (
     fetch_domain_projects,
     fetch_project,
     fetch_project_domain,
+    fetch_user_projects,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "fetch_domain_projects",
     "fetch_project",
     "fetch_project_domain",
+    "fetch_user_projects",
 ]
