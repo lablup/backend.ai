@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 
@@ -25,6 +26,13 @@ class DomainConditions:
     """Query conditions for filtering domains."""
 
     # ==================== Name Filters ====================
+
+    @staticmethod
+    def by_names(names: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.name.in_(names)
+
+        return inner
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
