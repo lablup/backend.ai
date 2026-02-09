@@ -378,6 +378,8 @@ class ResourceGroupGQL(Node):
 )
 class ResourceGroupOrderFieldGQL(StrEnum):
     NAME = "name"
+    CREATED_AT = "created_at"
+    IS_ACTIVE = "is_active"
 
 
 @strawberry.input(
@@ -386,6 +388,9 @@ class ResourceGroupOrderFieldGQL(StrEnum):
 )
 class ResourceGroupFilterGQL(GQLFilter):
     name: StringFilter | None = None
+    description: StringFilter | None = None
+    is_active: bool | None = None
+    is_public: bool | None = None
 
     AND: list[ResourceGroupFilterGQL] | None = None
     OR: list[ResourceGroupFilterGQL] | None = None
@@ -411,6 +416,25 @@ class ResourceGroupFilterGQL(GQLFilter):
             )
             if name_condition:
                 field_conditions.append(name_condition)
+
+        # Apply description filter
+        if self.description:
+            description_condition = self.description.build_query_condition(
+                contains_factory=ScalingGroupConditions.by_description_contains,
+                equals_factory=ScalingGroupConditions.by_description_equals,
+                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
+            )
+            if description_condition:
+                field_conditions.append(description_condition)
+
+        # Apply is_active filter
+        if self.is_active is not None:
+            field_conditions.append(ScalingGroupConditions.by_is_active(self.is_active))
+
+        # Apply is_public filter
+        if self.is_public is not None:
+            field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
 
         # Handle AND logical operator - these are implicitly ANDed with field conditions
         if self.AND:
@@ -451,6 +475,10 @@ class ResourceGroupOrderByGQL(GQLOrderBy):
         match self.field:
             case ResourceGroupOrderFieldGQL.NAME:
                 return ScalingGroupOrders.name(ascending)
+            case ResourceGroupOrderFieldGQL.CREATED_AT:
+                return ScalingGroupOrders.created_at(ascending)
+            case ResourceGroupOrderFieldGQL.IS_ACTIVE:
+                return ScalingGroupOrders.is_active(ascending)
 
 
 # Mutation Input/Payload types

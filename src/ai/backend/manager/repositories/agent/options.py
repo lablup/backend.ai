@@ -173,6 +173,12 @@ class AgentOrders:
         return AgentRow.id.desc()
 
     @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AgentRow.status.asc()
+        return AgentRow.status.desc()
+
+    @staticmethod
     def scaling_group(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AgentRow.scaling_group.asc()

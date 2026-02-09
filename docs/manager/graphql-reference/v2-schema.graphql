@@ -129,6 +129,7 @@ input AgentOrderBy {
 """Added in 26.1.0. Order by specification for agents"""
 enum AgentOrderField {
   ID
+  STATUS
   FIRST_CONTACT
   SCALING_GROUP
   SCHEDULABLE
@@ -5127,6 +5128,9 @@ type ResourceGroupEdge {
 """Added in 26.1.0. Filter for resource groups"""
 input ResourceGroupFilter {
   name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -5166,6 +5170,8 @@ input ResourceGroupOrderBy {
 """Added in 26.1.0. Fields available for ordering resource groups"""
 enum ResourceGroupOrderField {
   NAME
+  CREATED_AT
+  IS_ACTIVE
 }
 
 """Resource group + domain scope for project-level operations"""

@@ -288,6 +288,7 @@ enum AgentOrderField
   @join__type(graph: STRAWBERRY)
 {
   ID @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
   FIRST_CONTACT @join__enumValue(graph: STRAWBERRY)
   SCALING_GROUP @join__enumValue(graph: STRAWBERRY)
   SCHEDULABLE @join__enumValue(graph: STRAWBERRY)
@@ -9391,6 +9392,9 @@ input ResourceGroupFilter
   @join__type(graph: STRAWBERRY)
 {
   name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -9440,6 +9444,8 @@ enum ResourceGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Resource group + domain scope for project-level operations"""
