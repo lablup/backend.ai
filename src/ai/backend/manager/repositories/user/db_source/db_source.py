@@ -120,7 +120,7 @@ class UserDBSource:
         Get user by email with ownership validation.
         Returns None if user not found or access denied.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             user_row = await self._get_user_by_email(session, email)
             return UserData.from_row(user_row)
 

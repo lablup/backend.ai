@@ -27,7 +27,7 @@ class VFSStorageDBSource:
         """
         Get an existing VFS storage configuration from the database.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.name == storage_name)
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
@@ -39,7 +39,7 @@ class VFSStorageDBSource:
         """
         Get an existing VFS storage configuration from the database by ID.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             query = sa.select(VFSStorageRow).where(VFSStorageRow.id == storage_id)
             result = await db_session.execute(query)
             row = result.scalar_one_or_none()
@@ -85,7 +85,7 @@ class VFSStorageDBSource:
         """
         List all VFS storage configurations from the database.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             query = sa.select(VFSStorageRow)
             result = await db_session.execute(query)
             rows = result.scalars().all()
