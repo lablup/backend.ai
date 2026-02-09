@@ -138,7 +138,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import (
+    OpenTelemetrySpec,
+    instrument_aiohttp_client,
+    instrument_aiohttp_server,
+)
 from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -846,6 +850,8 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+        instrument_aiohttp_server()
+        instrument_aiohttp_client()
     try:
         yield
     finally:

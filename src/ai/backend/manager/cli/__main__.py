@@ -265,10 +265,16 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
     from more_itertools import chunked
 
     from ai.backend.common.validators import TimeDuration
+    from ai.backend.manager.models.agent import AgentRow
     from ai.backend.manager.models.error_logs import error_logs
     from ai.backend.manager.models.kernel import kernels
     from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.utils import connect_database, vacuum_db
+
+    # AgentRow must be imported to register it with SQLAlchemy's ORM mapper.
+    # KernelRow (via SessionRow) has a relationship to AgentRow using a string reference,
+    # which requires AgentRow to be in the mapper registry.
+    _ = AgentRow
 
     from .context import redis_ctx
 

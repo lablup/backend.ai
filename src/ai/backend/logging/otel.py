@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
@@ -59,11 +60,11 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
 
 
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     tracer_provider = TracerProvider(resource=spec.to_resource())
     span_exporter = OTLPSpanExporter(endpoint=spec.endpoint)
     span_processor = BatchSpanProcessor(span_exporter)
     tracer_provider.add_span_processor(span_processor)
+    trace.set_tracer_provider(tracer_provider)
     logging.info("OpenTelemetry tracing initialized successfully.")
 
 
