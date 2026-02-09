@@ -275,3 +275,22 @@ class FairShareCalculationSnapshotGQL:
             "Fair share factors are recalculated periodically by the scheduler."
         )
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.2.0. Average daily decayed resource usage during the lookback period. "
+            "Calculated as total_decayed_usage divided by lookback duration in days. "
+            "For each resource type, this represents the average decayed amount consumed per day. "
+            "Units match the resource type (e.g., CPU cores, memory bytes)."
+        )
+    )
+    def average_daily_decayed_usage(self) -> ResourceSlotGQL:
+        from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
+            calculate_average_daily_usage,
+        )
+
+        return calculate_average_daily_usage(
+            self.total_decayed_usage,
+            self.lookback_start,
+            self.lookback_end,
+        )
