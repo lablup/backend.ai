@@ -3341,7 +3341,7 @@ type DomainFairShare implements Node
   """
   Added in 26.2.0. The domain entity associated with this fair share record.
   """
-  domain: DomainV2!
+  domain: DomainV2
 }
 
 """
@@ -7594,7 +7594,7 @@ type ProjectFairShare implements Node
   """
   Added in 26.2.0. The project entity associated with this fair share record.
   """
-  project: ProjectV2!
+  project: ProjectV2
 }
 
 """
@@ -11412,7 +11412,7 @@ type UserFairShare implements Node
   """
   Added in 26.2.0. The user entity associated with this fair share record.
   """
-  user: UserV2!
+  user: UserV2
 }
 
 """
