@@ -30,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
@@ -205,6 +206,7 @@ def get_route_pagination_spec() -> PaginationSpec:
         backward_order=RouteOrders.created_at(ascending=True),
         forward_condition_factory=RouteConditions.by_cursor_forward,
         backward_condition_factory=RouteConditions.by_cursor_backward,
+        tiebreaker_order=RoutingRow.id.asc(),
     )
 
 

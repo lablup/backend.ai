@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentEdge,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentConditions,
     DeploymentOrders,
@@ -34,6 +35,7 @@ def get_deployment_pagination_spec() -> PaginationSpec:
         backward_order=DeploymentOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentConditions.by_cursor_forward,
         backward_condition_factory=DeploymentConditions.by_cursor_backward,
+        tiebreaker_order=EndpointRow.id.asc(),
     )
 
 

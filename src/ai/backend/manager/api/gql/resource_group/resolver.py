@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.scaling_group.types import SchedulerType
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
@@ -58,6 +59,7 @@ def _get_resource_group_pagination_spec() -> PaginationSpec:
         backward_order=ScalingGroupOrders.created_at(ascending=True),
         forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
+        tiebreaker_order=ScalingGroupRow.name.asc(),
     )
 
 

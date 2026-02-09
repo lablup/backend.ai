@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.resource_usage_history.row import ProjectUsageBucketRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.resource_usage_history.options import (
     ProjectUsageBucketConditions,
@@ -38,6 +39,7 @@ def get_project_usage_bucket_pagination_spec() -> PaginationSpec:
         backward_order=ProjectUsageBucketOrders.by_period_start(ascending=True),
         forward_condition_factory=ProjectUsageBucketConditions.by_cursor_forward,
         backward_condition_factory=ProjectUsageBucketConditions.by_cursor_backward,
+        tiebreaker_order=ProjectUsageBucketRow.id.asc(),
     )
 
 

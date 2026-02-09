@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRuleOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.deployment.options import (
     AutoScalingRuleConditions,
@@ -40,6 +41,7 @@ def get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
         backward_order=AutoScalingRuleOrders.created_at(ascending=True),
         forward_condition_factory=AutoScalingRuleConditions.by_cursor_forward,
         backward_condition_factory=AutoScalingRuleConditions.by_cursor_backward,
+        tiebreaker_order=EndpointAutoScalingRuleRow.id.asc(),
     )
 
 
