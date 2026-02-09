@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.deployment.options import (
     RevisionConditions,
@@ -35,6 +36,7 @@ def get_revision_pagination_spec() -> PaginationSpec:
         backward_order=RevisionOrders.created_at(ascending=True),
         forward_condition_factory=RevisionConditions.by_cursor_forward,
         backward_condition_factory=RevisionConditions.by_cursor_backward,
+        tiebreaker_order=DeploymentRevisionRow.id.asc(),
     )
 
 

@@ -29,6 +29,7 @@ def _get_kernel_pagination_spec() -> PaginationSpec:
         backward_order=KernelRow.created_at.asc(),
         forward_condition_factory=KernelConditions.by_cursor_forward,
         backward_condition_factory=KernelConditions.by_cursor_backward,
+        tiebreaker_order=KernelRow.id.asc(),
     )
 
 

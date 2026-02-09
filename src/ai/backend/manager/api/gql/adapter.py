@@ -61,6 +61,11 @@ class PaginationSpec:
     backward_condition_factory: CursorConditionFactory
     """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
 
+    tiebreaker_order: QueryOrder
+    """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
+    Applied as the last ORDER BY clause to ensure stable ordering
+    when the primary sort column has duplicate values."""
+
 
 class BaseGQLAdapter:
     """Base adapter providing common GraphQL query building utilities."""
@@ -176,6 +181,9 @@ class BaseGQLAdapter:
         elif not is_cursor_pagination:
             # Apply default order for offset pagination when order_by is not provided
             orders.append(pagination_spec.forward_order)
+
+        # Always append tiebreaker as the last ORDER BY for deterministic ordering
+        orders.append(pagination_spec.tiebreaker_order)
 
         pagination = self._build_pagination(
             options=pagination_options,

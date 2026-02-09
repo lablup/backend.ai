@@ -15,6 +15,11 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.models.scheduling_history.row import (
+    DeploymentHistoryRow,
+    RouteHistoryRow,
+    SessionSchedulingHistoryRow,
+)
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     DeploymentHistoryOrders,
@@ -57,6 +62,7 @@ def _get_session_history_pagination_spec() -> PaginationSpec:
         backward_order=SessionSchedulingHistoryOrders.created_at(ascending=True),
         forward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_forward,
         backward_condition_factory=SessionSchedulingHistoryConditions.by_cursor_backward,
+        tiebreaker_order=SessionSchedulingHistoryRow.id.asc(),
     )
 
 
@@ -67,6 +73,7 @@ def _get_deployment_history_pagination_spec() -> PaginationSpec:
         backward_order=DeploymentHistoryOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentHistoryConditions.by_cursor_forward,
         backward_condition_factory=DeploymentHistoryConditions.by_cursor_backward,
+        tiebreaker_order=DeploymentHistoryRow.id.asc(),
     )
 
 
@@ -77,6 +84,7 @@ def _get_route_history_pagination_spec() -> PaginationSpec:
         backward_order=RouteHistoryOrders.created_at(ascending=True),
         forward_condition_factory=RouteHistoryConditions.by_cursor_forward,
         backward_condition_factory=RouteHistoryConditions.by_cursor_backward,
+        tiebreaker_order=RouteHistoryRow.id.asc(),
     )
 
 

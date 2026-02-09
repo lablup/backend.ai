@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.auth import InvalidAuthParameters
+from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
@@ -73,6 +74,7 @@ def _get_channel_pagination_spec() -> PaginationSpec:
         backward_order=NotificationChannelOrders.created_at(ascending=True),
         forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
         backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
+        tiebreaker_order=NotificationChannelRow.id.asc(),
     )
 
 
@@ -83,6 +85,7 @@ def _get_rule_pagination_spec() -> PaginationSpec:
         backward_order=NotificationRuleOrders.created_at(ascending=True),
         forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
         backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
+        tiebreaker_order=NotificationRuleRow.id.asc(),
     )
 
 

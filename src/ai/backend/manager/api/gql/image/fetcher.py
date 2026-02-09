@@ -43,6 +43,7 @@ def _get_image_pagination_spec() -> PaginationSpec:
         backward_order=ImageRow.id.desc(),
         forward_condition_factory=lambda cursor_value: lambda: ImageRow.id > cursor_value,
         backward_condition_factory=lambda cursor_value: lambda: ImageRow.id < cursor_value,
+        tiebreaker_order=ImageRow.id.asc(),
     )
 
 
@@ -158,6 +159,7 @@ def _get_image_alias_pagination_spec() -> PaginationSpec:
         backward_order=ImageAliasRow.id.desc(),
         forward_condition_factory=lambda cursor_value: lambda: ImageAliasRow.id > cursor_value,
         backward_condition_factory=lambda cursor_value: lambda: ImageAliasRow.id < cursor_value,
+        tiebreaker_order=ImageAliasRow.id.asc(),
     )
 
 

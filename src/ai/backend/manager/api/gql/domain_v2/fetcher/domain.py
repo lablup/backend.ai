@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.repositories.domain.options import DomainConditions, DomainOrders
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
@@ -32,6 +33,7 @@ def get_domain_pagination_spec() -> PaginationSpec:
         backward_order=DomainOrders.created_at(ascending=True),
         forward_condition_factory=DomainConditions.by_cursor_forward,
         backward_condition_factory=DomainConditions.by_cursor_backward,
+        tiebreaker_order=DomainRow.name.asc(),
     )
 
 

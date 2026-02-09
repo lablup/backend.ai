@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.user_v2.types import (
     UserV2GQL,
     UserV2OrderBy,
 )
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
@@ -41,6 +42,7 @@ def get_user_pagination_spec() -> PaginationSpec:
         backward_order=UserOrders.created_at(ascending=True),
         forward_condition_factory=UserConditions.by_cursor_forward,
         backward_condition_factory=UserConditions.by_cursor_backward,
+        tiebreaker_order=UserRow.uuid.asc(),
     )
 
 

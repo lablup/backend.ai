@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     UserFairShareOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.row import UserFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.fair_share.options import (
     UserFairShareConditions,
@@ -38,6 +39,7 @@ def get_user_fair_share_pagination_spec() -> PaginationSpec:
         backward_order=UserFairShareOrders.by_created_at(ascending=True),
         forward_condition_factory=UserFairShareConditions.by_cursor_forward,
         backward_condition_factory=UserFairShareConditions.by_cursor_backward,
+        tiebreaker_order=UserFairShareRow.id.asc(),
     )
 
 

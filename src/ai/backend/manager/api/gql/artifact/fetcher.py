@@ -49,6 +49,7 @@ def _get_artifact_revision_pagination_spec() -> PaginationSpec:
         > cursor_value,
         backward_condition_factory=lambda cursor_value: lambda: ArtifactRevisionRow.id
         < cursor_value,
+        tiebreaker_order=ArtifactRevisionRow.id.asc(),
     )
 
 
@@ -60,6 +61,7 @@ def _get_artifact_pagination_spec() -> PaginationSpec:
         backward_order=ArtifactRow.id.desc(),
         forward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id > cursor_value,
         backward_condition_factory=lambda cursor_value: lambda: ArtifactRow.id < cursor_value,
+        tiebreaker_order=ArtifactRow.id.asc(),
     )
 
 

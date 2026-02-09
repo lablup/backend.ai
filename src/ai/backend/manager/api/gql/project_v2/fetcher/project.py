@@ -20,6 +20,7 @@ from ai.backend.manager.api.gql.project_v2.types import (
     ProjectV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.group.options import GroupConditions, GroupOrders
 from ai.backend.manager.repositories.group.types import DomainProjectSearchScope
@@ -47,6 +48,7 @@ def get_project_pagination_spec() -> PaginationSpec:
         backward_order=GroupOrders.created_at(ascending=True),
         forward_condition_factory=forward_cursor_factory,
         backward_condition_factory=backward_cursor_factory,
+        tiebreaker_order=GroupRow.id.asc(),
     )
 
 
