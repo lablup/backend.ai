@@ -69,12 +69,10 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
 
 
 def instrument_aiohttp_server() -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpServerInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
 
 
 def instrument_aiohttp_client() -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpClientInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp client initialized successfully.")

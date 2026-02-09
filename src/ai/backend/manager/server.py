@@ -41,6 +41,9 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
+from opentelemetry.instrumentation.aiohttp_server import (
+    middleware as otel_server_middleware,
+)
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
@@ -850,8 +853,6 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             service_instance_name=meta.display_name,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-        instrument_aiohttp_server()
-        instrument_aiohttp_client()
     try:
         yield
     finally:
@@ -1802,6 +1803,15 @@ async def server_main(
         # Initialize JWT validator after config is loaded
         jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
         root_ctx.jwt_validator = JWTValidator(jwt_config)
+
+        # TODO: Remove manual middleware injection once the manager startup is
+        # decoupled from the aiohttp Application lifecycle. Currently root_app is
+        # instantiated before OTel config is available, so instrument_aiohttp_server()
+        # (which patches the class via setattr) cannot take effect automatically.
+        if root_ctx.config_provider.config.otel.enabled:
+            instrument_aiohttp_server()
+            instrument_aiohttp_client()
+            root_app.middlewares.insert(0, otel_server_middleware)
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(webapp_plugin_ctx(root_app))
