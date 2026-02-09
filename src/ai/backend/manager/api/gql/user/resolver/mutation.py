@@ -9,21 +9,21 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.user_v2.types import (
+from ai.backend.manager.api.gql.user.types import (
     BulkCreateUserErrorGQL,
-    BulkCreateUsersV2PayloadGQL,
-    BulkCreateUserV2InputGQL,
-    CreateUserV2InputGQL,
-    CreateUserV2PayloadGQL,
-    DeleteUsersV2InputGQL,
-    DeleteUsersV2PayloadGQL,
-    DeleteUserV2PayloadGQL,
-    PurgeUsersV2InputGQL,
-    PurgeUsersV2PayloadGQL,
-    PurgeUserV2InputGQL,
-    PurgeUserV2PayloadGQL,
-    UpdateUserV2InputGQL,
-    UpdateUserV2PayloadGQL,
+    BulkCreateUserInputGQL,
+    BulkCreateUsersPayloadGQL,
+    CreateUserInputGQL,
+    CreateUserPayloadGQL,
+    DeleteUserPayloadGQL,
+    DeleteUsersInputGQL,
+    DeleteUsersPayloadGQL,
+    PurgeUserInputGQL,
+    PurgeUserPayloadGQL,
+    PurgeUsersInputGQL,
+    PurgeUsersPayloadGQL,
+    UpdateUserInputGQL,
+    UpdateUserPayloadGQL,
     UserV2GQL,
 )
 from ai.backend.manager.data.user.types import UserStatus
@@ -47,8 +47,8 @@ from ai.backend.manager.services.user.actions.create_user import (
 )  # type: ignore[misc]
 async def admin_create_user(
     info: Info[StrawberryGQLContext],
-    input: CreateUserV2InputGQL,
-) -> CreateUserV2PayloadGQL:
+    input: CreateUserInputGQL,
+) -> CreateUserPayloadGQL:
     """Create a new user.
 
     Args:
@@ -56,7 +56,7 @@ async def admin_create_user(
         input: User creation input.
 
     Returns:
-        CreateUserV2PayloadGQL with the created user.
+        CreateUserPayloadGQL with the created user.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -73,8 +73,8 @@ async def admin_create_user(
 )  # type: ignore[misc]
 async def admin_bulk_create_users(
     info: Info[StrawberryGQLContext],
-    input: BulkCreateUserV2InputGQL,
-) -> BulkCreateUsersV2PayloadGQL:
+    input: BulkCreateUserInputGQL,
+) -> BulkCreateUsersPayloadGQL:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -82,7 +82,7 @@ async def admin_bulk_create_users(
         input: Bulk user creation input with individual specs.
 
     Returns:
-        BulkCreateUsersV2PayloadGQL with created users.
+        BulkCreateUsersPayloadGQL with created users.
     """
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
@@ -133,7 +133,7 @@ async def admin_bulk_create_users(
         for error in result.data.failures
     ]
 
-    return BulkCreateUsersV2PayloadGQL(
+    return BulkCreateUsersPayloadGQL(
         created_users=created_users,
         failed=failed,
     )
@@ -152,8 +152,8 @@ async def admin_bulk_create_users(
 async def admin_update_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-    input: UpdateUserV2InputGQL,
-) -> UpdateUserV2PayloadGQL:
+    input: UpdateUserInputGQL,
+) -> UpdateUserPayloadGQL:
     """Update a user's information.
 
     Args:
@@ -162,7 +162,7 @@ async def admin_update_user(
         input: User update input with fields to modify.
 
     Returns:
-        UpdateUserV2PayloadGQL with the updated user.
+        UpdateUserPayloadGQL with the updated user.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -179,8 +179,8 @@ async def admin_update_user(
 )  # type: ignore[misc]
 async def update_user(
     info: Info[StrawberryGQLContext],
-    input: UpdateUserV2InputGQL,
-) -> UpdateUserV2PayloadGQL:
+    input: UpdateUserInputGQL,
+) -> UpdateUserPayloadGQL:
     """Update the current user's own information.
 
     Args:
@@ -188,7 +188,7 @@ async def update_user(
         input: User update input with fields to modify.
 
     Returns:
-        UpdateUserV2PayloadGQL with the updated user.
+        UpdateUserPayloadGQL with the updated user.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -209,7 +209,7 @@ async def update_user(
 async def admin_delete_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> DeleteUserV2PayloadGQL:
+) -> DeleteUserPayloadGQL:
     """Soft-delete a single user.
 
     Args:
@@ -217,7 +217,7 @@ async def admin_delete_user(
         user_id: UUID of the user to delete.
 
     Returns:
-        DeleteUserV2PayloadGQL indicating success.
+        DeleteUserPayloadGQL indicating success.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -234,8 +234,8 @@ async def admin_delete_user(
 )  # type: ignore[misc]
 async def admin_delete_users(
     info: Info[StrawberryGQLContext],
-    input: DeleteUsersV2InputGQL,
-) -> DeleteUsersV2PayloadGQL:
+    input: DeleteUsersInputGQL,
+) -> DeleteUsersPayloadGQL:
     """Soft-delete multiple users.
 
     Args:
@@ -243,7 +243,7 @@ async def admin_delete_users(
         input: Input containing list of user UUIDs to delete.
 
     Returns:
-        DeleteUsersV2PayloadGQL with count of deleted users.
+        DeleteUsersPayloadGQL with count of deleted users.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -263,8 +263,8 @@ async def admin_delete_users(
 )  # type: ignore[misc]
 async def admin_purge_user(
     info: Info[StrawberryGQLContext],
-    input: PurgeUserV2InputGQL,
-) -> PurgeUserV2PayloadGQL:
+    input: PurgeUserInputGQL,
+) -> PurgeUserPayloadGQL:
     """Permanently delete a single user.
 
     Args:
@@ -272,7 +272,7 @@ async def admin_purge_user(
         input: Purge input with email and options.
 
     Returns:
-        PurgeUserV2PayloadGQL indicating success.
+        PurgeUserPayloadGQL indicating success.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.
@@ -289,8 +289,8 @@ async def admin_purge_user(
 )  # type: ignore[misc]
 async def admin_purge_users(
     info: Info[StrawberryGQLContext],
-    input: PurgeUsersV2InputGQL,
-) -> PurgeUsersV2PayloadGQL:
+    input: PurgeUsersInputGQL,
+) -> PurgeUsersPayloadGQL:
     """Permanently delete multiple users.
 
     Args:
@@ -298,7 +298,7 @@ async def admin_purge_users(
         input: Purge input with emails and options.
 
     Returns:
-        PurgeUsersV2PayloadGQL with count of purged users.
+        PurgeUsersPayloadGQL with count of purged users.
 
     Raises:
         NotImplementedError: This mutation is not yet implemented.

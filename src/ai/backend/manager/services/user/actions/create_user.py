@@ -53,8 +53,8 @@ class BulkCreateUserAction(UserAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "bulk_create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

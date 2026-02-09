@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-    from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @strawberry.type(
@@ -75,11 +75,11 @@ class UserFairShareGQL(Node):
     ) -> (
         Annotated[
             UserV2GQL,
-            strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.user_v2.types.node import UserV2GQL
+        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
         user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
         if user_data is None:

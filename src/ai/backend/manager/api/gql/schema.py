@@ -210,7 +210,7 @@ from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
-from .user_v2 import (
+from .user import (
     # Mutations
     admin_bulk_create_users,
     admin_create_user,

@@ -406,10 +406,12 @@ class UserOrderByGQL(GQLOrderBy):
                 return UserOrders.email(ascending)
             case UserOrderFieldGQL.STATUS:
                 return UserOrders.status(ascending)
-            case UserV2OrderField.DOMAIN_NAME:
+            case UserOrderFieldGQL.DOMAIN_NAME:
                 return UserOrders.by_domain_name(ascending)
-            case UserV2OrderField.PROJECT_NAME:
+            case UserOrderFieldGQL.PROJECT_NAME:
                 return UserOrders.by_project_name(ascending)
+            case _:
+                raise ValueError(f"Unknown order field: {self.field}")
 
 
 @strawberry.input(

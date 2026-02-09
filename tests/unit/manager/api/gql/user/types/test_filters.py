@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.user_v2.types.filters import (
+from ai.backend.manager.api.gql.user.types.filters import (
     UserDomainNestedFilter,
+    UserFilterGQL,
+    UserOrderByGQL,
+    UserOrderFieldGQL,
     UserProjectNestedFilter,
-    UserV2Filter,
-    UserV2OrderBy,
-    UserV2OrderField,
 )
 
 # Row imports to trigger mapper initialization (FK dependency order).
@@ -160,11 +160,11 @@ class TestUserProjectNestedFilter:
         assert conditions == []
 
 
-class TestUserV2FilterWithNestedFilters:
-    """Tests for UserV2Filter integration with nested domain/project filters."""
+class TestUserFilterGQLWithNestedFilters:
+    """Tests for UserFilterGQL integration with nested domain/project filters."""
 
     def test_domain_nested_adds_exists_condition(self) -> None:
-        f = UserV2Filter(
+        f = UserFilterGQL(
             domain=UserDomainNestedFilter(
                 name=StringFilter(contains="example"),
                 is_active=None,
@@ -177,7 +177,7 @@ class TestUserV2FilterWithNestedFilters:
         assert "domains" in sql
 
     def test_project_nested_adds_exists_condition(self) -> None:
-        f = UserV2Filter(
+        f = UserFilterGQL(
             project=UserProjectNestedFilter(
                 name=StringFilter(contains="team"),
                 is_active=None,
@@ -190,7 +190,7 @@ class TestUserV2FilterWithNestedFilters:
         assert "association_groups_users" in sql
 
     def test_both_nested_filters_combined(self) -> None:
-        f = UserV2Filter(
+        f = UserFilterGQL(
             domain=UserDomainNestedFilter(
                 name=StringFilter(contains="corp"),
                 is_active=None,
@@ -204,7 +204,7 @@ class TestUserV2FilterWithNestedFilters:
         assert len(conditions) == 2
 
     def test_nested_with_existing_fields(self) -> None:
-        f = UserV2Filter(
+        f = UserFilterGQL(
             username=StringFilter(contains="admin"),
             domain=UserDomainNestedFilter(
                 name=StringFilter(contains="corp"),
@@ -215,7 +215,7 @@ class TestUserV2FilterWithNestedFilters:
         assert len(conditions) == 2
 
     def test_empty_nested_filters_no_extra_conditions(self) -> None:
-        f = UserV2Filter(
+        f = UserFilterGQL(
             domain=UserDomainNestedFilter(name=None, is_active=None),
             project=UserProjectNestedFilter(name=None, is_active=None),
         )
@@ -223,12 +223,12 @@ class TestUserV2FilterWithNestedFilters:
         assert len(conditions) == 0
 
 
-class TestUserV2OrderByNewFields:
+class TestUserOrderByGQLNewFields:
     """Tests for new DOMAIN_NAME and PROJECT_NAME order fields."""
 
     def test_domain_name_ascending(self) -> None:
-        order = UserV2OrderBy(
-            field=UserV2OrderField.DOMAIN_NAME,
+        order = UserOrderByGQL(
+            field=UserOrderFieldGQL.DOMAIN_NAME,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -237,8 +237,8 @@ class TestUserV2OrderByNewFields:
         assert "ASC" in sql.upper()
 
     def test_domain_name_descending(self) -> None:
-        order = UserV2OrderBy(
-            field=UserV2OrderField.DOMAIN_NAME,
+        order = UserOrderByGQL(
+            field=UserOrderFieldGQL.DOMAIN_NAME,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -247,8 +247,8 @@ class TestUserV2OrderByNewFields:
         assert "DESC" in sql.upper()
 
     def test_project_name_ascending(self) -> None:
-        order = UserV2OrderBy(
-            field=UserV2OrderField.PROJECT_NAME,
+        order = UserOrderByGQL(
+            field=UserOrderFieldGQL.PROJECT_NAME,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -258,8 +258,8 @@ class TestUserV2OrderByNewFields:
         assert "ASC" in sql.upper()
 
     def test_project_name_descending(self) -> None:
-        order = UserV2OrderBy(
-            field=UserV2OrderField.PROJECT_NAME,
+        order = UserOrderByGQL(
+            field=UserOrderFieldGQL.PROJECT_NAME,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -269,8 +269,8 @@ class TestUserV2OrderByNewFields:
         assert "DESC" in sql.upper()
 
     def test_existing_fields_still_work(self) -> None:
-        order = UserV2OrderBy(
-            field=UserV2OrderField.CREATED_AT,
+        order = UserOrderByGQL(
+            field=UserOrderFieldGQL.CREATED_AT,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
