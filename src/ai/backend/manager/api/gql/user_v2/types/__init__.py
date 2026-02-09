@@ -36,6 +36,7 @@ from .node import (
     UserV2GQL,
 )
 from .payloads import (
+    BulkCreateUserErrorGQL,
     BulkCreateUsersPayloadGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
@@ -85,6 +86,7 @@ __all__ = [
     "PurgeUsersInputGQL",
     # Payloads
     "CreateUserPayloadGQL",
+    "BulkCreateUserErrorGQL",
     "BulkCreateUsersPayloadGQL",
     "UpdateUserPayloadGQL",
     "DeleteUserPayloadGQL",

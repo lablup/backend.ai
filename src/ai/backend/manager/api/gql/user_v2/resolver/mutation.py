@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID
 
 import strawberry
@@ -9,6 +10,7 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user_v2.types import (
+    BulkCreateUserErrorGQL,
     BulkCreateUsersV2PayloadGQL,
     BulkCreateUserV2InputGQL,
     CreateUserV2InputGQL,
@@ -120,11 +122,20 @@ async def admin_bulk_create_users(
     action = BulkCreateUserAction(items=items)
     result = await ctx.processors.user.bulk_create_users.wait_for_complete(action)
 
-    users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    failed = [
+        BulkCreateUserErrorGQL(
+            index=error.index,
+            username=cast(UserCreatorSpec, error.spec).username,
+            email=cast(UserCreatorSpec, error.spec).email,
+            message=str(error.exception),
+        )
+        for error in result.data.failures
+    ]
 
     return BulkCreateUsersV2PayloadGQL(
-        created_count=result.data.success_count(),
-        users=users,
+        created_users=created_users,
+        failed=failed,
     )
 
 

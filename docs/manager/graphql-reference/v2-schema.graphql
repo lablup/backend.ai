@@ -891,6 +891,21 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.2.0. Error information for a failed user in bulk creation."""
+type BulkCreateUserError {
+  """Original position in the input list."""
+  index: Int!
+
+  """Username of the user that failed."""
+  username: String!
+
+  """Email of the user that failed."""
+  email: String!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """
 Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
 """
@@ -901,11 +916,11 @@ input BulkCreateUserV2Input {
 
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload {
-  """Number of users successfully created."""
-  createdCount: Int!
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
 
-  """List of newly created users."""
-  users: [UserV2!]!
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
 }
 
 """
