@@ -10,6 +10,13 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 class AgentConditions:
     @staticmethod
+    def by_ids(ids: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
     def by_id_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
