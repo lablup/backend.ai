@@ -1,4 +1,5 @@
-from typing import Any, Literal, cast
+from http import HTTPMethod
+from typing import Any, cast
 
 import aiohttp
 
@@ -57,7 +58,7 @@ class PrometheusClient:
             "end": time_range.end,
             "step": time_range.step,
         })
-        result = await self._execute_request("post", "/query_range", data=form_data)
+        result = await self._execute_request(HTTPMethod.POST, "/query_range", data=form_data)
         return PrometheusQueryRangeResponse.model_validate(result)
 
     async def query_label_values(
@@ -75,7 +76,9 @@ class PrometheusClient:
             LabelValueResponse containing the list of label values.
         """
         form_data = aiohttp.FormData({"match[]": metric_match})
-        result = await self._execute_request("get", f"/label/{label_name}/values", data=form_data)
+        result = await self._execute_request(
+            HTTPMethod.GET, f"/label/{label_name}/values", data=form_data
+        )
         return LabelValueResponse.model_validate(result)
 
     def _get_session(self) -> aiohttp.ClientSession:
@@ -83,12 +86,12 @@ class PrometheusClient:
 
     async def _execute_request(
         self,
-        method: Literal["get", "post"],
+        method: HTTPMethod,
         path: str,
         data: aiohttp.FormData | None = None,
     ) -> dict[str, Any]:
         session = self._get_session()
-        request_fn = session.get if method == "get" else session.post
+        request_fn = session.get if method == HTTPMethod.GET else session.post
         try:
             async with request_fn(path, data=data, timeout=self._timeout) as response:
                 result = cast(dict[str, Any], await response.json())
