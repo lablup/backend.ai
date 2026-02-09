@@ -1728,9 +1728,9 @@ type DomainFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group, including projects without fair share records (which use default values).
+  Added in 26.2.0. The domain entity associated with this fair share record.
   """
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+  domain: DomainV2!
 }
 
 """
@@ -1745,6 +1745,14 @@ type DomainFairShareConnection {
 
   """Total number of domain fair share records matching the query criteria."""
   count: Int!
+}
+
+"""
+Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.
+"""
+input DomainFairShareDomainNestedFilter {
+  """Filter by domain active status."""
+  isActive: Boolean = null
 }
 
 """An edge in a connection."""
@@ -1769,6 +1777,11 @@ input DomainFairShareFilter {
   Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
   """
   domainName: StringFilter = null
+
+  """
+  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
+  """
+  domain: DomainFairShareDomainNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
@@ -1800,12 +1813,13 @@ input DomainFairShareOrderBy {
 }
 
 """
-Added in 26.1.0. Fields available for ordering domain fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). DOMAIN_NAME: Order alphabetically by domain name. CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering domain fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). DOMAIN_NAME: Order alphabetically by domain name. CREATED_AT: Order by record creation timestamp. DOMAIN_IS_ACTIVE: Order by domain active status (added in 26.2.0).
 """
 enum DomainFairShareOrderField {
   FAIR_SHARE_FACTOR
   DOMAIN_NAME
   CREATED_AT
+  DOMAIN_IS_ACTIVE
 }
 
 input DomainFairShareScope {
@@ -3947,9 +3961,9 @@ type ProjectFairShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group, including users without fair share records (which use default values).
+  Added in 26.2.0. The project entity associated with this fair share record.
   """
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+  project: ProjectV2!
 }
 
 """
@@ -3996,6 +4010,11 @@ input ProjectFairShareFilter {
   """
   domainName: StringFilter = null
 
+  """
+  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
+  """
+  project: ProjectFairShareProjectNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
 
@@ -4026,16 +4045,57 @@ input ProjectFairShareOrderBy {
 }
 
 """
-Added in 26.1.0. Fields available for ordering project fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering project fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp. PROJECT_NAME: Order alphabetically by project name (added in 26.2.0). PROJECT_IS_ACTIVE: Order by project active status (added in 26.2.0).
 """
 enum ProjectFairShareOrderField {
   FAIR_SHARE_FACTOR
   CREATED_AT
+  PROJECT_NAME
+  PROJECT_IS_ACTIVE
+}
+
+"""
+Added in 26.2.0. Nested filter for project entity fields in project fair share queries. Allows filtering by project properties such as name, active status, and type.
+"""
+input ProjectFairShareProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+
+  """Filter by project type (GENERAL, MODEL_STORE)."""
+  type: ProjectFairShareTypeEnumFilter = null
 }
 
 input ProjectFairShareScope {
   """Resource group to filter fair shares by."""
   resourceGroup: String!
+}
+
+"""Added in 26.2.0. Project type enum for fair share filtering."""
+enum ProjectFairShareTypeEnum {
+  GENERAL
+  MODEL_STORE
+}
+
+"""
+Added in 26.2.0. Filter for project type enum in fair share queries. Supports equals, in, not_equals, and not_in operations.
+"""
+input ProjectFairShareTypeEnumFilter {
+  """Exact match for project type."""
+  equals: ProjectFairShareTypeEnum = null
+
+  """Match any of the provided types."""
+  in: [ProjectFairShareTypeEnum!] = null
+
+  """Exclude exact type match."""
+  notEquals: ProjectFairShareTypeEnum = null
+
+  """Exclude any of the provided types."""
+  notIn: [ProjectFairShareTypeEnum!] = null
 }
 
 """
@@ -6439,6 +6499,11 @@ type UserFairShare implements Node {
 
   """Timestamp when this record was last updated."""
   updatedAt: DateTime!
+
+  """
+  Added in 26.2.0. The user entity associated with this fair share record.
+  """
+  user: UserV2!
 }
 
 """
@@ -6488,6 +6553,11 @@ input UserFairShareFilter {
   """
   domainName: StringFilter = null
 
+  """
+  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
+  """
+  user: UserFairShareUserNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
 
@@ -6518,11 +6588,13 @@ input UserFairShareOrderBy {
 }
 
 """
-Added in 26.1.0. Fields available for ordering user fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering user fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp. USER_USERNAME: Order alphabetically by username (added in 26.2.0). USER_EMAIL: Order alphabetically by email (added in 26.2.0).
 """
 enum UserFairShareOrderField {
   FAIR_SHARE_FACTOR
   CREATED_AT
+  USER_USERNAME
+  USER_EMAIL
 }
 
 input UserFairShareScope {
@@ -6533,6 +6605,22 @@ input UserFairShareScope {
   Project ID that the user belongs to (required for user-level fair shares).
   """
   projectId: UUID!
+}
+
+"""
+Added in 26.2.0. Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.
+"""
+input UserFairShareUserNestedFilter {
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """Filter by user active status (based on user status field)."""
+  isActive: Boolean = null
 }
 
 extend type UserNode @key(fields: "id") {
