@@ -2060,6 +2060,12 @@ type DomainV2 implements Node @key(fields: "id") {
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+
+  """Projects belonging to this domain."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
+
+  """Users belonging to this domain."""
+  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 }
 
 """
@@ -4353,6 +4359,12 @@ type ProjectV2 implements Node @key(fields: "id") {
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+
+  """The domain this project belongs to."""
+  domain: DomainV2!
+
+  """Users who are members of this project."""
+  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
 }
 
 """
@@ -6872,6 +6884,12 @@ type UserV2 implements Node @key(fields: "id") {
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+
+  """The domain this user belongs to."""
+  domain: DomainV2
+
+  """Projects this user is a member of."""
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
 }
 
 """

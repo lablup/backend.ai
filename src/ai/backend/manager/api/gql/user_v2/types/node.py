@@ -199,13 +199,17 @@ class UserV2GQL(Node):
         self,
         info: Info,
         filter: Annotated[
-            ProjectV2Filter | None,
+            ProjectV2Filter,
             strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.filters"),
-        ] = None,
-        order_by: Annotated[
-            list[ProjectV2OrderBy] | None,
-            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.filters"),
-        ] = None,
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ProjectV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.filters"),
+            ]
+        ]
+        | None = None,
         before: str | None = None,
         after: str | None = None,
         first: int | None = None,

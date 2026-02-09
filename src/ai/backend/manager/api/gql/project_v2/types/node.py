@@ -173,13 +173,16 @@ class ProjectV2GQL(Node):
         self,
         info: Info,
         filter: Annotated[
-            UserV2Filter | None,
-            strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters"),
-        ] = None,
-        order_by: Annotated[
-            list[UserV2OrderBy] | None,
-            strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters"),
-        ] = None,
+            UserV2Filter, strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                UserV2OrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters"),
+            ]
+        ]
+        | None = None,
         before: str | None = None,
         after: str | None = None,
         first: int | None = None,
