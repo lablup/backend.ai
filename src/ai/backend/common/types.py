@@ -127,6 +127,7 @@ __all__ = (
     "SchedulerStatus",
     "SecretKey",
     "Sentinel",
+    "ServiceCatalogStatus",
     "ServicePort",
     "ServicePortProtocols",
     "SessionEnqueueingConfig",
@@ -2021,6 +2022,12 @@ class PurgeImageResult(TypedDict):
 class ServiceDiscoveryType(enum.StrEnum):
     ETCD = "etcd"
     REDIS = "redis"
+
+
+class ServiceCatalogStatus(enum.StrEnum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEREGISTERED = "deregistered"
 
 
 class SessionExecutionStatus(enum.StrEnum):
