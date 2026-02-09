@@ -1,6 +1,3 @@
-from .row import AuditLogEntityType, AuditLogRow
+from .row import AuditLogRow
 
-__all__ = (
-    "AuditLogEntityType",
-    "AuditLogRow",
-)
+__all__ = ("AuditLogRow",)

@@ -6,6 +6,7 @@ from typing import Self
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
 
 
@@ -368,7 +369,7 @@ class ActionMetricObserver:
     def observe_action(
         self,
         *,
-        entity_type: str,
+        entity_type: EntityType,
         operation_type: str,
         status: str,
         duration: float,
