@@ -518,7 +518,7 @@ class CommaSeparatedStrList(DelimiterSeparatedList[str]):
     min_length = None
 
 
-class PydanticJWTValidator[TModel: BaseModel]:
+class PydanticJWTValidator:
     """
     Generic JWT validator with pydantic model-based payload validation.
 
@@ -530,15 +530,11 @@ class PydanticJWTValidator[TModel: BaseModel]:
             user_id: str
             role: str
 
-        validator = PydanticJWTValidator(
-            secret="my-secret-key",
-            model=MyTokenData,
-        )
-        token_data = validator.validate("eyJ...")  # Returns MyTokenData instance
+        validator = PydanticJWTValidator(secret="my-secret-key")
+        token_data = validator.validate("eyJ...", MyTokenData)  # Returns MyTokenData instance
 
     Args:
         secret: Secret key for JWT signature verification
-        model: Pydantic model class to validate and parse the JWT payload
         algorithms: List of allowed JWT algorithms (default: ["HS256"])
     """
 
@@ -546,19 +542,18 @@ class PydanticJWTValidator[TModel: BaseModel]:
         self,
         *,
         secret: str,
-        model: type[TModel],
         algorithms: list[str] | None = None,
     ) -> None:
         self._secret = secret
-        self._model = model
         self._algorithms = algorithms or ["HS256"]
 
-    def validate(self, token: str) -> TModel:
+    def validate[TModel: BaseModel](self, token: str, model: type[TModel]) -> TModel:
         """
         Validate JWT token and return parsed payload as pydantic model instance.
 
         Args:
             token: Encoded JWT token string
+            model: Pydantic model class to validate and parse the JWT payload
 
         Returns:
             Pydantic model instance containing validated token claims
@@ -583,6 +578,6 @@ class PydanticJWTValidator[TModel: BaseModel]:
             raise JWTDecodeError(extra_msg=str(e)) from e
 
         try:
-            return self._model.model_validate(payload)
+            return model.model_validate(payload)
         except ValidationError as e:
             raise JWTPayloadValidationError(extra_msg=str(e)) from e

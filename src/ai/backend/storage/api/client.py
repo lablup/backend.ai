@@ -481,6 +481,9 @@ class DownloadHandler:
     for better testability and separation of concerns.
     """
 
+    def __init__(self, secret: str) -> None:
+        self._jwt_validator = PydanticJWTValidator(secret=secret)
+
     @stream_api_handler
     async def download_archive(
         self,
@@ -488,9 +491,7 @@ class DownloadHandler:
         ctx: StorageRootCtx,
     ) -> APIStreamResponse:
         """Stream multiple files/directories as a ZIP archive."""
-        secret = ctx.root_ctx.local_config.storage_proxy.secret
-        validator = PydanticJWTValidator(secret=secret, model=ArchiveDownloadTokenData)
-        token_data = validator.validate(query.parsed.token)
+        token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
         async with ctx.root_ctx.get_volume(token_data.volume) as volume:
             vfolder_root = volume.sanitize_vfpath(token_data.vfolder_id)
@@ -522,7 +523,7 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
 
     # Initialize handler instances
-    download_handler = DownloadHandler()
+    download_handler = DownloadHandler(secret=ctx.local_config.storage_proxy.secret)
 
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]

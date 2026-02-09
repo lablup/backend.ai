@@ -133,6 +133,7 @@ class ErrorDomain(enum.StrEnum):
 
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
+    AUTH = "auth"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
     ARTIFACT_ASSOCIATION = "artifact-association"
@@ -1012,7 +1013,6 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
         )
 
 
-<<<<<<< HEAD
 class PrometheusConnectionError(BackendAIError):
     """Exception raised when a connection to Prometheus fails."""
 
@@ -1038,7 +1038,7 @@ class FailedToGetMetric(BackendAIError):
             domain=ErrorDomain.METRIC,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
-=======
+        )
 # JWT Errors
 class JWTError(BackendAIError, web.HTTPUnauthorized):
     """
@@ -1053,7 +1053,7 @@ class JWTError(BackendAIError, web.HTTPUnauthorized):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.AUTH,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.UNAUTHORIZED,
         )
@@ -1072,7 +1072,7 @@ class JWTExpiredError(JWTError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.AUTH,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.DATA_EXPIRED,
         )
@@ -1107,7 +1107,7 @@ class JWTInvalidClaimsError(JWTError, web.HTTPForbidden):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.AUTH,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
@@ -1127,7 +1127,7 @@ class JWTDecodeError(BackendAIError, web.HTTPBadRequest):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.AUTH,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
@@ -1147,8 +1147,7 @@ class JWTPayloadValidationError(BackendAIError, web.HTTPBadRequest):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.AUTH,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
->>>>>>> 747b8eb80 (refactor: consolidate types with pydantic and error standarized)
         )

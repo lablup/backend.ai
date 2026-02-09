@@ -158,6 +158,7 @@ class TestDownloadArchiveHandler:
         mock_context: MagicMock,
         mock_query_param: MagicMock,
         token_data: ArchiveDownloadTokenData,
+        secret: str,
         tmp_path: Path,
     ) -> None:
         """
@@ -176,7 +177,7 @@ class TestDownloadArchiveHandler:
         (dir1 / "file2.txt").write_text("content2")
 
         # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler()
+        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         response = await unwrapped(handler, mock_query_param, mock_context)
 
@@ -222,7 +223,7 @@ class TestDownloadArchiveHandler:
         query.parsed.token = token
 
         # Create handler and attempt download
-        handler = DownloadHandler()
+        handler = DownloadHandler(secret=secret)
 
         # Verify InvalidAPIParameters is raised
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
@@ -265,7 +266,7 @@ class TestDownloadArchiveHandler:
         query.parsed.token = token
 
         # Create handler and attempt download
-        handler = DownloadHandler()
+        handler = DownloadHandler(secret=secret)
 
         # Verify HTTPNotFound is raised
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
@@ -280,6 +281,7 @@ class TestDownloadArchiveHandler:
         mock_context: MagicMock,
         mock_query_param: MagicMock,
         token_data: ArchiveDownloadTokenData,
+        secret: str,
         tmp_path: Path,
     ) -> None:
         """
@@ -298,7 +300,7 @@ class TestDownloadArchiveHandler:
         (dir1 / "file2.txt").write_text("content2")
 
         # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler()
+        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         response = await unwrapped(handler, mock_query_param, mock_context)
 
@@ -314,6 +316,7 @@ class TestDownloadArchiveHandler:
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
+        secret: str,
         tmp_path: Path,
     ) -> None:
         """
@@ -331,7 +334,7 @@ class TestDownloadArchiveHandler:
         (dir1 / "file2.txt").write_text("content2")
 
         # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler()
+        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         response = await unwrapped(handler, mock_query_param, mock_context)
 
