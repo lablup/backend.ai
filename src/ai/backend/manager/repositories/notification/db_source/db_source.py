@@ -166,7 +166,7 @@ class NotificationDBSource:
 
     async def get_channel_by_id(self, channel_id: UUID) -> NotificationChannelData:
         """Retrieves a notification channel by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.get(NotificationChannelRow, channel_id)
             if not row:
                 raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
@@ -174,7 +174,7 @@ class NotificationDBSource:
 
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             stmt = (
                 sa.select(NotificationRuleRow)
                 .where(NotificationRuleRow.id == rule_id)

@@ -119,7 +119,7 @@ class ScalingGroupDBSource:
         Raises:
             ScalingGroupNotFound: If the scaling group does not exist.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.get(ScalingGroupRow, name)
             if row is None:
                 raise ScalingGroupNotFound(name)
@@ -212,7 +212,7 @@ class ScalingGroupDBSource:
         domain: str,
     ) -> bool:
         """Checks if a scaling group is associated with a domain."""
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ScalingGroupForDomainRow)
@@ -248,7 +248,7 @@ class ScalingGroupDBSource:
         access_key: str,
     ) -> bool:
         """Checks if a scaling group is associated with a keypair."""
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(
                 sa.exists().where(
                     sa.and_(
@@ -282,7 +282,7 @@ class ScalingGroupDBSource:
         user_group: uuid.UUID,
     ) -> bool:
         """Checks if a scaling group is associated with a user group (project)."""
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ScalingGroupForProjectRow)

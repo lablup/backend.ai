@@ -31,7 +31,7 @@ class StorageNamespaceDBSource:
         """
         Get an existing storage namespace from the database.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = sa.select(StorageNamespaceRow).where(
                 StorageNamespaceRow.storage_id == storage_id,
                 StorageNamespaceRow.namespace == namespace,
@@ -48,7 +48,7 @@ class StorageNamespaceDBSource:
         """
         Get an existing storage namespace from the database by ID.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = sa.select(StorageNamespaceRow).where(
                 StorageNamespaceRow.id == storage_namespace_id
             )
@@ -91,7 +91,7 @@ class StorageNamespaceDBSource:
         """
         Get all namespaces for the specified storage.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = sa.select(StorageNamespaceRow).where(
                 StorageNamespaceRow.storage_id == storage_id
             )
@@ -106,7 +106,7 @@ class StorageNamespaceDBSource:
         Returns:
             Dictionary mapping storage_id to list of namespace names
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = sa.select(StorageNamespaceRow.storage_id, StorageNamespaceRow.namespace)
             result = await db_session.execute(query)
             rows = result.all()

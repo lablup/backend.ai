@@ -444,7 +444,7 @@ class DeploymentDBSource:
         if not scaling_group_names:
             return {}
 
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             stmt = sa.select(ScalingGroupRow.name, ScalingGroupRow.scheduler_opts).where(
                 ScalingGroupRow.name.in_(scaling_group_names)
             )
@@ -1897,7 +1897,7 @@ class DeploymentDBSource:
         Get the default (most common) architecture from active agents in a scaling group.
         Returns None if no active agents exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(AgentRow.architecture).where(
                 sa.and_(
                     AgentRow.scaling_group == scaling_group_name,
@@ -1970,7 +1970,7 @@ class DeploymentDBSource:
         Raises:
             DeploymentRevisionNotFound: If the revision does not exist.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id == revision_id)
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()

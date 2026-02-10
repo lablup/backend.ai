@@ -89,7 +89,7 @@ class ResourcePresetDBSource:
         Gets a resource preset by ID.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_id(session, preset_id)
             if preset_row is None:
                 raise ResourcePresetNotFound()
@@ -100,7 +100,7 @@ class ResourcePresetDBSource:
         Gets a resource preset by name.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_name(session, name)
             if preset_row is None:
                 raise ResourcePresetNotFound()
@@ -162,7 +162,7 @@ class ResourcePresetDBSource:
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(ResourcePresetRow)
             if scaling_group_name is not None:
                 query = query.where(

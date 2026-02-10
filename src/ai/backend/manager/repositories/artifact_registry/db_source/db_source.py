@@ -24,7 +24,7 @@ class ArtifactRegistryDBSource:
         self._db = db
 
     async def get_artifact_registry_data(self, registry_id: uuid.UUID) -> ArtifactRegistryData:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.registry_id == registry_id)
             )
@@ -34,7 +34,7 @@ class ArtifactRegistryDBSource:
             return row.to_dataclass()
 
     async def get_artifact_registry_data_by_name(self, registry_name: str) -> ArtifactRegistryData:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.name == registry_name)
             )
@@ -49,7 +49,7 @@ class ArtifactRegistryDBSource:
         """
         Get multiple artifact registry entries by their IDs in a single query.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow).where(
                     ArtifactRegistryRow.registry_id.in_(registry_ids)
@@ -59,7 +59,7 @@ class ArtifactRegistryDBSource:
             return [row.to_dataclass() for row in rows]
 
     async def get_artifact_registry_type(self, registry_id: uuid.UUID) -> ArtifactRegistryType:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ArtifactRegistryRow.type).where(
                     ArtifactRegistryRow.registry_id == registry_id

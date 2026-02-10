@@ -104,7 +104,7 @@ class ModelServingRepository:
         Get endpoint by ID.
         Returns None if endpoint doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             endpoint = await self._get_endpoint_by_id(
                 session,
                 endpoint_id,
@@ -126,7 +126,7 @@ class ModelServingRepository:
         Get minimal endpoint data required for access validation.
         Returns None if endpoint doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
@@ -153,7 +153,7 @@ class ModelServingRepository:
         Get endpoint by name with ownership validation.
         Returns None if endpoint doesn't exist or user doesn't own it.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             endpoint = await self._get_endpoint_by_name(session, name, user_id)
             if not endpoint:
                 return None
@@ -188,7 +188,7 @@ class ModelServingRepository:
         Check if endpoint name is unique (not already taken by non-destroyed endpoints).
         Returns True if name is available, False if taken.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(EndpointRow).where(
                 (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
                 & (EndpointRow.name == name)
@@ -372,7 +372,7 @@ class ModelServingRepository:
         """
         Get scaling group information (wsproxy details).
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
                 .select_from(scaling_groups)
@@ -392,7 +392,7 @@ class ModelServingRepository:
         """
         Get user information by ID.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(UserRow).where(UserRow.uuid == user_id)
             result = await session.execute(query)
             user_row: UserRow | None = result.scalar()
@@ -488,7 +488,7 @@ class ModelServingRepository:
         """
         Get VFolder by ID.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await VFolderRow.get(session, vfolder_id)
 
     @model_serving_repository_resilience.apply()
@@ -496,7 +496,7 @@ class ModelServingRepository:
         """
         Get user with their main access key.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
                 UserRow.uuid == user_id
             )

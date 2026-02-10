@@ -76,7 +76,7 @@ class AgentDBSource:
             return images_data
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)

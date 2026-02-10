@@ -34,7 +34,7 @@ class DomainDBSource:
         Raises:
             DomainNotFound: If the domain does not exist.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DomainRow).where(DomainRow.name == domain_name)
             row = await db_sess.scalar(query)
             if row is None:

@@ -43,7 +43,7 @@ class SessionDBSource:
         self._db = db
 
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
@@ -163,7 +163,7 @@ class SessionDBSource:
         registry_hostname: str,
         registry_project: str,
     ) -> ContainerRegistryRow | None:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
                 sa.select(ContainerRegistryRow)
                 .where(
@@ -210,7 +210,7 @@ class SessionDBSource:
         image_visibility: str,
         image_owner_id: str,
     ) -> int:
-        async with self._db.begin_readonly_session() as sess:
+        async with self._db.begin_readonly_session_read_committed() as sess:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ImageRow)
@@ -230,7 +230,7 @@ class SessionDBSource:
         image_owner_id: str,
         image_name: str,
     ) -> ImageRow | None:
-        async with self._db.begin_readonly_session() as sess:
+        async with self._db.begin_readonly_session_read_committed() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
                     ImageRow.name.like(f"{new_canonical}%"),
@@ -275,7 +275,7 @@ class SessionDBSource:
         self,
         session_id: str | SessionId,
     ) -> SessionRow | None:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == session_id)

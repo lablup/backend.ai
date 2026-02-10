@@ -45,7 +45,7 @@ class ProjectResourcePolicyRepository:
 
     @project_resource_policy_repository_resilience.apply()
     async def get_by_name(self, name: str) -> ProjectResourcePolicyData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()

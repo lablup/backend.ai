@@ -150,7 +150,7 @@ class VfolderRepository:
         Get a VFolder by ID without validation.
         Returns VFolderData if found, None otherwise.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
@@ -163,7 +163,7 @@ class VfolderRepository:
         """
         Get the allowed VFolder hosts for a user.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
                 group_row: GroupRow | None = await db_session.scalar(
                     sa.select(GroupRow).where(GroupRow.id == group_uuid)
@@ -196,7 +196,7 @@ class VfolderRepository:
         """
         Get the maximum VFolder count for a user or group.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
                 group_row: GroupRow | None = await db_session.scalar(
                     sa.select(GroupRow)
@@ -458,7 +458,7 @@ class VfolderRepository:
         """
         Get all permissions for a VFolder.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(VFolderPermissionRow).where(
                 VFolderPermissionRow.vfolder == vfolder_id
             )
@@ -585,7 +585,7 @@ class VfolderRepository:
         """
         Count VFolders owned by a user (excluding hard deleted ones).
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(VFolderRow)
@@ -603,7 +603,7 @@ class VfolderRepository:
         Count VFolders owned by a group (excluding hard deleted ones).
         """
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(VFolderRow)

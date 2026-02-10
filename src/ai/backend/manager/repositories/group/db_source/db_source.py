@@ -572,7 +572,7 @@ class GroupDBSource:
         Raises:
             ProjectNotFound: If project does not exist.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(sa.select(GroupRow).where(GroupRow.id == project_id))
             row = result.scalar_one_or_none()
             if row is None:

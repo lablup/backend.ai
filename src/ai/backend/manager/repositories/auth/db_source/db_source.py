@@ -271,7 +271,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         """Fetch user row by UUID from database."""
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             user_query = (
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)

@@ -36,7 +36,7 @@ class AppConfigDBSource:
         scope_id: str,
     ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(AppConfigRow).where(
                     sa.and_(
