@@ -1,4 +1,4 @@
-"""User V2 GraphQL input types for mutations."""
+"""User GraphQL input types for mutations."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from uuid import UUID
 
 import strawberry
 
-from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
+from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 # Create User Inputs
 
@@ -30,8 +30,8 @@ class CreateUserInputGQL:
     need_password_change: bool = strawberry.field(
         description="If true, user must change password on first login."
     )
-    status: UserStatusV2EnumGQL = strawberry.field(description="Initial account status.")
-    role: UserRoleV2EnumGQL = strawberry.field(
+    status: UserStatusEnumGQL = strawberry.field(description="Initial account status.")
+    role: UserRoleEnumGQL = strawberry.field(
         description="User role determining access permissions."
     )
     full_name: str | None = strawberry.field(
@@ -118,11 +118,11 @@ class UpdateUserInputGQL:
         default=None,
         description="New description.",
     )
-    status: UserStatusV2EnumGQL | None = strawberry.field(
+    status: UserStatusEnumGQL | None = strawberry.field(
         default=None,
         description="New account status.",
     )
-    role: UserRoleV2EnumGQL | None = strawberry.field(
+    role: UserRoleEnumGQL | None = strawberry.field(
         default=None,
         description="New user role.",
     )

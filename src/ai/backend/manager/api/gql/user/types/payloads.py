@@ -1,4 +1,4 @@
-"""User V2 GraphQL payload types for mutations."""
+"""User GraphQL payload types for mutations."""
 
 from __future__ import annotations
 

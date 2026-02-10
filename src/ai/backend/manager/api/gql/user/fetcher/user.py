@@ -1,4 +1,4 @@
-"""User V2 GraphQL data fetcher functions."""
+"""User GraphQL data fetcher functions."""
 
 from __future__ import annotations
 

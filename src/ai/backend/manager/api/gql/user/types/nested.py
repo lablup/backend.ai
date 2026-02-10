@@ -1,4 +1,4 @@
-"""User V2 GraphQL nested types for structured field groups."""
+"""User GraphQL nested types for structured field groups."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import datetime
 
 import strawberry
 
-from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
+from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
 @strawberry.type(
@@ -41,7 +41,7 @@ class UserBasicInfoGQL:
 class UserStatusInfoGQL:
     """User account status information."""
 
-    status: UserStatusV2EnumGQL = strawberry.field(
+    status: UserStatusEnumGQL = strawberry.field(
         description=(
             "Current account status. See UserStatusV2 enum for possible values. "
             "Replaces the deprecated is_active field."
@@ -68,7 +68,7 @@ class UserOrganizationInfoGQL:
     domain_name: str | None = strawberry.field(
         description="Name of the domain this user belongs to."
     )
-    role: UserRoleV2EnumGQL | None = strawberry.field(
+    role: UserRoleEnumGQL | None = strawberry.field(
         description="User's role determining access permissions. See UserRoleV2 enum."
     )
     resource_policy: str = strawberry.field(

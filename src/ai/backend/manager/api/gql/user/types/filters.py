@@ -1,4 +1,4 @@
-"""User V2 GraphQL filter and order-by types."""
+"""User GraphQL filter and order-by types."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from ai.backend.manager.repositories.domain.options import DomainConditions
 from ai.backend.manager.repositories.group.options import GroupConditions
 from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
 
-from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
+from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
 @strawberry.input(
@@ -126,20 +126,20 @@ class UserProjectNestedFilter:
 class UserStatusEnumFilterGQL:
     """Filter for user status enum fields."""
 
-    equals: UserStatusV2EnumGQL | None = strawberry.field(
+    equals: UserStatusEnumGQL | None = strawberry.field(
         default=None,
         description="Exact match for user status.",
     )
-    in_: list[UserStatusV2EnumGQL] | None = strawberry.field(
+    in_: list[UserStatusEnumGQL] | None = strawberry.field(
         name="in",
         default=None,
         description="Match any of the provided statuses.",
     )
-    not_equals: UserStatusV2EnumGQL | None = strawberry.field(
+    not_equals: UserStatusEnumGQL | None = strawberry.field(
         default=None,
         description="Exclude exact status match.",
     )
-    not_in: list[UserStatusV2EnumGQL] | None = strawberry.field(
+    not_in: list[UserStatusEnumGQL] | None = strawberry.field(
         default=None,
         description="Exclude any of the provided statuses.",
     )
@@ -155,20 +155,20 @@ class UserStatusEnumFilterGQL:
 class UserRoleEnumFilterGQL:
     """Filter for user role enum fields."""
 
-    equals: UserRoleV2EnumGQL | None = strawberry.field(
+    equals: UserRoleEnumGQL | None = strawberry.field(
         default=None,
         description="Exact match for user role.",
     )
-    in_: list[UserRoleV2EnumGQL] | None = strawberry.field(
+    in_: list[UserRoleEnumGQL] | None = strawberry.field(
         name="in",
         default=None,
         description="Match any of the provided roles.",
     )
-    not_equals: UserRoleV2EnumGQL | None = strawberry.field(
+    not_equals: UserRoleEnumGQL | None = strawberry.field(
         default=None,
         description="Exclude exact role match.",
     )
-    not_in: list[UserRoleV2EnumGQL] | None = strawberry.field(
+    not_in: list[UserRoleEnumGQL] | None = strawberry.field(
         default=None,
         description="Exclude any of the provided roles.",
     )

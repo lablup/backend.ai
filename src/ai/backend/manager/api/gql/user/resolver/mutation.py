@@ -1,4 +1,4 @@
-"""User V2 GraphQL mutation resolvers."""
+"""User GraphQL mutation resolvers."""
 
 from __future__ import annotations
 

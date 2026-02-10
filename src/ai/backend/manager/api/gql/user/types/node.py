@@ -1,4 +1,4 @@
-"""User V2 GraphQL Node, Edge, and Connection types."""
+"""User GraphQL Node, Edge, and Connection types."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import UserRoleV2EnumGQL, UserStatusV2EnumGQL
+from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 from .nested import (
     EntityTimestampsGQL,
     UserBasicInfoGQL,
@@ -277,13 +277,13 @@ class UserV2GQL(Node):
                 description=data.description,
             ),
             status=UserStatusInfoGQL(
-                status=UserStatusV2EnumGQL(data.status),
+                status=UserStatusEnumGQL(data.status),
                 status_info=data.status_info,
                 need_password_change=data.need_password_change,
             ),
             organization=UserOrganizationInfoGQL(
                 domain_name=data.domain_name,
-                role=UserRoleV2EnumGQL(data.role.value) if data.role else None,
+                role=UserRoleEnumGQL(data.role.value) if data.role else None,
                 resource_policy=data.resource_policy,
                 main_access_key=data.main_access_key,
             ),

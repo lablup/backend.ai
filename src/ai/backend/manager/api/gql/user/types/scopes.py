@@ -1,4 +1,4 @@
-"""User V2 GraphQL scope types."""
+"""User GraphQL scope types."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""User V2 GraphQL fetcher package."""
+"""User GraphQL fetcher package."""
 
 from .user import (
     fetch_admin_users,

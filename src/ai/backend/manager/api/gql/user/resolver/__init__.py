@@ -1,4 +1,4 @@
-"""User V2 GraphQL resolver package."""
+"""User GraphQL resolver package."""
 
 from .mutation import (
     admin_bulk_create_users,

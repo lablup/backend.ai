@@ -1,4 +1,4 @@
-"""User V2 GraphQL query resolvers."""
+"""User GraphQL query resolvers."""
 
 from __future__ import annotations
 
