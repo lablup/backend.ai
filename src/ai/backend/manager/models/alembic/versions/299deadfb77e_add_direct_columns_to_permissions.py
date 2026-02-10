@@ -9,6 +9,8 @@ Create Date: 2026-02-10 21:00:00.000000
 import sqlalchemy as sa
 from alembic import op
 
+from ai.backend.manager.models.base import GUID
+
 # revision identifiers, used by Alembic.
 revision = "299deadfb77e"
 down_revision = "8fd6f47bd226"
@@ -18,7 +20,7 @@ depends_on = None
 
 def upgrade() -> None:
     # 1. Add columns (nullable initially)
-    op.add_column("permissions", sa.Column("role_id", sa.UUID(), nullable=True))
+    op.add_column("permissions", sa.Column("role_id", GUID(), nullable=True))
     op.add_column("permissions", sa.Column("scope_type", sa.String(32), nullable=True))
     op.add_column("permissions", sa.Column("scope_id", sa.String(64), nullable=True))
 

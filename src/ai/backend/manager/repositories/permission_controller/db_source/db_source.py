@@ -484,7 +484,7 @@ class PermissionDBSource:
         role_query = (
             sa.select(sa.func.exist())
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
                     PermissionRow, RoleRow.id == PermissionRow.role_id
                 )
             )
@@ -513,11 +513,14 @@ class PermissionDBSource:
         return (
             sa.select(RoleRow)
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
                 .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                    sa.and_(
+                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
+                    ),
                 )
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
@@ -533,7 +536,7 @@ class PermissionDBSource:
                 )
             )
             .options(
-                selectinload(RoleRow.object_permission_rows),
+                contains_eager(RoleRow.object_permission_rows),
             )
         )
 
@@ -547,11 +550,14 @@ class PermissionDBSource:
         return (
             sa.select(RoleRow)
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
                 .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                    sa.and_(
+                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
+                    ),
                 )
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
@@ -576,7 +582,7 @@ class PermissionDBSource:
                 )
             )
             .options(
-                selectinload(RoleRow.object_permission_rows),
+                contains_eager(RoleRow.object_permission_rows),
             )
         )
 
