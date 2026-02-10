@@ -5,8 +5,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.manager.config.loader.env_loader import EnvLoader
-from ai.backend.manager.config.loader.loader_chain import merge_configs
+from ai.backend.common.configs.loader import EnvLoader, merge_configs
 
 
 @pytest.fixture

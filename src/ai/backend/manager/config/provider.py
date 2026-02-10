@@ -3,9 +3,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Self
 
+from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
 from .unified import ManagerUnifiedConfig

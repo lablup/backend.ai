@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, override
 
 from ai.backend.common import config
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
 
 
 class TomlConfigLoader(AbstractConfigLoader):
@@ -18,3 +18,7 @@ class TomlConfigLoader(AbstractConfigLoader):
     async def load(self) -> Mapping[str, Any]:
         raw_cfg, _ = config.read_from_file(self._config_path, self._daemon_name)
         return raw_cfg
+
+    @property
+    def source_name(self) -> str:
+        return f"toml:{self._config_path}"

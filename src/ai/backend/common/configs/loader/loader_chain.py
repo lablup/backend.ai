@@ -2,7 +2,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from typing import Any, cast, override
 
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
 
 
 def merge_configs(
@@ -37,3 +37,8 @@ class LoaderChain(AbstractConfigLoader):
             merged = merge_configs(merged, cfg)
 
         return merged
+
+    @property
+    def source_name(self) -> str:
+        names = [loader.source_name for loader in self._loaders]
+        return f"chain:[{', '.join(names)}]"

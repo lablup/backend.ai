@@ -1,4 +1,4 @@
-from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
+from ai.backend.common.configs.loader import ConfigOverrider
 
 
 async def test_empty_overrides() -> None:

@@ -5,6 +5,12 @@ from typing import Any, Self
 from pydantic import BaseModel, Field
 
 from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.loader import (
+    ConfigOverrider,
+    EnvLoader,
+    LoaderChain,
+    TomlConfigLoader,
+)
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
@@ -15,10 +21,6 @@ from ai.backend.manager.config.unified import (
 )
 
 from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
-from .loader.config_overrider import ConfigOverrider
-from .loader.env_loader import EnvLoader
-from .loader.loader_chain import LoaderChain
-from .loader.toml_loader import TomlConfigLoader
 
 
 # TODO: Remove useless config fields from this
