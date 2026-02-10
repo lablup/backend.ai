@@ -36,7 +36,7 @@ class ReservoirDBSource:
     async def get_reservoir_registry_data_by_id(
         self, reservoir_id: uuid.UUID
     ) -> ReservoirRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ReservoirRegistryRow)
                 .where(ReservoirRegistryRow.id == reservoir_id)
@@ -53,7 +53,7 @@ class ReservoirDBSource:
         """
         Get multiple Reservoir registry entries by their IDs in a single query.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             result = await db_session.execute(
                 sa.select(ReservoirRegistryRow)
                 .where(ReservoirRegistryRow.id.in_(reservoir_ids))
@@ -63,7 +63,7 @@ class ReservoirDBSource:
             return [row.to_dataclass() for row in rows]
 
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRegistryRow)
                 .where(ArtifactRegistryRow.name == name)
@@ -85,7 +85,7 @@ class ReservoirDBSource:
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow)
                 .where(ArtifactRow.id == artifact_id)
@@ -194,7 +194,7 @@ class ReservoirDBSource:
         """
         List all Reservoir entries from the database.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             query = sa.select(ReservoirRegistryRow).options(selectinload(ReservoirRegistryRow.meta))
             result = await db_session.execute(query)
             rows = result.scalars().all()

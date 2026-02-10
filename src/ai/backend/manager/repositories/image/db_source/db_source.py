@@ -66,7 +66,7 @@ class ImageDBSource:
         Returns an ImageData object.
         Raises Exception if the image cannot be found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             row = await self._resolve_image(session, identifiers)
             return row.to_dataclass()
 
@@ -78,7 +78,7 @@ class ImageDBSource:
         Returns a list of ImageData objects.
         More efficient than multiple individual fetch operations.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             rows: list[ImageRow] = []
             for identifiers in identifier_lists:
                 row = await self._resolve_image(
@@ -172,7 +172,7 @@ class ImageDBSource:
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             try:
                 row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
@@ -217,7 +217,7 @@ class ImageDBSource:
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
 
@@ -227,7 +227,7 @@ class ImageDBSource:
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id)
             return image_row.is_owned_by(user_id)
 
@@ -253,7 +253,7 @@ class ImageDBSource:
             raise AliasImageActionDBError(str(e)) from e
 
     async def query_image_alias(self, alias: str) -> ImageAliasData:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
             return ImageAliasData(id=row.id, alias=row.alias or "")
 

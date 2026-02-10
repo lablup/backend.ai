@@ -34,7 +34,7 @@ class HuggingFaceDBSource:
         self._db = db
 
     async def get_registry_data_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(HuggingFaceRegistryRow)
                 .where(HuggingFaceRegistryRow.id == registry_id)
@@ -46,7 +46,7 @@ class HuggingFaceDBSource:
             return row.to_dataclass()
 
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRegistryRow)
                 .where(ArtifactRegistryRow.name == name)
@@ -68,7 +68,7 @@ class HuggingFaceDBSource:
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> HuggingFaceRegistryData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow)
                 .where(ArtifactRow.id == artifact_id)
@@ -178,7 +178,7 @@ class HuggingFaceDBSource:
         """
         Get multiple Hugging Face registry entries by their IDs in a single query.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             result = await db_session.execute(
                 sa.select(HuggingFaceRegistryRow)
                 .where(HuggingFaceRegistryRow.id.in_(registry_ids))
@@ -191,7 +191,7 @@ class HuggingFaceDBSource:
         """
         List all Hugging Face registry entries from the database.
         """
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session() as db_session:
             query = sa.select(HuggingFaceRegistryRow).options(
                 selectinload(HuggingFaceRegistryRow.meta)
             )
