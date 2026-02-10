@@ -78,6 +78,7 @@ class ContainerUtilizationMetricService:
             project_id=label.project_id,
         )
         match metric_type:
+            # TODO: Define device metadata for each metric
             # TODO: Refactor metric template retrieval to query metric metadata from the repository layer
             case UtilizationMetricType.GAUGE:
                 template = (
