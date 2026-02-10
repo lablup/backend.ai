@@ -288,6 +288,7 @@ enum AgentOrderField
   @join__type(graph: STRAWBERRY)
 {
   ID @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
   FIRST_CONTACT @join__enumValue(graph: STRAWBERRY)
   SCALING_GROUP @join__enumValue(graph: STRAWBERRY)
   SCHEDULABLE @join__enumValue(graph: STRAWBERRY)
@@ -1402,15 +1403,32 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.2.0. Error information for a failed user in bulk creation."""
+type BulkCreateUserError
+  @join__type(graph: STRAWBERRY)
+{
+  """Original position in the input list."""
+  index: Int!
+
+  """Username of the user that failed."""
+  username: String!
+
+  """Email of the user that failed."""
+  email: String!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of users successfully created."""
-  createdCount: Int!
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
 
-  """List of newly created users."""
-  users: [UserV2!]!
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
 }
 
 """
@@ -3343,9 +3361,10 @@ type DomainFairShare implements Node
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List project fair shares belonging to this domain. Returns fair share data for all projects within this domain and scaling group, including projects without fair share records (which use default values).
+  Added in 26.2.0. The domain entity associated with this fair share record.
   """
   domain: DomainV2
+<<<<<<< HEAD
 <<<<<<< HEAD
 
   """
@@ -3355,6 +3374,8 @@ type DomainFairShare implements Node
 =======
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 >>>>>>> 96be8119f (chore: update api schema dump)
+=======
+>>>>>>> c1d5c6be2 (chore: update api schema dump)
 }
 
 """
@@ -3371,6 +3392,16 @@ type DomainFairShareConnection
 
   """Total number of domain fair share records matching the query criteria."""
   count: Int!
+}
+
+"""
+Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.
+"""
+input DomainFairShareDomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by domain active status."""
+  isActive: Boolean = null
 }
 
 """An edge in a connection."""
@@ -3399,6 +3430,11 @@ input DomainFairShareFilter
   Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
   """
   domainName: StringFilter = null
+
+  """
+  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
+  """
+  domain: DomainFairShareDomainNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
@@ -3432,7 +3468,7 @@ input DomainFairShareOrderBy
 }
 
 """
-Added in 26.1.0. Fields available for ordering domain fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). DOMAIN_NAME: Order alphabetically by domain name. CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering domain fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). DOMAIN_NAME: Order alphabetically by domain name. CREATED_AT: Order by record creation timestamp. DOMAIN_IS_ACTIVE: Order by domain active status (added in 26.2.0).
 """
 enum DomainFairShareOrderField
   @join__type(graph: STRAWBERRY)
@@ -3440,6 +3476,7 @@ enum DomainFairShareOrderField
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
 input DomainFairShareScope
@@ -3504,6 +3541,21 @@ Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_
 """
 scalar DomainPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""
+Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
+"""
+input DomainProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
 
 """
 Added in 26.2.0. Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.
@@ -3664,6 +3716,26 @@ input DomainUsageScope
 }
 
 """
+Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
+"""
+input DomainUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
 input DomainUserV2Scope
@@ -3695,9 +3767,9 @@ type DomainV2 implements Node
   lifecycle: DomainLifecycleInfo!
 
   """
-  Fair share records for this domain, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: DomainFairShareScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+  fairShare(scope: DomainFairShareScope!): DomainFairShare!
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
@@ -3739,7 +3811,7 @@ type DomainV2Edge
 }
 
 """
-Added in 26.2.0. Filter input for querying domains. Supports filtering by name, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input DomainV2Filter
   @join__type(graph: STRAWBERRY)
@@ -3748,6 +3820,11 @@ input DomainV2Filter
   Filter by domain name. Supports equals, contains, startsWith, and endsWith.
   """
   name: StringFilter = null
+
+  """
+  Filter by domain description. Supports equals, contains, startsWith, and endsWith.
+  """
+  description: StringFilter = null
 
   """
   Filter by active status. True for active domains, False for inactive domains.
@@ -3763,6 +3840,16 @@ input DomainV2Filter
   Filter by last modification timestamp. Supports before, after, and between operations.
   """
   modifiedAt: DateTimeFilter = null
+
+  """
+  Filter by nested project conditions. Returns domains that have at least one project matching all specified conditions.
+  """
+  project: DomainProjectNestedFilter = null
+
+  """
+  Filter by nested user conditions. Returns domains that have at least one user matching all specified conditions.
+  """
+  user: DomainUserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainV2Filter!] = null
@@ -3792,7 +3879,7 @@ input DomainV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically.
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum DomainV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -3800,6 +3887,10 @@ enum DomainV2OrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -4465,6 +4556,88 @@ type Image
   hash: String
 }
 
+"""
+Added in 26.2.0.
+
+Represents an alias for a container image.
+Aliases provide alternative names for images.
+"""
+type ImageAlias implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The alias string for the image."""
+  alias: String!
+}
+
+"""
+Added in 26.2.0.
+
+Relay-style connection for paginated image alias queries.
+Includes total count for pagination UI.
+"""
+type ImageAliasConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ImageAliasEdge!]!
+
+  """Total count of aliases matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ImageAliasEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ImageAlias!
+}
+
+"""
+Added in 26.2.0.
+
+Filter options for image aliases.
+Supports filtering by alias string.
+"""
+input ImageAliasFilterGQL
+  @join__type(graph: STRAWBERRY)
+{
+  alias: StringFilter = null
+}
+
+"""
+Added in 26.2.0.
+
+Specifies the field and direction for ordering image aliases in queries.
+"""
+input ImageAliasOrderByGQL
+  @join__type(graph: STRAWBERRY)
+{
+  field: ImageAliasOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.2.0.
+
+Fields available for ordering image alias queries.
+"""
+enum ImageAliasOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  ALIAS @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.3.0."""
 type ImageConnection
   @join__type(graph: GRAPHENE)
@@ -4755,6 +4928,18 @@ type ImageResourceLimit
   max: String!
 }
 
+"""
+Added in 26.2.0.
+
+Scope for querying aliases within a specific image.
+"""
+input ImageScope
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the image to scope the query to."""
+  imageId: UUID!
+}
+
 """Added in 25.4.0."""
 enum ImageStatus
   @join__type(graph: GRAPHENE)
@@ -4822,6 +5007,9 @@ type ImageV2 implements Node
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
+
+  """Added in 26.2.0. Aliases for this image."""
+  aliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageAliasConnection!
 }
 
 """An edge in a connection."""
@@ -4943,6 +5131,25 @@ schema (one of the key benefits of GraphQL).
 scalar JSONString
   @join__type(graph: GRAPHENE)
 
+"""
+Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
+"""
+type KernelClusterInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The role of this kernel in the cluster (e.g., main, sub)."""
+  clusterRole: String!
+
+  """The index of this kernel within the cluster (0-based)."""
+  clusterIdx: Int!
+
+  """The local rank of this kernel for distributed computing."""
+  localRank: Int!
+
+  """The hostname assigned to this kernel within the cluster network."""
+  clusterHostname: String!
+}
+
 """Added in 24.09.0."""
 type KernelConnection
   @join__type(graph: GRAPHENE)
@@ -4957,6 +5164,18 @@ type KernelConnection
   count: Int
 }
 
+"""Added in 26.2.0. Connection type for paginated kernel results."""
+type KernelConnectionV2
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelV2Edge!]!
+  count: Int!
+}
+
 """Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
 type KernelEdge
   @join__type(graph: GRAPHENE)
@@ -4966,6 +5185,49 @@ type KernelEdge
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 26.2.0. Filter criteria for querying kernels."""
+input KernelFilter
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUIDFilter = null
+  status: KernelStatusFilter = null
+  sessionId: UUIDFilter = null
+}
+
+"""Added in 26.2.0. Lifecycle and status information for a kernel."""
+type KernelLifecycleInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
+  Indicates the kernel's position in its lifecycle.
+  """
+  status: KernelStatus!
+
+  """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
+  result: SessionResult!
+
+  """Timestamp when the kernel was created."""
+  createdAt: DateTime
+
+  """Timestamp when the kernel was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the kernel, if applicable."""
+  startsAt: DateTime
+}
+
+"""Added in 26.2.0. Network configuration for a kernel."""
+type KernelNetworkInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Collection of service ports exposed by this kernel."""
+  servicePorts: ServicePorts
+
+  """List of ports that are pre-opened for this kernel."""
+  preopenPorts: [Int!]
 }
 
 """Added in 24.09.0."""
@@ -5008,6 +5270,168 @@ type KernelNode implements Node
   live_stat: JSONString
   abusing_report: JSONString
   preopen_ports: [Int]
+}
+
+"""Added in 26.2.0. Ordering specification for kernels."""
+input KernelOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: KernelOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.2.0. Fields available for ordering kernels."""
+enum KernelOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  TERMINATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_MODE @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_HOSTNAME @join__enumValue(graph: STRAWBERRY)
+  CLUSTER_IDX @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.2.0. Resource allocation information for a kernel."""
+type KernelResourceInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The ID of the agent running this kernel. Null if not yet assigned or hidden.
+  """
+  agentId: String
+
+  """The resource group (scaling group) this kernel is assigned to."""
+  resourceGroupName: String
+
+  """
+  The container ID on the agent. Null if container not yet created or hidden.
+  """
+  containerId: String
+
+  """Resource allocation with requested and used slots."""
+  allocation: ResourceAllocation!
+
+  """The fractional resource shares occupied by this kernel."""
+  shares: ResourceSlot!
+
+  """Additional resource options and configurations for this kernel."""
+  resourceOpts: ResourceOpts
+}
+
+"""Added in 26.2.0. Information about the session this kernel belongs to."""
+type KernelSessionInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The unique identifier of the session this kernel belongs to."""
+  sessionId: UUID!
+
+  """The creation ID used when creating the session."""
+  creationId: String
+
+  """The name of the session."""
+  name: String
+
+  """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
+  sessionType: SessionTypes!
+}
+
+"""Added in 26.2.0. Status of a kernel in its lifecycle."""
+enum KernelStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  SCHEDULED @join__enumValue(graph: STRAWBERRY)
+  PREPARING @join__enumValue(graph: STRAWBERRY)
+  PREPARED @join__enumValue(graph: STRAWBERRY)
+  CREATING @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.2.0. Filter for kernel status."""
+input KernelStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [KernelStatus!] = null
+  notIn: [KernelStatus!] = null
+}
+
+"""Added in 26.2.0. User and ownership information for a kernel."""
+type KernelUserInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The UUID of the user who owns this kernel."""
+  userId: UUID
+
+  """The access key used to create this kernel."""
+  accessKey: String
+
+  """The domain this kernel belongs to."""
+  domainName: String
+
+  """The group (project) ID this kernel belongs to."""
+  groupId: UUID
+}
+
+"""
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
+"""
+type KernelV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Startup command executed when the kernel starts."""
+  startupCommand: String
+
+  """Information about the session this kernel belongs to."""
+  session: KernelSessionInfo!
+
+  """User and ownership information."""
+  userInfo: KernelUserInfo!
+
+  """Network configuration and exposed ports."""
+  network: KernelNetworkInfo!
+
+  """Cluster configuration for distributed computing."""
+  cluster: KernelClusterInfo!
+
+  """Resource allocation and agent information."""
+  resource: KernelResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: KernelLifecycleInfo!
+
+  """Added in 26.2.0. The agent running this kernel."""
+  agent: AgentV2
+
+  """Added in 26.2.0. The user who owns this kernel."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this kernel belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The domain this kernel belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The resource group this kernel is assigned to."""
+  resourceGroup: ResourceGroup
+}
+
+"""An edge in a connection."""
+type KernelV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelV2!
 }
 
 type KeyPair implements Item
@@ -7151,6 +7575,21 @@ type ProjectBasicInfo
 }
 
 """
+Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
+"""
+input ProjectDomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
 """
 type ProjectFairShare implements Node
@@ -7182,9 +7621,10 @@ type ProjectFairShare implements Node
   updatedAt: DateTime!
 
   """
-  Added in 26.1.0. List user fair shares belonging to this project. Returns fair share data for all users within this project and scaling group, including users without fair share records (which use default values).
+  Added in 26.2.0. The project entity associated with this fair share record.
   """
   project: ProjectV2
+<<<<<<< HEAD
 <<<<<<< HEAD
 
   """
@@ -7199,6 +7639,8 @@ type ProjectFairShare implements Node
 =======
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
 >>>>>>> 96be8119f (chore: update api schema dump)
+=======
+>>>>>>> c1d5c6be2 (chore: update api schema dump)
 }
 
 """
@@ -7251,6 +7693,11 @@ input ProjectFairShareFilter
   """
   domainName: StringFilter = null
 
+  """
+  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
+  """
+  project: ProjectFairShareProjectNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
 
@@ -7283,13 +7730,33 @@ input ProjectFairShareOrderBy
 }
 
 """
-Added in 26.1.0. Fields available for ordering project fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering project fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp. PROJECT_NAME: Order alphabetically by project name (added in 26.2.0). PROJECT_IS_ACTIVE: Order by project active status (added in 26.2.0).
 """
 enum ProjectFairShareOrderField
   @join__type(graph: STRAWBERRY)
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. Nested filter for project entity fields in project fair share queries. Allows filtering by project properties such as name, active status, and type.
+"""
+input ProjectFairShareProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+
+  """Filter by project type (GENERAL, MODEL_STORE)."""
+  type: ProjectFairShareTypeEnumFilter = null
 }
 
 input ProjectFairShareScope
@@ -7297,6 +7764,33 @@ input ProjectFairShareScope
 {
   """Resource group to filter fair shares by."""
   resourceGroupName: String!
+}
+
+"""Added in 26.2.0. Project type enum for fair share filtering."""
+enum ProjectFairShareTypeEnum
+  @join__type(graph: STRAWBERRY)
+{
+  GENERAL @join__enumValue(graph: STRAWBERRY)
+  MODEL_STORE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. Filter for project type enum in fair share queries. Supports equals, in, not_equals, and not_in operations.
+"""
+input ProjectFairShareTypeEnumFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match for project type."""
+  equals: ProjectFairShareTypeEnum = null
+
+  """Match any of the provided types."""
+  in: [ProjectFairShareTypeEnum!] = null
+
+  """Exclude exact type match."""
+  notEquals: ProjectFairShareTypeEnum = null
+
+  """Exclude any of the provided types."""
+  notIn: [ProjectFairShareTypeEnum!] = null
 }
 
 """
@@ -7538,6 +8032,26 @@ input ProjectUsageScope
 }
 
 """
+Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
+"""
+input ProjectUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
 input ProjectUserV2Scope
@@ -7574,9 +8088,9 @@ type ProjectV2 implements Node
   lifecycle: ProjectLifecycleInfo!
 
   """
-  Fair share records for this project, filtered by resource group. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: ProjectFairShareScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+  fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
@@ -7656,6 +8170,16 @@ input ProjectV2Filter
   """
   modifiedAt: DateTimeFilter = null
 
+  """
+  Filter by nested domain conditions. Returns projects whose domain matches all specified conditions.
+  """
+  domain: ProjectDomainNestedFilter = null
+
+  """
+  Filter by nested user conditions. Returns projects that have at least one user matching all specified conditions.
+  """
+  user: ProjectUserNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectV2Filter!] = null
 
@@ -7684,7 +8208,7 @@ input ProjectV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically.
+Added in 26.2.0. Fields available for ordering project query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by project name alphabetically. IS_ACTIVE: Order by active status. TYPE: Order by project type. DOMAIN_NAME: Order by domain name (scalar subquery). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum ProjectV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -7692,6 +8216,11 @@ enum ProjectV2OrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  TYPE @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -8359,6 +8888,18 @@ type Query
   """
   imageV2(id: ID!): ImageV2 @join__field(graph: STRAWBERRY)
 
+  """Added in 26.2.0. Query a single kernel by ID."""
+  kernelV2(id: UUID!): KernelV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Retrieve a specific image alias by its ID.
+  
+  Returns the alias information including the alias string.
+  """
+  imageAlias(id: ID!): ImageAlias @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @join__field(graph: STRAWBERRY)
 
@@ -8434,6 +8975,25 @@ type Query
   adminImagesV2(filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
+  """
+  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Query image aliases with optional filtering, ordering, and pagination.
+  
+  Returns image aliases that provide alternative names for container images.
+  Use filters to search by alias string.
+  Supports both cursor-based and offset-based pagination.
+  """
+  adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.2.0. Query kernels within a specific session."""
+  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Get domain fair share data within resource group scope.
   """
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY)
@@ -8481,6 +9041,17 @@ type Query
   Supports both cursor-based and offset-based pagination.
   """
   containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageFilterGQL = null, orderBy: [ImageOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageConnectionV2! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.2.0.
+  
+  Query image aliases within a specific image with optional filtering,
+  ordering, and pagination.
+  
+  Returns image aliases that belong to the specified image.
+  Supports both cursor-based and offset-based pagination.
+  """
+  imageScopedAliases(scope: ImageScope!, filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @join__field(graph: STRAWBERRY)
@@ -8829,6 +9400,19 @@ type ReservoirRegistryEdge
   node: ReservoirRegistry!
 }
 
+"""Added in 26.2.0. Resource allocation with requested and used slots."""
+type ResourceAllocation
+  @join__type(graph: STRAWBERRY)
+{
+  """The resource slots originally requested for this kernel."""
+  requested: ResourceSlot!
+
+  """
+  The resource slots currently used by this kernel. May be null if not yet allocated.
+  """
+  used: ResourceSlot
+}
+
 type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
@@ -8934,6 +9518,9 @@ input ResourceGroupFilter
   @join__type(graph: STRAWBERRY)
 {
   name: StringFilter = null
+  description: StringFilter = null
+  isActive: Boolean = null
+  isPublic: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -8983,6 +9570,8 @@ enum ResourceGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Resource group + domain scope for project-level operations"""
@@ -9757,6 +10346,50 @@ type ServiceConfigNode implements Node
   schema: JSONString!
 }
 
+"""
+Added in 26.2.0. A single service port entry representing an exposed service. Contains port mapping and protocol information for accessing services.
+"""
+type ServicePortEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
+  name: String!
+
+  """Protocol type for this service port (http, tcp, preopen, internal)."""
+  protocol: ServicePortProtocol!
+
+  """Port numbers inside the container."""
+  containerPorts: [Int!]!
+
+  """Mapped port numbers on the host. May be null if not yet assigned."""
+  hostPorts: [Int]!
+
+  """Whether this port is used for inference endpoints."""
+  isInference: Boolean!
+}
+
+"""Added in 26.2.0. Protocol type for service ports."""
+enum ServicePortProtocol
+  @join__type(graph: STRAWBERRY)
+{
+  HTTP @join__enumValue(graph: STRAWBERRY)
+  TCP @join__enumValue(graph: STRAWBERRY)
+  PREOPEN @join__enumValue(graph: STRAWBERRY)
+  INTERNAL @join__enumValue(graph: STRAWBERRY)
+  VNC @join__enumValue(graph: STRAWBERRY)
+  RDP @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. A collection of exposed service ports. Each entry defines a service accessible through the compute session.
+"""
+type ServicePorts
+  @join__type(graph: STRAWBERRY)
+{
+  """List of service port entries."""
+  entries: [ServicePortEntry!]!
+}
+
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -9789,6 +10422,14 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
+
+enum SessionResult
+  @join__type(graph: STRAWBERRY)
+{
+  UNDEFINED @join__enumValue(graph: STRAWBERRY)
+  SUCCESS @join__enumValue(graph: STRAWBERRY)
+  FAILURE @join__enumValue(graph: STRAWBERRY)
+}
 
 """Session scheduling history record"""
 type SessionSchedulingHistory implements Node
@@ -9872,6 +10513,15 @@ input SessionScope
 {
   """Session ID to get history for"""
   sessionId: UUID!
+}
+
+enum SessionTypes
+  @join__type(graph: STRAWBERRY)
+{
+  INTERACTIVE @join__enumValue(graph: STRAWBERRY)
+  BATCH @join__enumValue(graph: STRAWBERRY)
+  INFERENCE @join__enumValue(graph: STRAWBERRY)
+  SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
 type SetQuotaScope
@@ -10740,6 +11390,21 @@ type UserConnection
   count: Int
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserDomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge
   @join__type(graph: GRAPHENE)
@@ -10859,6 +11524,11 @@ input UserFairShareFilter
   """
   domainName: StringFilter = null
 
+  """
+  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
+  """
+  user: UserFairShareUserNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
 
@@ -10891,13 +11561,15 @@ input UserFairShareOrderBy
 }
 
 """
-Added in 26.1.0. Fields available for ordering user fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp.
+Added in 26.1.0. Fields available for ordering user fair share query results. FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). CREATED_AT: Order by record creation timestamp. USER_USERNAME: Order alphabetically by username (added in 26.2.0). USER_EMAIL: Order alphabetically by email (added in 26.2.0).
 """
 enum UserFairShareOrderField
   @join__type(graph: STRAWBERRY)
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY)
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
 input UserFairShareScope
@@ -10910,6 +11582,24 @@ input UserFairShareScope
   Project ID that the user belongs to (required for user-level fair shares).
   """
   projectId: UUID!
+}
+
+"""
+Added in 26.2.0. Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.
+"""
+input UserFairShareUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """Filter by user active status (based on user status field)."""
+  isActive: Boolean = null
 }
 
 type UserGroup
@@ -11022,6 +11712,21 @@ type UserNode implements Node
 
   """Added in 25.5.0."""
   project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
+}
+
+"""
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
 }
 
 type UserResourcePolicy
@@ -11320,9 +12025,9 @@ type UserV2 implements Node
   timestamps: EntityTimestamps!
 
   """
-  Fair share records for this user, filtered by resource group and project. Returns fair share policy specifications and calculation snapshots.
+  Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShares(scope: UserFairShareScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+  fairShare(scope: UserFairShareScope!): UserFairShare!
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
@@ -11405,7 +12110,7 @@ type UserV2Edge
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
@@ -11443,6 +12148,16 @@ input UserV2Filter
   """
   createdAt: DateTimeFilter = null
 
+  """
+  Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
+  """
+  domain: UserDomainNestedFilter = null
+
+  """
+  Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
+  """
+  project: UserProjectNestedFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
 
@@ -11463,7 +12178,7 @@ Added in 26.2.0. Specifies ordering for user query results. Combine field select
 input UserV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """The field to order by. See UserV2OrderField for available options."""
+  """The field to order by. See UserOrderField for available options."""
   field: UserV2OrderField!
 
   """Sort direction. ASC for ascending, DESC for descending."""
@@ -11471,7 +12186,7 @@ input UserV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status.
+Added in 26.2.0. Fields available for ordering user query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. USERNAME: Order by username alphabetically. EMAIL: Order by email address alphabetically. STATUS: Order by account status. DOMAIN_NAME: Order by domain name (scalar subquery). PROJECT_NAME: Order by project name (MIN aggregation).
 """
 enum UserV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -11481,6 +12196,8 @@ enum UserV2OrderField
   USERNAME @join__enumValue(graph: STRAWBERRY)
   EMAIL @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
 }
 
 """
