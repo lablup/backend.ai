@@ -24,8 +24,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
-    from .permission_group import PermissionGroupRow
-
 
 def _get_role_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -42,14 +40,6 @@ def _get_scope_association_join_condition() -> sa.ColumnElement[bool]:
         ObjectPermissionRow.entity_type == foreign(AssociationScopesEntitiesRow.entity_type),
         ObjectPermissionRow.entity_id == foreign(AssociationScopesEntitiesRow.entity_id),
     )
-
-
-def _get_permission_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.rbac_models.permission.permission_group import (
-        PermissionGroupRow,
-    )
-
-    return PermissionGroupRow.id == foreign(ObjectPermissionRow.permission_group_id)
 
 
 class ObjectPermissionRow(Base):  # type: ignore[misc]
@@ -69,13 +59,6 @@ class ObjectPermissionRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
-    permission_group_id: Mapped[uuid.UUID] = mapped_column(
-        "permission_group_id",
-        GUID,
-        sa.ForeignKey("permission_groups.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", StrEnumType(EntityType, length=32), nullable=False
     )
@@ -91,11 +74,6 @@ class ObjectPermissionRow(Base):  # type: ignore[misc]
         back_populates="object_permission_rows",
         primaryjoin=_get_role_join_condition,
         viewonly=True,
-    )
-    permission_group_row: Mapped[PermissionGroupRow] = relationship(
-        "PermissionGroupRow",
-        back_populates="object_permission_rows",
-        primaryjoin=_get_permission_group_join_condition,
     )
     scope_association_rows: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
         "AssociationScopesEntitiesRow",
