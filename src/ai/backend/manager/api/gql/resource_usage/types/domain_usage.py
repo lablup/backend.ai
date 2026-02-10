@@ -57,7 +57,7 @@ class DomainUsageBucketGQL(Node):
     domain_name: str = strawberry.field(
         description="Name of the domain this usage bucket belongs to."
     )
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this usage was recorded in."
     )
     metadata: UsageBucketMetadataGQL = strawberry.field(
@@ -112,7 +112,7 @@ class DomainUsageBucketGQL(Node):
         return cls(
             id=ID(str(data.id)),
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
+            resource_group_name=data.resource_group,
             metadata=UsageBucketMetadataGQL(
                 period_start=data.period_start,
                 period_end=data.period_end,

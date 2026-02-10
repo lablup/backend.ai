@@ -38,14 +38,14 @@ if TYPE_CHECKING:
 class DomainFairShareScopeGQL:
     """Scope parameters for filtering domain fair shares."""
 
-    resource_group: str = strawberry.field(description="Resource group to filter fair shares by.")
+    resource_group_name: str = strawberry.field(description="Resource group to filter fair shares by.")
 
 
 @strawberry.input(name="DomainUsageScope")
 class DomainUsageScopeGQL:
     """Scope parameters for filtering domain usage buckets."""
 
-    resource_group: str = strawberry.field(description="Resource group to filter usage buckets by.")
+    resource_group_name: str = strawberry.field(description="Resource group to filter usage buckets by.")
 
 
 @strawberry.federation.type(
@@ -93,7 +93,7 @@ class DomainV2GQL(Node):
 
         return await fetch_single_domain_fair_share(
             info=info,
-            resource_group=scope.resource_group,
+            resource_group_name=scope.resource_group_name,
             domain_name=str(self.id),
         )
 
@@ -125,7 +125,7 @@ class DomainV2GQL(Node):
 
         # Create repository scope with context information
         repository_scope = DomainUsageBucketSearchScope(
-            resource_group=scope.resource_group,
+            resource_group=scope.resource_group_name,
             domain_name=str(self.id),
         )
 

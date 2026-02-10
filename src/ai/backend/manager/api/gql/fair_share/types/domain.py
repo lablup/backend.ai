@@ -353,7 +353,7 @@ class DomainFairShareOrderBy(GQLOrderBy):
 class UpsertDomainFairShareWeightInput:
     """Input for upserting domain fair share weight."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for this fair share."
     )
     domain_name: str = strawberry.field(description="Name of the domain to update weight for.")
@@ -411,7 +411,7 @@ class DomainWeightInputItem:
 class BulkUpsertDomainFairShareWeightInput:
     """Input for bulk upserting domain fair share weights."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for all fair shares."
     )
     inputs: list[DomainWeightInputItem] = strawberry.field(

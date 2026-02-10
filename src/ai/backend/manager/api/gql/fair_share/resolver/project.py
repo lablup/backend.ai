@@ -41,7 +41,7 @@ from ai.backend.manager.services.fair_share.actions import (
 @strawberry.field(description="Added in 26.2.0. Get project fair share data (admin only).")  # type: ignore[misc]
 async def admin_project_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL:
     """Get a single project fair share record (admin only)."""
@@ -50,7 +50,7 @@ async def admin_project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
         )
     )
@@ -101,7 +101,7 @@ async def rg_project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            resource_group=scope.resource_group,
+            resource_group=scope.resource_group_name,
             project_id=project_id,
         )
     )
@@ -126,7 +126,7 @@ async def rg_project_fair_shares(
 ) -> ProjectFairShareConnection:
     """Search project fair shares within resource group scope."""
     repo_scope = ProjectFairShareSearchScope(
-        resource_group=scope.resource_group,
+        resource_group=scope.resource_group_name,
         domain_name=scope.domain_name,
     )
     return await fetch_rg_project_fair_shares(
@@ -155,7 +155,7 @@ async def rg_project_fair_shares(
 )
 async def project_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL:
     """Get a single project fair share record."""
@@ -166,7 +166,7 @@ async def project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
         )
     )
@@ -229,7 +229,7 @@ async def admin_upsert_project_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
         UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             domain_name=input.domain_name,
             weight=input.weight,
@@ -258,7 +258,7 @@ async def admin_bulk_upsert_project_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
             BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     ProjectWeightInput(
                         project_id=item.project_id,
@@ -299,7 +299,7 @@ async def upsert_project_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
         UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             domain_name=input.domain_name,
             weight=input.weight,
@@ -334,7 +334,7 @@ async def bulk_upsert_project_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
             BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     ProjectWeightInput(
                         project_id=item.project_id,

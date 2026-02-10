@@ -39,7 +39,7 @@ from ai.backend.manager.services.fair_share.actions import (
 @strawberry.field(description="Added in 26.2.0. Get domain fair share data (admin only).")  # type: ignore[misc]
 async def admin_domain_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     domain_name: str,
 ) -> DomainFairShareGQL:
     """Get a single domain fair share record (admin only)."""
@@ -48,7 +48,7 @@ async def admin_domain_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
         GetDomainFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             domain_name=domain_name,
         )
     )
@@ -99,7 +99,7 @@ async def rg_domain_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
         GetDomainFairShareAction(
-            resource_group=scope.resource_group,
+            resource_group=scope.resource_group_name,
             domain_name=domain_name,
         )
     )
@@ -123,7 +123,7 @@ async def rg_domain_fair_shares(
     offset: int | None = None,
 ) -> DomainFairShareConnection:
     """Search domain fair shares within resource group scope."""
-    repo_scope = DomainFairShareSearchScope(resource_group=scope.resource_group)
+    repo_scope = DomainFairShareSearchScope(resource_group=scope.resource_group_name)
     return await fetch_rg_domain_fair_shares(
         info=info,
         scope=repo_scope,
@@ -150,7 +150,7 @@ async def rg_domain_fair_shares(
 )
 async def domain_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     domain_name: str,
 ) -> DomainFairShareGQL:
     """Get a single domain fair share record."""
@@ -161,7 +161,7 @@ async def domain_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
         GetDomainFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             domain_name=domain_name,
         )
     )
@@ -224,7 +224,7 @@ async def admin_upsert_domain_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
         UpsertDomainFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             domain_name=input.domain_name,
             weight=input.weight,
         )
@@ -252,7 +252,7 @@ async def admin_bulk_upsert_domain_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
             BulkUpsertDomainFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     DomainWeightInput(
                         domain_name=item.domain_name,
@@ -292,7 +292,7 @@ async def upsert_domain_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
         UpsertDomainFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             domain_name=input.domain_name,
             weight=input.weight,
         )
@@ -326,7 +326,7 @@ async def bulk_upsert_domain_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
             BulkUpsertDomainFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     DomainWeightInput(
                         domain_name=item.domain_name,

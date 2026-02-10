@@ -70,14 +70,14 @@ class StrawberryGQLContext:
 class ResourceGroupDomainScope:
     """Scope for domain-level APIs within a resource group context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(description="Resource group name to scope the operation")
 
 
 @strawberry.input(description="Resource group + domain scope for project-level operations")
 class ResourceGroupProjectScope:
     """Scope for project-level APIs within a resource group and domain context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(description="Resource group name to scope the operation")
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
 
 
@@ -85,7 +85,7 @@ class ResourceGroupProjectScope:
 class ResourceGroupUserScope:
     """Scope for user-level APIs within a resource group, domain, and project context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(description="Resource group name to scope the operation")
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
     project_id: str = strawberry.field(description="Project ID to scope the operation")
 
@@ -97,7 +97,7 @@ class ResourceGroupUserScope:
 class DomainUsageBucketScope:
     """Scope for domain-level usage bucket APIs."""
 
-    resource_group: str = strawberry.field(description="Resource group name")
+    resource_group_name: str = strawberry.field(description="Resource group name")
     domain_name: str = strawberry.field(description="Domain name to retrieve usage buckets for")
 
 
@@ -105,7 +105,7 @@ class DomainUsageBucketScope:
 class ProjectUsageBucketScope:
     """Scope for project-level usage bucket APIs."""
 
-    resource_group: str = strawberry.field(description="Resource group name")
+    resource_group_name: str = strawberry.field(description="Resource group name")
     domain_name: str = strawberry.field(description="Domain name")
     project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
 
@@ -114,7 +114,7 @@ class ProjectUsageBucketScope:
 class UserUsageBucketScope:
     """Scope for user-level usage bucket APIs."""
 
-    resource_group: str = strawberry.field(description="Resource group name")
+    resource_group_name: str = strawberry.field(description="Resource group name")
     domain_name: str = strawberry.field(description="Domain name")
     project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
     user_uuid: str = strawberry.field(description="User UUID (will be converted to UUID)")

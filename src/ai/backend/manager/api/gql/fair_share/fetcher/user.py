@@ -163,7 +163,7 @@ async def fetch_rg_user_fair_shares(
 
 async def fetch_single_user_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: UUID,
     user_uuid: UUID,
 ) -> UserFairShareGQL:
@@ -176,7 +176,7 @@ async def fetch_single_user_fair_share(
 
     action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
         GetUserFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
             user_uuid=user_uuid,
         )

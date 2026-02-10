@@ -41,7 +41,7 @@ from ai.backend.manager.services.fair_share.actions import (
 @strawberry.field(description="Added in 26.2.0. Get user fair share data (admin only).")  # type: ignore[misc]
 async def admin_user_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
 ) -> UserFairShareGQL:
@@ -51,7 +51,7 @@ async def admin_user_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
         GetUserFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -103,7 +103,7 @@ async def rg_user_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
         GetUserFairShareAction(
-            resource_group=scope.resource_group,
+            resource_group=scope.resource_group_name,
             project_id=uuid.UUID(scope.project_id),
             user_uuid=user_uuid,
         )
@@ -129,7 +129,7 @@ async def rg_user_fair_shares(
 ) -> UserFairShareConnection:
     """Search user fair shares within resource group scope."""
     repo_scope = UserFairShareSearchScope(
-        resource_group=scope.resource_group,
+        resource_group=scope.resource_group_name,
         domain_name=scope.domain_name,
         project_id=uuid.UUID(scope.project_id),
     )
@@ -159,7 +159,7 @@ async def rg_user_fair_shares(
 )
 async def user_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
 ) -> UserFairShareGQL:
@@ -171,7 +171,7 @@ async def user_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
         GetUserFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -235,7 +235,7 @@ async def admin_upsert_user_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
         UpsertUserFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             user_uuid=input.user_uuid,
             domain_name=input.domain_name,
@@ -265,7 +265,7 @@ async def admin_bulk_upsert_user_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
             BulkUpsertUserFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     UserWeightInput(
                         user_uuid=item.user_uuid,
@@ -307,7 +307,7 @@ async def upsert_user_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
         UpsertUserFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             user_uuid=input.user_uuid,
             domain_name=input.domain_name,
@@ -343,7 +343,7 @@ async def bulk_upsert_user_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
             BulkUpsertUserFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     UserWeightInput(
                         user_uuid=item.user_uuid,
