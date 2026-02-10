@@ -104,6 +104,9 @@ Artifact ━━auto━━► ArtifactRevision
 NotificationChannel ━━auto━━► NotificationRule
 Kernel ━━auto━━► KernelSchedulingHistory
 Routing ━━auto━━► RouteHistory
+Domain ━━auto━━► DomainFairShare
+Project ━━auto━━► ProjectFairShare
+User ━━auto━━► UserFairShare
 Role ━━auto━━► Permission
 Role ━━auto━━► UserRole
 ```
@@ -191,7 +194,7 @@ Single-item queries are supported for all guarded entities. List queries depend 
 - DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
 - List: Implicit
 
-#### Auto-only Entities (19 types)
+#### Auto-only Entities (22 types)
 
 No standalone single-item or list queries. Always accessed through parent:
 
@@ -216,13 +219,13 @@ No standalone single-item or list queries. Always accessed through parent:
 | NotificationRuleRow | NotificationChannel | `notificationChannel { rules }` |
 | KernelSchedulingHistoryRow | Kernel | `kernel { schedulingHistory }` |
 | RouteHistoryRow | Routing | `routing { history }` |
+| DomainFairShareRow | Domain | `domain { fairShare }` |
+| ProjectFairShareRow | Project | `project { fairShare }` |
+| UserFairShareRow | User | `user { fairShare }` |
 
 ### Entities Outside RBAC Scope
 
 The following entities are intentionally excluded from the 3-Type Model:
-
-**TBD:**
-- DomainFairShareRow, ProjectFairShareRow, UserFairShareRow (computed/derived data; classification pending)
 
 **System Internal / Infrastructure:**
 - ResourceSlotTypeRow, AgentResourceRow, ResourceAllocationRow (scheduler internals)
@@ -296,10 +299,6 @@ After migration, the core RBAC tables are:
    - Migrate existing junction tables to `association_scopes_entities`
    - Remove deprecated junction tables
    - Migrate StorageHost from string-based to normalized DB table
-
-## Open Questions
-
-- **FairShare entities**: Should DomainFairShareRow, ProjectFairShareRow, UserFairShareRow be classified within the RBAC model or remain outside?
 
 ## References
 
