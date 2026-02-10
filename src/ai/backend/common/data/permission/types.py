@@ -306,3 +306,14 @@ class ScopeType(enum.StrEnum):
 
 
 GLOBAL_SCOPE_ID = "global"
+
+
+class RelationType(enum.StrEnum):
+    """Classification of parent-child entity edges in BEP-1048.
+
+    AUTO: Composition edge with permission delegation from parent.
+    REF: Read-only reference edge with no permission delegation.
+    """
+
+    AUTO = "auto"
+    REF = "ref"
