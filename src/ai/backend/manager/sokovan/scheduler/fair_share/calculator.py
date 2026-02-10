@@ -213,6 +213,8 @@ class FairShareFactorCalculator:
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.project[project_id].domain_name
+            if not domain_name:
+                domain_name = context.project_domain_names.get(project_id, "")
 
             factor_result = self._calculate_factor(
                 usage=usage,
@@ -241,6 +243,8 @@ class FairShareFactorCalculator:
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.user[user_key].domain_name
+            if not domain_name:
+                domain_name = context.project_domain_names.get(user_key.project_id, "")
 
             factor_result = self._calculate_factor(
                 usage=usage,
