@@ -12,7 +12,7 @@ from .node import UserV2GQL
 
 
 @strawberry.type(
-    name="CreateUserPayload",
+    name="CreateUserV2Payload",
     description="Added in 26.2.0. Payload for user creation mutation.",
 )
 class CreateUserPayloadGQL:
@@ -39,7 +39,7 @@ class BulkCreateUserErrorGQL:
 
 
 @strawberry.type(
-    name="BulkCreateUsersPayload",
+    name="BulkCreateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
 class BulkCreateUsersPayloadGQL:
@@ -57,7 +57,7 @@ class BulkCreateUsersPayloadGQL:
 
 
 @strawberry.type(
-    name="UpdateUserPayload",
+    name="UpdateUserV2Payload",
     description="Added in 26.2.0. Payload for user update mutation.",
 )
 class UpdateUserPayloadGQL:
@@ -70,7 +70,7 @@ class UpdateUserPayloadGQL:
 
 
 @strawberry.type(
-    name="DeleteUserPayload",
+    name="DeleteUserV2Payload",
     description="Added in 26.2.0. Payload for single user soft-delete mutation.",
 )
 class DeleteUserPayloadGQL:
@@ -80,7 +80,7 @@ class DeleteUserPayloadGQL:
 
 
 @strawberry.type(
-    name="DeleteUsersPayload",
+    name="DeleteUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
 )
 class DeleteUsersPayloadGQL:
@@ -93,7 +93,7 @@ class DeleteUsersPayloadGQL:
 
 
 @strawberry.type(
-    name="PurgeUserPayload",
+    name="PurgeUserV2Payload",
     description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
 )
 class PurgeUserPayloadGQL:
@@ -103,7 +103,7 @@ class PurgeUserPayloadGQL:
 
 
 @strawberry.type(
-    name="PurgeUsersPayload",
+    name="PurgeUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
 )
 class PurgeUsersPayloadGQL:

@@ -117,7 +117,7 @@ class UserProjectNestedFilter:
 
 
 @strawberry.input(
-    name="UserStatusEnumFilter",
+    name="UserStatusV2EnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserStatusV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
@@ -146,7 +146,7 @@ class UserStatusEnumFilterGQL:
 
 
 @strawberry.input(
-    name="UserRoleEnumFilter",
+    name="UserRoleV2EnumFilter",
     description=(
         "Added in 26.2.0. Filter for UserRoleV2 enum fields."
         "Supports equals, in, not_equals, and not_in operations."
@@ -175,7 +175,7 @@ class UserRoleEnumFilterGQL:
 
 
 @strawberry.input(
-    name="UserFilter",
+    name="UserV2Filter",
     description=(
         "Added in 26.2.0. Filter input for querying users. "
         "Supports filtering by UUID, username, email, status, domain, role, creation time, "
@@ -346,7 +346,7 @@ class UserFilterGQL(GQLFilter):
 
 
 @strawberry.enum(
-    name="UserOrderField",
+    name="UserV2OrderField",
     description=(
         "Added in 26.2.0. Fields available for ordering user query results. "
         "CREATED_AT: Order by creation timestamp. "
@@ -369,7 +369,7 @@ class UserOrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="UserOrderBy",
+    name="UserV2OrderBy",
     description=(
         "Added in 26.2.0. Specifies ordering for user query results. "
         "Combine field selection with direction to sort results. "
@@ -415,7 +415,7 @@ class UserOrderByGQL(GQLOrderBy):
 
 
 @strawberry.input(
-    name="UserScope",
+    name="UserV2Scope",
     description=(
         "Added in 26.2.0. Scope for user queries to restrict results to a specific context."
     ),
