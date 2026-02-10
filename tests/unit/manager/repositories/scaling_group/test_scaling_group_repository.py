@@ -1246,12 +1246,14 @@ class TestScalingGroupRepositoryDB:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_session: SessionId,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a kernel for the session."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        kernel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KernelRow(
+                    id=kernel_id,
                     session_id=sample_session,
                     domain_name=test_domain,
                     group_id=test_group_id,
@@ -1266,7 +1268,7 @@ class TestScalingGroupRepositoryDB:
                 )
             )
             await db_sess.flush()
-        yield
+        yield kernel_id
 
     @pytest.fixture
     async def sample_endpoint(
@@ -1302,13 +1304,14 @@ class TestScalingGroupRepositoryDB:
         sample_session: SessionId,
         sample_endpoint: uuid.UUID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a route connecting the session to the endpoint."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        route_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 RoutingRow(
-                    id=uuid.uuid4(),
+                    id=route_id,
                     endpoint=sample_endpoint,
                     session=sample_session,
                     session_owner=test_user_uuid,
@@ -1318,13 +1321,16 @@ class TestScalingGroupRepositoryDB:
                 )
             )
             await db_sess.flush()
-        yield
+        yield route_id
 
-    @pytest.mark.usefixtures("sample_kernel", "sample_route")
     async def test_purge_scaling_group_with_full_hierarchy(
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_hierarchy: str,
+        sample_session: SessionId,
+        sample_kernel: uuid.UUID,
+        sample_endpoint: uuid.UUID,
+        sample_route: uuid.UUID,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test purging a scaling group with the full FK hierarchy.
@@ -1332,14 +1338,45 @@ class TestScalingGroupRepositoryDB:
         Hierarchy: ScalingGroup → Session → Kernel + Endpoint → Route
         """
         sgroup_name = sample_scaling_group_for_hierarchy
+        session_id = sample_session
+        kernel_id = sample_kernel
+        endpoint_id = sample_endpoint
+        route_id = sample_route
 
         purger = Purger(row_class=ScalingGroupRow, pk_value=sgroup_name)
+        # FK Error should not occur, and all related records should be deleted
         result = await scaling_group_repository.purge_scaling_group(purger)
 
         assert result.name == sgroup_name
 
+        # Verify all records in the hierarchy are deleted
         async with db_with_cleanup.begin_readonly_session() as db_sess:
+            # Verify scaling group is deleted
             sg_result = await db_sess.execute(
                 sa.select(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name)
             )
             assert sg_result.scalar_one_or_none() is None
+
+            # Verify session is deleted
+            session_result = await db_sess.execute(
+                sa.select(SessionRow).where(SessionRow.id == session_id)
+            )
+            assert session_result.scalar_one_or_none() is None
+
+            # Verify kernel is deleted
+            kernel_result = await db_sess.execute(
+                sa.select(KernelRow).where(KernelRow.id == kernel_id)
+            )
+            assert kernel_result.scalar_one_or_none() is None
+
+            # Verify endpoint is deleted
+            endpoint_result = await db_sess.execute(
+                sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+            )
+            assert endpoint_result.scalar_one_or_none() is None
+
+            # Verify route is deleted
+            route_result = await db_sess.execute(
+                sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            )
+            assert route_result.scalar_one_or_none() is None
