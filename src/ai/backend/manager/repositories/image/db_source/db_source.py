@@ -66,7 +66,7 @@ class ImageDBSource:
         Returns an ImageData object.
         Raises Exception if the image cannot be found.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             row = await self._resolve_image(session, identifiers)
             return row.to_dataclass()
 
@@ -139,7 +139,7 @@ class ImageDBSource:
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(query)
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
@@ -153,7 +153,7 @@ class ImageDBSource:
         Deprecated. Use query_image_details_by_id instead.
         """
         try:
-            async with self._db.begin_readonly_session() as session:
+            async with self._db.begin_readonly_session_read_committed() as session:
                 image_row = await ImageRow.resolve(
                     session,
                     [
@@ -172,7 +172,7 @@ class ImageDBSource:
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
@@ -184,7 +184,7 @@ class ImageDBSource:
     async def query_all_images(
         self, status_filter: list[ImageStatus] | None = None
     ) -> Mapping[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)
             return {ImageID(row.id): row.to_detailed_dataclass() for row in rows}
 
@@ -217,7 +217,7 @@ class ImageDBSource:
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
 
@@ -227,7 +227,7 @@ class ImageDBSource:
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id)
             return image_row.is_owned_by(user_id)
 
@@ -253,7 +253,7 @@ class ImageDBSource:
             raise AliasImageActionDBError(str(e)) from e
 
     async def query_image_alias(self, alias: str) -> ImageAliasData:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             row = await self._get_image_alias_by_name(session, alias)
             return ImageAliasData(id=row.id, alias=row.alias or "")
 
@@ -361,7 +361,7 @@ class ImageDBSource:
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(query)
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}

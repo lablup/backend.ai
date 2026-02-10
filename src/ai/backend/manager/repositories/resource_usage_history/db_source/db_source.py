@@ -373,7 +373,7 @@ class ResourceUsageHistoryDBSource:
         Note: ResourceSlot is a JSONB type and cannot be aggregated in SQL,
         so we fetch all rows and aggregate in Python.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._fetch_aggregated_usage_by_user(
                 db_sess, resource_group, lookback_start, lookback_end
             )
@@ -420,7 +420,7 @@ class ResourceUsageHistoryDBSource:
         This method aggregates resource_usage across all buckets within the
         lookback period for each project.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(
                 ProjectUsageBucketRow.project_id,
                 ProjectUsageBucketRow.resource_usage,
@@ -453,7 +453,7 @@ class ResourceUsageHistoryDBSource:
         This method aggregates resource_usage across all buckets within the
         lookback period for each domain.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(
                 DomainUsageBucketRow.domain_name,
                 DomainUsageBucketRow.resource_usage,

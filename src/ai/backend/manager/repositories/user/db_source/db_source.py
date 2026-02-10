@@ -108,7 +108,7 @@ class UserDBSource:
         Get user by UUID without ownership validation.
         Admin-only operation.
         """
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
 
@@ -120,7 +120,7 @@ class UserDBSource:
         Get user by email with ownership validation.
         Returns None if user not found or access denied.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
             return UserData.from_row(user_row)
 

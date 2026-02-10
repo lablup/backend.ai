@@ -213,7 +213,7 @@ class ArtifactDBSource:
         self._db = db
 
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
@@ -223,7 +223,7 @@ class ArtifactDBSource:
             return row.to_dataclass()
 
     async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
@@ -235,7 +235,7 @@ class ArtifactDBSource:
             return row.to_dataclass()
 
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(
                     sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
@@ -251,7 +251,7 @@ class ArtifactDBSource:
     async def get_artifact_revision(
         self, artifact_id: uuid.UUID, revision: str
     ) -> ArtifactRevisionData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(
                     sa.and_(
@@ -285,7 +285,7 @@ class ArtifactDBSource:
             return result.row.to_dataclass()
 
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
             )
@@ -810,7 +810,7 @@ class ArtifactDBSource:
             return artifact_revision_id
 
     async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow.readme).where(
                     ArtifactRevisionRow.id == artifact_revision_id

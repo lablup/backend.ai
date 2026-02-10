@@ -46,7 +46,7 @@ class AgentDBSource:
     async def get_images_by_image_identifiers(
         self, image_identifiers: list[ImageIdentifier]
     ) -> dict[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             identifier_tuples = [
                 (identifier.canonical, identifier.architecture) for identifier in image_identifiers
             ]
@@ -63,7 +63,7 @@ class AgentDBSource:
             return images_data
 
     async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
                 sa.select(ImageRow)
                 .where(ImageRow.config_digest.in_(digests))
@@ -76,7 +76,7 @@ class AgentDBSource:
             return images_data
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)

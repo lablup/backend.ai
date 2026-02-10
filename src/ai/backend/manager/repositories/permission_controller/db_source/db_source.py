@@ -597,7 +597,7 @@ class PermissionDBSource:
             return role_row
 
     async def get_role(self, role_id: uuid.UUID) -> RoleRow | None:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             try:
                 result = await self._get_role(db_session, role_id)
             except ObjectNotFound:
@@ -605,7 +605,7 @@ class PermissionDBSource:
             return result
 
     async def get_user_roles(self, user_id: uuid.UUID) -> list[RoleRow]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             j = (
                 sa.join(
                     RoleRow,
@@ -643,7 +643,7 @@ class PermissionDBSource:
     async def get_entity_mapped_scopes(
         self, target_object_id: ObjectId
     ) -> list[AssociationScopesEntitiesRow]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             stmt = sa.select(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.entity_id == target_object_id.entity_id,
                 AssociationScopesEntitiesRow.entity_type == target_object_id.entity_type.value,
@@ -681,7 +681,7 @@ class PermissionDBSource:
                 )
             )
         )
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(role_query)
             return result or False
 
@@ -779,7 +779,7 @@ class PermissionDBSource:
         role_query = self._make_query_statement_for_object_permissions(
             user_id, [object_id], operation
         )
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalars(role_query)
             role_rows = cast(list[RoleRow], result.all())
             return len(role_rows) > 0
@@ -794,7 +794,7 @@ class PermissionDBSource:
         role_query = self._make_query_statement_for_object_permissions(
             user_id, object_ids, operation
         )
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             role_rows_result = await db_session.scalars(role_query)
             role_rows = list(role_rows_result.all())
 
@@ -927,7 +927,7 @@ class PermissionDBSource:
 
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleRow:
         """Get role with eagerly loaded permissions only (no users)."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             stmt = (
                 sa.select(RoleRow)
                 .where(RoleRow.id == role_id)

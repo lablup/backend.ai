@@ -208,7 +208,7 @@ class TestProjectResourcePolicyRepository:
         """Test successful policy retrieval by name"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+        mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = mock_session
 
         # Mock query result
         mock_result = MagicMock()
@@ -232,7 +232,7 @@ class TestProjectResourcePolicyRepository:
         """Test policy retrieval when policy not found"""
         # Mock database session
         mock_session = AsyncMock(spec=AsyncSession)
-        mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+        mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = mock_session
 
         # Mock query result to return None
         mock_result = MagicMock()

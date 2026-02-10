@@ -135,7 +135,7 @@ class ContainerRegistryRepository:
         registry_name: str,
         project: str | None = None,
     ) -> ContainerRegistryData:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await self._get_by_registry_and_project(session, registry_name, project)
             if not result:
                 raise ContainerRegistryNotFound()
@@ -143,7 +143,7 @@ class ContainerRegistryRepository:
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == registry_name
             )
@@ -153,7 +153,7 @@ class ContainerRegistryRepository:
 
     @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ContainerRegistryRow)
             result = await session.execute(stmt)
             rows = list(result.scalars().all())
@@ -186,7 +186,7 @@ class ContainerRegistryRepository:
 
     @container_registry_repository_resilience.apply()
     async def get_known_registries(self) -> dict[str, str]:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             known_registries_map = await ContainerRegistryRow.get_known_container_registries(
                 session
             )
@@ -210,7 +210,7 @@ class ContainerRegistryRepository:
         Raises ContainerRegistryNotFound if registry is not found.
         TODO: Refactor to return ContainerRegistryData when Registry Scanner is updated
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == registry_name,
             )

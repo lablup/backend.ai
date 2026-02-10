@@ -43,7 +43,7 @@ class SessionDBSource:
         self._db = db
 
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
@@ -62,7 +62,7 @@ class SessionDBSource:
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
@@ -77,7 +77,7 @@ class SessionDBSource:
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
     ) -> list[SessionRow]:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.match_sessions(
                 db_sess,
                 id_or_name_prefix,
@@ -88,7 +88,7 @@ class SessionDBSource:
         self,
         session_id: SessionId,
     ) -> SessionRow:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session_to_determine_status(db_sess, session_id)
 
     async def get_template_by_id(
@@ -163,7 +163,7 @@ class SessionDBSource:
         registry_hostname: str,
         registry_project: str,
     ) -> ContainerRegistryRow | None:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
                 sa.select(ContainerRegistryRow)
                 .where(
@@ -193,7 +193,7 @@ class SessionDBSource:
         useful when the caller needs to reference images that are no longer active
         (e.g., committing a session whose base image has been deleted).
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             if alive_only:
                 return await ImageRow.resolve(db_sess, image_identifiers)
             return await ImageRow.resolve(
@@ -210,7 +210,7 @@ class SessionDBSource:
         image_visibility: str,
         image_owner_id: str,
     ) -> int:
-        async with self._db.begin_readonly_session() as sess:
+        async with self._db.begin_readonly_session_read_committed() as sess:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ImageRow)
@@ -230,7 +230,7 @@ class SessionDBSource:
         image_owner_id: str,
         image_name: str,
     ) -> ImageRow | None:
-        async with self._db.begin_readonly_session() as sess:
+        async with self._db.begin_readonly_session_read_committed() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
                     ImageRow.name.like(f"{new_canonical}%"),
@@ -275,7 +275,7 @@ class SessionDBSource:
         self,
         session_id: str | SessionId,
     ) -> SessionRow | None:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == session_id)
@@ -449,7 +449,7 @@ class SessionDBSource:
         session_name_or_id: uuid.UUID | str,
         access_key: AccessKey,
     ) -> dict[str, list[Any] | str]:
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,
                 db_sess,
@@ -464,7 +464,7 @@ class SessionDBSource:
         allow_stale: bool = False,
     ) -> SessionRow:
         """Get session with group information eagerly loaded"""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
@@ -480,7 +480,7 @@ class SessionDBSource:
         owner_access_key: AccessKey,
     ) -> SessionRow:
         """Get session with minimal routing information"""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
