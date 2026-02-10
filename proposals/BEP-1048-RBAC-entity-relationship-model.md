@@ -52,17 +52,18 @@ Entity visibility is currently handled per-entity:
 
 All entity relationships are classified into exactly three types:
 
-| Type | Semantics | Storage | Traversal |
-|------|-----------|---------|-----------|
-| `guarded` | Root Query entry point; scope-based access control via CTE recursive lookup | DB per-instance (`association_scopes_entities`) | Entry point, RBAC check performed |
-| `auto` | Composition; automatically accessible when parent is accessible | Code (type-level metadata) | Continue traversal |
-| `ref` | Reference; all fields readable, no further traversal | Code (type-level metadata) | Terminate traversal |
+| Type | Semantics | Storage | GQL Sub-field | Permission |
+|------|-----------|---------|---------------|------------|
+| `guarded` | Independent entity; no edge relationship | N/A (no edge) | No | Separate RBAC check required |
+| `auto` | Composition; permission delegation from parent | DB (`association_scopes_entities`, `relation_type=auto`) | Yes | Parent's CRUD inherited → child's CRUD |
+| `ref` | Read-only reference; no permission delegation | DB (`association_scopes_entities`, `relation_type=ref`) | Yes (read-only) | Parent's CRUD → child's READ only |
 
-Key design decisions:
+Key semantics:
 
-- Only `guarded` relationships are stored in the database. `auto` and `ref` are defined as code-level type metadata.
-- No `relation_type` column is needed in the DB table since it only stores guarded relationships.
-- A `RelationType` enum is defined in code for type-level annotations.
+- **Guarded** is not an edge — it represents the absence of a relationship. A's permissions are independent of B's. B requires its own Root Query with its own RBAC check. No GQL sub-field exists between them.
+- **Auto** edges are stored per-instance in `association_scopes_entities` with `relation_type=auto`. If you have CRUD on parent A, you have CRUD on child B. No separate permission check needed for B. The parent can list and mutate its auto children.
+- **Ref** edges are stored per-instance in `association_scopes_entities` with `relation_type=ref`. If you have CRUD on parent A, you get READ-only on child B. CUD on B is not permitted via this path. The parent can list its ref children, but no permission delegation occurs. Further traversal from B requires a separate guarded-level permission check.
+- A `RelationType` enum (`auto`, `ref`) is defined in code. The `association_scopes_entities` table includes a `relation_type` column to distinguish auto from ref edges.
 
 ### Discarded Alternatives
 
@@ -78,44 +79,19 @@ Guarded entities are entry points for Root Queries. RBAC permission checks are p
 | User | Session, VFolder, Endpoint, KeyPair, NotificationChannel |
 | Project | Session, VFolder, Endpoint, Network, ResourceGroup, ContainerRegistry, StorageHost, Artifact, SessionTemplate |
 | Domain | User, Project, Network, ResourceGroup, ContainerRegistry, StorageHost, AppConfig |
-| Global | Domain, ResourcePreset, ResourcePolicy, AuditLog, EventLog |
 
-### Guarded Edges
+**Superadmin-only (no scope context):**
+- DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
 
-Guarded edges are **dynamically mapped** per-instance in the `association_scopes_entities` table. The edges below represent the baseline scope-entity mappings; additional mappings can be added as new entity types are introduced.
-
-```
-Global ━━guarded━━► Domain
-Global ━━guarded━━► ResourcePreset
-Global ━━guarded━━► ResourcePolicy
-Global ━━guarded━━► AuditLog
-Global ━━guarded━━► EventLog
-Domain ━━guarded━━► User
-Domain ━━guarded━━► Project
-Domain ━━guarded━━► Network
-Domain ━━guarded━━► ResourceGroup
-Domain ━━guarded━━► ContainerRegistry
-Domain ━━guarded━━► StorageHost
-Domain ━━guarded━━► AppConfig
-Project ━━guarded━━► Session
-Project ━━guarded━━► VFolder
-Project ━━guarded━━► Endpoint
-Project ━━guarded━━► Network
-Project ━━guarded━━► ResourceGroup
-Project ━━guarded━━► ContainerRegistry
-Project ━━guarded━━► StorageHost
-Project ━━guarded━━► Artifact
-Project ━━guarded━━► SessionTemplate
-User ━━guarded━━► Session
-User ━━guarded━━► VFolder
-User ━━guarded━━► Endpoint
-User ━━guarded━━► KeyPair
-User ━━guarded━━► NotificationChannel
-```
+Since guarded means no edge relationship, there is no "Guarded Edges" diagram. Each guarded entity is independently queried at the Root Query level with its own RBAC check.
 
 ### Auto Edges
 
-Auto edges represent composition relationships. When a parent entity is accessible, its auto children are automatically accessible without additional RBAC checks. Traversal continues through auto edges.
+Auto edges represent composition relationships with **permission delegation** via `association_scopes_entities`. If A ━━auto━━► B:
+
+- A's CRUD permissions are inherited by B (full CRUD delegation).
+- No separate RBAC check is needed for B.
+- B appears as a GQL sub-field of A.
 
 ```
 Session ━━auto━━► Kernel
@@ -142,6 +118,7 @@ ResourceGroup ━━auto━━► ProjectFairShare
 ResourceGroup ━━auto━━► UserFairShare
 Domain ━━auto━━► DomainFairShare
 Project ━━auto━━► ProjectFairShare
+Project ━━auto━━► Session
 User ━━auto━━► UserFairShare
 Role ━━auto━━► Permission
 Role ━━auto━━► UserRole
@@ -149,7 +126,12 @@ Role ━━auto━━► UserRole
 
 ### Ref Edges
 
-Ref edges represent read-only references. All fields of the referenced entity are readable, but traversal terminates — no further edges are followed from a ref target.
+Ref edges represent read-only references stored per-instance in `association_scopes_entities` with `relation_type=ref`, but with **no permission delegation**. If A ──ref──► B:
+
+- A's CRUD permissions grant READ-only on B. CUD on B is not permitted via this path.
+- The parent can list its ref children (the row in `association_scopes_entities` enables this).
+- B appears as a read-only GQL sub-field of A.
+- Further traversal from B requires a separate guarded-level permission check (same as accessing an independent entity).
 
 ```
 Session ──ref──► Agent, ResourceGroup, KeyPair
@@ -177,19 +159,19 @@ NotificationRule ──ref──► User (created_by)
 
 ### Resolver Traversal Context
 
-Since relationship type is an edge property, the GQL resolver for a child entity does not inherently know whether it was reached via `auto` or `ref`. However, `ref` edges require traversal termination — nested entity fields should not be resolved further from a ref target.
+Since relationship type is an edge property, the GQL resolver for a child entity does not inherently know whether it was reached via `auto` or `ref`. After a `ref` edge, further traversal requires a separate guarded-level permission check — the parent's authorization does not carry forward.
 
 Example — the same `Agent` entity behaves differently by entry path:
 
 ```
 resourceGroup { agents { kernels { ... } } }
-  └─ auto ──► Agent ──► auto continues → Kernel accessible
+  └─ auto ──► Agent ──► auto continues → Kernel accessible (CRUD inherited)
 
 session { agent { kernels { ... } } }
-  └─ ref ──► Agent ──► traversal terminates → Kernel NOT accessible
+  └─ ref ──► Agent (READ only) ──► further traversal requires separate permission check
 ```
 
-To enforce this, the **parent resolver** (which owns the edge metadata) must propagate a traversal context to downstream resolvers. The child entity itself does not need to be aware of its classification — it only needs to check whether traversal is permitted in the current context. The specific mechanism (e.g., resolver context flag, middleware decorator) is an implementation detail to be decided in Phase 2–3.
+To enforce this, the **parent resolver** (which owns the edge metadata) must propagate a traversal context to downstream resolvers. After a ref edge, the authorization context resets — any further access requires an independent permission check, equivalent to a guarded Root Query. The specific mechanism (e.g., resolver context flag, middleware decorator) is an implementation detail to be decided in Phase 2–3.
 
 ### Query Constraints
 
@@ -200,35 +182,19 @@ To enforce this, the **parent resolver** (which owns the edge metadata) must pro
 | User | Yes | Viewer identity |
 | Domain | Yes | `viewer.domain` |
 | Project | **No** | Multiple project membership possible; `project_id` required |
-| Global | Yes | Superadmin; no parameter needed |
 
-#### Guarded Entities (22 types)
+#### Root Query Enabled Entities (22 types)
 
-Single-item queries are supported for all guarded entities. List queries depend on scope:
+These entities have standalone Root Queries with RBAC checks. Only these entities are stored in `association_scopes_entities` as scope→entity mappings.
 
-**User + Project Scope:**
-- SessionRow, VFolderRow, EndpointRow
-- List: User scope implicit / Project scope requires `project_id`
-
-**User Scope only:**
-- KeyPairRow, NotificationChannelRow
-- List: Implicit (viewer)
-
-**Project Scope only:**
-- ArtifactRow, SessionTemplate(session_templates)
-- List: Requires `project_id`
-
-**Project + Domain Scope:**
+**Scoped (14 types):**
+- SessionRow, VFolderRow, EndpointRow, KeyPairRow, NotificationChannelRow
 - NetworkRow, ScalingGroupRow, ContainerRegistryRow, StorageHostRow
-- List: Project scope requires `project_id` / Domain scope implicit (`viewer.domain`)
+- ArtifactRow, SessionTemplateRow
+- UserRow, ProjectRow, AppConfigRow
 
-**Domain Scope only:**
-- UserRow, GroupRow (Project), AppConfigRow
-- List: Implicit (`viewer.domain`)
-
-**Global Scope only (superadmin):**
+**Superadmin-only (8 types):**
 - DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
-- List: Implicit
 
 #### Auto-only Entities (22 types)
 
@@ -284,7 +250,7 @@ StorageHost is a planned entity that does not yet exist as a DB table:
 
 ### DB Schema Changes
 
-1. **New table**: `association_scopes_entities` — stores all guarded scope-entity relationships.
+1. **New table**: `association_scopes_entities` — stores per-instance auto and ref edges with a `relation_type` column (`auto` for permission delegation, `ref` for read-only listing).
 2. **Remove**: `permission_groups` table — fields (`role_id`, `scope_type`, `scope_id`) moved directly into `permissions`.
 3. **Remove**: `object_permissions` table — replaced by entity-as-scope pattern.
 
