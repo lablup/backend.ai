@@ -96,6 +96,10 @@ class TestSearchScopedPermissions:
                 (EntityType.IMAGE, OperationType.READ),
             ]:
                 perm = PermissionRow(
+                    permission_group_id=perm_group_id,
+                    role_id=role_id,
+                    scope_type=ScopeType.DOMAIN,
+                    scope_id="test-domain",
                     entity_type=entity_type,
                     operation=operation,
                 )

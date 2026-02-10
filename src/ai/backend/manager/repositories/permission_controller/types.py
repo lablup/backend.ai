@@ -32,9 +32,7 @@ class ScopedPermissionSearchScope(SearchScope):
 
     def to_condition(self) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.id.in_(
-                sa.select(PermissionRow.id).where(PermissionRow.id.isnot(None))
-            )
+            return PermissionRow.role_id == role_id
 
         return inner
 

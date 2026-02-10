@@ -693,6 +693,150 @@ class TestRBACEntityPurgerEntityFieldCleanup:
             assert all(f.entity_id == str(ctx.entity_uuid2) for f in remaining_fields)
 
 
+class TestRBACEntityPurgerPermissionRowPreservation:
+    """Tests for permission group preservation when PermissionRow exists."""
+
+    @pytest.fixture
+    async def entity_with_permission_row(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> AsyncGenerator[EntityWithPermissionRowContext, None]:
+        """Create entity with permission group that has PermissionRow (type-level permission).
+
+        Scenario:
+        - Entity A with object_permission
+        - PermissionGroup has PermissionRow (type-level permission for VFOLDER)
+
+        When Entity A is deleted:
+        - PermissionGroup should be PRESERVED (has remaining PermissionRow)
+        """
+        user_id = str(uuid.uuid4())
+        entity_uuid = uuid.uuid4()
+        role_id: UUID
+        perm_group_id: UUID
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            entity_row = RBACEntityPurgerTestRow(
+                id=entity_uuid,
+                name="entity-with-perm-row",
+                owner_scope_type=ScopeType.USER.value,
+                owner_scope_id=user_id,
+            )
+            db_sess.add(entity_row)
+
+            assoc_row = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=str(entity_uuid),
+            )
+            db_sess.add(assoc_row)
+
+            role = RoleRow(
+                id=uuid.uuid4(),
+                name="system-role",
+                source=RoleSource.SYSTEM,
+            )
+            db_sess.add(role)
+            await db_sess.flush()
+
+            perm_group = PermissionGroupRow(
+                role_id=role.id,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+            )
+            db_sess.add(perm_group)
+            await db_sess.flush()
+
+            # Create PermissionRow (type-level permission) in the permission group
+            perm_row = PermissionRow(
+                permission_group_id=perm_group.id,
+                role_id=role.id,
+                scope_type=ScopeType.USER,
+                scope_id=user_id,
+                entity_type=EntityType.VFOLDER,
+                operation=OperationType.READ,
+            )
+            db_sess.add(perm_row)
+
+            # Create object permission for the entity
+            obj_perm = ObjectPermissionRow(
+                role_id=role.id,
+                permission_group_id=perm_group.id,
+                entity_type=EntityType.VFOLDER,
+                entity_id=str(entity_uuid),
+                operation=OperationType.READ,
+            )
+            db_sess.add(obj_perm)
+            await db_sess.flush()
+
+            role_id = role.id
+            perm_group_id = perm_group.id
+
+        yield EntityWithPermissionRowContext(
+            entity_uuid=entity_uuid,
+            user_id=user_id,
+            role_id=role_id,
+            perm_group_id=perm_group_id,
+        )
+
+    async def test_purger_preserves_permission_group_with_remaining_permissions(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        entity_with_permission_row: EntityWithPermissionRowContext,
+    ) -> None:
+        """Test that purger preserves permission groups that have remaining PermissionRow entries.
+
+        When an entity is deleted, permission groups should NOT be deleted if they
+        still have type-level permissions (PermissionRow entries).
+        """
+        ctx = entity_with_permission_row
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            # Verify initial state
+            perm_row_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionRow)
+            )
+            assert perm_row_count == 1
+
+            perm_group_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
+            )
+            assert perm_group_count == 1
+
+            # Delete the entity
+            spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
+            purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
+                row_class=RBACEntityPurgerTestRow,
+                pk_value=ctx.entity_uuid,
+                spec=spec,
+            )
+            await execute_rbac_entity_purger(db_sess, purger)
+
+            # Verify object permission is deleted
+            obj_perm_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(ObjectPermissionRow)
+            )
+            assert obj_perm_count == 0
+
+            # Verify permission group is PRESERVED (has PermissionRow)
+            remaining_perm_group_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionGroupRow)
+            )
+            assert remaining_perm_group_count == 1
+
+            remaining_perm_group = await db_sess.scalar(sa.select(PermissionGroupRow))
+            assert remaining_perm_group is not None
+            assert remaining_perm_group.id == ctx.perm_group_id
+
+            # Verify PermissionRow is preserved
+            remaining_perm_row_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(PermissionRow)
+            )
+            assert remaining_perm_row_count == 1
+
+
 # =============================================================================
 # Batch Purger Tests
 # =============================================================================

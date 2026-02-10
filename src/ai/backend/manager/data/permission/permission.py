@@ -9,6 +9,13 @@ from .types import EntityType, OperationType, ScopeType
 
 @dataclass
 class PermissionCreator:
+<<<<<<< HEAD
+=======
+    permission_group_id: uuid.UUID
+    role_id: uuid.UUID
+    scope_type: ScopeType
+    scope_id: str
+>>>>>>> c9ceaf302 (feat(BA-4350): Add direct role_id, scope_type, scope_id columns to permissions table)
     entity_type: EntityType
     operation: OperationType
 
@@ -16,6 +23,24 @@ class PermissionCreator:
 @dataclass
 class PermissionData:
     id: uuid.UUID
+<<<<<<< HEAD
+=======
+    permission_group_id: uuid.UUID
+    role_id: uuid.UUID
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
+    operation: OperationType
+
+
+@dataclass
+class PermissionCreatorBeforePermissionGroupCreation:
+    """
+    Input for creating a permission before the permission group is created.
+    Used when creating permissions as part of permission group creation.
+    """
+
+>>>>>>> c9ceaf302 (feat(BA-4350): Add direct role_id, scope_type, scope_id columns to permissions table)
     entity_type: EntityType
     operation: OperationType
 

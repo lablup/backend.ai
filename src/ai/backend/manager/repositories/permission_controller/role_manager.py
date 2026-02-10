@@ -80,6 +80,10 @@ class RoleManager:
         for entity, operations in data.entity_operations().items():
             for operation in operations:
                 creator = PermissionCreator(
+                    permission_group_id=permission_group.id,
+                    role_id=permission_group.role_id,
+                    scope_type=data.scope_id().scope_type,
+                    scope_id=data.scope_id().scope_id,
                     entity_type=entity,
                     operation=operation,
                 )
