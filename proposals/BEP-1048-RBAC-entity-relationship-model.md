@@ -101,9 +101,19 @@ Routing ━━auto━━► RouteHistory
 ResourceGroup ━━auto━━► DomainFairShare
 ResourceGroup ━━auto━━► ProjectFairShare
 ResourceGroup ━━auto━━► UserFairShare
+Domain ━━auto━━► User
+Domain ━━auto━━► Project
+Domain ━━auto━━► Network
 Domain ━━auto━━► DomainFairShare
-Project ━━auto━━► ProjectFairShare
 Project ━━auto━━► Session
+Project ━━auto━━► VFolder
+Project ━━auto━━► Endpoint
+Project ━━auto━━► Network
+Project ━━auto━━► ProjectFairShare
+User ━━auto━━► Session
+User ━━auto━━► VFolder
+User ━━auto━━► Endpoint
+User ━━auto━━► KeyPair
 User ━━auto━━► UserFairShare
 Role ━━auto━━► Permission
 Role ━━auto━━► UserRole
@@ -117,6 +127,31 @@ Ref edges represent read-only references stored per-instance in `association_sco
 - The parent can list its ref children (the row in `association_scopes_entities` enables this).
 - B appears as a read-only GQL sub-field of A.
 - Further traversal from B requires a separate guarded-level permission check (same as accessing an independent entity).
+
+#### Sharing via Ref Edge
+
+Entity sharing (e.g., VFolder invitation) uses ref edges combined with entity-scope permissions:
+
+- **Ref edge** provides visibility (listing) and prevents permission escalation from the invitee's scope.
+- **Entity-scope permissions** control the exact operations granted (read, write, etc.).
+
+When User A shares VFolder X with User B (write invitation):
+
+```
+association_scopes_entities:
+  (scope=User:B, entity=VFolder:X, relation_type=ref)    ← visibility + escalation prevention
+
+permissions (B's system role, entity-scope):
+  (scope=VFolder:X, entity_type=vfolder, op=read)         ← explicit read grant
+  (scope=VFolder:X, entity_type=vfolder, op=write)        ← explicit write grant
+```
+
+Permission check is two-layer:
+
+1. **Entity-scope direct match** (priority): Check if the user has a permission where `scope_id = target entity`. This matches regardless of edge type.
+2. **CTE scope chain** (fallback): Traverse `association_scopes_entities` upward. Ref edges limit inherited permissions to READ-only, preventing the invitee's User-scope CRUD from escalating to the shared entity.
+
+This ensures that B's existing User-scope permissions (e.g., `vfolder:delete` at `scope=User:B`) do not flow through to VFolder X, while explicitly granted entity-scope permissions (read/write) work as intended.
 
 ```
 Session ──ref──► Agent, ResourceGroup, KeyPair
@@ -149,7 +184,7 @@ These entities have standalone Root Queries with RBAC checks. Only these entitie
 **Scoped:**
 - SessionRow, VFolderRow, EndpointRow, KeyPairRow, NotificationChannelRow
 - NetworkRow, ScalingGroupRow, ContainerRegistryRow, StorageHostRow
-- ArtifactRow, SessionTemplateRow
+- ImageRow, ArtifactRow, SessionTemplateRow
 - UserRow, ProjectRow, AppConfigRow
 
 **Superadmin-only:**
@@ -162,7 +197,7 @@ These entities have mutation APIs (Create, Update, Delete, Purge). All root-quer
 **Scoped:**
 - SessionRow, VFolderRow, EndpointRow, KeyPairRow, NotificationChannelRow
 - NetworkRow, ScalingGroupRow, ContainerRegistryRow, StorageHostRow
-- ArtifactRow, SessionTemplateRow
+- ImageRow, ArtifactRow, SessionTemplateRow
 - UserRow, ProjectRow, AppConfigRow
 
 **Superadmin-only:**
@@ -182,7 +217,6 @@ No standalone single-item or list queries. Always accessed through parent:
 | SessionDependencyRow | Session | `session { dependencies }` |
 | SessionSchedulingHistoryRow | Session | `session { schedulingHistory }` |
 | AgentRow | ResourceGroup | `resourceGroup { agents }` |
-| ImageRow | ContainerRegistry | `containerRegistry { images }` |
 | ImageAliasRow | Image | `image { aliases }` |
 | VFolderPermissionRow | VFolder | `vfolder { permissions }` |
 | VFolderInvitationRow | VFolder | `vfolder { invitations }` |
@@ -242,6 +276,8 @@ Existing junction tables will be replaced by `association_scopes_entities`:
 | `ScalingGroupForProjectRow` | `association_scopes_entities` (ResourceGroup, Project scope) | `auto` |
 | `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) | `auto` |
 | `AssocGroupUserRow` | `association_scopes_entities` (User, Project scope) | `ref` |
+| `VFolderPermissionRow` | `association_scopes_entities` (VFolder, User scope) + entity-scope permissions | `ref` |
+| `VFolderInvitationRow` | Replaced by ref edge INSERT/DELETE workflow | `ref` |
 
 ### Final RBAC Tables
 
@@ -254,7 +290,10 @@ After migration, the core RBAC tables are:
 
 ### Backward Compatibility
 
-- Sharing is implemented via system role entity-scope permission INSERT/DELETE.
+- **Sharing** is implemented via ref edge + entity-scope permissions:
+  - **Invite**: INSERT ref edge in `association_scopes_entities` + INSERT entity-scope permissions (read/write) in the invitee's system role.
+  - **Revoke**: DELETE ref edge + DELETE entity-scope permissions.
+  - The ref edge prevents the invitee's User-scope CRUD from escalating to the shared entity. Only explicitly granted entity-scope permissions apply.
 - Project membership is managed through `user_roles` and excluded from RBAC scope chain (Visibility only).
 
 ## Implementation Plan
