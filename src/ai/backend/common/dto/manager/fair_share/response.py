@@ -230,9 +230,6 @@ class UsageBucketMetadataDTO(BaseModel):
     usage_capacity_ratio: ResourceSlotDTO = Field(
         description="Ratio of usage to capacity (usage / total capacity available)"
     )
-    average_capacity_per_second: ResourceSlotDTO = Field(
-        description="Average capacity available per second during this period"
-    )
 
 
 # Domain Usage Bucket

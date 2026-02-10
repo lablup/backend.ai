@@ -87,6 +87,8 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketData,
 )
 
+SECONDS_PER_DAY = Decimal("86400")
+
 __all__ = ("FairShareAdapter",)
 
 
@@ -394,9 +396,6 @@ class FairShareAdapter:
                 usage_capacity_ratio=self._calculate_usage_capacity_ratio(
                     data.resource_usage, data.capacity_snapshot
                 ),
-                average_capacity_per_second=self._calculate_average_capacity_per_second(
-                    data.capacity_snapshot, data.period_start, data.period_end
-                ),
             ),
             resource_usage=self._convert_resource_slot(data.resource_usage),
             capacity_snapshot=self._convert_resource_slot(data.capacity_snapshot),
@@ -467,9 +466,6 @@ class FairShareAdapter:
                 ),
                 usage_capacity_ratio=self._calculate_usage_capacity_ratio(
                     data.resource_usage, data.capacity_snapshot
-                ),
-                average_capacity_per_second=self._calculate_average_capacity_per_second(
-                    data.capacity_snapshot, data.period_start, data.period_end
                 ),
             ),
             resource_usage=self._convert_resource_slot(data.resource_usage),
@@ -544,9 +540,6 @@ class FairShareAdapter:
                 usage_capacity_ratio=self._calculate_usage_capacity_ratio(
                     data.resource_usage, data.capacity_snapshot
                 ),
-                average_capacity_per_second=self._calculate_average_capacity_per_second(
-                    data.capacity_snapshot, data.period_start, data.period_end
-                ),
             ),
             resource_usage=self._convert_resource_slot(data.resource_usage),
             capacity_snapshot=self._convert_resource_slot(data.capacity_snapshot),
@@ -564,7 +557,8 @@ class FairShareAdapter:
 
         entries = [
             ResourceSlotEntryDTO(
-                resource_type=key, quantity=str(Decimal(str(value)) / Decimal(days))
+                resource_type=key,
+                quantity=str(Decimal(str(value)) / (Decimal(days) * SECONDS_PER_DAY)),
             )
             for key, value in usage.items()
         ]
@@ -582,22 +576,6 @@ class FairShareAdapter:
             else:
                 ratio = Decimal(str(usage[key])) / Decimal(str(capacity_val))
             entries.append(ResourceSlotEntryDTO(resource_type=key, quantity=str(ratio)))
-        return ResourceSlotDTO(entries=entries)
-
-    def _calculate_average_capacity_per_second(
-        self, capacity: ResourceSlot, period_start: date, period_end: date
-    ) -> ResourceSlotDTO:
-        """Calculate average capacity per second."""
-        total_seconds = (period_end - period_start).total_seconds()
-        if total_seconds == 0:
-            return ResourceSlotDTO(entries=[])
-
-        entries = [
-            ResourceSlotEntryDTO(
-                resource_type=key, quantity=str(Decimal(str(value)) / Decimal(str(total_seconds)))
-            )
-            for key, value in capacity.items()
-        ]
         return ResourceSlotDTO(entries=entries)
 
     # Common helpers
