@@ -989,3 +989,181 @@ class TestIntegrationScenarios:
 
         # User B (in low-usage domain) should have better rank despite higher personal usage
         assert rank_b.rank < rank_a.rank
+
+
+class TestDomainNameResolution:
+    """Tests for domain_name resolution in calculate_factors.
+
+    Verifies that domain_name is correctly resolved from:
+    1. fair_shares (existing record) - primary source
+    2. project_domain_names (GroupRow lookup) - fallback
+    3. Empty string - when project is deleted and no source available
+    """
+
+    def test_project_domain_name_from_fair_shares(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares has the project, domain_name comes from there."""
+        project_id = uuid4()
+        domain_name = "existing-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(
+                domain={},
+                project={
+                    project_id: ProjectFairShareData(
+                        resource_group="default",
+                        project_id=project_id,
+                        domain_name=domain_name,
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                    )
+                },
+                user={},
+            ),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            today=today,
+            project_domain_names={project_id: "fallback-domain"},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == domain_name
+
+    def test_project_domain_name_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares doesn't have the project, fallback to project_domain_names."""
+        project_id = uuid4()
+        fallback_domain = "fallback-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == fallback_domain
+
+    def test_user_domain_name_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares doesn't have the user, fallback to project_domain_names."""
+        project_id = uuid4()
+        user_uuid = uuid4()
+        user_key = UserProjectKey(user_uuid, project_id)
+        fallback_domain = "fallback-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={},
+                user={user_key: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.user_results[user_key].domain_name == fallback_domain
+
+    def test_domain_name_empty_when_no_source(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When neither fair_shares nor project_domain_names has the project, domain_name is empty."""
+        project_id = uuid4()
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            today=today,
+            project_domain_names={},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == ""
+
+    def test_project_fair_share_with_empty_domain_uses_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares has the project but domain_name is empty, fallback is used."""
+        project_id = uuid4()
+        fallback_domain = "correct-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(
+                domain={},
+                project={
+                    project_id: ProjectFairShareData(
+                        resource_group="default",
+                        project_id=project_id,
+                        domain_name="",
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                    )
+                },
+                user={},
+            ),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == fallback_domain

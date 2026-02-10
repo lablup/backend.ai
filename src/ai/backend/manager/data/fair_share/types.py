@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -303,3 +303,8 @@ class FairShareCalculationContext:
 
     today: date
     """Current date for decay calculation."""
+
+    project_domain_names: Mapping[uuid.UUID, str] = field(default_factory=dict)
+    """Mapping from project_id to domain_name.
+    Used as fallback when fair_shares.project doesn't contain the project
+    (new projects with usage but no fair share record yet)."""

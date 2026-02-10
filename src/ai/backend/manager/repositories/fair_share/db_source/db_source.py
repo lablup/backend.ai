@@ -998,6 +998,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "project_id"],
                     set_={
+                        "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
                         "normalized_usage": insert_stmt.excluded.normalized_usage,
@@ -1027,6 +1028,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "user_uuid", "project_id"],
                     set_={
+                        "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
                         "normalized_usage": insert_stmt.excluded.normalized_usage,
@@ -1167,6 +1169,13 @@ class FairShareDBSource:
                 db_sess, scaling_group, lookback_start, lookback_end
             )
 
+            # 5. Collect project_ids from raw usage buckets and fetch domain names
+            project_ids: set[uuid.UUID] = set()
+            project_ids.update(raw_usage_buckets.project.keys())
+            for user_key in raw_usage_buckets.user:
+                project_ids.add(user_key.project_id)
+            project_domain_names = await self._fetch_project_domain_names(db_sess, project_ids)
+
         return FairShareCalculationContext(
             fair_shares=fair_shares,
             raw_usage_buckets=raw_usage_buckets,
@@ -1176,7 +1185,28 @@ class FairShareDBSource:
             resource_weights=spec.resource_weights,
             cluster_capacity=cluster_capacity,
             today=today,
+            project_domain_names=project_domain_names,
         )
+
+    async def _fetch_project_domain_names(
+        self,
+        db_sess: SASession,
+        project_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, str]:
+        """Fetch domain_name for projects from GroupRow.
+
+        Args:
+            db_sess: Database session
+            project_ids: Set of project IDs to look up
+
+        Returns:
+            Mapping from project_id to domain_name
+        """
+        if not project_ids:
+            return {}
+        query = sa.select(GroupRow.id, GroupRow.domain_name).where(GroupRow.id.in_(project_ids))
+        result = await db_sess.execute(query)
+        return {row.id: row.domain_name for row in result}
 
     async def _fetch_fair_share_spec(
         self,
