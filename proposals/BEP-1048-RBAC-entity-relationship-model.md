@@ -80,6 +80,39 @@ Guarded entities are entry points for Root Queries. RBAC permission checks are p
 | Domain | User, Project, Network, ResourceGroup, ContainerRegistry, StorageHost, AppConfig |
 | Global | Domain, ResourcePreset, ResourcePolicy, AuditLog, EventLog |
 
+### Guarded Edges
+
+Guarded edges are **dynamically mapped** per-instance in the `association_scopes_entities` table. The edges below represent the baseline scope-entity mappings; additional mappings can be added as new entity types are introduced.
+
+```
+Global ━━guarded━━► Domain
+Global ━━guarded━━► ResourcePreset
+Global ━━guarded━━► ResourcePolicy
+Global ━━guarded━━► AuditLog
+Global ━━guarded━━► EventLog
+Domain ━━guarded━━► User
+Domain ━━guarded━━► Project
+Domain ━━guarded━━► Network
+Domain ━━guarded━━► ResourceGroup
+Domain ━━guarded━━► ContainerRegistry
+Domain ━━guarded━━► StorageHost
+Domain ━━guarded━━► AppConfig
+Project ━━guarded━━► Session
+Project ━━guarded━━► VFolder
+Project ━━guarded━━► Endpoint
+Project ━━guarded━━► Network
+Project ━━guarded━━► ResourceGroup
+Project ━━guarded━━► ContainerRegistry
+Project ━━guarded━━► StorageHost
+Project ━━guarded━━► Artifact
+Project ━━guarded━━► SessionTemplate
+User ━━guarded━━► Session
+User ━━guarded━━► VFolder
+User ━━guarded━━► Endpoint
+User ━━guarded━━► KeyPair
+User ━━guarded━━► NotificationChannel
+```
+
 ### Auto Edges
 
 Auto edges represent composition relationships. When a parent entity is accessible, its auto children are automatically accessible without additional RBAC checks. Traversal continues through auto edges.
