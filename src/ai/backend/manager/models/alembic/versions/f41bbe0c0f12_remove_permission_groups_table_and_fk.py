@@ -48,6 +48,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+
     # Recreate permission_groups table
     op.create_table(
         "permission_groups",
@@ -66,15 +68,71 @@ def downgrade() -> None:
         ["role_id", "scope_type", "scope_id"],
     )
 
-    # Restore permission_group_id columns
+    # Add permission_group_id columns as nullable first (backfill needed)
     op.add_column(
         "permissions",
-        sa.Column("permission_group_id", GUID(), nullable=False),
+        sa.Column("permission_group_id", GUID(), nullable=True),
     )
     op.add_column(
         "object_permissions",
-        sa.Column("permission_group_id", GUID(), nullable=False),
+        sa.Column("permission_group_id", GUID(), nullable=True),
     )
+
+    # Backfill: create a GLOBAL-scope permission_group per role_id found in
+    # object_permissions, then point every row at it.
+    permissions_t = sa.table(
+        "permissions",
+        sa.column("id", GUID()),
+        sa.column("permission_group_id", GUID()),
+    )
+    object_permissions_t = sa.table(
+        "object_permissions",
+        sa.column("id", GUID()),
+        sa.column("role_id", GUID()),
+        sa.column("permission_group_id", GUID()),
+    )
+    permission_groups_t = sa.table(
+        "permission_groups",
+        sa.column("id", GUID()),
+        sa.column("role_id", GUID()),
+        sa.column("scope_type", sa.VARCHAR(length=32)),
+        sa.column("scope_id", sa.String(length=64)),
+    )
+
+    # Collect distinct role_ids from object_permissions
+    role_ids = {
+        row[0]
+        for row in conn.execute(sa.select(object_permissions_t.c.role_id).distinct()).fetchall()
+    }
+
+    for role_id in role_ids:
+        # Create a GLOBAL permission_group for each role
+        pg_id = conn.execute(
+            sa.insert(permission_groups_t)
+            .values(role_id=role_id, scope_type="GLOBAL", scope_id="*")
+            .returning(permission_groups_t.c.id)
+        ).scalar_one()
+
+        # Backfill object_permissions
+        conn.execute(
+            sa.update(object_permissions_t)
+            .where(object_permissions_t.c.role_id == role_id)
+            .values(permission_group_id=pg_id)
+        )
+
+    # Backfill permissions (no role_id column) — assign to first available
+    # permission_group if any exist.
+    first_pg = conn.execute(sa.select(permission_groups_t.c.id).limit(1)).scalar()
+    if first_pg is not None:
+        conn.execute(
+            sa.update(permissions_t)
+            .where(permissions_t.c.permission_group_id.is_(None))
+            .values(permission_group_id=first_pg)
+        )
+
+    # Set columns to NOT NULL
+    op.alter_column("permissions", "permission_group_id", nullable=False)
+    op.alter_column("object_permissions", "permission_group_id", nullable=False)
 
     # Restore indexes
     op.create_index(
