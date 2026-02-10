@@ -186,11 +186,11 @@ from .public_api.health import hello as health_hello
 from .registry import AgentRegistry
 from .reporters.hub import ReporterHub, ReporterHubArgs
 from .reporters.smtp import SMTPReporter, SMTPSenderArgs
+from .repositories.container_registry_quota.repository import PerProjectRegistryQuotaRepository
 from .repositories.repositories import Repositories
 from .repositories.types import RepositoryArgs
 from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .service.base import ServicesContext
-from .service.container_registry.base import PerProjectRegistryQuotaRepository
 from .service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,

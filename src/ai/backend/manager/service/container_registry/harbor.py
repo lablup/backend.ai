@@ -12,11 +12,11 @@ from ai.backend.manager.clients.container_registry.harbor import (
     HarborProjectInfo,
     PerProjectHarborQuotaClient,
 )
+from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.service.container_registry.base import (
-    ContainerRegistryRowInfo,
-    PerProjectRegistryQuotaRepository,
+from ai.backend.manager.repositories.container_registry_quota.repository import (
+    AbstractPerProjectRegistryQuotaRepository,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -62,19 +62,19 @@ class PerProjectContainerRegistryQuotaClientPool(abc.ABC):
 
 
 class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
-    _repository: PerProjectRegistryQuotaRepository
+    _repository: AbstractPerProjectRegistryQuotaRepository
     _client_pool: PerProjectContainerRegistryQuotaClientPool
 
     def __init__(
         self,
-        repository: PerProjectRegistryQuotaRepository,
+        repository: AbstractPerProjectRegistryQuotaRepository,
         client_pool: PerProjectContainerRegistryQuotaClientPool,
     ) -> None:
         self._repository = repository
         self._client_pool = client_pool
 
     def _registry_row_to_harbor_project_info(
-        self, registry_info: ContainerRegistryRowInfo
+        self, registry_info: PerProjectContainerRegistryInfo
     ) -> HarborProjectInfo:
         return HarborProjectInfo(
             url=registry_info.url,
