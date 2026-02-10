@@ -125,7 +125,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 DomainWeightInputItem(domain_name="domain1", weight=Decimal("1.5")),
                 DomainWeightInputItem(domain_name="domain2", weight=None),
@@ -173,7 +173,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 DomainWeightInputItem(domain_name=f"domain{i}", weight=Decimal(str(i)))
                 for i in range(5)
@@ -206,7 +206,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[DomainWeightInputItem(domain_name="domain1", weight=Decimal("1.0"))],
         )
 
@@ -248,7 +248,7 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         )
 
         input_data = BulkUpsertProjectFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 ProjectWeightInputItem(
                     project_id=project_id1,
@@ -303,7 +303,7 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         )
 
         input_data = BulkUpsertProjectFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 ProjectWeightInputItem(
                     project_id=uuid.uuid4(),
@@ -353,7 +353,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
         )
 
         input_data = BulkUpsertUserFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 UserWeightInputItem(
                     user_uuid=user_uuid1,
@@ -412,7 +412,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
         )
 
         input_data = BulkUpsertUserFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 UserWeightInputItem(
                     user_uuid=uuid.uuid4(),

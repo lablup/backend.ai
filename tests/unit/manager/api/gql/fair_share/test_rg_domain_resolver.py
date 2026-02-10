@@ -77,7 +77,7 @@ class TestRGDomainFairShare:
         info_with_domain_fair_share_exists: MagicMock,
     ) -> None:
         """Should return domain fair share when it exists."""
-        scope = ResourceGroupDomainScope(resource_group="default")
+        scope = ResourceGroupDomainScope(resource_group_name="default")
 
         resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
         result = await resolver_fn(
@@ -97,7 +97,7 @@ class TestRGDomainFairShare:
         info_with_domain_fair_share_exists: MagicMock,
     ) -> None:
         """Should call action with correct resource_group and domain_name."""
-        scope = ResourceGroupDomainScope(resource_group="custom-rg")
+        scope = ResourceGroupDomainScope(resource_group_name="custom-rg")
 
         resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
         await resolver_fn(
@@ -127,7 +127,7 @@ class TestRGDomainFairShare:
         info_with_domain_not_found: MagicMock,
     ) -> None:
         """Should raise DomainNotFound when domain does not exist."""
-        scope = ResourceGroupDomainScope(resource_group="default")
+        scope = ResourceGroupDomainScope(resource_group_name="default")
 
         resolver_fn = domain_resolver.rg_domain_fair_share.base_resolver
         with pytest.raises(DomainNotFound):
@@ -145,7 +145,7 @@ class TestRGDomainFairShares:
     async def test_calls_fetch_rg_domain_fair_shares(self) -> None:
         """Should call fetch_rg_domain_fair_shares with correct scope."""
         info = MagicMock()
-        scope = ResourceGroupDomainScope(resource_group="default")
+        scope = ResourceGroupDomainScope(resource_group_name="default")
         mock_connection = MagicMock()
 
         with patch(

@@ -93,7 +93,7 @@ class TestRGUserFairShare:
     ) -> None:
         """Should return user fair share when it exists."""
         scope = ResourceGroupUserScope(
-            resource_group="default",
+            resource_group_name="default",
             domain_name="test-domain",
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )
@@ -120,7 +120,7 @@ class TestRGUserFairShare:
         user_uuid = UUID("66666666-7777-8888-9999-aaaaaaaaaaaa")
 
         scope = ResourceGroupUserScope(
-            resource_group="custom-rg",
+            resource_group_name="custom-rg",
             domain_name="my-domain",
             project_id=project_id,
         )
@@ -155,7 +155,7 @@ class TestRGUserFairShare:
     ) -> None:
         """Should raise UserNotFound when user does not exist."""
         scope = ResourceGroupUserScope(
-            resource_group="default",
+            resource_group_name="default",
             domain_name="test-domain",
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )
@@ -178,7 +178,7 @@ class TestRGUserFairShares:
         """Should call fetch_rg_user_fair_shares with correct scope."""
         info = MagicMock()
         scope = ResourceGroupUserScope(
-            resource_group="default",
+            resource_group_name="default",
             domain_name="test-domain",
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )

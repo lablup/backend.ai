@@ -159,7 +159,7 @@ class DomainUsageBucketGQL(Node):
             offset=offset,
             base_conditions=[
                 ProjectUsageBucketConditions.by_domain_name(self.domain_name),
-                ProjectUsageBucketConditions.by_resource_group(self.resource_group),
+                ProjectUsageBucketConditions.by_resource_group(self.resource_group_name),
                 ProjectUsageBucketConditions.by_period_start(self.metadata.period_start),
             ],
         )
