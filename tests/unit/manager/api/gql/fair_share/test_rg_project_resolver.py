@@ -96,7 +96,7 @@ class TestRGProjectFairShare:
 
         assert result is not None
         assert isinstance(result, ProjectFairShareGQL)
-        assert result.resource_group == "default"
+        assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
     @pytest.mark.asyncio

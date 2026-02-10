@@ -162,7 +162,7 @@ class TestDomainFairShareGQLConversion:
         gql = DomainFairShareGQL.from_dataclass(data)
 
         # Then
-        assert gql.resource_group == "default"
+        assert gql.resource_group_name == "default"
         assert gql.domain_name == "test-domain"
         assert gql.spec.uses_default is True
 

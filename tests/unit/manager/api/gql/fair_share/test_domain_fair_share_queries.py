@@ -158,7 +158,7 @@ class TestAdminDomainFairShareSingleQuery:
 
         # Should return DomainFairShareGQL
         assert isinstance(result, DomainFairShareGQL)
-        assert result.resource_group == "default"
+        assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
     @pytest.mark.asyncio
@@ -229,7 +229,7 @@ class TestAdminDomainFairShareSingleQuery:
             result.id
             == f"{sample_domain_fair_share_data.resource_group}:{sample_domain_fair_share_data.domain_name}"
         )
-        assert result.resource_group == sample_domain_fair_share_data.resource_group
+        assert result.resource_group_name == sample_domain_fair_share_data.resource_group
         assert result.domain_name == sample_domain_fair_share_data.domain_name
         assert result.spec.weight == sample_domain_fair_share_data.data.spec.weight
 

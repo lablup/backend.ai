@@ -33,6 +33,7 @@ from .common import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 
 @strawberry.type(
@@ -43,7 +44,7 @@ class DomainFairShareGQL(Node):
     """Domain-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this fair share belongs to."
     )
     domain_name: str = strawberry.field(
@@ -80,6 +81,28 @@ class DomainFairShareGQL(Node):
             return None
         return DomainV2GQL.from_data(domain_data)
 
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The resource group associated with this fair share record."),
+    )
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+        rg_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource_group_name
+        )
+        if rg_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(rg_data)
+
     @classmethod
     def from_dataclass(cls, data: DomainFairShareData) -> DomainFairShareGQL:
         """Convert DomainFairShareData to GraphQL type.
@@ -89,7 +112,7 @@ class DomainFairShareGQL(Node):
         """
         return cls(
             id=ID(f"{data.resource_group}:{data.domain_name}"),
-            resource_group=data.resource_group,
+            resource_group_name=data.resource_group,
             domain_name=data.domain_name,
             spec=FairShareSpecGQL.from_spec(
                 data.data.spec,
