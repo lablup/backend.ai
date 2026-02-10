@@ -85,7 +85,6 @@ Session ━━auto━━► SessionDependency
 Session ━━auto━━► SessionSchedulingHistory
 ResourceGroup ━━auto━━► Agent ━━auto━━► Kernel
 ContainerRegistry ━━auto━━► Image ━━auto━━► ImageAlias
-VFolder ━━auto━━► VFolderPermission
 VFolder ━━auto━━► VFolderInvitation
 Endpoint ━━auto━━► EndpointToken
 Endpoint ━━auto━━► EndpointAutoScalingRule
@@ -148,7 +147,7 @@ permissions (B's system role, entity-scope):
 
 Permission check is two-layer:
 
-1. **Entity-scope direct match** (priority): Check if the user has a permission where `scope_id = target entity`. This matches regardless of edge type.
+1. **Entity-scope direct match** (priority): Check if the user has a permission where the full scope identifier `(scope_type, scope_id)` matches the target entity's type and id. This matches regardless of edge type.
 2. **CTE scope chain** (fallback): Traverse `association_scopes_entities` upward. Ref edges limit inherited permissions to READ-only, preventing the invitee's User-scope CRUD from escalating to the shared entity.
 
 This ensures that B's existing User-scope permissions (e.g., `vfolder:delete` at `scope=User:B`) do not flow through to VFolder X, while explicitly granted entity-scope permissions (read/write) work as intended.
@@ -157,7 +156,6 @@ This ensures that B's existing User-scope permissions (e.g., `vfolder:delete` at
 Session ──ref──► Agent, ResourceGroup, KeyPair
 Kernel ──ref──► Image, Agent
 Routing ──ref──► Endpoint (from Session), Session (from Endpoint)
-VFolderPermission ──ref──► User
 VFolderInvitation ──ref──► User (invitee, inviter)
 Endpoint ──ref──► Image, User (created_user, session_owner)
 User ──ref──► UserResourcePolicy, KeyPair (main_access_key)
@@ -218,7 +216,6 @@ No standalone single-item or list queries. Always accessed through parent:
 | SessionSchedulingHistoryRow | Session | `session { schedulingHistory }` |
 | AgentRow | ResourceGroup | `resourceGroup { agents }` |
 | ImageAliasRow | Image | `image { aliases }` |
-| VFolderPermissionRow | VFolder | `vfolder { permissions }` |
 | VFolderInvitationRow | VFolder | `vfolder { invitations }` |
 | EndpointTokenRow | Endpoint | `endpoint { tokens }` |
 | EndpointAutoScalingRuleRow | Endpoint | `endpoint { autoScalingRules }` |
@@ -277,7 +274,6 @@ Existing junction tables will be replaced by `association_scopes_entities`:
 | `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) | `auto` |
 | `AssocGroupUserRow` | `association_scopes_entities` (User, Project scope) | `ref` |
 | `VFolderPermissionRow` | `association_scopes_entities` (VFolder, User scope) + entity-scope permissions | `ref` |
-| `VFolderInvitationRow` | Replaced by ref edge INSERT/DELETE workflow | `ref` |
 
 ### Final RBAC Tables
 
