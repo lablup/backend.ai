@@ -2146,7 +2146,7 @@ class DeploymentDBSource:
         Raises:
             AutoScalingPolicyNotFound: If no policy exists for the endpoint.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DeploymentAutoScalingPolicyRow).where(
                 DeploymentAutoScalingPolicyRow.endpoint == endpoint_id
             )
@@ -2213,7 +2213,7 @@ class DeploymentDBSource:
         Raises:
             DeploymentPolicyNotFound: If no policy exists for the endpoint.
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(DeploymentPolicyRow).where(
                 DeploymentPolicyRow.endpoint == endpoint_id
             )

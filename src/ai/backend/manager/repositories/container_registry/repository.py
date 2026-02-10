@@ -135,7 +135,7 @@ class ContainerRegistryRepository:
         registry_name: str,
         project: str | None = None,
     ) -> ContainerRegistryData:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await self._get_by_registry_and_project(session, registry_name, project)
             if not result:
                 raise ContainerRegistryNotFound()
@@ -210,7 +210,7 @@ class ContainerRegistryRepository:
         Raises ContainerRegistryNotFound if registry is not found.
         TODO: Refactor to return ContainerRegistryData when Registry Scanner is updated
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == registry_name,
             )

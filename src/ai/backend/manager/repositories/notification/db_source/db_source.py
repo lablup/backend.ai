@@ -62,7 +62,7 @@ class NotificationDBSource:
         enabled_only: bool = True,
     ) -> list[NotificationRuleData]:
         """Retrieves all notification rules that match the given rule type."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             rows = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
             return [row.to_data() for row in rows]
 

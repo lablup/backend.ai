@@ -166,7 +166,7 @@ class ModelServingRepository:
         """
         List endpoints owned by a specific user with optional name filter.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query_conds = (EndpointRow.session_owner == session_owner_id) & (
                 EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
             )
@@ -286,7 +286,7 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             route = await self._get_route_by_id(session, route_id, load_endpoint=True)
             if not route or route.endpoint != service_id:
                 return None
@@ -508,7 +508,7 @@ class ModelServingRepository:
         """
         Get keypair resource policy by name.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(keypair_resource_policies)
                 .select_from(keypair_resource_policies)
@@ -522,7 +522,7 @@ class ModelServingRepository:
         """
         Get endpoint with routes loaded for AppProxy updates.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
 
     @model_serving_repository_resilience.apply()
@@ -530,7 +530,7 @@ class ModelServingRepository:
         """
         Get route with endpoint and session data loaded.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_route_by_id(
                 session, route_id, load_endpoint=True, load_session=True
             )
@@ -567,7 +567,7 @@ class ModelServingRepository:
         Get auto scaling rule by ID.
         Returns None if rule doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
@@ -672,7 +672,7 @@ class ModelServingRepository:
         """
         Resolve group name or ID to group ID.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             conn = await session.connection()
             if conn is None:
                 raise DatabaseConnectionUnavailable("Database connection is not available")
@@ -685,7 +685,7 @@ class ModelServingRepository:
         """
         Get session by ID with specified kernel loading strategy.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 return await SessionRow.get_session(
                     session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
@@ -702,7 +702,7 @@ class ModelServingRepository:
         This is a special case where we need the actual ImageRow object
         because EndpointRow constructor requires it.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await ImageRow.resolve(session, identifiers)
 
     @model_serving_repository_resilience.apply()

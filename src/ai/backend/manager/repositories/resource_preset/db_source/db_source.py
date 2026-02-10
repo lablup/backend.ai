@@ -114,7 +114,7 @@ class ResourcePresetDBSource:
         ID takes precedence if both are provided.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             preset_row = await self._get_preset_by_id_or_name(session, preset_id, name)
             return preset_row.to_dataclass()
 

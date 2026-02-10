@@ -50,6 +50,7 @@ def mock_db_engine() -> MagicMock:
     async_cm_readonly.__aenter__ = AsyncMock()
     async_cm_readonly.__aexit__ = AsyncMock()
     mock_engine.begin_readonly_session.return_value = async_cm_readonly
+    mock_engine.begin_readonly_session_read_committed.return_value = async_cm_readonly
 
     async_cm = AsyncMock()
     async_cm.__aenter__ = AsyncMock()
@@ -304,6 +305,7 @@ def mock_session() -> AsyncMock:
 def setup_readonly_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Automatically sets up a readonly session fixture"""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+    mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = mock_session
     return mock_session
 
 
@@ -373,6 +375,7 @@ def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
 def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+    mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = mock_session
     mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     return mock_session
 
