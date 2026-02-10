@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -13,7 +13,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import AgentId, SessionResult, SessionTypes
+from ai.backend.common.types import AgentId, KernelId, SessionResult, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
@@ -447,6 +447,19 @@ class KernelV2GQL(Node):
         if resource_group_data is None:
             return None
         return ResourceGroupGQL.from_dataclass(resource_group_data)
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.kernel_loader.load_many([
+            KernelId(UUID(nid)) for nid in node_ids
+        ])
+        return [cls.from_kernel_info(data) if data is not None else None for data in results]
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:

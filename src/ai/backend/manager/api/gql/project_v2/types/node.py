@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrderBy,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 from .nested import (
@@ -209,6 +211,19 @@ class ProjectV2GQL(Node):
             limit=limit,
             offset=offset,
         )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.project_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_data(
