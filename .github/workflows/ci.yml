@@ -76,15 +76,24 @@ jobs:
         run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
       - name: Alembic
         id: alembic
-        if: |
-          contains(github.event.pull_request.labels.*.name, 'comp:manager')
-          || github.event_name == 'merge_group'
-        run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" == "merge_group" ]; then
+            echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+          else
+            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+              --paginate --jq '.[].filename')
+            if echo "$changed" | grep -qE '^src/ai/backend/manager/models/'; then
+              echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+            fi
+          fi
 
 
 
 
-  lint:
+  lint-and-typecheck:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
     needs: [optimize-ci]
@@ -128,30 +137,58 @@ jobs:
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
+    - name: Calculate base ref
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          echo "BASE_REF=origin/${BASE_REF_SHORT}" >> $GITHUB_ENV
+          git remote set-branches origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
+        else
+          echo "BASE_REF=HEAD~1" >> $GITHUB_ENV
+        fi
     - name: Check BUILD files
-      run: pants tailor --check update-build-files --check '::'
+      run: |
+        IS_RELEASE="${{ needs.optimize-ci.outputs.release }}"
+        if [ "$IS_RELEASE" == "true" ]; then
+          pants tailor --check update-build-files --check '::'
+        else
+          pants tailor --check update-build-files --check --changed-since=$BASE_REF
+        fi
     - name: Lint
+      id: lint
+      continue-on-error: true
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
           echo "(skipping matchers for pull request from local branches)"
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-          BASE_REF="origin/${BASE_REF_SHORT}"
-          git remote set-branches origin "$BASE_REF_SHORT"
-          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
-        else
-          BASE_REF="HEAD~1"
-        fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
+    - name: Typecheck
+      id: typecheck
+      continue-on-error: true
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        fi
+        pants check --changed-since=$BASE_REF --changed-dependents=transitive
+    - name: Check results
+      if: always()
+      run: |
+        if [ "${{ steps.lint.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ]; then
+          echo "Lint outcome: ${{ steps.lint.outcome }}"
+          echo "Typecheck outcome: ${{ steps.typecheck.outcome }}"
+          exit 1
+        fi
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
-        name: pants.lint.log
+        name: pants.lint-and-typecheck.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
@@ -211,73 +248,6 @@ jobs:
         echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
     - name: Verify that revision is empty
       run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
-
-
-  typecheck:
-    if: |
-      needs.optimize-ci.outputs.skip != 'true'
-    needs: [optimize-ci]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: ./actions/init-pants
-      with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Typecheck
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
-          echo "(skipping matchers for pull request from local branches)"
-        else
-          echo "::add-matcher::.github/workflows/mypy-matcher.json"
-        fi
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
-          BASE_REF="origin/${BASE_REF_SHORT}"
-          git remote set-branches origin "$BASE_REF_SHORT"
-          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
-        else
-          BASE_REF="HEAD~1"
-        fi
-        pants check --changed-since=$BASE_REF --changed-dependents=transitive
-    - name: Upload pants log
-      uses: actions/upload-artifact@v4
-      with:
-        name: pants.check.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
 
 
   test:
@@ -348,7 +318,7 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    needs: [lint-and-typecheck, test, check-alembic-migrations, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     strategy:
       fail-fast: false
@@ -415,7 +385,7 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    needs: [lint-and-typecheck, test, check-alembic-migrations, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-22.04
     steps:
@@ -461,9 +431,58 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    needs: [lint-and-typecheck, test, check-alembic-migrations, optimize-ci]
     if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
+
+  build-supergraph:
+    needs: [lint-and-typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v10
+      with:
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'false'
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Install Rover CLI for generating supergraph
+      run: |
+        curl -sSL https://rover.apollo.dev/nix/latest | sh
+        echo "$HOME/.rover/bin" >> $GITHUB_PATH
+    - name: Generate GraphQL schemas and supergraph
+      env:
+        APOLLO_ELV2_LICENSE: accept
+      run: |
+        ./backend.ai mgr api dump-gql-schema --output schema.graphql
+        ./backend.ai mgr api dump-gql-schema --v2 --output v2-schema.graphql
+        ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o .
+    - name: Upload supergraph schema
+      uses: actions/upload-artifact@v5
+      with:
+        name: supergraph
+        path: supergraph.graphql
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.build-supergraph.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
 
   build-isla-sorna-image:
     needs: [build-scies, build-wheels, build-sbom, optimize-ci]
