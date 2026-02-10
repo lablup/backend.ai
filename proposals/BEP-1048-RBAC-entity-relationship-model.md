@@ -155,6 +155,22 @@ These entities have standalone Root Queries with RBAC checks. Only these entitie
 **Superadmin-only:**
 - DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
 
+#### Mutation Enabled Entities
+
+These entities have mutation APIs (Create, Update, Delete, Purge). All root-query-enabled entities except read-only system logs.
+
+**Scoped:**
+- SessionRow, VFolderRow, EndpointRow, KeyPairRow, NotificationChannelRow
+- NetworkRow, ScalingGroupRow, ContainerRegistryRow, StorageHostRow
+- ArtifactRow, SessionTemplateRow
+- UserRow, ProjectRow, AppConfigRow
+
+**Superadmin-only:**
+- DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow
+
+**Read-only (no mutation API):**
+- AuditLogRow, EventLogRow
+
 #### Auto-only Entities
 
 No standalone single-item or list queries. Always accessed through parent:
