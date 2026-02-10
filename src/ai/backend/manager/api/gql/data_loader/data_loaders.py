@@ -10,9 +10,13 @@ from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHistoryData,
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelReplicaData,
     ModelRevisionData,
+    RouteHistoryData,
     RouteInfo,
 )
 from ai.backend.manager.data.domain.types import DomainData
@@ -24,6 +28,7 @@ from ai.backend.manager.data.notification import NotificationChannelData, Notifi
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -34,6 +39,8 @@ from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
 from .deployment import (
+    load_access_tokens_by_ids,
+    load_auto_scaling_rules_by_ids,
     load_deployments_by_ids,
     load_replicas_by_ids,
     load_revisions_by_ids,
@@ -48,6 +55,11 @@ from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .reservoir_registry import load_reservoir_registries_by_ids
 from .resource_group import load_resource_groups_by_names
+from .scheduling_history import (
+    load_deployment_histories_by_ids,
+    load_route_histories_by_ids,
+    load_session_histories_by_ids,
+)
 from .storage_namespace import load_storage_namespaces_by_ids
 from .user import load_users_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
@@ -219,3 +231,41 @@ class DataLoaders:
         self,
     ) -> DataLoader[AgentId, AgentDetailData | None]:
         return DataLoader(load_fn=partial(load_agents_by_ids, self._processors.agent))
+
+    @cached_property
+    def auto_scaling_rule_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, ModelDeploymentAutoScalingRuleData | None]:
+        return DataLoader(
+            load_fn=partial(load_auto_scaling_rules_by_ids, self._processors.deployment)
+        )
+
+    @cached_property
+    def access_token_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, ModelDeploymentAccessTokenData | None]:
+        return DataLoader(load_fn=partial(load_access_tokens_by_ids, self._processors.deployment))
+
+    @cached_property
+    def session_history_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, SessionSchedulingHistoryData | None]:
+        return DataLoader(
+            load_fn=partial(load_session_histories_by_ids, self._processors.scheduling_history)
+        )
+
+    @cached_property
+    def deployment_history_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentHistoryData | None]:
+        return DataLoader(
+            load_fn=partial(load_deployment_histories_by_ids, self._processors.scheduling_history)
+        )
+
+    @cached_property
+    def route_history_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RouteHistoryData | None]:
+        return DataLoader(
+            load_fn=partial(load_route_histories_by_ids, self._processors.scheduling_history)
+        )
