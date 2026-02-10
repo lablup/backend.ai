@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import abc
-
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -36,15 +34,9 @@ per_project_registry_quota_repository_resilience = Resilience(
 )
 
 
-class AbstractPerProjectRegistryQuotaRepository(abc.ABC):
-    @abc.abstractmethod
-    async def fetch_container_registry_row(
-        self, scope_id: ProjectScope
-    ) -> PerProjectContainerRegistryInfo:
-        raise NotImplementedError
-
-
-class PerProjectRegistryQuotaRepository(AbstractPerProjectRegistryQuotaRepository):
+# NOTE: Only one implementation exists for now, so no ABC is used.
+# Introduce an abstract base class when multiple implementations are needed.
+class PerProjectRegistryQuotaRepository:
     _db_source: PerProjectRegistryQuotaDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:

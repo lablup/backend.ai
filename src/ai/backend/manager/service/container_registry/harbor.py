@@ -16,7 +16,7 @@ from ai.backend.manager.data.container_registry.types import PerProjectContainer
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.repositories.container_registry_quota.repository import (
-    AbstractPerProjectRegistryQuotaRepository,
+    PerProjectRegistryQuotaRepository,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -62,12 +62,12 @@ class PerProjectContainerRegistryQuotaClientPool(abc.ABC):
 
 
 class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
-    _repository: AbstractPerProjectRegistryQuotaRepository
+    _repository: PerProjectRegistryQuotaRepository
     _client_pool: PerProjectContainerRegistryQuotaClientPool
 
     def __init__(
         self,
-        repository: AbstractPerProjectRegistryQuotaRepository,
+        repository: PerProjectRegistryQuotaRepository,
         client_pool: PerProjectContainerRegistryQuotaClientPool,
     ) -> None:
         self._repository = repository
