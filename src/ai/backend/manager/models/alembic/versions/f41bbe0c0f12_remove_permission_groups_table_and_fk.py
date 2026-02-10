@@ -48,6 +48,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+
     # Recreate permission_groups table
     op.create_table(
         "permission_groups",
@@ -66,15 +68,54 @@ def downgrade() -> None:
         ["role_id", "scope_type", "scope_id"],
     )
 
-    # Restore permission_group_id columns
+    # Populate permission_groups from existing permissions data
+    conn.execute(
+        sa.text("""
+        INSERT INTO permission_groups (role_id, scope_type, scope_id)
+        SELECT DISTINCT role_id, scope_type, scope_id FROM permissions
+    """)
+    )
+
+    # Add permission_group_id columns as nullable first
     op.add_column(
         "permissions",
-        sa.Column("permission_group_id", GUID(), nullable=False),
+        sa.Column("permission_group_id", GUID(), nullable=True),
     )
     op.add_column(
         "object_permissions",
-        sa.Column("permission_group_id", GUID(), nullable=False),
+        sa.Column("permission_group_id", GUID(), nullable=True),
     )
+
+    # Backfill permissions.permission_group_id
+    conn.execute(
+        sa.text("""
+        UPDATE permissions p
+        SET permission_group_id = pg.id
+        FROM permission_groups pg
+        WHERE pg.role_id = p.role_id
+          AND pg.scope_type = p.scope_type
+          AND pg.scope_id = p.scope_id
+    """)
+    )
+
+    # Backfill object_permissions.permission_group_id
+    conn.execute(
+        sa.text("""
+        UPDATE object_permissions op
+        SET permission_group_id = pg.id
+        FROM permission_groups pg
+        JOIN association_scopes_entities ase
+            ON pg.scope_type = ase.scope_type
+            AND pg.scope_id = ase.scope_id
+            AND ase.entity_type = op.entity_type
+            AND ase.entity_id = op.entity_id
+        WHERE pg.role_id = op.role_id
+    """)
+    )
+
+    # Set columns to NOT NULL after backfill
+    op.alter_column("permissions", "permission_group_id", nullable=False)
+    op.alter_column("object_permissions", "permission_group_id", nullable=False)
 
     # Restore indexes
     op.create_index(
