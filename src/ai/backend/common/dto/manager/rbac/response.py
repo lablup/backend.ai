@@ -128,7 +128,6 @@ class PermissionDTO(BaseModel):
     """DTO for permission data."""
 
     id: UUID = Field(description="Permission ID")
-    permission_group_id: UUID = Field(description="Permission group ID")
     entity_type: EntityType = Field(description="Entity type")
     operation: OperationType = Field(description="Operation type")
 

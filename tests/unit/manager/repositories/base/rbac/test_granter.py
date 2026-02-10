@@ -20,7 +20,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.rbac.granter import (
     RBACGranter,
@@ -38,7 +37,6 @@ if TYPE_CHECKING:
 
 GRANTER_TABLES = [
     RoleRow,
-    PermissionGroupRow,
     ObjectPermissionRow,
 ]
 
@@ -168,41 +166,6 @@ class TestGranterBasic:
                 assert perm.entity_type == EntityType.VFOLDER
                 assert perm.entity_id == ctx.entity_id.entity_id
 
-    async def test_granter_creates_permission_group_for_entity_scope(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        single_role: SingleRoleContext,
-    ) -> None:
-        """Test that granter ensures permission group exists for entity's original scope."""
-        ctx = single_role
-
-        async with database_connection.begin_session_read_committed() as db_sess:
-            granter = RBACGranter(
-                granted_entity_id=ctx.entity_id,
-                granted_entity_scope_id=ctx.entity_scope_id,
-                target_role_ids=[ctx.role_id],
-                operations=[OperationType.READ],
-            )
-            await execute_rbac_granter(db_sess, granter)
-
-            # Verify permission group was created for entity scope
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 1
-
-            # Verify the permission group details
-            entity_scope_pg = await db_sess.scalar(
-                sa.select(PermissionGroupRow).where(
-                    sa.and_(
-                        PermissionGroupRow.scope_id == ctx.entity_scope_id.scope_id,
-                        PermissionGroupRow.scope_type == ctx.entity_scope_id.scope_type,
-                    )
-                )
-            )
-            assert entity_scope_pg is not None
-            assert entity_scope_pg.role_id == ctx.role_id
-
     async def test_granter_with_empty_role_ids(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -225,12 +188,6 @@ class TestGranterBasic:
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
             )
             assert obj_perm_count == 0
-
-            # Verify no permission groups were created
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 0
 
 
 class TestGranterMultipleRoles:
@@ -292,33 +249,6 @@ class TestGranterMultipleRoles:
             obj_perms = (await db_sess.scalars(sa.select(ObjectPermissionRow))).all()
             granted_role_ids = {perm.role_id for perm in obj_perms}
             assert granted_role_ids == set(ctx.role_ids)
-
-    async def test_granter_creates_permission_groups_for_all_roles(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        multi_role_context: MultiRoleContext,
-    ) -> None:
-        """Test that granter creates permission groups for all roles."""
-        ctx = multi_role_context
-
-        async with database_connection.begin_session_read_committed() as db_sess:
-            granter = RBACGranter(
-                granted_entity_id=ctx.entity_id,
-                granted_entity_scope_id=ctx.entity_scope_id,
-                target_role_ids=ctx.role_ids,
-                operations=[OperationType.READ],
-            )
-            await execute_rbac_granter(db_sess, granter)
-
-            # Verify permission groups were created for all roles
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 3  # One per role
-
-            pg_rows = (await db_sess.scalars(sa.select(PermissionGroupRow))).all()
-            pg_role_ids = {pg.role_id for pg in pg_rows}
-            assert pg_role_ids == set(ctx.role_ids)
 
 
 class TestGranterMultipleOperations:
@@ -404,12 +334,6 @@ class TestGranterMultipleOperations:
             )
             assert obj_perm_count == 0
 
-            # Permission group should still be created for entity scope
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 1
-
 
 class TestGranterIdempotent:
     """Tests for idempotent behavior of RBAC entity granter."""
@@ -472,58 +396,10 @@ class TestGranterIdempotent:
             )
             assert obj_perm_count == 2
 
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 1
-
         # Second grant (duplicate) - should raise IntegrityError
         with pytest.raises(IntegrityError):
             async with database_connection.begin_session_read_committed() as db_sess:
                 await execute_rbac_granter(db_sess, granter)
-
-    async def test_granter_reuses_existing_permission_group_for_entity_scope(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-        single_role: SingleRoleContext,
-    ) -> None:
-        """Test that granter reuses existing permission_group for entity's original scope.
-
-        When granting, if a permission_group already exists for the entity's scope,
-        the granter should not create a duplicate.
-        """
-        ctx = single_role
-
-        async with database_connection.begin_session_read_committed() as db_sess:
-            # Pre-create permission_group for entity's scope
-            existing_perm_group = PermissionGroupRow(
-                role_id=ctx.role_id,
-                scope_type=ctx.entity_scope_id.scope_type,
-                scope_id=ctx.entity_scope_id.scope_id,
-            )
-            db_sess.add(existing_perm_group)
-            await db_sess.flush()
-
-            # Count permission groups before grant
-            pg_count_before = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count_before == 1
-
-            # Execute grant
-            granter = RBACGranter(
-                granted_entity_id=ctx.entity_id,
-                granted_entity_scope_id=ctx.entity_scope_id,
-                target_role_ids=[ctx.role_id],
-                operations=[OperationType.READ],
-            )
-            await execute_rbac_granter(db_sess, granter)
-
-            # Verify no duplicate permission_group created
-            pg_count_after = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count_after == 1  # Same count, no duplicates
 
     async def test_granter_grants_to_multiple_roles_sequentially(
         self,
@@ -563,9 +439,3 @@ class TestGranterIdempotent:
                 sa.select(sa.func.count()).select_from(ObjectPermissionRow)
             )
             assert obj_perm_count == 3
-
-            # Verify permission groups created for all roles
-            pg_count = await db_sess.scalar(
-                sa.select(sa.func.count()).select_from(PermissionGroupRow)
-            )
-            assert pg_count == 3  # One per role

@@ -15,7 +15,7 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
@@ -24,8 +24,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
 
@@ -121,7 +119,6 @@ class RBACEntityBatchPurgerResult:
 
     deleted_count: int
     deleted_object_permission_count: int
-    deleted_permission_group_count: int
     deleted_scope_association_count: int
 
 
@@ -139,7 +136,6 @@ async def _get_related_roles(
 
     Eagerly loads:
     - object_permissions with their scope_associations
-    - permission_groups with their permissions
     """
     role_scalars = await db_sess.scalars(
         sa.select(RoleRow)
@@ -153,9 +149,6 @@ async def _get_related_roles(
         .options(
             selectinload(RoleRow.object_permission_rows).selectinload(
                 ObjectPermissionRow.scope_association_rows
-            ),
-            selectinload(RoleRow.permission_group_rows).selectinload(
-                PermissionGroupRow.permission_rows
             ),
         )
     )
@@ -176,7 +169,6 @@ async def _get_related_roles_for_entities(
 
     Eagerly loads:
     - object_permissions with their scope_associations
-    - permission_groups with their permissions
     """
     if not entity_ids:
         return []
@@ -197,9 +189,6 @@ async def _get_related_roles_for_entities(
             selectinload(RoleRow.object_permission_rows).selectinload(
                 ObjectPermissionRow.scope_association_rows
             ),
-            selectinload(RoleRow.permission_group_rows).selectinload(
-                PermissionGroupRow.permission_rows
-            ),
         )
     )
     return list(role_scalars.unique().all())
@@ -208,53 +197,6 @@ async def _get_related_roles_for_entities(
 # =============================================================================
 # ID Collection Helpers (Pure Functions)
 # =============================================================================
-
-
-def _find_orphaned_perm_groups_in_role(
-    role_row: RoleRow,
-    entity_to_delete: ObjectId,
-) -> list[UUID]:
-    """
-    Identify permission_groups to delete when an entity is removed from a role.
-
-    A permission_group is considered orphaned and should be deleted if:
-    1. It has no remaining PermissionRow entries, AND
-    2. No other object_permission entity in this role belongs to the same scope.
-    """
-    perm_group_ids: list[UUID] = []
-    if not role_row.permission_group_rows:
-        return perm_group_ids
-
-    # Collect scopes from remaining entities (via eagerly loaded scope_association_rows)
-    remaining_scopes: set[ScopeId] = set()
-    for object_permission_row in role_row.object_permission_rows:
-        if object_permission_row.object_id() == entity_to_delete:
-            continue
-        for assoc in object_permission_row.scope_association_rows:
-            remaining_scopes.add(assoc.parsed_scope_id())
-
-    for perm_group_row in role_row.permission_group_rows:
-        # Skip permission groups that have remaining permissions
-        if perm_group_row.permission_rows:
-            continue
-        perm_group_scope = perm_group_row.parsed_scope_id()
-        if perm_group_scope not in remaining_scopes:
-            perm_group_ids.append(perm_group_row.id)
-    return perm_group_ids
-
-
-def _find_orphaned_perm_groups(
-    role_rows: Collection[RoleRow],
-    entity_to_delete: ObjectId,
-) -> list[UUID]:
-    """Collect orphaned permission group IDs across the given roles."""
-    if not role_rows:
-        return []
-    permission_group_ids: list[UUID] = []
-    for role_row in role_rows:
-        perm_group_ids = _find_orphaned_perm_groups_in_role(role_row, entity_to_delete)
-        permission_group_ids.extend(perm_group_ids)
-    return permission_group_ids
 
 
 def _find_object_permissions_for_entity(
@@ -294,47 +236,6 @@ def _find_object_permissions_for_entities(
     return object_permission_ids
 
 
-def _find_orphaned_perm_groups_for_entities(
-    role_rows: Collection[RoleRow],
-    entities_to_delete: Collection[ObjectId],
-) -> list[UUID]:
-    """
-    Identify permission_groups that will be orphaned after deleting multiple entities.
-
-    A permission_group is considered orphaned and should be deleted if:
-    1. It has no remaining PermissionRow entries, AND
-    2. No other object_permission entity in this role belongs to the same scope
-       (after all the entities are deleted)
-    """
-    if not role_rows or not entities_to_delete:
-        return []
-
-    entity_set = set(entities_to_delete)
-    perm_group_ids: list[UUID] = []
-
-    for role_row in role_rows:
-        if not role_row.permission_group_rows:
-            continue
-
-        # Collect scopes from remaining entities (not in delete set)
-        remaining_scopes: set[ScopeId] = set()
-        for object_permission_row in role_row.object_permission_rows:
-            if object_permission_row.object_id() in entity_set:
-                continue
-            for assoc in object_permission_row.scope_association_rows:
-                remaining_scopes.add(assoc.parsed_scope_id())
-
-        for perm_group_row in role_row.permission_group_rows:
-            # Skip permission groups that have remaining permissions
-            if perm_group_row.permission_rows:
-                continue
-            perm_group_scope = perm_group_row.parsed_scope_id()
-            if perm_group_scope not in remaining_scopes:
-                perm_group_ids.append(perm_group_row.id)
-
-    return perm_group_ids
-
-
 # =============================================================================
 # Deletion Helpers (Single Entity)
 # =============================================================================
@@ -348,37 +249,6 @@ async def _delete_object_permissions(
     if not ids:
         return
     await db_sess.execute(sa.delete(ObjectPermissionRow).where(ObjectPermissionRow.id.in_(ids)))
-
-
-async def _delete_orphan_permission_groups(
-    db_sess: SASession,
-    ids: Collection[UUID],
-) -> None:
-    """Delete PermissionGroupRows only if they have no remaining references.
-
-    Uses NOT EXISTS to ensure no ObjectPermission or Permission references exist,
-    preventing race conditions with concurrent Granter operations.
-    """
-    if not ids:
-        return
-
-    await db_sess.execute(
-        sa.delete(PermissionGroupRow).where(
-            sa.and_(
-                PermissionGroupRow.id.in_(ids),
-                ~sa.exists(
-                    sa.select(ObjectPermissionRow.id).where(
-                        ObjectPermissionRow.permission_group_id == PermissionGroupRow.id
-                    )
-                ),
-                ~sa.exists(
-                    sa.select(PermissionRow.id).where(
-                        PermissionRow.permission_group_id == PermissionGroupRow.id
-                    )
-                ),
-            )
-        )
-    )
 
 
 async def _delete_entity_fields(
@@ -429,39 +299,6 @@ async def _batch_delete_object_permissions(
     return cast(CursorResult[Any], result).rowcount or 0
 
 
-async def _batch_delete_orphan_permission_groups(
-    db_sess: SASession,
-    ids: Collection[UUID],
-) -> int:
-    """Delete PermissionGroupRows only if they have no remaining references.
-
-    Uses NOT EXISTS to ensure no ObjectPermission or Permission references exist,
-    preventing race conditions with concurrent Granter operations.
-    Returns count of deleted rows.
-    """
-    if not ids:
-        return 0
-
-    result = await db_sess.execute(
-        sa.delete(PermissionGroupRow).where(
-            sa.and_(
-                PermissionGroupRow.id.in_(ids),
-                ~sa.exists(
-                    sa.select(ObjectPermissionRow.id).where(
-                        ObjectPermissionRow.permission_group_id == PermissionGroupRow.id
-                    )
-                ),
-                ~sa.exists(
-                    sa.select(PermissionRow.id).where(
-                        PermissionRow.permission_group_id == PermissionGroupRow.id
-                    )
-                ),
-            )
-        )
-    )
-    return cast(CursorResult[Any], result).rowcount or 0
-
-
 async def _batch_delete_scope_associations(
     db_sess: SASession,
     entity_ids: Collection[ObjectId],
@@ -494,7 +331,6 @@ class _RBACEntityBatchCleanupCounts:
     """Internal result for batch RBAC cleanup counts."""
 
     object_permission_count: int
-    permission_group_count: int
     scope_association_count: int
 
 
@@ -512,18 +348,15 @@ async def _delete_rbac_for_entity(
 
     Deletion order:
     1. ObjectPermissionRows - permissions granted on this entity
-    2. PermissionGroupRows - orphaned groups with no remaining permissions/entities
-    3. AssociationScopesEntitiesRows - scope-entity mappings
-    4. EntityFieldRows - field mappings for this entity
+    2. AssociationScopesEntitiesRows - scope-entity mappings
+    3. EntityFieldRows - field mappings for this entity
     """
     # Collect related data
     role_rows = await _get_related_roles(db_sess, entity_id)
     object_permission_ids = _find_object_permissions_for_entity(role_rows, entity_id)
-    permission_group_ids = _find_orphaned_perm_groups(role_rows, entity_id)
 
     # Execute deletions
     await _delete_object_permissions(db_sess, object_permission_ids)
-    await _delete_orphan_permission_groups(db_sess, permission_group_ids)
     await _delete_scope_associations(db_sess, entity_id)
 
     # Delete EntityFieldRows for this entity
@@ -540,22 +373,17 @@ async def _batch_delete_rbac_for_entities(
 
     Deletion order:
     1. ObjectPermissionRows - permissions granted on these entities
-    2. PermissionGroupRows - orphaned groups with no remaining permissions/entities
-    3. AssociationScopesEntitiesRows - scope-entity mappings
+    2. AssociationScopesEntitiesRows - scope-entity mappings
     """
     role_rows = await _get_related_roles_for_entities(db_sess, entity_ids)
 
     obj_perm_ids = _find_object_permissions_for_entities(role_rows, entity_ids)
     obj_perm_count = await _batch_delete_object_permissions(db_sess, obj_perm_ids)
 
-    perm_group_ids = _find_orphaned_perm_groups_for_entities(role_rows, entity_ids)
-    perm_group_count = await _batch_delete_orphan_permission_groups(db_sess, perm_group_ids)
-
     scope_assoc_count = await _batch_delete_scope_associations(db_sess, entity_ids)
 
     return _RBACEntityBatchCleanupCounts(
         object_permission_count=obj_perm_count,
-        permission_group_count=perm_group_count,
         scope_association_count=scope_assoc_count,
     )
 
@@ -598,7 +426,7 @@ async def execute_rbac_entity_purger(
 
     Operations performed:
     1. Get entity info from spec
-    2. Delete RBAC entries (ObjectPermissions/PermissionGroups/Associations)
+    2. Delete RBAC entries (ObjectPermissions/Associations)
     3. Delete the main object row with RETURNING
 
     Args:
@@ -631,7 +459,6 @@ async def execute_rbac_entity_batch_purger(
 
     Deletes rows in batches, cleaning up related RBAC entries for each batch:
     - ObjectPermissionRows for entity_ids
-    - Orphaned PermissionGroupRows
     - AssociationScopesEntitiesRows for entity_ids
 
     Args:
@@ -643,7 +470,6 @@ async def execute_rbac_entity_batch_purger(
     """
     total_deleted = 0
     total_obj_perm = 0
-    total_perm_group = 0
     total_scope_assoc = 0
 
     # Get table and PK info from subquery
@@ -683,7 +509,6 @@ async def execute_rbac_entity_batch_purger(
         # 3. Clean up RBAC entries (after main row deletion - no FK constraint)
         cleanup = await _batch_delete_rbac_for_entities(db_sess, entity_ids)
         total_obj_perm += cleanup.object_permission_count
-        total_perm_group += cleanup.permission_group_count
         total_scope_assoc += cleanup.scope_association_count
 
         if batch_deleted < purger.batch_size:
@@ -692,6 +517,5 @@ async def execute_rbac_entity_batch_purger(
     return RBACEntityBatchPurgerResult(
         deleted_count=total_deleted,
         deleted_object_permission_count=total_obj_perm,
-        deleted_permission_group_count=total_perm_group,
         deleted_scope_association_count=total_scope_assoc,
     )
