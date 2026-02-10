@@ -34,8 +34,14 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
+from ai.backend.common.dto.storage.request import (
+    ArchiveDownloadTokenData,
+    CreateArchiveDownloadSessionRequest,
+    FileDeleteAsyncRequest,
+    TokenOperationType,
+)
 from ai.backend.common.dto.storage.response import (
+    CreateArchiveDownloadSessionResponse,
     FileDeleteAsyncResponse,
     VFolderCloneResponse,
     VFolderDeleteResponse,
@@ -1087,6 +1093,36 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
+class ArchiveDownloadHandler:
+    """Handler for archive download session operations."""
+
+    @api_handler
+    async def create_session(
+        self,
+        body: BodyParam[CreateArchiveDownloadSessionRequest],
+        ctx: StorageRootCtx,
+    ) -> APIResponse:
+        """Create a JWT token for archive download session."""
+        await log_manager_api_entry(log, "create_archive_download_session", body.parsed)
+        token_payload = ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume=body.parsed.volume,
+            virtual_folder_id=body.parsed.virtual_folder_id,
+            files=body.parsed.files,
+            exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
+        )
+        payload = token_payload.model_dump(mode="json")
+        token = jwt.encode(
+            payload,
+            ctx.root_ctx.local_config.storage_proxy.secret,
+            algorithm="HS256",
+        )
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=CreateArchiveDownloadSessionResponse(token=token),
+        )
+
+
 async def create_upload_session(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1267,6 +1303,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
 
     # Initialize handlers
     file_operation_handler = FileOperationHandler()
+    archive_download_handler = ArchiveDownloadHandler()
 
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/health", check_health)
@@ -1295,6 +1332,9 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
+    app.router.add_route(
+        "POST", "/folder/file/download-archive", archive_download_handler.create_session
+    )
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
     app.router.add_route(

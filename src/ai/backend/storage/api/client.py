@@ -29,16 +29,34 @@ import zipstream
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import (
+    APIStreamResponse,
+    QueryParam,
+    stream_api_handler,
+)
+from ai.backend.common.dto.storage.request import (
+    ArchiveDownloadQueryParams,
+    ArchiveDownloadTokenData,
+)
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
+from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.services.file_stream.zip import (
+    ZipArchiveStreamReader,
+)
 from ai.backend.storage.types import SENTINEL
-from ai.backend.storage.utils import CheckParamSource, check_params
+from ai.backend.storage.utils import (
+    CheckParamSource,
+    build_attachment_headers,
+    check_params,
+)
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -454,6 +472,47 @@ async def prepare_tus_session_headers(
     return headers
 
 
+class DownloadHandler:
+    """Handler class for download operations following manager's api_handler pattern.
+
+    Future refactoring: When StreamReader class is settled and if we decide to put
+    Reader class in api_handler, we will refactor this to receive StreamReader as
+    interface, which decouples handler logic from aiohttp web.Request/Response objects
+    for better testability and separation of concerns.
+    """
+
+    def __init__(self, secret: str) -> None:
+        self._jwt_validator = PydanticJWTValidator(secret=secret)
+
+    @stream_api_handler
+    async def download_archive(
+        self,
+        query: QueryParam[ArchiveDownloadQueryParams],
+        ctx: StorageRootCtx,
+    ) -> APIStreamResponse:
+        """Stream multiple files/directories as a ZIP archive."""
+        token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
+
+        async with ctx.root_ctx.get_volume(token_data.volume) as volume:
+            vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
+            sanitized: list[Path] = [
+                (vfolder_root / relpath).resolve() for relpath in token_data.files
+            ]
+            for file_path, relpath in zip(sanitized, token_data.files, strict=True):
+                if not file_path.is_relative_to(vfolder_root):
+                    raise InvalidAPIParameters(
+                        extra_msg=f"Path escapes vfolder boundary: {relpath}"
+                    )
+                if not file_path.exists():
+                    raise web.HTTPNotFound(reason=f"File not found: {relpath}")
+
+            reader = ZipArchiveStreamReader(vfolder_root)
+            reader.add_entries(sanitized)
+
+            headers = build_attachment_headers(reader.filename(), reader.content_type())
+            return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
+
+
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -462,6 +521,10 @@ async def init_client_app(ctx: RootContext) -> web.Application:
         ]
     )
     app["ctx"] = ctx
+
+    # Initialize handler instances
+    download_handler = DownloadHandler(secret=ctx.local_config.storage_proxy.secret)
+
     cors_options = {
         "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=True,
@@ -475,6 +538,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
+    r = cors.add(app.router.add_resource("/download-archive"))
+    r.add_route("GET", download_handler.download_archive)
     # tus handlers handle CORS by themselves
     r = app.router.add_resource("/upload")
     r.add_route("OPTIONS", tus_options)

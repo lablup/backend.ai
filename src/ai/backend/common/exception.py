@@ -133,6 +133,7 @@ class ErrorDomain(enum.StrEnum):
 
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
+    AUTH = "auth"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
     ARTIFACT_ASSOCIATION = "artifact-association"
@@ -1037,4 +1038,118 @@ class FailedToGetMetric(BackendAIError):
             domain=ErrorDomain.METRIC,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+# JWT Errors
+class JWTError(BackendAIError, web.HTTPUnauthorized):
+    """
+    Base exception for JWT-related authentication errors.
+
+    All JWT-specific exceptions inherit from this base class.
+    Default HTTP status is 401 Unauthorized.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-error"
+    error_title = "JWT authentication error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
+class JWTExpiredError(JWTError):
+    """
+    JWT token has expired.
+
+    Raised when attempting to use a token past its expiration time.
+    HTTP 401 Unauthorized - token was valid but is no longer.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-expired"
+    error_title = "JWT token has expired."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.DATA_EXPIRED,
+        )
+
+
+class JWTInvalidSignatureError(JWTError):
+    """
+    JWT signature verification failed.
+
+    Raised when the token's signature doesn't match the expected signature,
+    indicating the token may have been tampered with or was signed with
+    a different secret key.
+    HTTP 401 Unauthorized - authentication failed.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-invalid-signature"
+    error_title = "JWT signature verification failed."
+
+
+class JWTInvalidClaimsError(JWTError, web.HTTPForbidden):
+    """
+    JWT claims are missing or invalid.
+
+    Raised when required claims are missing from the token or when
+    claim values don't meet validation requirements (e.g., invalid role,
+    wrong issuer).
+    HTTP 403 Forbidden - authenticated but not authorized.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-invalid-claims"
+    error_title = "JWT claims are invalid."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class JWTDecodeError(BackendAIError, web.HTTPBadRequest):
+    """
+    Failed to decode JWT token.
+
+    Raised when the token cannot be decoded, typically due to malformed
+    token structure or encoding issues.
+    HTTP 400 Bad Request - malformed token is client error.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-decode-error"
+    error_title = "Failed to decode JWT token."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class JWTPayloadValidationError(BackendAIError, web.HTTPBadRequest):
+    """
+    JWT payload validation failed.
+
+    Raised when the JWT payload fails pydantic model validation,
+    indicating missing or invalid fields in the token data.
+    HTTP 400 Bad Request - payload structure is invalid.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwt-payload-validation-error"
+    error_title = "JWT payload validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

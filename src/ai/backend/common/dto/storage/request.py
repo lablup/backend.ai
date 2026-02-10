@@ -1,8 +1,10 @@
 import uuid
 from collections.abc import Mapping
+from datetime import datetime
+from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -533,4 +535,59 @@ class GetVerificationResultReq(BaseRequestModel):
 
     artifact_revision_id: uuid.UUID = Field(
         description="The artifact revision ID to get verification result."
+    )
+
+
+# Client-facing API token operation types
+class TokenOperationType(StrEnum):
+    DOWNLOAD = "download"
+    UPLOAD = "upload"
+
+
+# Client-facing API request models for download archive endpoint
+class ArchiveDownloadTokenData(BaseModel):
+    """Pydantic model for validating the JWT payload of archive download tokens."""
+
+    operation: TokenOperationType = Field(
+        description="The type of storage operation this token authorizes.",
+    )
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID that this token grants access to.",
+    )
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths within the virtual folder to include in the archive.",
+    )
+    exp: datetime = Field(
+        description="Token expiration time as a Unix timestamp.",
+    )
+    model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+    @field_serializer("exp")
+    def serialize_exp(self, exp: datetime) -> int:
+        """JWT standard requires exp to be Unix timestamp (integer)."""
+        return int(exp.timestamp())
+
+
+class ArchiveDownloadQueryParams(BaseRequestModel):
+    """Pydantic model for archive download endpoint query parameters."""
+
+    token: str = Field(description="JWT token containing download authorization")
+
+
+class CreateArchiveDownloadSessionRequest(BaseRequestModel):
+    """Request for creating an archive download session (JWT token generation)."""
+
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID containing the files to archive for download.",
+    )
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths within the virtual folder to include in the archive.",
     )
