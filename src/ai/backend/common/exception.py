@@ -1039,6 +1039,8 @@ class FailedToGetMetric(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
 # JWT Errors
 class JWTError(BackendAIError, web.HTTPUnauthorized):
     """

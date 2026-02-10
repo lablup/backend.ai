@@ -1107,7 +1107,7 @@ class ArchiveDownloadHandler:
         token_payload = ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume=body.parsed.volume,
-            vfolder_id=body.parsed.vfid,
+            virtual_folder_id=body.parsed.virtual_folder_id,
             files=body.parsed.files,
             exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
         )

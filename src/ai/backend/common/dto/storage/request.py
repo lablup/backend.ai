@@ -548,11 +548,22 @@ class TokenOperationType(StrEnum):
 class ArchiveDownloadTokenData(BaseModel):
     """Pydantic model for validating the JWT payload of archive download tokens."""
 
-    operation: TokenOperationType
-    volume: str
-    vfolder_id: VFolderIDField
-    files: list[str] = Field(min_length=1)
-    exp: datetime
+    operation: TokenOperationType = Field(
+        description="The type of storage operation this token authorizes.",
+    )
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID that this token grants access to.",
+    )
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths within the virtual folder to include in the archive.",
+    )
+    exp: datetime = Field(
+        description="Token expiration time as a Unix timestamp.",
+    )
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
 
     @field_serializer("exp")
@@ -570,9 +581,13 @@ class ArchiveDownloadQueryParams(BaseRequestModel):
 class CreateArchiveDownloadSessionRequest(BaseRequestModel):
     """Request for creating an archive download session (JWT token generation)."""
 
-    volume: str = Field(description="Volume name where the vfolder is located")
-    vfid: VFolderIDField = Field(description="Virtual folder ID")
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID containing the files to archive for download.",
+    )
     files: list[str] = Field(
         min_length=1,
-        description="List of relative file paths to include in the archive",
+        description="List of relative file paths within the virtual folder to include in the archive.",
     )

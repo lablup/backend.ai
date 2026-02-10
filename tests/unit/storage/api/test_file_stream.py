@@ -49,7 +49,7 @@ class TestJWTTokenForArchiveDownload:
         return ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
-            vfolder_id=VFolderID(None, uuid4()),
+            virtual_folder_id=VFolderID(None, uuid4()),
             files=["file1.txt", "dir1/file2.txt", "dir2/"],
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
@@ -68,7 +68,7 @@ class TestJWTTokenForArchiveDownload:
         3. Decode JWT back to dict
         4. Compare decoded values with original:
            - volume matches
-           - vfolder_id matches
+           - virtual_folder_id matches
            - files list matches (order preserved)
            - operation type matches
         """
@@ -82,7 +82,7 @@ class TestJWTTokenForArchiveDownload:
 
         # Verify all fields are preserved
         assert decoded["volume"] == token_data.volume
-        assert decoded["vfolder_id"] == str(token_data.vfolder_id)
+        assert decoded["virtual_folder_id"] == str(token_data.virtual_folder_id)
         assert decoded["files"] == token_data.files
         assert decoded["operation"] == token_data.operation
 
@@ -111,7 +111,7 @@ class TestDownloadArchiveHandler:
         return ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
-            vfolder_id=VFolderID(None, uuid4()),
+            virtual_folder_id=VFolderID(None, uuid4()),
             files=["file1.txt", "dir1/file2.txt"],
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
@@ -167,7 +167,7 @@ class TestDownloadArchiveHandler:
         Scenario:
         1. Create test files in tmp_path
         2. Call download_archive with JWT containing paths
-        3. Verify handler uses volume and vfolder_id from token
+        3. Verify handler uses volume and virtual_folder_id from token
         4. Verify files are resolved relative to correct base path
         """
         # Create test files matching token_data.files
@@ -208,7 +208,7 @@ class TestDownloadArchiveHandler:
         malicious_token_data = ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
-            vfolder_id=VFolderID(None, uuid4()),
+            virtual_folder_id=VFolderID(None, uuid4()),
             files=["../../etc/passwd"],  # Path traversal attempt
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
@@ -251,7 +251,7 @@ class TestDownloadArchiveHandler:
         nonexistent_token_data = ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
-            vfolder_id=VFolderID(None, uuid4()),
+            virtual_folder_id=VFolderID(None, uuid4()),
             files=["nonexistent_file.txt"],  # File doesn't exist
             exp=datetime.now(UTC) + timedelta(hours=1),
         )

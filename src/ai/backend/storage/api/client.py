@@ -494,7 +494,7 @@ class DownloadHandler:
         token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
         async with ctx.root_ctx.get_volume(token_data.volume) as volume:
-            vfolder_root = volume.sanitize_vfpath(token_data.vfolder_id)
+            vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
             sanitized: list[Path] = [
                 (vfolder_root / relpath).resolve() for relpath in token_data.files
             ]
