@@ -23,6 +23,7 @@ from aiohttp.typedefs import Handler
 
 from ai.backend.manager.api.auth import AuthAPIHandler
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.dto.context import ProcessorsCtx, RequestCtx
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
@@ -85,6 +86,24 @@ def mock_user_data(user_uuid: uuid.UUID) -> dict[str, Any]:
 @pytest.fixture
 def mock_keypair_data() -> dict[str, Any]:
     return {"access_key": ACCESS_KEY}
+
+
+@pytest.fixture(autouse=True)
+def _patch_middleware_params(monkeypatch: pytest.MonkeyPatch, mock_root_ctx: MagicMock) -> None:
+    """Bypass Pydantic validation for MiddlewareParam types using TYPE_CHECKING imports."""
+
+    async def _processors_from_request(request: web.Request) -> MagicMock:
+        mock = MagicMock()
+        mock.processors = request.app["_root.context"].processors
+        return mock
+
+    async def _request_from_request(request: web.Request) -> MagicMock:
+        mock = MagicMock()
+        mock.request = request
+        return mock
+
+    monkeypatch.setattr(ProcessorsCtx, "from_request", _processors_from_request)
+    monkeypatch.setattr(RequestCtx, "from_request", _request_from_request)
 
 
 @pytest.fixture
@@ -618,7 +637,7 @@ class TestGenerateSSHKeypair:
 
 
 class TestUploadSSHKeypair:
-    """Test upload_ssh_keypair: trailing newline normalization and result→response mapping."""
+    """Test upload_ssh_keypair: trailing newline normalization and result→response magitping."""
 
     @pytest.mark.asyncio
     async def test_normalizes_trailing_newline(
