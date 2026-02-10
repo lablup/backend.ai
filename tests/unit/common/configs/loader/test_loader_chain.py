@@ -1,7 +1,7 @@
 from typing import Any
 
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.common.configs.loader import LoaderChain
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
 
 
 class DummyLoader(AbstractConfigLoader):

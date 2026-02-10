@@ -3,9 +3,9 @@ from typing import Any
 from aiotools import aclosing
 from etcd_client import WatchEventType
 
+from ai.backend.common.configs.loader.types import AbstractConfigWatcher
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QueueSentinel
-from ai.backend.manager.config.watchers.types import AbstractConfigWatcher
 
 
 class EtcdConfigWatcher(AbstractConfigWatcher):
@@ -25,3 +25,7 @@ class EtcdConfigWatcher(AbstractConfigWatcher):
                     case _:
                         if ev.event == WatchEventType.PUT or ev.event == WatchEventType.DELETE:
                             yield ev
+
+    @property
+    def source_name(self) -> str:
+        return f"etcd-watcher:{self._config_prefix}"

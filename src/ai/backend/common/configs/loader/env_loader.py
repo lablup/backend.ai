@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
 
 
 class EnvLoader(AbstractConfigLoader):
@@ -26,3 +26,7 @@ class EnvLoader(AbstractConfigLoader):
                 set_key(key_path, val)
 
         return cfg
+
+    @property
+    def source_name(self) -> str:
+        return "env"

@@ -66,6 +66,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
+from ai.backend.common.configs.loader import (
+    ConfigOverrider,
+    EtcdConfigLoader,
+    EtcdConfigWatcher,
+    LoaderChain,
+    TomlConfigLoader,
+)
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -148,21 +156,12 @@ from .api.context import RootContext
 from .clients.agent import AgentClientPool, AgentPoolSpec
 from .clients.appproxy.client import AppProxyClientPool
 from .config.bootstrap import BootstrapConfig
-from .config.loader.config_overrider import ConfigOverrider
-from .config.loader.etcd_loader import (
-    EtcdCommonConfigLoader,
-    EtcdManagerConfigLoader,
-)
 from .config.loader.legacy_etcd_loader import (
     LegacyEtcdLoader,
     LegacyEtcdVolumesLoader,
 )
-from .config.loader.loader_chain import LoaderChain
-from .config.loader.toml_loader import TomlConfigLoader
-from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
-from .config.watchers.etcd import EtcdConfigWatcher
 from .errors.api import InvalidAPIParameters
 from .errors.common import (
     GenericBadRequest,
@@ -530,8 +529,8 @@ async def config_provider_ctx(
     legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     loaders.append(legacy_etcd_loader)
     loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
-    loaders.append(EtcdCommonConfigLoader(root_ctx.etcd))
-    loaders.append(EtcdManagerConfigLoader(root_ctx.etcd))
+    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/common"))
+    loaders.append(EtcdConfigLoader(root_ctx.etcd, prefix="ai/backend/config/manager"))
 
     overrides: list[tuple[tuple[str, ...], Any]] = [
         (("debug", "enabled"), log_level == LogLevel.DEBUG),

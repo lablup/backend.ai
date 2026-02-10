@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
+from ai.backend.common.configs.loader import TomlConfigLoader
 
 DUMMY_CFG = {"api": {"port": 8000}}
 DUMMY_PATH = Path("/fake/config.toml")
