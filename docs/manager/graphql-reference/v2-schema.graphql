@@ -1716,7 +1716,7 @@ type DomainFairShare implements Node {
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Name of the domain this fair share is calculated for."""
   domainName: String!
@@ -1737,6 +1737,11 @@ type DomainFairShare implements Node {
   Added in 26.2.0. The domain entity associated with this fair share record.
   """
   domain: DomainV2
+
+  """
+  Added in 26.2.0. The resource group associated with this fair share record.
+  """
+  resourceGroup: ResourceGroup
 }
 
 """
@@ -3957,7 +3962,7 @@ type ProjectFairShare implements Node {
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the project this fair share is calculated for."""
   projectId: UUID!
@@ -3981,6 +3986,16 @@ type ProjectFairShare implements Node {
   Added in 26.2.0. The project entity associated with this fair share record.
   """
   project: ProjectV2
+
+  """
+  Added in 26.2.0. The domain entity associated with this fair share record.
+  """
+  domain: DomainV2
+
+  """
+  Added in 26.2.0. The resource group associated with this fair share record.
+  """
+  resourceGroup: ResourceGroup
 }
 
 """
@@ -6505,7 +6520,7 @@ type UserFairShare implements Node {
   id: ID!
 
   """Name of the scaling group this fair share belongs to."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the user this fair share is calculated for."""
   userUuid: UUID!
@@ -6532,6 +6547,21 @@ type UserFairShare implements Node {
   Added in 26.2.0. The user entity associated with this fair share record.
   """
   user: UserV2
+
+  """
+  Added in 26.2.0. The domain entity associated with this fair share record.
+  """
+  domain: DomainV2
+
+  """
+  Added in 26.2.0. The project entity associated with this fair share record.
+  """
+  project: ProjectV2
+
+  """
+  Added in 26.2.0. The resource group associated with this fair share record.
+  """
+  resourceGroup: ResourceGroup
 }
 
 """
