@@ -21,17 +21,6 @@ class PermissionData:
 
 
 @dataclass
-class PermissionCreatorBeforePermissionGroupCreation:
-    """
-    Input for creating a permission before the permission group is created.
-    Used when creating permissions as part of permission group creation.
-    """
-
-    entity_type: EntityType
-    operation: OperationType
-
-
-@dataclass
 class ScopedPermissionCreateInput:
     """
     Input for creating a scoped permission using scope information.
