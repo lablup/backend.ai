@@ -162,7 +162,7 @@ async def fetch_rg_domain_fair_shares(
 
 async def fetch_single_domain_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     domain_name: str,
 ) -> DomainFairShareGQL:
     """Fetch a single domain fair share record.
@@ -174,7 +174,7 @@ async def fetch_single_domain_fair_share(
 
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
         GetDomainFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             domain_name=domain_name,
         )
     )

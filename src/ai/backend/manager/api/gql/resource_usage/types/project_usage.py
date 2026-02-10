@@ -60,7 +60,7 @@ class ProjectUsageBucketGQL(Node):
         description="UUID of the project this usage bucket belongs to."
     )
     domain_name: str = strawberry.field(description="Name of the domain the project belongs to.")
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this usage was recorded in."
     )
     metadata: UsageBucketMetadataGQL = strawberry.field(
@@ -116,7 +116,7 @@ class ProjectUsageBucketGQL(Node):
             id=ID(str(data.id)),
             project_id=data.project_id,
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
+            resource_group_name=data.resource_group,
             metadata=UsageBucketMetadataGQL(
                 period_start=data.period_start,
                 period_end=data.period_end,
@@ -163,7 +163,7 @@ class ProjectUsageBucketGQL(Node):
             offset=offset,
             base_conditions=[
                 UserUsageBucketConditions.by_project_id(self.project_id),
-                UserUsageBucketConditions.by_resource_group(self.resource_group),
+                UserUsageBucketConditions.by_resource_group(self.resource_group_name),
                 UserUsageBucketConditions.by_period_start(self.metadata.period_start),
             ],
         )

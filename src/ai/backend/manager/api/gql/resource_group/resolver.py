@@ -220,7 +220,7 @@ async def admin_update_resource_group_fair_share_spec(
         ]
 
     action = UpdateFairShareSpecAction(
-        resource_group=input.resource_group,
+        resource_group=input.resource_group_name,
         half_life_days=input.half_life_days,
         lookback_days=input.lookback_days,
         decay_unit_days=input.decay_unit_days,
@@ -266,7 +266,7 @@ async def update_resource_group_fair_share_spec(
         ]
 
     action = UpdateFairShareSpecAction(
-        resource_group=input.resource_group,
+        resource_group=input.resource_group_name,
         half_life_days=input.half_life_days,
         lookback_days=input.lookback_days,
         decay_unit_days=input.decay_unit_days,
@@ -356,7 +356,7 @@ async def admin_update_resource_group(
         scheduler=scheduler_spec,
     )
 
-    updater = Updater(spec=updater_spec, pk_value=input.resource_group)
+    updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
 
     # Use existing ModifyScalingGroupAction
     action = ModifyScalingGroupAction(updater=updater)

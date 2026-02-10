@@ -492,7 +492,7 @@ class ProjectFairShareOrderBy(GQLOrderBy):
 class UpsertProjectFairShareWeightInput:
     """Input for upserting project fair share weight."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for this fair share."
     )
     project_id: UUID = strawberry.field(description="UUID of the project to update weight for.")
@@ -552,7 +552,7 @@ class ProjectWeightInputItem:
 class BulkUpsertProjectFairShareWeightInput:
     """Input for bulk upserting project fair share weights."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for all fair shares."
     )
     inputs: list[ProjectWeightInputItem] = strawberry.field(

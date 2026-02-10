@@ -914,7 +914,7 @@ Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows upda
 """
 input BulkUpsertDomainFairShareWeightInput {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of domain weight updates to apply."""
   inputs: [DomainWeightInputItem!]!
@@ -933,7 +933,7 @@ Added in 26.1.0. Input for bulk upserting project fair share weights. Allows upd
 """
 input BulkUpsertProjectFairShareWeightInput {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of project weight updates to apply."""
   inputs: [ProjectWeightInputItem!]!
@@ -952,7 +952,7 @@ Added in 26.1.0. Input for bulk upserting user fair share weights. Allows updati
 """
 input BulkUpsertUserFairShareWeightInput {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of user weight updates to apply."""
   inputs: [UserWeightInputItem!]!
@@ -1835,7 +1835,7 @@ enum DomainFairShareOrderField {
 
 input DomainFairShareScope {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """
@@ -1902,7 +1902,7 @@ type DomainUsageBucket implements Node {
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -2009,7 +2009,7 @@ input DomainUsageBucketOrderBy {
 
 input DomainUsageScope {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """
@@ -4099,7 +4099,7 @@ input ProjectFairShareProjectNestedFilter {
 
 input ProjectFairShareScope {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """Added in 26.2.0. Project type enum for fair share filtering."""
@@ -4201,7 +4201,7 @@ type ProjectUsageBucket implements Node {
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -4313,7 +4313,7 @@ input ProjectUsageBucketOrderBy {
 
 input ProjectUsageScope {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """
@@ -4719,19 +4719,19 @@ type Query {
   adminDomainAppConfig(domainName: String!): AppConfig
 
   """Added in 26.2.0. Get domain fair share data (admin only)."""
-  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare!
+  adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare!
 
   """Added in 26.2.0. List domain fair shares (admin only)."""
   adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
 
   """Added in 26.2.0. Get project fair share data (admin only)."""
-  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare!
+  adminProjectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare!
 
   """Added in 26.2.0. List project fair shares (admin only)."""
   adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
 
   """Added in 26.2.0. Get user fair share data (admin only)."""
-  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare!
+  adminUserFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare!
 
   """Added in 26.2.0. List user fair shares (admin only)."""
   adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
@@ -4861,19 +4861,19 @@ type Query {
   domainAppConfig(domainName: String!): AppConfig @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare! @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare! @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List domain fair shares (superadmin only)."""
   domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare! @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare! @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List project fair shares (superadmin only)."""
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List user fair shares (superadmin only)."""
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -5200,7 +5200,7 @@ type ResourceGroupConnection {
 """Resource group scope for domain-level operations"""
 input ResourceGroupDomainScope {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """An edge in a connection."""
@@ -5264,7 +5264,7 @@ enum ResourceGroupOrderField {
 """Resource group + domain scope for project-level operations"""
 input ResourceGroupProjectScope {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Domain name to scope the operation"""
   domainName: String!
@@ -5290,7 +5290,7 @@ type ResourceGroupStatus {
 """Resource group + domain + project scope for user-level operations"""
 input ResourceGroupUserScope {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Domain name to scope the operation"""
   domainName: String!
@@ -6182,7 +6182,7 @@ Added in 26.1.0. Input for updating resource group fair share configuration. All
 """
 input UpdateResourceGroupFairShareSpecInput {
   """Name of the resource group to update."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Half-life for exponential decay in days. Leave null to keep existing value.
@@ -6219,7 +6219,7 @@ Added in 26.2.0. Resource group configuration update input. All fields are optio
 """
 input UpdateResourceGroupInput {
   """Name of the resource group to update."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Whether the resource group is active. Leave null to keep existing value.
@@ -6368,7 +6368,7 @@ Added in 26.1.0. Input for upserting domain fair share weight. The weight parame
 """
 input UpsertDomainFairShareWeightInput {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Name of the domain to update weight for."""
   domainName: String!
@@ -6390,7 +6390,7 @@ Added in 26.1.0. Input for upserting project fair share weight. The weight param
 """
 input UpsertProjectFairShareWeightInput {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the project to update weight for."""
   projectId: UUID!
@@ -6439,7 +6439,7 @@ Added in 26.1.0. Input for upserting user fair share weight. The weight paramete
 """
 input UpsertUserFairShareWeightInput {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the project the user belongs to."""
   projectId: UUID!
@@ -6647,7 +6647,7 @@ enum UserFairShareOrderField {
 
 input UserFairShareScope {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Project ID that the user belongs to (required for user-level fair shares).
@@ -6759,7 +6759,7 @@ type UserUsageBucket implements Node {
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -6869,7 +6869,7 @@ input UserUsageBucketOrderBy {
 
 input UserUsageScope {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Project ID that the user belongs to (required for user-level usage)."""
   projectId: UUID!

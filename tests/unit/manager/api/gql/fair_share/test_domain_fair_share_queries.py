@@ -144,7 +144,7 @@ class TestAdminDomainFairShareSingleQuery:
         with with_user(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_share.base_resolver(
                 info=info,
-                resource_group="default",
+                resource_group_name="default",
                 domain_name="test-domain",
             )
 
@@ -178,7 +178,7 @@ class TestAdminDomainFairShareSingleQuery:
             with pytest.raises(DomainNotFound):
                 await domain_resolver.admin_domain_fair_share.base_resolver(
                     info=info,
-                    resource_group="default",
+                    resource_group_name="default",
                     domain_name="nonexistent-domain",
                 )
 
@@ -196,7 +196,7 @@ class TestAdminDomainFairShareSingleQuery:
             with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_share.base_resolver(
                     info=info,
-                    resource_group="default",
+                    resource_group_name="default",
                     domain_name="test-domain",
                 )
 
@@ -220,7 +220,7 @@ class TestAdminDomainFairShareSingleQuery:
         with with_user(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_share.base_resolver(
                 info=info,
-                resource_group="default",
+                resource_group_name="default",
                 domain_name="test-domain",
             )
 

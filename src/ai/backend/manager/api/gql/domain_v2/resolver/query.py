@@ -121,7 +121,7 @@ async def rg_domains_v2(
         DomainV2Connection with paginated domain records.
     """
     # Convert GraphQL scope to repository scope
-    repo_scope = DomainSearchScope(resource_group=scope.resource_group)
+    repo_scope = DomainSearchScope(resource_group=scope.resource_group_name)
 
     return await fetch_rg_domains(
         info,

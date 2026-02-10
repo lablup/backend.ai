@@ -85,7 +85,7 @@ class TestRGProjectFairShare:
         project_id: UUID,
     ) -> None:
         """Should return project fair share when it exists."""
-        scope = ResourceGroupProjectScope(resource_group="default", domain_name="test-domain")
+        scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
 
         resolver_fn = project_resolver.rg_project_fair_share.base_resolver
         result = await resolver_fn(
@@ -105,7 +105,7 @@ class TestRGProjectFairShare:
         info_with_project_fair_share_exists: MagicMock,
     ) -> None:
         """Should call action with correct resource_group and project_id."""
-        scope = ResourceGroupProjectScope(resource_group="custom-rg", domain_name="my-domain")
+        scope = ResourceGroupProjectScope(resource_group_name="custom-rg", domain_name="my-domain")
         project_id = UUID("11111111-2222-3333-4444-555555555555")
 
         resolver_fn = project_resolver.rg_project_fair_share.base_resolver
@@ -136,7 +136,7 @@ class TestRGProjectFairShare:
         info_with_project_not_found: MagicMock,
     ) -> None:
         """Should raise ProjectNotFound when project does not exist."""
-        scope = ResourceGroupProjectScope(resource_group="default", domain_name="test-domain")
+        scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
         project_id = UUID("11111111-2222-3333-4444-555555555555")
 
         resolver_fn = project_resolver.rg_project_fair_share.base_resolver
@@ -155,7 +155,7 @@ class TestRGProjectFairShares:
     async def test_calls_fetch_rg_project_fair_shares(self) -> None:
         """Should call fetch_rg_project_fair_shares with correct scope."""
         info = MagicMock()
-        scope = ResourceGroupProjectScope(resource_group="default", domain_name="test-domain")
+        scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
         mock_connection = MagicMock()
 
         with patch(

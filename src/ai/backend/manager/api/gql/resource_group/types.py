@@ -506,7 +506,7 @@ class ResourceGroupOrderByGQL(GQLOrderBy):
 class UpdateResourceGroupFairShareSpecInput:
     """Partial update input for fair share spec. All fields optional for partial update."""
 
-    resource_group: str = strawberry.field(description="Name of the resource group to update.")
+    resource_group_name: str = strawberry.field(description="Name of the resource group to update.")
     half_life_days: int | None = strawberry.field(
         default=None,
         description="Half-life for exponential decay in days. Leave null to keep existing value.",
@@ -590,7 +590,7 @@ class UpdateResourceGroupFairShareSpecPayload:
 class UpdateResourceGroupInput:
     """Input for updating resource group configuration. All fields optional for partial update."""
 
-    resource_group: str = strawberry.field(description="Name of the resource group to update.")
+    resource_group_name: str = strawberry.field(description="Name of the resource group to update.")
 
     # Status fields (ScalingGroupStatusUpdaterSpec)
     is_active: bool | None = strawberry.field(

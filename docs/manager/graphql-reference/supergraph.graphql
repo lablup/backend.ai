@@ -1431,7 +1431,7 @@ input BulkUpsertDomainFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of domain weight updates to apply."""
   inputs: [DomainWeightInputItem!]!
@@ -1454,7 +1454,7 @@ input BulkUpsertProjectFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of project weight updates to apply."""
   inputs: [ProjectWeightInputItem!]!
@@ -1477,7 +1477,7 @@ input BulkUpsertUserFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for all fair shares."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """List of user weight updates to apply."""
   inputs: [UserWeightInputItem!]!
@@ -3459,7 +3459,7 @@ input DomainFairShareScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 input DomainInput
@@ -3571,7 +3571,7 @@ type DomainUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -3688,7 +3688,7 @@ input DomainUsageScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """
@@ -7732,7 +7732,7 @@ input ProjectFairShareScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """Added in 26.2.0. Project type enum for fair share filtering."""
@@ -7875,7 +7875,7 @@ type ProjectUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -7997,7 +7997,7 @@ input ProjectUsageScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """
@@ -8904,19 +8904,19 @@ type Query
   adminDomainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get domain fair share data (admin only)."""
-  adminDomainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY)
+  adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List domain fair shares (admin only)."""
   adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get project fair share data (admin only)."""
-  adminProjectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare! @join__field(graph: STRAWBERRY)
+  adminProjectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List project fair shares (admin only)."""
   adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get user fair share data (admin only)."""
-  adminUserFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @join__field(graph: STRAWBERRY)
+  adminUserFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List user fair shares (admin only)."""
   adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY)
@@ -9046,19 +9046,19 @@ type Query
   domainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroup: String!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List domain fair shares (superadmin only)."""
   domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroup: String!, projectId: UUID!): ProjectFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List project fair shares (superadmin only)."""
   projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroup: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List user fair shares (superadmin only)."""
   userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -9468,7 +9468,7 @@ input ResourceGroupDomainScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 }
 
 """An edge in a connection."""
@@ -9548,7 +9548,7 @@ input ResourceGroupProjectScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Domain name to scope the operation"""
   domainName: String!
@@ -9580,7 +9580,7 @@ input ResourceGroupUserScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group name to scope the operation"""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Domain name to scope the operation"""
   domainName: String!
@@ -10950,7 +10950,7 @@ input UpdateResourceGroupFairShareSpecInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the resource group to update."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Half-life for exponential decay in days. Leave null to keep existing value.
@@ -10991,7 +10991,7 @@ input UpdateResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the resource group to update."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Whether the resource group is active. Leave null to keep existing value.
@@ -11160,7 +11160,7 @@ input UpsertDomainFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Name of the domain to update weight for."""
   domainName: String!
@@ -11186,7 +11186,7 @@ input UpsertProjectFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the project to update weight for."""
   projectId: UUID!
@@ -11243,7 +11243,7 @@ input UpsertUserFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the scaling group (resource group) for this fair share."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """UUID of the project the user belongs to."""
   projectId: UUID!
@@ -11545,7 +11545,7 @@ input UserFairShareScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter fair shares by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """
   Project ID that the user belongs to (required for user-level fair shares).
@@ -11809,7 +11809,7 @@ type UserUsageBucket implements Node
   domainName: String!
 
   """Name of the scaling group this usage was recorded in."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Metadata about the usage measurement period and timestamps."""
   metadata: UsageBucketMetadata!
@@ -11929,7 +11929,7 @@ input UserUsageScope
   @join__type(graph: STRAWBERRY)
 {
   """Resource group to filter usage buckets by."""
-  resourceGroup: String!
+  resourceGroupName: String!
 
   """Project ID that the user belongs to (required for user-level usage)."""
   projectId: UUID!
