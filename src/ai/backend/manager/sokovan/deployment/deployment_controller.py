@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -123,8 +123,8 @@ class DeploymentController:
         creator = RBACEntityCreator(
             spec=spec,
             scope_ref=ScopeId(scope_type=ScopeType.USER, scope_id=str(draft.metadata.created_user)),
-            additional_scope_refs=[],
             entity_type=EntityType.MODEL_DEPLOYMENT,
+            relation_type=RelationType.AUTO,
         )
         return await self._deployment_repository.create_endpoint_legacy(creator)
 

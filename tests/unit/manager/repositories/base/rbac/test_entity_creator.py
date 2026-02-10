@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.id import ScopeId as ScopeRef
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -134,8 +134,8 @@ class TestRBACEntityCreatorBasic:
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
                 scope_ref=ScopeRef(ScopeType.USER, user_id),
-                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
 
@@ -163,6 +163,7 @@ class TestRBACEntityCreatorBasic:
             assert assoc_row.scope_id == user_id
             assert assoc_row.entity_type == EntityType.VFOLDER
             assert assoc_row.entity_id == str(result.row.id)
+            assert assoc_row.relation_type == RelationType.AUTO
 
     async def test_create_entity_with_project_scope(
         self,
@@ -181,8 +182,8 @@ class TestRBACEntityCreatorBasic:
             creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec,
                 scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
-                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             await execute_rbac_entity_creator(db_sess, creator)
 
@@ -191,6 +192,7 @@ class TestRBACEntityCreatorBasic:
             assert assoc_row is not None
             assert assoc_row.scope_type == ScopeType.PROJECT
             assert assoc_row.scope_id == project_id
+            assert assoc_row.relation_type == RelationType.AUTO
 
     async def test_create_multiple_entities_sequentially(
         self,
@@ -210,8 +212,8 @@ class TestRBACEntityCreatorBasic:
                 creator: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                     spec=spec,
                     scope_ref=ScopeRef(ScopeType.USER, user_id),
-                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
+                    relation_type=RelationType.AUTO,
                 )
                 result = await execute_rbac_entity_creator(db_sess, creator)
                 assert result.row.name == f"entity-{i}"
@@ -246,6 +248,7 @@ class TestRBACEntityCreatorBasic:
                 scope_ref=ScopeRef(ScopeType.PROJECT, project_id),
                 additional_scope_refs=[ScopeRef(ScopeType.USER, user_id)],
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_entity_creator(db_sess, creator)
 
@@ -280,6 +283,10 @@ class TestRBACEntityCreatorBasic:
             assert len(entity_ids) == 1
             assert str(result.row.id) in entity_ids
 
+            # All associations should have default AUTO relation type
+            for assoc in assoc_rows:
+                assert assoc.relation_type == RelationType.AUTO
+
 
 class TestRBACEntityCreatorIdempotent:
     """Tests for idempotent behavior of RBAC entity creator."""
@@ -308,8 +315,8 @@ class TestRBACEntityCreatorIdempotent:
             creator1: RBACEntityCreator[RBACEntityCreatorTestRow] = RBACEntityCreator(
                 spec=spec1,
                 scope_ref=ScopeRef(ScopeType.USER, user_id),
-                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result1 = await execute_rbac_entity_creator(db_sess, creator1)
             assert result1.row.id == entity_id
@@ -368,6 +375,7 @@ class TestRBACBulkEntityCreator:
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -399,6 +407,7 @@ class TestRBACBulkEntityCreator:
                 scope_type=ScopeType.USER,
                 scope_id="dummy",
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -437,6 +446,7 @@ class TestRBACBulkEntityCreator:
                 scope_type=ScopeType.USER,
                 scope_id=user_id,
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_bulk_entity_creator(db_sess, creator)
 
@@ -446,10 +456,11 @@ class TestRBACBulkEntityCreator:
             assoc_rows = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
             assert len(assoc_rows) == 2
 
-            # All should have same scope
+            # All should have same scope and default relation type
             for assoc in assoc_rows:
                 assert assoc.scope_type == ScopeType.USER
                 assert assoc.scope_id == user_id
+                assert assoc.relation_type == RelationType.AUTO
 
 
 # =============================================================================
@@ -501,8 +512,8 @@ class TestRBACEntityCreatorCompositePK:
                 creator = RBACEntityCreator(
                     spec=spec,
                     scope_ref=ScopeRef(ScopeType.USER, "user-123"),
-                    additional_scope_refs=[],
                     entity_type=EntityType.VFOLDER,
+                    relation_type=RelationType.AUTO,
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):
@@ -530,6 +541,7 @@ class TestRBACEntityCreatorCompositePK:
                     scope_type=ScopeType.USER,
                     scope_id="user-123",
                     entity_type=EntityType.VFOLDER,
+                    relation_type=RelationType.AUTO,
                 )
 
                 with pytest.raises(UnsupportedCompositePrimaryKeyError):

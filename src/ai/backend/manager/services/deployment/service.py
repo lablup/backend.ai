@@ -11,7 +11,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.types import (
     ResourceSlot,
 )
@@ -331,8 +331,8 @@ class DeploymentService:
         creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
             spec=creator_spec,
             scope_ref=ScopeId(scope_type=ScopeType.USER, scope_id=str(metadata.created_user)),
-            additional_scope_refs=[],
             entity_type=EntityType.MODEL_DEPLOYMENT,
+            relation_type=RelationType.AUTO,
         )
 
         # Create endpoint via repository

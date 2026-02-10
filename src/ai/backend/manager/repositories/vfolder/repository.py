@@ -19,6 +19,7 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    RelationType,
     RoleSource,
     ScopeType,
 )
@@ -300,8 +301,8 @@ class VfolderRepository:
             rbac_creator = RBACEntityCreator(
                 spec=spec,
                 scope_ref=ScopeId(scope_type=scope_type, scope_id=scope_id),
-                additional_scope_refs=[],
                 entity_type=EntityType.VFOLDER,
+                relation_type=RelationType.AUTO,
             )
             result = await execute_rbac_entity_creator(session, rbac_creator)
             created_row = result.row
