@@ -42,6 +42,9 @@ class PermissionAdapter:
         """Convert CreatePermissionRequest to CreatePermissionAction."""
         creator = Creator(
             spec=PermissionCreatorSpec(
+                role_id=request.role_id,
+                scope_type=request.scope_type,
+                scope_id=request.scope_id,
                 entity_type=request.entity_type,
                 operation=request.operation,
             )

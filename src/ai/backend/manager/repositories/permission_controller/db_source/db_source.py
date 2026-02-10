@@ -6,7 +6,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -109,7 +109,7 @@ class PermissionDBSource:
             Created permission row
         """
         async with self._db.begin_session() as db_session:
-            perm_row = await self._add_permission(db_session, creator)
+            perm_row = await self._add_permission_to_group(db_session, creator)
             await db_session.refresh(perm_row)
             return perm_row
 
@@ -182,7 +182,7 @@ class PermissionDBSource:
     # Private Helper Functions (for use within transactions)
     # ============================================================
 
-    async def _add_permission(
+    async def _add_permission_to_group(
         self,
         db_session: SASession,
         creator: Creator[PermissionRow],
@@ -293,11 +293,14 @@ class PermissionDBSource:
             for scoped_perm_input in input_data.add_scoped_permissions:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
+                        role_id=input_data.role_id,
+                        scope_type=scoped_perm_input.scope_type,
+                        scope_id=scoped_perm_input.scope_id,
                         entity_type=scoped_perm_input.entity_type,
                         operation=scoped_perm_input.operation,
                     )
                 )
-                await self._add_permission(db_session, perm_creator)
+                await self._add_permission_to_group(db_session, perm_creator)
 
             # 2. Remove scoped permissions
             for perm_id in input_data.remove_scoped_permission_ids:
@@ -336,13 +339,20 @@ class PermissionDBSource:
 
     async def get_user_roles(self, user_id: uuid.UUID) -> list[RoleRow]:
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            j = sa.join(
-                RoleRow,
-                UserRoleRow,
-                RoleRow.id == UserRoleRow.role_id,
-            ).join(
-                ObjectPermissionRow,
-                RoleRow.id == ObjectPermissionRow.role_id,
+            j = (
+                sa.join(
+                    RoleRow,
+                    UserRoleRow,
+                    RoleRow.id == UserRoleRow.role_id,
+                )
+                .join(
+                    ObjectPermissionRow,
+                    RoleRow.id == ObjectPermissionRow.role_id,
+                )
+                .join(
+                    PermissionRow,
+                    RoleRow.id == PermissionRow.role_id,
+                )
             )
             stmt = (
                 sa.select(RoleRow)
@@ -376,14 +386,18 @@ class PermissionDBSource:
         role_query = (
             sa.select(sa.func.exist())
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
-                    PermissionRow, sa.literal(True)
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
+                    PermissionRow, RoleRow.id == PermissionRow.role_id
                 )
             )
             .where(
                 sa.and_(
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
+                    sa.or_(
+                        PermissionRow.scope_type == ScopeType.GLOBAL,
+                        PermissionRow.scope_id == scope_id.scope_id,
+                    ),
                     PermissionRow.operation == operation,
                 )
             )
@@ -401,10 +415,14 @@ class PermissionDBSource:
         return (
             sa.select(RoleRow)
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    sa.literal(True),
+                    sa.and_(
+                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
+                    ),
                 )
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
@@ -413,13 +431,14 @@ class PermissionDBSource:
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
                     sa.or_(
+                        PermissionRow.scope_type == ScopeType.GLOBAL,
                         AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                         ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                     ),
                 )
             )
             .options(
-                selectinload(RoleRow.object_permission_rows),
+                contains_eager(RoleRow.object_permission_rows),
             )
         )
 
@@ -433,12 +452,15 @@ class PermissionDBSource:
         return (
             sa.select(RoleRow)
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                .join(PermissionRow, RoleRow.id == PermissionRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    sa.literal(True),
+                    sa.and_(
+                        PermissionRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                        PermissionRow.scope_type == AssociationScopesEntitiesRow.scope_type,
+                    ),
                 )
-                .join(PermissionRow, sa.literal(True))
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
             .where(
@@ -447,6 +469,7 @@ class PermissionDBSource:
                     UserRoleRow.user_id == user_id,
                     sa.or_(
                         sa.and_(
+                            PermissionRow.scope_type == ScopeType.GLOBAL,
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
@@ -461,7 +484,7 @@ class PermissionDBSource:
                 )
             )
             .options(
-                selectinload(RoleRow.object_permission_rows),
+                contains_eager(RoleRow.object_permission_rows),
             )
         )
 

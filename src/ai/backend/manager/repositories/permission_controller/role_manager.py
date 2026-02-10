@@ -55,7 +55,7 @@ class RoleManager:
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
         role = await self._create_system_role(db_session, data)
-        await self._create_permissions(db_session, data)
+        await self._create_permissions(db_session, data, role.id)
         return role
 
     async def _create_system_role(
@@ -75,11 +75,15 @@ class RoleManager:
         self,
         db_session: SASession,
         data: ScopeSystemRoleData,
+        role_id: uuid.UUID,
     ) -> list[PermissionData]:
         permission_rows: list[PermissionRow] = []
         for entity, operations in data.entity_operations().items():
             for operation in operations:
                 creator = PermissionCreator(
+                    role_id=role_id,
+                    scope_type=data.scope_id().scope_type,
+                    scope_id=data.scope_id().scope_id,
                     entity_type=entity,
                     operation=operation,
                 )

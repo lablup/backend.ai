@@ -14,6 +14,7 @@ import pytest
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    ScopeType,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
@@ -96,6 +97,9 @@ class TestSearchScopedPermissions:
                 (EntityType.IMAGE, OperationType.READ),
             ]:
                 perm = PermissionRow(
+                    role_id=role_id,
+                    scope_type=ScopeType.DOMAIN,
+                    scope_id="test-domain",
                     entity_type=entity_type,
                     operation=operation,
                 )

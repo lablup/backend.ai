@@ -1,7 +1,7 @@
 """remove_permission_groups_table_and_fk
 
 Revision ID: f41bbe0c0f12
-Revises: 8fd6f47bd226
+Revises: 299deadfb77e
 Create Date: 2026-02-11 02:43:17.099347
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "f41bbe0c0f12"
-down_revision = "8fd6f47bd226"
+down_revision = "299deadfb77e"
 branch_labels = None
 depends_on = None
 

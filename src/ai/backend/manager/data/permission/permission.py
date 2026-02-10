@@ -9,6 +9,9 @@ from .types import EntityType, OperationType, ScopeType
 
 @dataclass
 class PermissionCreator:
+    role_id: uuid.UUID
+    scope_type: ScopeType
+    scope_id: str
     entity_type: EntityType
     operation: OperationType
 
@@ -16,6 +19,9 @@ class PermissionCreator:
 @dataclass
 class PermissionData:
     id: uuid.UUID
+    role_id: uuid.UUID
+    scope_type: ScopeType
+    scope_id: str
     entity_type: EntityType
     operation: OperationType
 
@@ -25,9 +31,6 @@ class ScopedPermissionCreateInput:
     """
     Input for creating a scoped permission using scope information.
     Used in update_role_permissions API to add permissions by scope.
-
-    The system will automatically find or create the permission group
-    based on (role_id, scope_type, scope_id) combination.
     """
 
     scope_type: ScopeType
@@ -36,7 +39,7 @@ class ScopedPermissionCreateInput:
     operation: OperationType
 
     def to_scope_id(self) -> ScopeId:
-        """Convert to ScopeId for permission group lookup"""
+        """Convert to ScopeId."""
         return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
 
 
