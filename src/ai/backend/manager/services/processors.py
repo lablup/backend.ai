@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -138,6 +139,7 @@ class ServiceArgs:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    prometheus_client: PrometheusClient
 
 
 @dataclass
@@ -273,7 +275,9 @@ class Services:
             repositories.scaling_group.repository,
         )
         utilization_metric_service = UtilizationMetricService(
-            args.config_provider, repositories.metric.repository
+            args.prometheus_client,
+            args.config_provider.config.metric.timewindow,
+            repositories.metric.repository,
         )
 
         # Use deployment-based model serving if deployment_controller is available

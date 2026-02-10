@@ -9,6 +9,7 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
         ValkeyArtifactDownloadTrackingClient,
     )
@@ -99,6 +100,7 @@ class RootContext(BaseContext):
     agent_cache: AgentRPCCache
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
+    prometheus_client: PrometheusClient
     sokovan_orchestrator: SokovanOrchestrator
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
