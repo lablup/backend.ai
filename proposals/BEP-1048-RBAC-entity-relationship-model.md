@@ -68,7 +68,6 @@ Key design decisions:
 
 - **Reference Type (separate GQL types for ref entities)**: Rejected. Ref entities expose all fields.
 - **Denormalization (flat fields)**: Rejected. Increases maintenance burden.
-- **Separate `scope_delegations` / `scope_entity_mappings` tables**: Rejected. Unified into single `association_scopes_entities` table.
 
 ### Guarded Root Query Targets
 
@@ -274,7 +273,6 @@ After migration, the core RBAC tables are:
 
 ### Backward Compatibility
 
-- Recursive CTE scope chain traversal replaces the former `scope_delegations` role.
 - Sharing is implemented via system role entity-scope permission INSERT/DELETE.
 - Project membership is managed through `user_roles` and excluded from RBAC scope chain (Visibility only).
 
