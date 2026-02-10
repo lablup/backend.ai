@@ -27,14 +27,7 @@ from .types import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# TODO: Refactor metric type detection to query metric metadata from the repository layer
 CONTAINER_UTILIZATION_METRIC_NAME: Final[str] = "backendai_container_utilization"
-_GAUGE_TEMPLATE = f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-_RATE_TEMPLATE = (
-    f"sum by ({{group_by}})(rate({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
-    f" / {UTILIZATION_METRIC_INTERVAL}"
-)
-_DIFF_TEMPLATE = f"sum by ({{group_by}})(rate({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
 
 
 class ContainerUtilizationMetricService:
@@ -85,12 +78,24 @@ class ContainerUtilizationMetricService:
             project_id=label.project_id,
         )
         match metric_type:
+            # TODO: Refactor metric template retrieval to query metric metadata from the repository layer
             case UtilizationMetricType.GAUGE:
-                template = _GAUGE_TEMPLATE
+                template = (
+                    "sum by ({group_by})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{{{labels}}})"
+                )
             case UtilizationMetricType.RATE:
-                template = _RATE_TEMPLATE
+                template = (
+                    "sum by ({group_by})(rate("
+                    + CONTAINER_UTILIZATION_METRIC_NAME
+                    + "{{{labels}}}[{window}]))"
+                    " / " + str(UTILIZATION_METRIC_INTERVAL)
+                )
             case UtilizationMetricType.DIFF:
-                template = _DIFF_TEMPLATE
+                template = (
+                    "sum by ({group_by})(rate("
+                    + CONTAINER_UTILIZATION_METRIC_NAME
+                    + "{{{labels}}}[{window}]))"
+                )
             case _:
                 raise ValueError(f"Unknown metric type: {metric_type}")
         return MetricPreset(
