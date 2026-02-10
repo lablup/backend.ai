@@ -33,7 +33,6 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
 from .common_calculations import (
-    calculate_average_capacity_per_second,
     calculate_average_daily_usage,
     calculate_usage_capacity_ratio,
 )
@@ -101,21 +100,6 @@ class UserUsageBucketGQL(Node):
         return calculate_usage_capacity_ratio(
             self.resource_usage,
             self.capacity_snapshot,
-        )
-
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.2.0. Average available capacity per second during this period. "
-            "Calculated as capacity_snapshot divided by bucket duration in seconds. "
-            "For each resource type, represents the average instantaneous capacity. "
-            "Units are resource/second (e.g., CPU cores, memory bytes)."
-        )
-    )
-    def average_capacity_per_second(self) -> ResourceSlotGQL:
-        return calculate_average_capacity_per_second(
-            self.capacity_snapshot,
-            self.metadata.period_start,
-            self.metadata.period_end,
         )
 
     @classmethod

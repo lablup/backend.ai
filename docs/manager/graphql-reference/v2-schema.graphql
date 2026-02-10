@@ -1923,11 +1923,6 @@ type DomainUsageBucket implements Node {
   usageCapacityRatio: ResourceSlot!
 
   """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
-
-  """
   Added in 26.1.0. Project usage buckets belonging to this domain. Returns paginated project-level usage history for all projects in this domain within the same scaling group.
   """
   projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
@@ -4215,11 +4210,6 @@ type ProjectUsageBucket implements Node {
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
   usageCapacityRatio: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
 
   """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
@@ -6763,11 +6753,6 @@ type UserUsageBucket implements Node {
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
   usageCapacityRatio: ResourceSlot!
-
-  """
-  Added in 26.2.0. Average available capacity per second during this period. Calculated as capacity_snapshot divided by bucket duration in seconds. For each resource type, represents the average instantaneous capacity. Units are resource/second (e.g., CPU cores, memory bytes).
-  """
-  averageCapacityPerSecond: ResourceSlot!
 }
 
 """

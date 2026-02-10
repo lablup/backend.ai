@@ -10,7 +10,6 @@ import pytest
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
-    calculate_average_capacity_per_second,
     calculate_average_daily_usage,
     calculate_usage_capacity_ratio,
 )
@@ -21,18 +20,13 @@ class TestCalculateAverageDailyUsage:
 
     @pytest.fixture
     def one_day_period(self) -> tuple[date, date]:
-        """One day period (2026-02-01 to 2026-02-02)."""
-        return (date(2026, 2, 1), date(2026, 2, 2))
+        """One day period [2026-02-01, 2026-02-01] (inclusive)."""
+        return (date(2026, 2, 1), date(2026, 2, 1))
 
     @pytest.fixture
     def multi_day_period(self) -> tuple[date, date]:
-        """Seven day period (2026-02-01 to 2026-02-08)."""
-        return (date(2026, 2, 1), date(2026, 2, 8))
-
-    @pytest.fixture
-    def zero_day_period(self) -> tuple[date, date]:
-        """Zero day period (same start and end date)."""
-        return (date(2026, 2, 1), date(2026, 2, 1))
+        """Seven day period [2026-02-01, 2026-02-07] (inclusive)."""
+        return (date(2026, 2, 1), date(2026, 2, 7))
 
     @pytest.fixture
     def sample_resource_usage(self) -> ResourceSlotGQL:
@@ -84,8 +78,10 @@ class TestCalculateAverageDailyUsage:
 
         # Then
         result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
-        assert result_dict["cpu"] == Decimal("172800.0")
-        assert result_dict["mem"] == Decimal("34359738368.0")
+        # 172800 / (1 * 86400) = 2.0 cores
+        assert result_dict["cpu"] == Decimal("2.0")
+        # 34359738368 / (1 * 86400) = 397672.0 (approx) bytes
+        assert result_dict["mem"] == Decimal("34359738368.0") / Decimal("86400")
 
     def test_calculates_daily_average_for_multiple_days(
         self,
@@ -105,17 +101,18 @@ class TestCalculateAverageDailyUsage:
 
         # Then
         result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
-        # 1209600 / 7 = 172800
-        assert result_dict["cpu"] == Decimal("172800.0")
+        # 1209600 / (7 * 86400) = 2.0 cores
+        assert result_dict["cpu"] == Decimal("2.0")
 
-    def test_returns_empty_for_zero_duration(
+    def test_calculates_for_same_day_period(
         self,
         sample_resource_usage: ResourceSlotGQL,
-        zero_day_period: tuple[date, date],
+        one_day_period: tuple[date, date],
     ) -> None:
-        """Test that zero bucket duration returns empty ResourceSlotGQL."""
+        """Test that same-day period (period_start == period_end) is treated as 1 day."""
         # Given
-        period_start, period_end = zero_day_period
+        period_start, period_end = one_day_period
+        assert period_start == period_end
 
         # When
         result = calculate_average_daily_usage(
@@ -124,8 +121,10 @@ class TestCalculateAverageDailyUsage:
             period_end,
         )
 
-        # Then
-        assert len(result.entries) == 0
+        # Then - same as single day test, 1 day inclusive
+        result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
+        assert result_dict["cpu"] == Decimal("2.0")
+        assert result_dict["mem"] == Decimal("34359738368.0") / Decimal("86400")
 
     def test_handles_empty_resource_usage(
         self,
@@ -165,9 +164,12 @@ class TestCalculateAverageDailyUsage:
         # Then
         result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
         assert len(result_dict) == 3
-        assert result_dict["cpu"] == Decimal("172800.0")
-        assert result_dict["mem"] == Decimal("34359738368.0")
-        assert result_dict["cuda.shares"] == Decimal("86400.0")
+        # 172800 / 86400 = 2.0 cores
+        assert result_dict["cpu"] == Decimal("2.0")
+        # 34359738368 / 86400
+        assert result_dict["mem"] == Decimal("34359738368.0") / Decimal("86400")
+        # 86400 / 86400 = 1.0 GPU share
+        assert result_dict["cuda.shares"] == Decimal("1.0")
 
 
 class TestCalculateUsageCapacityRatio:
@@ -339,153 +341,3 @@ class TestCalculateUsageCapacityRatio:
         assert result_dict["mem"] == Decimal("0.5")
         # cuda.shares: 43200 / 4 = 10800
         assert result_dict["cuda.shares"] == Decimal("10800.0")
-
-
-class TestCalculateAverageCapacityPerSecond:
-    """Tests for calculate_average_capacity_per_second function."""
-
-    @pytest.fixture
-    def one_day_period(self) -> tuple[date, date]:
-        """One day period (2026-02-01 to 2026-02-02)."""
-        return (date(2026, 2, 1), date(2026, 2, 2))
-
-    @pytest.fixture
-    def multi_day_period(self) -> tuple[date, date]:
-        """Seven day period (2026-02-01 to 2026-02-08)."""
-        return (date(2026, 2, 1), date(2026, 2, 8))
-
-    @pytest.fixture
-    def zero_day_period(self) -> tuple[date, date]:
-        """Zero day period (same start and end date)."""
-        return (date(2026, 2, 1), date(2026, 2, 1))
-
-    @pytest.fixture
-    def sample_capacity(self) -> ResourceSlotGQL:
-        """Sample capacity with 8 CPU cores."""
-        slot = ResourceSlot({
-            "cpu": Decimal("8.0"),
-        })
-        return ResourceSlotGQL.from_resource_slot(slot)
-
-    @pytest.fixture
-    def empty_capacity(self) -> ResourceSlotGQL:
-        """Empty capacity with no entries."""
-        return ResourceSlotGQL(entries=[])
-
-    @pytest.fixture
-    def multi_resource_capacity(self) -> ResourceSlotGQL:
-        """Capacity with multiple resource types."""
-        slot = ResourceSlot({
-            "cpu": Decimal("8.0"),
-            "mem": Decimal("68719476736.0"),  # 64 GiB
-            "cuda.shares": Decimal("4.0"),
-        })
-        return ResourceSlotGQL.from_resource_slot(slot)
-
-    def test_calculates_capacity_per_second_for_single_day(
-        self,
-        sample_capacity: ResourceSlotGQL,
-        one_day_period: tuple[date, date],
-    ) -> None:
-        """Test capacity per second calculation for 1-day period."""
-        # Given
-        period_start, period_end = one_day_period
-
-        # When
-        result = calculate_average_capacity_per_second(
-            sample_capacity,
-            period_start,
-            period_end,
-        )
-
-        # Then
-        result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
-        # 8.0 / 86400 ≈ 0.0000925925...
-        expected = Decimal("8.0") / Decimal("86400")
-        assert result_dict["cpu"] == expected
-
-    def test_calculates_capacity_per_second_for_multiple_days(
-        self,
-        sample_capacity: ResourceSlotGQL,
-        multi_day_period: tuple[date, date],
-    ) -> None:
-        """Test capacity per second calculation for 7-day period."""
-        # Given
-        period_start, period_end = multi_day_period
-
-        # When
-        result = calculate_average_capacity_per_second(
-            sample_capacity,
-            period_start,
-            period_end,
-        )
-
-        # Then
-        result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
-        # 8.0 / (7 * 86400) = 8.0 / 604800 ≈ 0.00001322751...
-        expected = Decimal("8.0") / (Decimal("7") * Decimal("86400"))
-        assert result_dict["cpu"] == expected
-
-    def test_returns_empty_for_zero_duration(
-        self,
-        sample_capacity: ResourceSlotGQL,
-        zero_day_period: tuple[date, date],
-    ) -> None:
-        """Test that zero bucket duration returns empty ResourceSlotGQL."""
-        # Given
-        period_start, period_end = zero_day_period
-
-        # When
-        result = calculate_average_capacity_per_second(
-            sample_capacity,
-            period_start,
-            period_end,
-        )
-
-        # Then
-        assert len(result.entries) == 0
-
-    def test_handles_empty_capacity(
-        self,
-        empty_capacity: ResourceSlotGQL,
-        one_day_period: tuple[date, date],
-    ) -> None:
-        """Test handling of empty capacity."""
-        # Given
-        period_start, period_end = one_day_period
-
-        # When
-        result = calculate_average_capacity_per_second(
-            empty_capacity,
-            period_start,
-            period_end,
-        )
-
-        # Then
-        assert len(result.entries) == 0
-
-    def test_calculates_for_multiple_resource_types(
-        self,
-        multi_resource_capacity: ResourceSlotGQL,
-        one_day_period: tuple[date, date],
-    ) -> None:
-        """Test calculation for multiple resource types simultaneously."""
-        # Given
-        period_start, period_end = one_day_period
-
-        # When
-        result = calculate_average_capacity_per_second(
-            multi_resource_capacity,
-            period_start,
-            period_end,
-        )
-
-        # Then
-        result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
-        assert len(result_dict) == 3
-        # cpu: 8.0 / 86400
-        assert result_dict["cpu"] == Decimal("8.0") / Decimal("86400")
-        # mem: 68719476736 / 86400
-        assert result_dict["mem"] == Decimal("68719476736.0") / Decimal("86400")
-        # cuda.shares: 4.0 / 86400
-        assert result_dict["cuda.shares"] == Decimal("4.0") / Decimal("86400")
