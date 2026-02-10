@@ -20,18 +20,13 @@ class TestCalculateAverageDailyUsage:
 
     @pytest.fixture
     def one_day_period(self) -> tuple[date, date]:
-        """One day period (2026-02-01 to 2026-02-02)."""
-        return (date(2026, 2, 1), date(2026, 2, 2))
+        """One day period [2026-02-01, 2026-02-01] (inclusive)."""
+        return (date(2026, 2, 1), date(2026, 2, 1))
 
     @pytest.fixture
     def multi_day_period(self) -> tuple[date, date]:
-        """Seven day period (2026-02-01 to 2026-02-08)."""
-        return (date(2026, 2, 1), date(2026, 2, 8))
-
-    @pytest.fixture
-    def zero_day_period(self) -> tuple[date, date]:
-        """Zero day period (same start and end date)."""
-        return (date(2026, 2, 1), date(2026, 2, 1))
+        """Seven day period [2026-02-01, 2026-02-07] (inclusive)."""
+        return (date(2026, 2, 1), date(2026, 2, 7))
 
     @pytest.fixture
     def sample_resource_usage(self) -> ResourceSlotGQL:
@@ -109,14 +104,15 @@ class TestCalculateAverageDailyUsage:
         # 1209600 / (7 * 86400) = 2.0 cores
         assert result_dict["cpu"] == Decimal("2.0")
 
-    def test_returns_empty_for_zero_duration(
+    def test_calculates_for_same_day_period(
         self,
         sample_resource_usage: ResourceSlotGQL,
-        zero_day_period: tuple[date, date],
+        one_day_period: tuple[date, date],
     ) -> None:
-        """Test that zero bucket duration returns empty ResourceSlotGQL."""
+        """Test that same-day period (period_start == period_end) is treated as 1 day."""
         # Given
-        period_start, period_end = zero_day_period
+        period_start, period_end = one_day_period
+        assert period_start == period_end
 
         # When
         result = calculate_average_daily_usage(
@@ -125,8 +121,10 @@ class TestCalculateAverageDailyUsage:
             period_end,
         )
 
-        # Then
-        assert len(result.entries) == 0
+        # Then - same as single day test, 1 day inclusive
+        result_dict = {entry.resource_type: entry.quantity for entry in result.entries}
+        assert result_dict["cpu"] == Decimal("2.0")
+        assert result_dict["mem"] == Decimal("34359738368.0") / Decimal("86400")
 
     def test_handles_empty_resource_usage(
         self,

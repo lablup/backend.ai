@@ -550,10 +550,11 @@ class FairShareAdapter:
     def _calculate_average_daily_usage(
         self, usage: ResourceSlot, period_start: date, period_end: date
     ) -> ResourceSlotDTO:
-        """Calculate average daily usage."""
-        days = (period_end - period_start).days
-        if days == 0:
-            return ResourceSlotDTO(entries=[])
+        """Calculate average daily usage.
+
+        The bucket period is inclusive: [period_start, period_end].
+        """
+        days = (period_end - period_start).days + 1
 
         entries = [
             ResourceSlotEntryDTO(

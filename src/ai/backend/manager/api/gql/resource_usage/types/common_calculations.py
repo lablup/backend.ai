@@ -26,10 +26,13 @@ def calculate_average_daily_usage(
 
     For each resource type, computes: resource_usage / (bucket_duration_days * SECONDS_PER_DAY)
 
+    The bucket period is inclusive on both ends: [period_start, period_end].
+    For example, period_start=Feb 1, period_end=Feb 1 means 1 day.
+
     Args:
         resource_usage: Total resource usage in resource-seconds
-        period_start: Bucket period start date
-        period_end: Bucket period end date
+        period_start: Bucket period start date (inclusive)
+        period_end: Bucket period end date (inclusive)
 
     Returns:
         Average daily usage per resource type. Units match the resource type
@@ -38,7 +41,7 @@ def calculate_average_daily_usage(
     Note:
         Returns empty ResourceSlotGQL if bucket duration is zero.
     """
-    bucket_duration_days = Decimal((period_end - period_start).days)
+    bucket_duration_days = Decimal((period_end - period_start).days + 1)
 
     if bucket_duration_days == 0:
         return ResourceSlotGQL(entries=[])
