@@ -208,14 +208,16 @@ class UserUsageBucketFilter(GQLFilter):
 
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
-                contains_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
+                contains_factory=lambda spec: UserUsageBucketConditions.by_resource_group_contains(
                     spec.value
                 ),
-                equals_factory=lambda spec: UserUsageBucketConditions.by_resource_group(spec.value),
-                starts_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
+                equals_factory=lambda spec: UserUsageBucketConditions.by_resource_group_equals(
                     spec.value
                 ),
-                ends_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
+                starts_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group_ends_with(
                     spec.value
                 ),
             )
@@ -240,12 +242,18 @@ class UserUsageBucketFilter(GQLFilter):
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
-                equals_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
-                starts_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name(
+                contains_factory=lambda spec: UserUsageBucketConditions.by_domain_name_contains(
                     spec.value
                 ),
-                ends_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
+                equals_factory=lambda spec: UserUsageBucketConditions.by_domain_name_equals(
+                    spec.value
+                ),
+                starts_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name_starts_with(
+                    spec.value
+                ),
+                ends_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name_ends_with(
+                    spec.value
+                ),
             )
             if dn_condition:
                 conditions.append(dn_condition)
