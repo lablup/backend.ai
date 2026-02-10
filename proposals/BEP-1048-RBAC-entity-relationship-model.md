@@ -26,7 +26,7 @@ BEP-1008 and BEP-1012 define RBAC roles, permissions, and scope hierarchy, but d
 - No unified model exists for how entity relationships affect traversal and access.
 - Association tables (`AssociationContainerRegistriesGroupsRow`, `ScalingGroupForDomainRow`, etc.) are scattered across the codebase with inconsistent patterns.
 
-This proposal introduces an **Entity Relationship Model** that classifies all entity relationships into a small set of types, unifying visibility logic into a single table (`association_scopes_entities`) and a set of code-level metadata annotations.
+This proposal introduces an **Entity Relationship Model** that classifies all entity relationships into a small set of types, unifying visibility logic into a single table (`association_scopes_entities`).
 
 ## Current Design
 
@@ -55,13 +55,13 @@ All entity relationships are classified into exactly three types:
 | Type | Semantics | Storage | GQL Sub-field | Permission |
 |------|-----------|---------|---------------|------------|
 | `guarded` | Independent entity; no edge relationship | N/A (no edge) | No | Separate RBAC check required |
-| `auto` | Composition; permission delegation from parent | DB (`association_scopes_entities`, `relation_type=auto`) | Yes | Parent's CRUD inherited → child's CRUD |
+| `auto` | Composition; permission delegation from parent | DB (`association_scopes_entities`, `relation_type=auto`) | Yes | Role-defined permissions flow through |
 | `ref` | Read-only reference; no permission delegation | DB (`association_scopes_entities`, `relation_type=ref`) | Yes (read-only) | Parent's CRUD → child's READ only |
 
 Key semantics:
 
 - **Guarded** is not an edge — it represents the absence of a relationship. A's permissions are independent of B's. B requires its own Root Query with its own RBAC check. No GQL sub-field exists between them.
-- **Auto** edges are stored per-instance in `association_scopes_entities` with `relation_type=auto`. If you have CRUD on parent A, you have CRUD on child B. No separate permission check needed for B. The parent can list and mutate its auto children.
+- **Auto** edges are stored per-instance in `association_scopes_entities` with `relation_type=auto`. The role's permissions flow through the edge — which specific operations are allowed is determined by the role, not the edge type. No separate RBAC check is needed for traversal.
 - **Ref** edges are stored per-instance in `association_scopes_entities` with `relation_type=ref`. If you have CRUD on parent A, you get READ-only on child B. CUD on B is not permitted via this path. The parent can list its ref children, but no permission delegation occurs. Further traversal from B requires a separate guarded-level permission check.
 - A `RelationType` enum (`auto`, `ref`) is defined in code. The `association_scopes_entities` table includes a `relation_type` column to distinguish auto from ref edges.
 
@@ -70,26 +70,11 @@ Key semantics:
 - **Reference Type (separate GQL types for ref entities)**: Rejected. Ref entities expose all fields.
 - **Denormalization (flat fields)**: Rejected. Increases maintenance burden.
 
-### Guarded Root Query Targets
-
-Guarded entities are entry points for Root Queries. RBAC permission checks are performed at this level.
-
-| Scope | Guarded Targets |
-|-------|----------------|
-| User | Session, VFolder, Endpoint, KeyPair, NotificationChannel |
-| Project | Session, VFolder, Endpoint, Network, ResourceGroup, ContainerRegistry, StorageHost, Artifact, SessionTemplate |
-| Domain | User, Project, Network, ResourceGroup, ContainerRegistry, StorageHost, AppConfig |
-
-**Superadmin-only (no scope context):**
-- DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
-
-Since guarded means no edge relationship, there is no "Guarded Edges" diagram. Each guarded entity is independently queried at the Root Query level with its own RBAC check.
-
 ### Auto Edges
 
 Auto edges represent composition relationships with **permission delegation** via `association_scopes_entities`. If A ━━auto━━► B:
 
-- A's CRUD permissions are inherited by B (full CRUD delegation).
+- The role's permissions flow through the edge to B. Which operations are permitted on B is determined by the role, not the edge type.
 - No separate RBAC check is needed for B.
 - B appears as a GQL sub-field of A.
 
@@ -152,51 +137,25 @@ NotificationRule ──ref──► User (created_by)
 
 ### Key Principles
 
-1. **RBAC checks at Root Query only.** After the entry point, `auto`/`ref`/unregistered determines traversal scope.
-2. **Relationship type is an edge property, not an entity property.** The same entity can have different roles depending on the entry path. For example, Agent is `auto` from ResourceGroup but `ref` from Session/Kernel. An entity does not inherently "know" whether it is auto or ref — the parent→child edge determines this.
-3. **Auto-only entities have no standalone root query.** They are always accessed through their parent.
-4. **RBAC/Visibility separation.** RBAC validates scope + operation. Visibility is resolver-level business logic.
-
-### Resolver Traversal Context
-
-Since relationship type is an edge property, the GQL resolver for a child entity does not inherently know whether it was reached via `auto` or `ref`. After a `ref` edge, further traversal requires a separate guarded-level permission check — the parent's authorization does not carry forward.
-
-Example — the same `Agent` entity behaves differently by entry path:
-
-```
-resourceGroup { agents { kernels { ... } } }
-  └─ auto ──► Agent ──► auto continues → Kernel accessible (CRUD inherited)
-
-session { agent { kernels { ... } } }
-  └─ ref ──► Agent (READ only) ──► further traversal requires separate permission check
-```
-
-To enforce this, the **parent resolver** (which owns the edge metadata) must propagate a traversal context to downstream resolvers. After a ref edge, the authorization context resets — any further access requires an independent permission check, equivalent to a guarded Root Query. The specific mechanism (e.g., resolver context flag, middleware decorator) is an implementation detail to be decided in Phase 2–3.
+1. **Unified edge storage.** `association_scopes_entities` is the single source of truth for all entity relationships, replacing scattered junction tables. It stores both permission delegation (`auto`) and visibility (`ref`) through the `relation_type` column.
+2. **Edge property, not entity property.** The relationship type is determined by the parent→child edge, not the entity itself. The same entity can be `auto` from one parent and `ref` from another (e.g., Agent is `auto` from ResourceGroup but `ref` from Session).
 
 ### Query Constraints
 
-#### Scope Inference
-
-| Scope | Implicit Inference | Method |
-|-------|--------------------|--------|
-| User | Yes | Viewer identity |
-| Domain | Yes | `viewer.domain` |
-| Project | **No** | Multiple project membership possible; `project_id` required |
-
-#### Root Query Enabled Entities (22 types)
+#### Root Query Enabled Entities
 
 These entities have standalone Root Queries with RBAC checks. Only these entities are stored in `association_scopes_entities` as scope→entity mappings.
 
-**Scoped (14 types):**
+**Scoped:**
 - SessionRow, VFolderRow, EndpointRow, KeyPairRow, NotificationChannelRow
 - NetworkRow, ScalingGroupRow, ContainerRegistryRow, StorageHostRow
 - ArtifactRow, SessionTemplateRow
 - UserRow, ProjectRow, AppConfigRow
 
-**Superadmin-only (8 types):**
+**Superadmin-only:**
 - DomainRow, ResourcePresetRow, UserResourcePolicyRow, KeyPairResourcePolicyRow, ProjectResourcePolicyRow, RoleRow, AuditLogRow, EventLogRow
 
-#### Auto-only Entities (22 types)
+#### Auto-only Entities
 
 No standalone single-item or list queries. Always accessed through parent:
 
@@ -224,6 +183,8 @@ No standalone single-item or list queries. Always accessed through parent:
 | DomainFairShareRow | Domain, ResourceGroup | `domain { fairShare }`, `resourceGroup { domainFairShares }` |
 | ProjectFairShareRow | Project, ResourceGroup | `project { fairShare }`, `resourceGroup { projectFairShares }` |
 | UserFairShareRow | User, ResourceGroup | `user { fairShare }`, `resourceGroup { userFairShares }` |
+| PermissionRow | Role | `role { permissions }` |
+| UserRoleRow | Role | `role { userRoles }` |
 
 ### Entities Outside RBAC Scope
 
@@ -244,7 +205,7 @@ The following entities are intentionally excluded from the 3-Type Model:
 StorageHost is a planned entity that does not yet exist as a DB table:
 
 - **Current state**: `VFolderRow.host` stores a `"proxy_name:volume_name"` string. `allowed_vfolder_hosts` is a JSON column scattered across Domain/Group/KeyPairResourcePolicy.
-- **Plan**: Normalize into a `StorageHostRow` DB table, unifying existing `ObjectStorageRow` and `VFSStorageRow`. Positioned like ContainerRegistry with Domain/Project scope guarded and N:N mapping.
+- **Plan**: Normalize into a `StorageHostRow` DB table, unifying existing `ObjectStorageRow` and `VFSStorageRow`. Positioned like ContainerRegistry as a root-query-enabled entity with N:N scope mapping via `association_scopes_entities`.
 
 ## Migration / Compatibility
 
@@ -258,14 +219,13 @@ StorageHost is a planned entity that does not yet exist as a DB table:
 
 Existing junction tables will be replaced by `association_scopes_entities`:
 
-| Current Table | Replacement |
-|--------------|-------------|
-| `AssociationContainerRegistriesGroupsRow` | `association_scopes_entities` (ContainerRegistry, Project scope) |
-| `ScalingGroupForDomainRow` | `association_scopes_entities` (ResourceGroup, Domain scope) |
-| `ScalingGroupForProjectRow` | `association_scopes_entities` (ResourceGroup, Project scope) |
-| `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) |
-
-`AssocGroupUserRow` (project membership) remains separate as it serves Visibility logic only, not RBAC.
+| Current Table | Replacement | `relation_type` |
+|--------------|-------------|-----------------|
+| `AssociationContainerRegistriesGroupsRow` | `association_scopes_entities` (ContainerRegistry, Project scope) | `auto` |
+| `ScalingGroupForDomainRow` | `association_scopes_entities` (ResourceGroup, Domain scope) | `auto` |
+| `ScalingGroupForProjectRow` | `association_scopes_entities` (ResourceGroup, Project scope) | `auto` |
+| `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) | `auto` |
+| `AssocGroupUserRow` | `association_scopes_entities` (User, Project scope) | `ref` |
 
 ### Final RBAC Tables
 
@@ -295,7 +255,7 @@ After migration, the core RBAC tables are:
 
 3. **Phase 3: Root Query RBAC Enforcement**
    - Integrate guarded checks into Root Query resolvers
-   - Implement auto-traversal and ref-termination in nested resolvers
+   - Implement auto-traversal and ref auth context reset in nested resolvers
 
 4. **Phase 4: Association Table Migration**
    - Migrate existing junction tables to `association_scopes_entities`
