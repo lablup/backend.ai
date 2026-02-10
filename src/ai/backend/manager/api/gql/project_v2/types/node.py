@@ -38,14 +38,18 @@ if TYPE_CHECKING:
 class ProjectFairShareScopeGQL:
     """Scope parameters for filtering project fair shares."""
 
-    resource_group_name: str = strawberry.field(description="Resource group to filter fair shares by.")
+    resource_group_name: str = strawberry.field(
+        description="Resource group to filter fair shares by."
+    )
 
 
 @strawberry.input(name="ProjectUsageScope")
 class ProjectUsageScopeGQL:
     """Scope parameters for filtering project usage buckets."""
 
-    resource_group_name: str = strawberry.field(description="Resource group to filter usage buckets by.")
+    resource_group_name: str = strawberry.field(
+        description="Resource group to filter usage buckets by."
+    )
 
 
 @strawberry.federation.type(

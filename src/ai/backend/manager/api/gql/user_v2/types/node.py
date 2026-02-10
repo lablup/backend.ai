@@ -43,7 +43,9 @@ if TYPE_CHECKING:
 class UserFairShareScopeGQL:
     """Scope parameters for filtering user fair shares."""
 
-    resource_group_name: str = strawberry.field(description="Resource group to filter fair shares by.")
+    resource_group_name: str = strawberry.field(
+        description="Resource group to filter fair shares by."
+    )
     project_id: UUID = strawberry.field(
         description="Project ID that the user belongs to (required for user-level fair shares)."
     )
@@ -53,7 +55,9 @@ class UserFairShareScopeGQL:
 class UserUsageScopeGQL:
     """Scope parameters for filtering user usage buckets."""
 
-    resource_group_name: str = strawberry.field(description="Resource group to filter usage buckets by.")
+    resource_group_name: str = strawberry.field(
+        description="Resource group to filter usage buckets by."
+    )
     project_id: UUID = strawberry.field(
         description="Project ID that the user belongs to (required for user-level usage)."
     )
