@@ -116,7 +116,7 @@ class VfolderRepository:
         Returns VFolderData if user has access.
         Raises VFolderNotFound if vfolder doesn't exist or user has no access.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
@@ -150,7 +150,7 @@ class VfolderRepository:
         Get a VFolder by ID without validation.
         Returns VFolderData if found, None otherwise.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
@@ -231,7 +231,7 @@ class VfolderRepository:
         List all VFolders accessible to a user.
         Returns VFolderListResult with access information.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
             vfolder_dicts = await query_accessible_vfolders(
                 conn,
@@ -458,7 +458,7 @@ class VfolderRepository:
         """
         Get all permissions for a VFolder.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = sa.select(VFolderPermissionRow).where(
                 VFolderPermissionRow.vfolder == vfolder_id
             )
@@ -560,7 +560,7 @@ class VfolderRepository:
         """
         Get all invitations for a VFolder.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = sa.select(VFolderInvitationRow).where(
                 VFolderInvitationRow.vfolder == vfolder_id
             )
@@ -585,7 +585,7 @@ class VfolderRepository:
         """
         Count VFolders owned by a user (excluding hard deleted ones).
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(VFolderRow)
@@ -603,7 +603,7 @@ class VfolderRepository:
         Count VFolders owned by a group (excluding hard deleted ones).
         """
 
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(VFolderRow)
@@ -628,7 +628,7 @@ class VfolderRepository:
         Check if a VFolder with the given name already exists for the user.
         """
 
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             # Use query_accessible_vfolders to check accessible folders
             extra_vf_conds = sa.and_(
                 (VFolderRow.name == name),
@@ -653,7 +653,7 @@ class VfolderRepository:
         Get user role and domain name for a user.
         Returns (role, domain_name) or None if user not found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
                 return None
@@ -667,7 +667,7 @@ class VfolderRepository:
         Get user email by user ID.
         Returns email or None if user not found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
                 return None
@@ -679,7 +679,7 @@ class VfolderRepository:
         Get user info for multiple user IDs.
         Returns list of (user_id, email) tuples.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             result = await session.execute(sa.select(UserRow).where(UserRow.uuid.in_(user_ids)))
             user_rows = result.scalars().all()
             return [(row.uuid, row.email) for row in user_rows]
@@ -693,7 +693,7 @@ class VfolderRepository:
         Returns (group_uuid, max_vfolder_count, max_quota_scope_size, group_type) or None.
         """
 
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             if isinstance(group_id_or_name, str):
                 query = (
                     sa.select(GroupRow)
@@ -732,7 +732,7 @@ class VfolderRepository:
         Get user resource information.
         Returns (max_vfolder_count, max_quota_scope_size, container_uid) or None.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = (
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_id)
@@ -848,7 +848,7 @@ class VfolderRepository:
         Check if any of the users already have permission for the vfolder.
         Returns True if any user already has permission.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             # Check direct permissions and ownership
             j = sa.join(
                 VFolderPermissionRow, VFolderRow, VFolderRow.id == VFolderPermissionRow.vfolder
@@ -875,7 +875,7 @@ class VfolderRepository:
         Get user info by email.
         Returns (user_id, domain_name) or None if user not found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
             if not user_row:
                 return None
@@ -889,7 +889,7 @@ class VfolderRepository:
         Get user info for multiple emails.
         Returns list of (user_id, email) tuples.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             result = await session.execute(sa.select(UserRow).where(UserRow.email.in_(emails)))
             user_rows = result.scalars().all()
             return [(row.uuid, row.email) for row in user_rows]
@@ -900,7 +900,7 @@ class VfolderRepository:
         Count VFolders with the given name accessible to the user.
         Used to check for duplicates when accepting invitations.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             j = sa.join(
                 VFolderRow,
                 VFolderPermissionRow,
@@ -932,7 +932,7 @@ class VfolderRepository:
         Check if a pending invitation already exists.
         Returns True if a pending invitation exists.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = (
                 sa.select(sa.func.count())
                 .select_from(VFolderInvitationRow)
@@ -978,7 +978,7 @@ class VfolderRepository:
         Get invitation by ID.
         Returns VFolderInvitationData or None if not found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             query = sa.select(VFolderInvitationRow).where(
                 (VFolderInvitationRow.id == invitation_id)
                 & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
@@ -1061,7 +1061,7 @@ class VfolderRepository:
         Get all pending invitations for a user with VFolder info.
         Returns list of (invitation_data, vfolder_data) tuples.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
             )
@@ -1112,7 +1112,7 @@ class VfolderRepository:
         """
         Ensure that the user has the required permission on the specified vfolder host.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             # Get connection from session
             conn = await session.connection()
             await ensure_host_permission_allowed(
