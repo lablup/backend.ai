@@ -39,6 +39,7 @@ from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
+from ai.backend.manager.repositories.resource_slot.repositories import ResourceSlotRepositories
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
     ResourceUsageHistoryRepositories,
 )
@@ -81,6 +82,7 @@ class Repositories:
     project_resource_policy: ProjectResourcePolicyRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
+    resource_slot: ResourceSlotRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
     scheduler: SchedulerRepositories
@@ -118,6 +120,7 @@ class Repositories:
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
+        resource_slot_repositories = ResourceSlotRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
@@ -154,6 +157,7 @@ class Repositories:
             project_resource_policy=project_resource_policy_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
+            resource_slot=resource_slot_repositories,
             resource_usage_history=resource_usage_history_repositories,
             scaling_group=scaling_group_repositories,
             scheduler=scheduler_repositories,

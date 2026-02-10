@@ -71,8 +71,8 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
-    used: Mapped[Decimal | None] = mapped_column(
-        "used", sa.Numeric(precision=24, scale=6), nullable=True
+    used: Mapped[Decimal] = mapped_column(
+        "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -138,6 +138,11 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
         sa.DateTime(timezone=True),
         nullable=True,
     )
+    free_at: Mapped[datetime | None] = mapped_column(
+        "free_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -153,4 +158,10 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
         ),
         sa.Index("ix_resource_allocations_slot_name", "slot_name"),
         sa.Index("ix_ra_kernel_slot", "kernel_id", "slot_name"),
+        sa.Index(
+            "ix_ra_occupied",
+            "kernel_id",
+            "slot_name",
+            postgresql_where=sa.text("free_at IS NULL"),
+        ),
     )

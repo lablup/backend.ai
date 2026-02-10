@@ -1137,6 +1137,18 @@ class ResourceSlot(UserDict[str, Decimal]):
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
 
 
+@dataclass(frozen=True)
+class SlotQuantity:
+    """A single resource slot entry with slot name and quantity.
+
+    Represents one (slot_name, quantity) pair as a list-friendly alternative
+    to ResourceSlot (UserDict).
+    """
+
+    slot_name: str
+    quantity: Decimal
+
+
 class ResourceSlotState(enum.StrEnum):
     OCCUPIED = "occupied"
     AVAILABLE = "available"

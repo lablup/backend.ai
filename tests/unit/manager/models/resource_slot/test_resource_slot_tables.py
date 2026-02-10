@@ -242,7 +242,7 @@ class TestAgentResourceRow:
             assert row is not None
             assert row.capacity == half_cpu
 
-    async def test_used_nullable(
+    async def test_used_default_zero(
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
@@ -257,7 +257,6 @@ class TestAgentResourceRow:
                     agent_id=agent_id,
                     slot_name="cpu",
                     capacity=Decimal("4"),
-                    used=None,
                 )
             )
             await db_sess.flush()
@@ -265,7 +264,7 @@ class TestAgentResourceRow:
         async with database_with_resource_slot_tables.begin_session() as db_sess:
             row = await db_sess.get(AgentResourceRow, (agent_id, "cpu"))
             assert row is not None
-            assert row.used is None
+            assert row.used == Decimal("0")
 
     async def test_fk_constraint_on_slot_name(
         self,
