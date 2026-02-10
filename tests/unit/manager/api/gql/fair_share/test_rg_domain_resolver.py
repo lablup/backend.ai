@@ -89,7 +89,7 @@ class TestRGDomainFairShare:
         assert result is not None
         assert isinstance(result, DomainFairShareGQL)
         assert result.domain_name == "test-domain"
-        assert result.resource_group == "default"
+        assert result.resource_group_name == "default"
 
     @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
