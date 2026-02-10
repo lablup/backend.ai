@@ -6,6 +6,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelReplicaData,
     ModelRevisionData,
@@ -13,9 +15,17 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.deployment.options import (
+    AccessTokenConditions,
+    AutoScalingRuleConditions,
     DeploymentConditions,
     RevisionConditions,
     RouteConditions,
+)
+from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
+    SearchAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
+    SearchAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -144,3 +154,45 @@ async def load_replicas_by_ids(
 
     replica_map = {replica.id: replica for replica in action_result.data}
     return [replica_map.get(replica_id) for replica_id in replica_ids]
+
+
+async def load_auto_scaling_rules_by_ids(
+    processor: DeploymentProcessors,
+    rule_ids: Sequence[uuid.UUID],
+) -> list[ModelDeploymentAutoScalingRuleData | None]:
+    """Batch load auto-scaling rules by their IDs."""
+    if not rule_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=OffsetPagination(limit=len(rule_ids)),
+        conditions=[AutoScalingRuleConditions.by_ids(rule_ids)],
+    )
+
+    action_result = await processor.search_auto_scaling_rules.wait_for_complete(
+        SearchAutoScalingRulesAction(querier=querier)
+    )
+
+    rule_map = {rule.id: rule for rule in action_result.data}
+    return [rule_map.get(rule_id) for rule_id in rule_ids]
+
+
+async def load_access_tokens_by_ids(
+    processor: DeploymentProcessors,
+    token_ids: Sequence[uuid.UUID],
+) -> list[ModelDeploymentAccessTokenData | None]:
+    """Batch load access tokens by their IDs."""
+    if not token_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=OffsetPagination(limit=len(token_ids)),
+        conditions=[AccessTokenConditions.by_ids(token_ids)],
+    )
+
+    action_result = await processor.search_access_tokens.wait_for_complete(
+        SearchAccessTokensAction(querier=querier)
+    )
+
+    token_map = {token.id: token for token in action_result.data}
+    return [token_map.get(token_id) for token_id in token_ids]

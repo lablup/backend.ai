@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Self
 
@@ -159,6 +160,19 @@ class ImageTagEntryGQL:
 class ImageAliasGQL(Node):
     id: NodeID[uuid.UUID]
     alias: str = strawberry.field(description="The alias string for the image.")
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.image_alias_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_data(cls, data: ImageAliasData) -> Self:
@@ -376,6 +390,19 @@ class ImageV2GQL(Node):
             last=last,
             base_conditions=base_conditions,
         )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.image_loader.load_many([
+            ImageID(uuid.UUID(nid)) for nid in node_ids
+        ])
+        return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_data(

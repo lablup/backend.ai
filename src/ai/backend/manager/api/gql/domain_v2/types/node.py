@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
@@ -14,6 +15,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketFilter,
     DomainUsageBucketOrderBy,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .nested import (
     DomainBasicInfoGQL,
@@ -233,6 +235,17 @@ class DomainV2GQL(Node):
             limit=limit,
             offset=offset,
         )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.domain_loader.load_many(node_ids)
+        return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_data(

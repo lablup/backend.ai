@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self
@@ -439,6 +439,19 @@ class AgentV2GQL(Node):
             offset=offset,
             base_conditions=[KernelConditions.by_agent_id(str(self._agent_id))],
         )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.agent_loader.load_many([
+            AgentId(nid) for nid in node_ids
+        ])
+        return [cls.from_agent_detail_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import datetime
 from typing import cast
 
@@ -41,6 +42,13 @@ class SessionSchedulingHistoryConditions:
             if spec.negated:
                 return SessionSchedulingHistoryRow.id.notin_(spec.values)
             return SessionSchedulingHistoryRow.id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.id.in_(ids)
 
         return inner
 
@@ -510,6 +518,13 @@ class DeploymentHistoryConditions:
         return inner
 
     @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
     def by_deployment_id(deployment_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentHistoryRow.deployment_id == deployment_id
@@ -857,6 +872,13 @@ class RouteHistoryConditions:
             if spec.negated:
                 return RouteHistoryRow.id.notin_(spec.values)
             return RouteHistoryRow.id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.id.in_(ids)
 
         return inner
 
