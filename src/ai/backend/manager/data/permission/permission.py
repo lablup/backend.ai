@@ -9,7 +9,6 @@ from .types import EntityType, OperationType, ScopeType
 
 @dataclass
 class PermissionCreator:
-    permission_group_id: uuid.UUID
     entity_type: EntityType
     operation: OperationType
 
@@ -17,7 +16,6 @@ class PermissionCreator:
 @dataclass
 class PermissionData:
     id: uuid.UUID
-    permission_group_id: uuid.UUID
     entity_type: EntityType
     operation: OperationType
 

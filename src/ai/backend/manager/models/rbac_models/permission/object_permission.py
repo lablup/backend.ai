@@ -112,7 +112,6 @@ class ObjectPermissionRow(Base):  # type: ignore[misc]
         return cls(
             id=row.id,
             role_id=row.role_id,
-            permission_group_id=row.permission_group_id,
             entity_type=row.entity_type,
             entity_id=row.entity_id,
             operation=row.operation,
@@ -122,7 +121,6 @@ class ObjectPermissionRow(Base):  # type: ignore[misc]
         return ObjectPermissionData(
             id=self.id,
             role_id=self.role_id,
-            permission_group_id=self.permission_group_id,
             object_id=self.object_id(),
             operation=self.operation,
         )

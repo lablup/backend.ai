@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
 from ai.backend.common.exception import BackendAIError
@@ -18,10 +18,6 @@ from ai.backend.manager.data.permission.object_permission import (
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     ScopedPermissionListResult,
-)
-from ai.backend.manager.data.permission.permission_group import (
-    PermissionGroupData,
-    PermissionGroupListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -44,7 +40,6 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
@@ -53,7 +48,6 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
-    PermissionGroupSearchScope,
     ScopedPermissionSearchScope,
 )
 
@@ -93,25 +87,6 @@ class PermissionControllerRepository:
         """
         role_row = await self._db_source.create_role(input_data)
         return role_row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def create_permission_group(
-        self,
-        creator: Creator[PermissionGroupRow],
-        permissions: Sequence[Creator[PermissionRow]] = tuple(),
-    ) -> PermissionGroupData:
-        """
-        Create a new permission group in the database.
-
-        Args:
-            creator: Permission group creator defining the group to create
-            permissions: Optional sequence of permission creators to add to the group
-
-        Returns:
-            Created permission group data.
-        """
-        row = await self._db_source.create_permission_group(creator, permissions)
-        return row.to_data()
 
     @permission_controller_repository_resilience.apply()
     async def create_permission(
@@ -212,21 +187,12 @@ class PermissionControllerRepository:
     async def check_permission_of_entity(self, data: SingleEntityPermissionCheckInput) -> bool:
         target_object_id = data.target_object_id
         roles = await self._db_source.get_user_roles(data.user_id)
-        associated_scopes = await self._db_source.get_entity_mapped_scopes(target_object_id)
-        associated_scopes_set = {row.parsed_scope_id() for row in associated_scopes}
         for role in roles:
             for object_perm in role.object_permission_rows:
                 if object_perm.operation != data.operation:
                     continue
                 if object_perm.object_id() == target_object_id:
                     return True
-
-            for permission_group in role.permission_group_rows:
-                if permission_group.parsed_scope_id() not in associated_scopes_set:
-                    continue
-                for permission in permission_group.permission_rows:
-                    if permission.operation == data.operation:
-                        return True
         return False
 
     @permission_controller_repository_resilience.apply()
@@ -255,15 +221,6 @@ class PermissionControllerRepository:
     ) -> RoleListResult:
         """Searches roles with pagination and filtering."""
         return await self._db_source.search_roles(querier=querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_permission_groups(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionGroupSearchScope | None = None,
-    ) -> PermissionGroupListResult:
-        """Searches permission groups (scopes) with pagination and filtering."""
-        return await self._db_source.search_permission_groups(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_scoped_permissions(

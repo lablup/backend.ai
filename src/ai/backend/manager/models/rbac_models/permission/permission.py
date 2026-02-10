@@ -58,7 +58,6 @@ class PermissionRow(Base):  # type: ignore[misc]
     @classmethod
     def from_input(cls, input: PermissionCreator) -> Self:
         return cls(
-            permission_group_id=input.permission_group_id,
             entity_type=input.entity_type,
             operation=input.operation,
         )
@@ -66,7 +65,6 @@ class PermissionRow(Base):  # type: ignore[misc]
     def to_data(self) -> PermissionData:
         return PermissionData(
             id=self.id,
-            permission_group_id=self.permission_group_id,
             entity_type=self.entity_type,
             operation=self.operation,
         )

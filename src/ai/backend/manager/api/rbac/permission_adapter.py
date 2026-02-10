@@ -33,7 +33,6 @@ class PermissionAdapter:
         """Convert PermissionData to PermissionDTO."""
         return PermissionDTO(
             id=data.id,
-            permission_group_id=data.permission_group_id,
             entity_type=data.entity_type,
             operation=data.operation,
         )
@@ -43,7 +42,6 @@ class PermissionAdapter:
         """Convert CreatePermissionRequest to CreatePermissionAction."""
         creator = Creator(
             spec=PermissionCreatorSpec(
-                permission_group_id=request.permission_group_id,
                 entity_type=request.entity_type,
                 operation=request.operation,
             )

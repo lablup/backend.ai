@@ -9,10 +9,6 @@ from .search_object_permissions import (
     SearchObjectPermissionsAction,
     SearchObjectPermissionsActionResult,
 )
-from .search_permission_groups import (
-    SearchPermissionGroupsAction,
-    SearchPermissionGroupsActionResult,
-)
 from .search_roles import SearchRolesAction, SearchRolesActionResult
 from .search_scoped_permissions import (
     SearchScopedPermissionsAction,
@@ -45,8 +41,6 @@ __all__ = [
     "RevokeRoleActionResult",
     "SearchObjectPermissionsAction",
     "SearchObjectPermissionsActionResult",
-    "SearchPermissionGroupsAction",
-    "SearchPermissionGroupsActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
     "SearchScopedPermissionsAction",
