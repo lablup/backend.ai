@@ -34,7 +34,7 @@ This proposal introduces an **Entity Relationship Model** that classifies all en
 
 Entity visibility is currently handled per-entity:
 
-- **ScalingGroup**: Uses separate junction tables (`sgroups_for_domains`, `sgroups_for_groups`, `sgroups_for_keypairs`) to determine which scaling groups are visible to which scopes.
+- **ResourceGroup**: Uses separate junction tables (`sgroups_for_domains`, `sgroups_for_groups`, `sgroups_for_keypairs`) to determine which resource groups are visible to which scopes.
 - **ContainerRegistry**: Uses `association_container_registries_groups` junction table for project-level visibility.
 - **VFolder**: Uses `vfolder_permissions` and `vfolder_invitations` for sharing.
 - **Session/Kernel/Agent**: Visibility determined by ad-hoc query joins.
@@ -76,8 +76,8 @@ Guarded entities are entry points for Root Queries. RBAC permission checks are p
 | Scope | Guarded Targets |
 |-------|----------------|
 | User | Session, VFolder, Endpoint, KeyPair, NotificationChannel |
-| Project | Session, VFolder, Endpoint, Network, ScalingGroup, ContainerRegistry, StorageHost, Artifact, SessionTemplate |
-| Domain | User, Project, Network, ScalingGroup, ContainerRegistry, StorageHost, AppConfig |
+| Project | Session, VFolder, Endpoint, Network, ResourceGroup, ContainerRegistry, StorageHost, Artifact, SessionTemplate |
+| Domain | User, Project, Network, ResourceGroup, ContainerRegistry, StorageHost, AppConfig |
 | Global | Domain, ResourcePreset, ResourcePolicy, AuditLog, EventLog |
 
 ### Auto Edges
@@ -89,7 +89,7 @@ Session ━━auto━━► Kernel
 Session ━━auto━━► Routing
 Session ━━auto━━► SessionDependency
 Session ━━auto━━► SessionSchedulingHistory
-ScalingGroup ━━auto━━► Agent ━━auto━━► Kernel
+ResourceGroup ━━auto━━► Agent ━━auto━━► Kernel
 ContainerRegistry ━━auto━━► Image ━━auto━━► ImageAlias
 VFolder ━━auto━━► VFolderPermission
 VFolder ━━auto━━► VFolderInvitation
@@ -104,6 +104,9 @@ Artifact ━━auto━━► ArtifactRevision
 NotificationChannel ━━auto━━► NotificationRule
 Kernel ━━auto━━► KernelSchedulingHistory
 Routing ━━auto━━► RouteHistory
+ResourceGroup ━━auto━━► DomainFairShare
+ResourceGroup ━━auto━━► ProjectFairShare
+ResourceGroup ━━auto━━► UserFairShare
 Domain ━━auto━━► DomainFairShare
 Project ━━auto━━► ProjectFairShare
 User ━━auto━━► UserFairShare
@@ -116,7 +119,7 @@ Role ━━auto━━► UserRole
 Ref edges represent read-only references. All fields of the referenced entity are readable, but traversal terminates — no further edges are followed from a ref target.
 
 ```
-Session ──ref──► Agent, ScalingGroup, KeyPair
+Session ──ref──► Agent, ResourceGroup, KeyPair
 Kernel ──ref──► Image, Agent
 Routing ──ref──► Endpoint (from Session), Session (from Endpoint)
 VFolderPermission ──ref──► User
@@ -135,7 +138,7 @@ NotificationRule ──ref──► User (created_by)
 ### Key Principles
 
 1. **RBAC checks at Root Query only.** After the entry point, `auto`/`ref`/unregistered determines traversal scope.
-2. **Relationship type is an edge property, not an entity property.** The same entity can have different roles depending on the entry path. For example, Agent is `auto` from ScalingGroup but `ref` from Session/Kernel. An entity does not inherently "know" whether it is auto or ref — the parent→child edge determines this.
+2. **Relationship type is an edge property, not an entity property.** The same entity can have different roles depending on the entry path. For example, Agent is `auto` from ResourceGroup but `ref` from Session/Kernel. An entity does not inherently "know" whether it is auto or ref — the parent→child edge determines this.
 3. **Auto-only entities have no standalone root query.** They are always accessed through their parent.
 4. **RBAC/Visibility separation.** RBAC validates scope + operation. Visibility is resolver-level business logic.
 
@@ -146,7 +149,7 @@ Since relationship type is an edge property, the GQL resolver for a child entity
 Example — the same `Agent` entity behaves differently by entry path:
 
 ```
-scalingGroup { agents { kernels { ... } } }
+resourceGroup { agents { kernels { ... } } }
   └─ auto ──► Agent ──► auto continues → Kernel accessible
 
 session { agent { kernels { ... } } }
@@ -204,7 +207,7 @@ No standalone single-item or list queries. Always accessed through parent:
 | RoutingRow | Session, Endpoint | `session { routings }` |
 | SessionDependencyRow | Session | `session { dependencies }` |
 | SessionSchedulingHistoryRow | Session | `session { schedulingHistory }` |
-| AgentRow | ScalingGroup | `scalingGroup { agents }` |
+| AgentRow | ResourceGroup | `resourceGroup { agents }` |
 | ImageRow | ContainerRegistry | `containerRegistry { images }` |
 | ImageAliasRow | Image | `image { aliases }` |
 | VFolderPermissionRow | VFolder | `vfolder { permissions }` |
@@ -219,9 +222,9 @@ No standalone single-item or list queries. Always accessed through parent:
 | NotificationRuleRow | NotificationChannel | `notificationChannel { rules }` |
 | KernelSchedulingHistoryRow | Kernel | `kernel { schedulingHistory }` |
 | RouteHistoryRow | Routing | `routing { history }` |
-| DomainFairShareRow | Domain | `domain { fairShare }` |
-| ProjectFairShareRow | Project | `project { fairShare }` |
-| UserFairShareRow | User | `user { fairShare }` |
+| DomainFairShareRow | Domain, ResourceGroup | `domain { fairShare }`, `resourceGroup { domainFairShares }` |
+| ProjectFairShareRow | Project, ResourceGroup | `project { fairShare }`, `resourceGroup { projectFairShares }` |
+| UserFairShareRow | User, ResourceGroup | `user { fairShare }`, `resourceGroup { userFairShares }` |
 
 ### Entities Outside RBAC Scope
 
@@ -259,9 +262,9 @@ Existing junction tables will be replaced by `association_scopes_entities`:
 | Current Table | Replacement |
 |--------------|-------------|
 | `AssociationContainerRegistriesGroupsRow` | `association_scopes_entities` (ContainerRegistry, Project scope) |
-| `ScalingGroupForDomainRow` | `association_scopes_entities` (ScalingGroup, Domain scope) |
-| `ScalingGroupForProjectRow` | `association_scopes_entities` (ScalingGroup, Project scope) |
-| `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ScalingGroup, User scope) |
+| `ScalingGroupForDomainRow` | `association_scopes_entities` (ResourceGroup, Domain scope) |
+| `ScalingGroupForProjectRow` | `association_scopes_entities` (ResourceGroup, Project scope) |
+| `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) |
 
 `AssocGroupUserRow` (project membership) remains separate as it serves Visibility logic only, not RBAC.
 
