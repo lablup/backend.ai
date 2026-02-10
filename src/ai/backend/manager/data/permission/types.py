@@ -7,6 +7,7 @@ from ai.backend.common.data.permission.types import (
     EntityType,
     FieldType,
     OperationType,
+    RelationType,
     RoleSource,
     ScopeType,
 )
@@ -19,6 +20,7 @@ __all__ = (
     "EntityType",
     "FieldType",
     "OperationType",
+    "RelationType",
     "RoleSource",
     "ScopeData",
     "ScopeListResult",
