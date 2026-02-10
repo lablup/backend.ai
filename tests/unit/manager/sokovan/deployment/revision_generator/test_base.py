@@ -220,7 +220,6 @@ class TestLoadServiceDefinition:
         # When: Loading service definition
         result = await base_generator.load_service_definition(
             vfolder_id=vfolder_id,
-            model_definition_path=None,
             runtime_variant=test_case.runtime_variant,
         )
 
@@ -246,7 +245,6 @@ class TestLoadServiceDefinition:
         # When: Loading service definition
         result = await base_generator.load_service_definition(
             vfolder_id=vfolder_id,
-            model_definition_path=None,
             runtime_variant="vllm",
         )
 
@@ -788,7 +786,6 @@ class TestCompleteOverridePipeline:
         result = await base_generator.generate_revision(
             draft_revision=requested_revision,
             vfolder_id=vfolder_id,
-            model_definition_path="service-definition.toml",
             default_architecture=test_case.default_architecture,
         )
 
@@ -884,7 +881,6 @@ class TestDefinitionFileRequirement:
                 ),
             ),
             vfolder_id=vfolder_id,
-            model_definition_path=None,
         )
 
         # Then: Should succeed without requiring model definition
@@ -936,7 +932,6 @@ class TestDefinitionFileRequirement:
         result = await base_generator.generate_revision(
             draft_revision=draft_revision,
             vfolder_id=vfolder_id,
-            model_definition_path=None,
         )
 
         # Then: Should succeed using only API request values

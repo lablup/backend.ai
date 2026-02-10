@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -35,6 +35,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingGroupData,
     UserData,
 )
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -484,12 +485,20 @@ class ModelServingRepository:
                 return owner.uuid == user_id
 
     @model_serving_repository_resilience.apply()
-    async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> VFolderRow | None:
+    async def get_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> VFolderOwnershipType:
         """
-        Get VFolder by ID.
+        Get VFolder ownership type by VFolder ID.
+        Raises VFolderNotFound if vfolder not found by the given ID.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            return await VFolderRow.get(session, vfolder_id)
+            stmt = sa.select(VFolderRow.ownership_type).where(VFolderRow.id == vfolder_id)
+            result = await session.execute(stmt)
+            vfolder_ownership_type = result.scalar_one_or_none()
+
+            if vfolder_ownership_type is None:
+                raise VFolderNotFound(f"VFolder with ID {vfolder_id} not found.")
+
+            return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
