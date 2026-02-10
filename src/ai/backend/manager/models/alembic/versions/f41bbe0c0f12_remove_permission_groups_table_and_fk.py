@@ -103,13 +103,19 @@ def downgrade() -> None:
         sa.text("""
         UPDATE object_permissions op
         SET permission_group_id = pg.id
-        FROM permission_groups pg
-        JOIN association_scopes_entities ase
-            ON pg.scope_type = ase.scope_type
-            AND pg.scope_id = ase.scope_id
-            AND ase.entity_type = op.entity_type
-            AND ase.entity_id = op.entity_id
-        WHERE pg.role_id = op.role_id
+        FROM permission_groups pg, association_scopes_entities ase
+        WHERE pg.scope_type = ase.scope_type
+          AND pg.scope_id = ase.scope_id
+          AND ase.entity_type = op.entity_type
+          AND ase.entity_id = op.entity_id
+          AND pg.role_id = op.role_id
+    """)
+    )
+
+    # Delete orphan object_permissions that couldn't be mapped to a permission_group
+    conn.execute(
+        sa.text("""
+        DELETE FROM object_permissions WHERE permission_group_id IS NULL
     """)
     )
 
