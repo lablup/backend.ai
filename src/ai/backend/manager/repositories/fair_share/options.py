@@ -38,6 +38,62 @@ class DomainFairShareConditions:
         return inner
 
     @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainFairShareRow.domain_name.like(f"%{domain_name}")
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
@@ -133,6 +189,62 @@ class ProjectFairShareConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectFairShareRow.domain_name.like(f"%{domain_name}")
 
         return inner
 
@@ -288,6 +400,62 @@ class UserFairShareConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserFairShareRow.domain_name.like(f"%{domain_name}")
 
         return inner
 

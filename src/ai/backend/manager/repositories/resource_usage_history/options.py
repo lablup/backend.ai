@@ -92,6 +92,62 @@ class DomainUsageBucketConditions:
         return inner
 
     @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.domain_name.like(f"%{domain_name}")
+
+        return inner
+
+    @staticmethod
     def by_period_range(start: date, end: date) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
@@ -225,6 +281,62 @@ class ProjectUsageBucketConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.domain_name.like(f"%{domain_name}")
 
         return inner
 
@@ -369,6 +481,62 @@ class UserUsageBucketConditions:
     def by_domain_name(domain_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.resource_group.like(f"%{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.resource_group == resource_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.resource_group.like(f"{resource_group}%")
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(resource_group: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.resource_group.like(f"%{resource_group}")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.domain_name.like(f"%{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.domain_name == domain_name
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.domain_name.like(f"{domain_name}%")
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(domain_name: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.domain_name.like(f"%{domain_name}")
 
         return inner
 
