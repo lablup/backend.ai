@@ -6,7 +6,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -91,34 +91,6 @@ class PermissionDBSource:
             # 1. Create role
             result = await execute_creator(db_session, input_data.creator)
             role_row = result.row
-            role_id = role_row.id
-
-            # 2. Create permission groups with their nested permissions
-            for group_input in input_data.permission_groups:
-                group_creator_input = group_input.to_input(role_id)
-                # 2-1. Create permission group
-                group_creator = Creator(
-                    spec=PermissionGroupCreatorSpec(
-                        role_id=group_creator_input.role_id,
-                        scope_id=group_creator_input.scope_id,
-                        permissions=group_creator_input.permissions,
-                    )
-                )
-                group_row = await self._add_permission_group(db_session, group_creator)
-
-                # 2-2. Create nested permissions
-                for perm_input in group_creator_input.permissions:
-                    perm_creator = Creator(
-                        spec=PermissionCreatorSpec(
-                            permission_group_id=group_row.id,
-                            role_id=role_id,
-                            scope_type=group_row.scope_type,
-                            scope_id=group_row.scope_id,
-                            entity_type=perm_input.entity_type,
-                            operation=perm_input.operation,
-                        )
-                    )
-                    await self._add_permission_to_group(db_session, perm_creator)
 
             await db_session.refresh(role_row)
             return role_row
@@ -137,7 +109,7 @@ class PermissionDBSource:
             Created permission row
         """
         async with self._db.begin_session() as db_session:
-            perm_row = await self._add_permission(db_session, creator)
+            perm_row = await self._add_permission_to_group(db_session, creator)
             await db_session.refresh(perm_row)
             return perm_row
 
@@ -209,62 +181,6 @@ class PermissionDBSource:
     # ============================================================
     # Private Helper Functions (for use within transactions)
     # ============================================================
-
-    async def _add_permission_group_to_role(
-        self,
-        db_session: SASession,
-        pg_creator: PermissionGroupCreator,
-    ) -> PermissionGroupRow:
-        """Add a permission group with its permissions to a role (private, within transaction).
-
-        Creates both the permission group and all its associated permissions
-        in a single transaction.
-        """
-
-        # Create permission group with permissions list
-        creator = Creator(
-            spec=PermissionGroupCreatorSpec(
-                role_id=pg_creator.role_id,
-                scope_id=pg_creator.scope_id,
-                permissions=pg_creator.permissions,
-            )
-        )
-        result = await execute_creator(db_session, creator)
-        pg_row = result.row
-
-        # Create nested permissions
-        for perm_input in pg_creator.permissions:
-            perm_creator = Creator(
-                spec=PermissionCreatorSpec(
-                    permission_group_id=pg_row.id,
-                    role_id=pg_row.role_id,
-                    scope_type=pg_row.scope_type,
-                    scope_id=pg_row.scope_id,
-                    entity_type=perm_input.entity_type,
-                    operation=perm_input.operation,
-                )
-            )
-            await self._add_permission_to_group(db_session, perm_creator)
-
-        return pg_row
-
-    async def _remove_permission_group_from_role(
-        self,
-        db_session: SASession,
-        purger: Purger[PermissionGroupRow],
-    ) -> None:
-        """Remove a permission group from a role (private, within transaction).
-
-        Also deletes all permissions in this group.
-        """
-        # Delete all permissions in this group
-        stmt_perms = sa.delete(PermissionRow).where(
-            PermissionRow.permission_group_id == purger.pk_value
-        )
-        await db_session.execute(stmt_perms)
-
-        # Delete the permission group using purger
-        await execute_purger(db_session, purger)
 
     async def _add_permission_to_group(
         self,
@@ -377,24 +293,14 @@ class PermissionDBSource:
             for scoped_perm_input in input_data.add_scoped_permissions:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
+                        role_id=input_data.role_id,
+                        scope_type=scoped_perm_input.scope_type,
+                        scope_id=scoped_perm_input.scope_id,
                         entity_type=scoped_perm_input.entity_type,
                         operation=scoped_perm_input.operation,
                     )
-                    pg_row = await self._add_permission_group(db_session, pg_creator)
-
-                # Add permissions to the permission group
-                for perm_input in perm_inputs:
-                    perm_creator = Creator(
-                        spec=PermissionCreatorSpec(
-                            permission_group_id=pg_row.id,
-                            role_id=pg_row.role_id,
-                            scope_type=pg_row.scope_type,
-                            scope_id=pg_row.scope_id,
-                            entity_type=perm_input.entity_type,
-                            operation=perm_input.operation,
-                        )
-                    )
-                    await self._add_permission_to_group(db_session, perm_creator)
+                )
+                await self._add_permission_to_group(db_session, perm_creator)
 
             # 2. Remove scoped permissions
             for perm_id in input_data.remove_scoped_permission_ids:
@@ -442,10 +348,6 @@ class PermissionDBSource:
                 .join(
                     ObjectPermissionRow,
                     RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .join(
-                    PermissionGroupRow,
-                    RoleRow.id == PermissionGroupRow.role_id,
                 )
                 .join(
                     PermissionRow,

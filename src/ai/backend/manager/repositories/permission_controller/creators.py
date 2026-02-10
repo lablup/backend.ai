@@ -51,7 +51,6 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
 class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     """CreatorSpec for permissions."""
 
-    permission_group_id: uuid.UUID
     role_id: uuid.UUID
     scope_type: ScopeType
     scope_id: str
@@ -61,7 +60,6 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     @override
     def build_row(self) -> PermissionRow:
         return PermissionRow(
-            permission_group_id=self.permission_group_id,
             role_id=self.role_id,
             scope_type=self.scope_type,
             scope_id=self.scope_id,

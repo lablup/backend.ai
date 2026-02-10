@@ -31,6 +31,8 @@ class ScopedPermissionSearchScope(SearchScope):
     role_id: uuid.UUID
 
     def to_condition(self) -> QueryCondition:
+        role_id = self.role_id
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.role_id == role_id
 

@@ -21,19 +21,10 @@ from ai.backend.manager.models.base import (
 
 class PermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "permissions"
-    __table_args__ = (
-        sa.Index("ix_id_permission_group_id", "id", "permission_group_id"),
-        sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
-    )
+    __table_args__ = (sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
-    permission_group_id: Mapped[uuid.UUID] = mapped_column(
-        "permission_group_id",
-        GUID,
-        sa.ForeignKey("permission_groups.id", ondelete="CASCADE"),
-        nullable=False,
     )
     role_id: Mapped[uuid.UUID] = mapped_column(
         "role_id",
@@ -54,7 +45,6 @@ class PermissionRow(Base):  # type: ignore[misc]
     @classmethod
     def from_input(cls, input: PermissionCreator) -> Self:
         return cls(
-            permission_group_id=input.permission_group_id,
             role_id=input.role_id,
             scope_type=input.scope_type,
             scope_id=input.scope_id,
@@ -65,7 +55,6 @@ class PermissionRow(Base):  # type: ignore[misc]
     def to_data(self) -> PermissionData:
         return PermissionData(
             id=self.id,
-            permission_group_id=self.permission_group_id,
             role_id=self.role_id,
             scope_type=self.scope_type,
             scope_id=self.scope_id,

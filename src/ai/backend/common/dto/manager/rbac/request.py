@@ -151,7 +151,6 @@ class SearchUsersAssignedToRoleRequest(BaseRequestModel):
 class CreatePermissionRequest(BaseRequestModel):
     """Request to create a permission."""
 
-    permission_group_id: UUID = Field(description="Permission group ID to add the permission to")
     role_id: UUID = Field(description="Role ID for the permission")
     scope_type: ScopeType = Field(description="Scope type for the permission")
     scope_id: str = Field(description="Scope ID for the permission")
