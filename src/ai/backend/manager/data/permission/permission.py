@@ -9,7 +9,6 @@ from .types import EntityType, OperationType, ScopeType
 
 @dataclass
 class PermissionCreator:
-    permission_group_id: uuid.UUID
     entity_type: EntityType
     operation: OperationType
 
@@ -17,18 +16,6 @@ class PermissionCreator:
 @dataclass
 class PermissionData:
     id: uuid.UUID
-    permission_group_id: uuid.UUID
-    entity_type: EntityType
-    operation: OperationType
-
-
-@dataclass
-class PermissionCreatorBeforePermissionGroupCreation:
-    """
-    Input for creating a permission before the permission group is created.
-    Used when creating permissions as part of permission group creation.
-    """
-
     entity_type: EntityType
     operation: OperationType
 

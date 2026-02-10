@@ -11,10 +11,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
-from ai.backend.manager.data.permission.permission_group import (
-    PermissionGroupCreator,
-    PermissionGroupData,
-)
 from ai.backend.manager.data.permission.role import (
     RoleData,
 )
@@ -29,7 +25,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -59,8 +55,7 @@ class RoleManager:
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
         role = await self._create_system_role(db_session, data)
-        permission_group = await self._create_permission_group(db_session, data, role)
-        await self._create_permissions(db_session, data, permission_group)
+        await self._create_permissions(db_session, data)
         return role
 
     async def _create_system_role(
@@ -76,30 +71,15 @@ class RoleManager:
         result = await execute_creator(db_session, creator)
         return result.row.to_data()
 
-    async def _create_permission_group(
-        self, db_session: SASession, data: ScopeSystemRoleData, role: RoleData
-    ) -> PermissionGroupData:
-        input = PermissionGroupCreator(
-            role_id=role.id,
-            scope_id=data.scope_id(),
-        )
-        row = PermissionGroupRow.from_input(input)
-        db_session.add(row)
-        await db_session.flush()
-        await db_session.refresh(row)
-        return row.to_data()
-
     async def _create_permissions(
         self,
         db_session: SASession,
         data: ScopeSystemRoleData,
-        permission_group: PermissionGroupData,
     ) -> list[PermissionData]:
         permission_rows: list[PermissionRow] = []
         for entity, operations in data.entity_operations().items():
             for operation in operations:
                 creator = PermissionCreator(
-                    permission_group_id=permission_group.id,
                     entity_type=entity,
                     operation=operation,
                 )
@@ -150,19 +130,19 @@ class RoleManager:
         entity_id: ObjectId,
         operations: Iterable[OperationType],
     ) -> list[ObjectPermissionData]:
-        permission_group = await db_session.scalar(
-            sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
+        role_row = await db_session.scalar(
+            sa.select(RoleRow)
+            .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+            .where(UserRoleRow.user_id == user_id)
         )
-        if permission_group is None:
-            raise ValueError(f"Permission group not found for user_id={user_id}")
-        role_id = permission_group.role_id
-        permission_group_id = permission_group.id
+        if role_row is None:
+            raise ValueError(f"Role not found for user_id={user_id}")
+        role_id = role_row.id
 
         creators = [
             Creator(
                 spec=ObjectPermissionCreatorSpec(
                     role_id=role_id,
-                    permission_group_id=permission_group_id,
                     entity_type=entity_id.entity_type,
                     entity_id=entity_id.entity_id,
                     operation=operation,
@@ -180,12 +160,14 @@ class RoleManager:
         user_id: uuid.UUID,
         entity_id: uuid.UUID,
     ) -> None:
-        permission_group = await db_session.scalar(
-            sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
+        role_row = await db_session.scalar(
+            sa.select(RoleRow)
+            .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+            .where(UserRoleRow.user_id == user_id)
         )
-        if permission_group is None:
-            raise ValueError(f"Permission group not found for user_id={user_id}")
-        role_id = permission_group.role_id
+        if role_row is None:
+            raise ValueError(f"Role not found for user_id={user_id}")
+        role_id = role_row.id
         await db_session.execute(
             sa.delete(ObjectPermissionRow).where(
                 sa.and_(

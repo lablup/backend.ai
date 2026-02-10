@@ -10,9 +10,6 @@ from .object_permission import (
     ObjectPermissionData,
 )
 from .permission import ScopedPermissionCreateInput
-from .permission_group import (
-    PermissionGroupExtendedData,
-)
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
@@ -55,7 +52,6 @@ class RoleDetailData:
     source: RoleSource
     status: RoleStatus
 
-    permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime

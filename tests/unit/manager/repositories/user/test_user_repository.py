@@ -29,7 +29,6 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
-    PermissionGroupRow,
     PermissionRow,
     RoleRow,
     UserRoleRow,
@@ -93,8 +92,7 @@ class TestUserRepository:
                 UserRoleRow,
                 UserRow,
                 RoleRow,  # RBAC role table
-                PermissionGroupRow,  # Depends on RoleRow
-                PermissionRow,  # Depends on PermissionGroupRow
+                PermissionRow,
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
                 KeyPairRow,
                 GroupRow,

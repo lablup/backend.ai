@@ -148,9 +148,8 @@ class SearchUsersAssignedToRoleRequest(BaseRequestModel):
 
 
 class CreatePermissionRequest(BaseRequestModel):
-    """Request to create a permission in a permission group."""
+    """Request to create a permission."""
 
-    permission_group_id: UUID = Field(description="Permission group ID to add the permission to")
     entity_type: EntityType = Field(description="Entity type for the permission")
     operation: OperationType = Field(description="Operation type for the permission")
 
@@ -159,9 +158,6 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     """Request to create an object permission for a role."""
 
     role_id: UUID = Field(description="Role ID to add the object permission to")
-    permission_group_id: UUID = Field(
-        description="Permission group ID to associate the object permission with"
-    )
     entity_type: EntityType = Field(description="Entity type for the object permission")
     entity_id: str = Field(description="Entity ID (e.g., project_id, user_id)")
     operation: OperationType = Field(description="Operation type for the object permission")

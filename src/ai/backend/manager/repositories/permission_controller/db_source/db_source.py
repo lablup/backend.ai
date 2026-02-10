@@ -6,7 +6,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import contains_eager, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.permission.entity import EntityData, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -15,13 +15,7 @@ from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionListResult,
 )
 from ai.backend.manager.data.permission.permission import (
-    ScopedPermissionCreateInput,
     ScopedPermissionListResult,
-)
-from ai.backend.manager.data.permission.permission_group import (
-    PermissionGroupCreator,
-    PermissionGroupCreatorBeforeRoleCreation,
-    PermissionGroupListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -49,7 +43,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
@@ -61,21 +54,18 @@ from ai.backend.manager.repositories.base.updater import Updater, execute_update
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     PermissionCreatorSpec,
-    PermissionGroupCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
-    PermissionGroupSearchScope,
     ScopedPermissionSearchScope,
 )
 
 
 @dataclass
 class CreateRoleInput:
-    """Input for creating a role with permission groups and object permissions."""
+    """Input for creating a role with object permissions."""
 
     creator: Creator[RoleRow]
-    permission_groups: Sequence[PermissionGroupCreatorBeforeRoleCreation]
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
 
 
@@ -87,90 +77,30 @@ class PermissionDBSource:
 
     async def create_role(self, input_data: CreateRoleInput) -> RoleRow:
         """
-        Create a new role with permission groups and object permissions.
+        Create a new role with object permissions.
 
         All related entities are created in a single transaction.
 
         Args:
-            input_data: Input containing creator, permission groups, and object permissions
+            input_data: Input containing creator and object permissions
 
         Returns:
             Created role row
         """
-        # TODO: Object permissions require a permission group for the scope they reference.
-        # When creating object permissions during role creation, the corresponding permission group
-        # for each object permission's scope MUST be included in `permission_groups`.
-        # This acts as a "guest permission group" providing scope visibility (see BEP-1012-main.md).
-        # Currently, ObjectPermissionCreateInputBeforeRoleCreation does not include scope_id,
-        # so the caller must ensure the correct permission group is provided in `permission_groups`.
-
         async with self._db.begin_session() as db_session:
             # 1. Create role
             result = await execute_creator(db_session, input_data.creator)
             role_row = result.row
-            role_id = role_row.id
-
-            # 2. Create permission groups with their nested permissions
-            for group_input in input_data.permission_groups:
-                group_creator_input = group_input.to_input(role_id)
-                # 2-1. Create permission group
-                group_creator = Creator(
-                    spec=PermissionGroupCreatorSpec(
-                        role_id=group_creator_input.role_id,
-                        scope_id=group_creator_input.scope_id,
-                        permissions=group_creator_input.permissions,
-                    )
-                )
-                group_row = await self._add_permission_group(db_session, group_creator)
-
-                # 2-2. Create nested permissions
-                for perm_input in group_creator_input.permissions:
-                    perm_creator = Creator(
-                        spec=PermissionCreatorSpec(
-                            permission_group_id=group_row.id,
-                            entity_type=perm_input.entity_type,
-                            operation=perm_input.operation,
-                        )
-                    )
-                    await self._add_permission_to_group(db_session, perm_creator)
 
             await db_session.refresh(role_row)
             return role_row
-
-    async def create_permission_group(
-        self,
-        creator: Creator[PermissionGroupRow],
-        permissions: Sequence[Creator[PermissionRow]] = tuple(),
-    ) -> PermissionGroupRow:
-        """
-        Create a permission group with its nested permissions.
-
-        All related entities are created in a single transaction.
-
-        Args:
-            creator: Permission group creator defining the group to create
-            permissions: Optional sequence of permission creators to add to the group
-
-        Returns:
-            Created permission group row
-        """
-        async with self._db.begin_session() as db_session:
-            # Create permission group
-            pg_row = await self._add_permission_group(db_session, creator)
-
-            # Create nested permissions
-            for perm_creator in permissions:
-                await self._add_permission_to_group(db_session, perm_creator)
-
-            await db_session.refresh(pg_row)
-            return pg_row
 
     async def create_permission(
         self,
         creator: Creator[PermissionRow],
     ) -> PermissionRow:
         """
-        Create a permission in a permission group.
+        Create a permission.
 
         Args:
             creator: Permission creator defining the permission to create
@@ -179,7 +109,7 @@ class PermissionDBSource:
             Created permission row
         """
         async with self._db.begin_session() as db_session:
-            perm_row = await self._add_permission_to_group(db_session, creator)
+            perm_row = await self._add_permission(db_session, creator)
             await db_session.refresh(perm_row)
             return perm_row
 
@@ -200,30 +130,6 @@ class PermissionDBSource:
             obj_perm_row = await self._add_object_permission_to_role(db_session, creator)
             await db_session.refresh(obj_perm_row)
             return obj_perm_row
-
-    async def delete_permission_group(
-        self,
-        purger: Purger[PermissionGroupRow],
-    ) -> PermissionGroupRow | None:
-        """
-        Delete a permission group and its nested permissions (cascade).
-
-        Args:
-            purger: Purger with permission group ID
-
-        Returns:
-            Deleted permission group row, or None if not found
-        """
-        async with self._db.begin_session() as db_session:
-            # Delete all permissions in this group first
-            stmt_perms = sa.delete(PermissionRow).where(
-                PermissionRow.permission_group_id == purger.pk_value
-            )
-            await db_session.execute(stmt_perms)
-
-            # Delete the permission group
-            result = await execute_purger(db_session, purger)
-            return result.row if result else None
 
     async def delete_permission(
         self,
@@ -272,155 +178,18 @@ class PermissionDBSource:
             raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
         return result
 
-    async def _find_permission_group_by_scope(
-        self,
-        db_session: SASession,
-        role_id: uuid.UUID,
-        scope_id: ScopeId,
-    ) -> PermissionGroupRow | None:
-        """
-        Find permission group by role_id and scope.
-
-        Used by update_role_permissions to find existing permission groups
-        before adding permissions. If not found, a new permission group should
-        be created.
-
-        Args:
-            db_session: Database session
-            role_id: Role ID
-            scope_id: Scope identifier (type + id)
-
-        Returns:
-            Permission group row if found, None otherwise
-        """
-        stmt = sa.select(PermissionGroupRow).where(
-            PermissionGroupRow.role_id == role_id,
-            PermissionGroupRow.scope_type == scope_id.scope_type,
-            PermissionGroupRow.scope_id == scope_id.scope_id,
-        )
-        return cast(PermissionGroupRow | None, await db_session.scalar(stmt))
-
-    async def _find_permission_groups_by_scopes(
-        self,
-        db_session: SASession,
-        role_id: uuid.UUID,
-        scope_ids: Sequence[ScopeId],
-    ) -> dict[ScopeId, PermissionGroupRow]:
-        """
-        Find multiple permission groups by role_id and scopes in a single query.
-
-        This is more efficient than calling _find_permission_group_by_scope
-        multiple times when updating multiple scopes.
-
-        Args:
-            db_session: Database session
-            role_id: Role ID
-            scope_ids: List of scope identifiers to look up
-
-        Returns:
-            Dictionary mapping scope_id to permission group row (only existing groups)
-        """
-        if not scope_ids:
-            return {}
-
-        # Build OR conditions for all scopes
-        scope_conditions = [
-            sa.and_(
-                PermissionGroupRow.scope_type == scope_id.scope_type,
-                PermissionGroupRow.scope_id == scope_id.scope_id,
-            )
-            for scope_id in scope_ids
-        ]
-
-        stmt = sa.select(PermissionGroupRow).where(
-            PermissionGroupRow.role_id == role_id,
-            sa.or_(*scope_conditions),
-        )
-
-        result = await db_session.execute(stmt)
-        pg_rows = result.scalars().all()
-
-        # Build mapping: ScopeId -> PermissionGroupRow
-        pg_map: dict[ScopeId, PermissionGroupRow] = {}
-        for pg_row in pg_rows:
-            scope_id = ScopeId(scope_type=pg_row.scope_type, scope_id=pg_row.scope_id)
-            pg_map[scope_id] = pg_row
-
-        return pg_map
-
     # ============================================================
     # Private Helper Functions (for use within transactions)
     # ============================================================
 
-    async def _add_permission_group_to_role(
-        self,
-        db_session: SASession,
-        pg_creator: PermissionGroupCreator,
-    ) -> PermissionGroupRow:
-        """Add a permission group with its permissions to a role (private, within transaction).
-
-        Creates both the permission group and all its associated permissions
-        in a single transaction.
-        """
-
-        # Create permission group with permissions list
-        creator = Creator(
-            spec=PermissionGroupCreatorSpec(
-                role_id=pg_creator.role_id,
-                scope_id=pg_creator.scope_id,
-                permissions=pg_creator.permissions,
-            )
-        )
-        result = await execute_creator(db_session, creator)
-        pg_row = result.row
-
-        # Create nested permissions
-        for perm_input in pg_creator.permissions:
-            perm_creator = Creator(
-                spec=PermissionCreatorSpec(
-                    permission_group_id=pg_row.id,
-                    entity_type=perm_input.entity_type,
-                    operation=perm_input.operation,
-                )
-            )
-            await self._add_permission_to_group(db_session, perm_creator)
-
-        return pg_row
-
-    async def _remove_permission_group_from_role(
-        self,
-        db_session: SASession,
-        purger: Purger[PermissionGroupRow],
-    ) -> None:
-        """Remove a permission group from a role (private, within transaction).
-
-        Also deletes all permissions in this group.
-        """
-        # Delete all permissions in this group
-        stmt_perms = sa.delete(PermissionRow).where(
-            PermissionRow.permission_group_id == purger.pk_value
-        )
-        await db_session.execute(stmt_perms)
-
-        # Delete the permission group using purger
-        await execute_purger(db_session, purger)
-
-    async def _add_permission_to_group(
+    async def _add_permission(
         self,
         db_session: SASession,
         creator: Creator[PermissionRow],
     ) -> PermissionRow:
-        """Add a permission to a permission group (private, within transaction)."""
+        """Add a permission (private, within transaction)."""
         result = await execute_creator(db_session, creator)
         return result.row
-
-    async def _remove_permission_from_group(
-        self,
-        db_session: SASession,
-        purger: Purger[PermissionRow],
-    ) -> None:
-        """Remove a permission from a permission group (private, within transaction)."""
-        await execute_purger(db_session, purger)
 
     async def _add_object_permission_to_role(
         self,
@@ -431,14 +200,13 @@ class PermissionDBSource:
         result = await execute_creator(db_session, creator)
         return result.row
 
-    async def _add_permission_group(
+    async def _remove_permission(
         self,
         db_session: SASession,
-        creator: Creator[PermissionGroupRow],
-    ) -> PermissionGroupRow:
-        """Add a permission group to a role (private, within transaction)."""
-        result = await execute_creator(db_session, creator)
-        return result.row
+        purger: Purger[PermissionRow],
+    ) -> None:
+        """Remove a permission (private, within transaction)."""
+        await execute_purger(db_session, purger)
 
     async def _remove_object_permission_from_role(
         self,
@@ -506,12 +274,7 @@ class PermissionDBSource:
         input_data: RolePermissionsUpdateInput,
     ) -> RoleRow:
         """
-        Update role permissions in batch using scope-based management.
-
-        For scoped permissions:
-        - Automatically finds or creates permission groups by (role_id, scope_type, scope_id)
-        - Groups permissions by scope to minimize database lookups
-        - All operations are performed in a single transaction
+        Update role permissions in batch.
 
         Args:
             input_data: Batch update input containing scoped and object permissions
@@ -527,58 +290,25 @@ class PermissionDBSource:
             role_row = await self._get_role(db_session, input_data.role_id)
 
             # 1. Add scoped permissions
-            # Group by scope to minimize permission group lookups
-            scoped_perms_by_scope: dict[ScopeId, list[ScopedPermissionCreateInput]] = {}
             for scoped_perm_input in input_data.add_scoped_permissions:
-                scope_id = scoped_perm_input.to_scope_id()
-                if scope_id not in scoped_perms_by_scope:
-                    scoped_perms_by_scope[scope_id] = []
-                scoped_perms_by_scope[scope_id].append(scoped_perm_input)
-
-            # Bulk fetch all permission groups for the scopes (performance optimization)
-            pg_map = await self._find_permission_groups_by_scopes(
-                db_session,
-                role_id=input_data.role_id,
-                scope_ids=list(scoped_perms_by_scope.keys()),
-            )
-
-            # For each scope, find or create permission group and add permissions
-            for scope_id, perm_inputs in scoped_perms_by_scope.items():
-                # Get existing permission group from bulk result
-                pg_row = pg_map.get(scope_id)
-
-                # Create permission group if not exists
-                if pg_row is None:
-                    pg_creator = Creator(
-                        spec=PermissionGroupCreatorSpec(
-                            role_id=input_data.role_id,
-                            scope_id=scope_id,
-                        )
+                perm_creator = Creator(
+                    spec=PermissionCreatorSpec(
+                        entity_type=scoped_perm_input.entity_type,
+                        operation=scoped_perm_input.operation,
                     )
-                    pg_row = await self._add_permission_group(db_session, pg_creator)
-
-                # Add permissions to the permission group
-                for perm_input in perm_inputs:
-                    perm_creator = Creator(
-                        spec=PermissionCreatorSpec(
-                            permission_group_id=pg_row.id,
-                            entity_type=perm_input.entity_type,
-                            operation=perm_input.operation,
-                        )
-                    )
-                    await self._add_permission_to_group(db_session, perm_creator)
+                )
+                await self._add_permission(db_session, perm_creator)
 
             # 2. Remove scoped permissions
             for perm_id in input_data.remove_scoped_permission_ids:
                 perm_purger = Purger(row_class=PermissionRow, pk_value=perm_id)
-                await self._remove_permission_from_group(db_session, perm_purger)
+                await self._remove_permission(db_session, perm_purger)
 
             # 3. Add object permissions
             for obj_perm_input in input_data.add_object_permissions:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        permission_group_id=obj_perm_input.permission_group_id,
                         entity_type=obj_perm_input.entity_type,
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
@@ -606,34 +336,20 @@ class PermissionDBSource:
 
     async def get_user_roles(self, user_id: uuid.UUID) -> list[RoleRow]:
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            j = (
-                sa.join(
-                    RoleRow,
-                    UserRoleRow,
-                    RoleRow.id == UserRoleRow.role_id,
-                )
-                .join(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .join(
-                    PermissionGroupRow,
-                    RoleRow.id == PermissionGroupRow.role_id,
-                )
-                .join(
-                    PermissionRow,
-                    PermissionGroupRow.id == PermissionRow.permission_group_id,
-                )
+            j = sa.join(
+                RoleRow,
+                UserRoleRow,
+                RoleRow.id == UserRoleRow.role_id,
+            ).join(
+                ObjectPermissionRow,
+                RoleRow.id == ObjectPermissionRow.role_id,
             )
             stmt = (
                 sa.select(RoleRow)
                 .select_from(j)
                 .where(UserRoleRow.user_id == user_id)
                 .options(
-                    contains_eager(RoleRow.permission_group_rows).options(
-                        contains_eager(PermissionGroupRow.permission_rows)
-                    ),
-                    contains_eager(RoleRow.object_permission_rows),
+                    selectinload(RoleRow.object_permission_rows),
                 )
             )
 
@@ -660,24 +376,15 @@ class PermissionDBSource:
         role_query = (
             sa.select(sa.func.exist())
             .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
-                .join(PermissionRow, PermissionGroupRow.id == PermissionRow.permission_group_id)
+                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
+                    PermissionRow, sa.literal(True)
+                )
             )
             .where(
                 sa.and_(
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
-                        PermissionGroupRow.scope_id == scope_id.scope_id,
-                    ),
                     PermissionRow.operation == operation,
-                )
-            )
-            .options(
-                contains_eager(RoleRow.permission_group_rows).options(
-                    selectinload(PermissionGroupRow.permission_rows)
                 )
             )
         )
@@ -695,10 +402,9 @@ class PermissionDBSource:
             sa.select(RoleRow)
             .select_from(
                 sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    PermissionGroupRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                    sa.literal(True),
                 )
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
@@ -707,18 +413,13 @@ class PermissionDBSource:
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
                     sa.or_(
-                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
                         AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                         ObjectPermissionRow.entity_id.in_(object_id_for_cond),
                     ),
                 )
             )
             .options(
-                contains_eager(RoleRow.permission_group_rows).options(
-                    contains_eager(PermissionGroupRow.mapped_entities),
-                    selectinload(PermissionGroupRow.permission_rows),
-                ),
-                contains_eager(RoleRow.object_permission_rows),
+                selectinload(RoleRow.object_permission_rows),
             )
         )
 
@@ -733,12 +434,11 @@ class PermissionDBSource:
             sa.select(RoleRow)
             .select_from(
                 sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
-                .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
                 .join(
                     AssociationScopesEntitiesRow,
-                    PermissionGroupRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                    sa.literal(True),
                 )
-                .join(PermissionRow, PermissionGroupRow.id == PermissionRow.permission_group_id)
+                .join(PermissionRow, sa.literal(True))
                 .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
             )
             .where(
@@ -747,7 +447,6 @@ class PermissionDBSource:
                     UserRoleRow.user_id == user_id,
                     sa.or_(
                         sa.and_(
-                            PermissionGroupRow.scope_type == ScopeType.GLOBAL,
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
@@ -762,11 +461,7 @@ class PermissionDBSource:
                 )
             )
             .options(
-                contains_eager(RoleRow.permission_group_rows).options(
-                    contains_eager(PermissionGroupRow.mapped_entities),
-                    contains_eager(PermissionGroupRow.permission_rows),
-                ),
-                contains_eager(RoleRow.object_permission_rows),
+                selectinload(RoleRow.object_permission_rows),
             )
         )
 
@@ -802,12 +497,6 @@ class PermissionDBSource:
                 for op in role.object_permission_rows:
                     object_id = op.object_id()
                     result[object_id] = True
-                for pg in role.permission_group_rows:
-                    if pg.scope_type == ScopeType.GLOBAL:
-                        return dict.fromkeys(object_ids, True)
-                    for object in pg.mapped_entities:
-                        object_id = object.object_id()
-                        result[object_id] = True
         return result
 
     async def search_roles(
@@ -816,18 +505,14 @@ class PermissionDBSource:
     ) -> RoleListResult:
         """Searches roles with pagination and filtering.
 
-        Uses LEFT JOIN with PermissionGroupRow and ObjectPermissionRow to support
-        scope-based and entity-based filtering. The JOINs are always performed to
+        Uses LEFT JOIN with ObjectPermissionRow to support
+        entity-based filtering. The JOIN is always performed to
         simplify the implementation, with distinct() used to prevent duplicates.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            # Build query with LEFT JOINs to support scope and entity filtering
+            # Build query with LEFT JOIN to support entity filtering
             query = (
                 sa.select(RoleRow)
-                .outerjoin(
-                    PermissionGroupRow,
-                    RoleRow.id == PermissionGroupRow.role_id,
-                )
                 .outerjoin(
                     ObjectPermissionRow,
                     RoleRow.id == ObjectPermissionRow.role_id,
@@ -844,31 +529,6 @@ class PermissionDBSource:
             items = [row.RoleRow.to_data() for row in result.rows]
 
             return RoleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_permission_groups(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionGroupSearchScope | None = None,
-    ) -> PermissionGroupListResult:
-        """Searches permission groups (scopes) with pagination and filtering."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(PermissionGroupRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scope,
-            )
-
-            items = [row.PermissionGroupRow.to_data() for row in result.rows]
-
-            return PermissionGroupListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -932,9 +592,6 @@ class PermissionDBSource:
                 sa.select(RoleRow)
                 .where(RoleRow.id == role_id)
                 .options(
-                    selectinload(RoleRow.permission_group_rows).selectinload(
-                        PermissionGroupRow.permission_rows
-                    ),
                     selectinload(RoleRow.object_permission_rows),
                 )
             )
@@ -1070,17 +727,7 @@ class PermissionDBSource:
         self,
         querier: BatchQuerier,
     ) -> EntityListResult:
-        """Search entities within a scope.
-
-        Queries the association_scopes_entities table for entity IDs matching
-        the conditions in the querier (scope_type, scope_id, entity_type).
-
-        Args:
-            querier: BatchQuerier with scope conditions and pagination settings.
-
-        Returns:
-            EntityListResult containing entity data
-        """
+        """Search entities within a scope."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(
                 AssociationScopesEntitiesRow.entity_id,

@@ -60,10 +60,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_object_perm
     SearchObjectPermissionsAction,
     SearchObjectPermissionsActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_permission_groups import (
-    SearchPermissionGroupsAction,
-    SearchPermissionGroupsActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
@@ -104,7 +100,6 @@ class PermissionControllerService:
         """
         input_data = CreateRoleInput(
             creator=action.creator,
-            permission_groups=action.permission_groups,
             object_permissions=action.object_permissions,
         )
         result = await self._repository.create_role(input_data)
@@ -196,18 +191,6 @@ class PermissionControllerService:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
         return SearchRolesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_permission_groups(
-        self, action: SearchPermissionGroupsAction
-    ) -> SearchPermissionGroupsActionResult:
-        """Search permission groups (scopes) with pagination and filtering."""
-        result = await self._repository.search_permission_groups(action.querier)
-        return SearchPermissionGroupsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

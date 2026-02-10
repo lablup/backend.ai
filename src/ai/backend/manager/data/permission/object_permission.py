@@ -31,7 +31,6 @@ class ObjectPermissionCreateInput:
     Used when adding object permissions to a role that already exists.
     """
 
-    permission_group_id: uuid.UUID
     entity_type: EntityType
     entity_id: str
     operation: OperationType
@@ -54,7 +53,6 @@ class ObjectPermissionDeleteInput:
 class ObjectPermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
-    permission_group_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
 

@@ -30,7 +30,6 @@ from ai.backend.manager.models.base import (
 
 if TYPE_CHECKING:
     from .permission.object_permission import ObjectPermissionRow
-    from .permission.permission_group import PermissionGroupRow
     from .user_role import UserRoleRow
 
 
@@ -44,12 +43,6 @@ def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
     from .permission.object_permission import ObjectPermissionRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
-
-
-def _get_permission_group_rows_join_condition() -> sa.ColumnElement[bool]:
-    from .permission.permission_group import PermissionGroupRow
-
-    return RoleRow.id == foreign(PermissionGroupRow.role_id)
 
 
 class RoleRow(Base):  # type: ignore[misc]
@@ -96,12 +89,6 @@ class RoleRow(Base):  # type: ignore[misc]
         primaryjoin=_get_object_permission_rows_join_condition,
         viewonly=True,
     )
-    permission_group_rows: Mapped[list[PermissionGroupRow]] = relationship(
-        "PermissionGroupRow",
-        back_populates="role_row",
-        primaryjoin=_get_permission_group_rows_join_condition,
-        viewonly=True,
-    )
 
     def to_data(self) -> RoleData:
         return RoleData(
@@ -126,6 +113,5 @@ class RoleRow(Base):  # type: ignore[misc]
             updated_at=self.updated_at or self.created_at,
             deleted_at=self.deleted_at,
             description=self.description,
-            permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

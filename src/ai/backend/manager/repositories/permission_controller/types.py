@@ -10,7 +10,6 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import BatchQuerierResult
@@ -26,42 +25,15 @@ class AssignedUserBatchQuerierResult(BatchQuerierResult[UserRow]):
 
 
 @dataclass(frozen=True)
-class PermissionGroupSearchScope(SearchScope):
-    """Scope for searching permission groups by role."""
-
-    role_id: uuid.UUID
-
-    def to_condition(self) -> QueryCondition:
-        role_id = self.role_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.role_id == role_id
-
-        return inner
-
-    @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return [
-            ExistenceCheck(
-                column=RoleRow.id,
-                value=self.role_id,
-                error=RoleNotFound(),
-            ),
-        ]
-
-
-@dataclass(frozen=True)
 class ScopedPermissionSearchScope(SearchScope):
     """Scope for searching scoped permissions by role."""
 
     role_id: uuid.UUID
 
     def to_condition(self) -> QueryCondition:
-        role_id = self.role_id
-
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.permission_group_id.in_(
-                sa.select(PermissionGroupRow.id).where(PermissionGroupRow.role_id == role_id)
+            return PermissionRow.id.in_(
+                sa.select(PermissionRow.id).where(PermissionRow.id.isnot(None))
             )
 
         return inner
