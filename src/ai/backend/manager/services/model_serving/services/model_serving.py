@@ -7,7 +7,6 @@ from http import HTTPStatus
 from typing import cast
 
 import aiohttp
-import tomli
 from pydantic import HttpUrl
 from yarl import URL
 
@@ -38,7 +37,14 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import ModelServiceDefinition
+from ai.backend.manager.data.deployment.types import (
+    ExecutionSpec,
+    ImageIdentifierDraft,
+    ModelRevisionSpec,
+    ModelRevisionSpecDraft,
+    MountMetadata,
+    ResourceSpecDraft,
+)
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
@@ -50,19 +56,19 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
     EndpointNotFound,
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -124,6 +130,9 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
@@ -139,10 +148,12 @@ class ModelServingService:
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _repository: ModelServingRepository
+    _deployment_repository: DeploymentRepository
 
     _valkey_live: ValkeyLiveClient
     _deployment_controller: DeploymentController
     _scheduling_controller: SchedulingController
+    _revision_generator_registry: RevisionGeneratorRegistry
 
     def __init__(
         self,
@@ -154,8 +165,10 @@ class ModelServingService:
         config_provider: ManagerConfigProvider,
         valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
+        deployment_repository: DeploymentRepository,
         deployment_controller: DeploymentController,
         scheduling_controller: SchedulingController,
+        revision_generator_registry: RevisionGeneratorRegistry,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
@@ -165,8 +178,10 @@ class ModelServingService:
         self._config_provider = config_provider
         self._valkey_live = valkey_live
         self._repository = repository
+        self._deployment_repository = deployment_repository
         self._deployment_controller = deployment_controller
         self._scheduling_controller = scheduling_controller
+        self._revision_generator_registry = revision_generator_registry
         # Map SessionStatus to legacy event names for backward compatibility
         self._status_to_event_name: dict[SessionStatus, str] = {
             SessionStatus.PENDING: "session_enqueued",
@@ -182,67 +197,71 @@ class ModelServingService:
             SessionStatus.ERROR: "session_cancelled",
         }
 
-    async def _fetch_file_from_storage_proxy(
+    async def _generate_revision(
         self,
-        filename: str,
-        model_vfolder_row: VFolderRow,
-    ) -> bytes:
-        vfid = model_vfolder_row.vfid
-        folder_host = model_vfolder_row.host
-
-        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
-
-        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        return await manager_client.fetch_file_content(
-            volume_name,
-            str(vfid),
-            f"./{filename}",
+        draft: ModelRevisionSpecDraft,
+        vfolder_id: uuid.UUID,
+        scaling_group: str,
+    ) -> ModelRevisionSpec:
+        """Generate model revision using RevisionGenerator."""
+        default_architecture = (
+            await self._deployment_repository.get_default_architecture_from_scaling_group(
+                scaling_group
+            )
         )
+        generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
+        return await generator.generate_revision(
+            draft_revision=draft,
+            vfolder_id=vfolder_id,
+            default_architecture=default_architecture,
+        )
+
+    async def _check_model_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> None:
+        """Check model vfolder ownership type."""
+        vfolder_ownership_type = await self._repository.get_vfolder_ownership_type(vfolder_id)
+        if vfolder_ownership_type == VFolderOwnershipType.GROUP:
+            raise InvalidAPIParameters("Cannot use project-type vfolder for model service")
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
 
-        # Get model vfolder
-        model_vfolder_row = await self._repository.get_vfolder_by_id(service_prepare_ctx.model_id)
-        if not model_vfolder_row:
-            raise InvalidAPIParameters("Model vfolder not found")
-        if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
-            raise InvalidAPIParameters(
-                "Cannot create model service with the project type's vfolder"
-            )
+        model_vfolder_id = service_prepare_ctx.model_id
+        await self._check_model_vfolder_ownership_type(model_vfolder_id)
 
-        try:
-            chunks = await self._fetch_file_from_storage_proxy(
-                "service-definition.toml", model_vfolder_row
-            )
-        except UnexpectedStorageProxyResponseError:
-            chunks = None
-
-        if chunks:
-            raw_service_definition = chunks.decode("utf-8")
-            service_definition = tomli.loads(raw_service_definition)
-
-            definition = action.creator.runtime_variant
-            if definition in service_definition:
-                variant_def = ModelServiceDefinition.model_validate(service_definition[definition])
-                if variant_def.resource_slots:
-                    action.creator.config.resources = variant_def.resource_slots
-                if variant_def.environment:
-                    action.creator.image = variant_def.environment.image
-                    action.creator.architecture = variant_def.environment.architecture
-                if variant_def.environ:
-                    if action.creator.config.environ:
-                        action.creator.config.environ.update(variant_def.environ)
-                    else:
-                        action.creator.config.environ = variant_def.environ
+        # Use RevisionGenerator to load service definition and merge with API request
+        draft = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=action.creator.image,
+                architecture=action.creator.architecture,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=action.creator.cluster_mode,
+                cluster_size=action.creator.cluster_size,
+                resource_slots=action.creator.config.resources,
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=model_vfolder_id,
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=action.creator.runtime_variant,
+                startup_command=action.creator.startup_command,
+                environ=action.creator.config.environ,
+            ),
+        )
+        revision = await self._generate_revision(
+            draft, model_vfolder_id, service_prepare_ctx.scaling_group
+        )
+        action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
-            service_prepare_ctx.model_id,
+            model_vfolder_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
         creation_config["mount_map"] = {
-            service_prepare_ctx.model_id: action.creator.config.model_mount_destination,
+            model_vfolder_id: action.creator.config.model_mount_destination,
             **{
                 m.vfid.folder_id: m.kernel_path.as_posix() for m in service_prepare_ctx.extra_mounts
             },
@@ -416,20 +435,51 @@ class ModelServingService:
     async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
         # TODO: Seperate background task definition and trigger into different layer
         service_prepare_ctx = action.model_service_prepare_ctx
+
+        model_vfolder_id = service_prepare_ctx.model_id
+        await self._check_model_vfolder_ownership_type(model_vfolder_id)
+
+        # Use RevisionGenerator to load service definition and merge with API request
+        draft = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=action.image,
+                architecture=action.architecture,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=action.cluster_mode,
+                cluster_size=action.cluster_size,
+                resource_slots=action.config.resources,
+                resource_opts=None,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=model_vfolder_id,
+                model_definition_path=None,
+            ),
+            execution=ExecutionSpec(
+                runtime_variant=action.runtime_variant,
+                startup_command=action.startup_command,
+                environ=action.config.environ,
+            ),
+        )
+        revision = await self._generate_revision(
+            draft, model_vfolder_id, service_prepare_ctx.scaling_group
+        )
+        action = action.with_revision(revision)
+
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
         if not created_user:
             raise InvalidAPIParameters("User not found")
 
         image_row = await self._repository.resolve_image_for_endpoint_creation([
-            ImageIdentifier(action.image, action.architecture),
-            ImageAlias(action.image),
+            # Image and architecture must be provided either from service definition or API request
+            # If Architecture is not provided, default arch from scaling group is used in revision generation
+            ImageIdentifier(cast(str, action.image), cast(str, action.architecture)),
+            ImageAlias(cast(str, action.image)),
         ])
 
         creation_config = action.config.to_dict()
-        creation_config["mount_map"] = {
-            service_prepare_ctx.model_id: action.config.model_mount_destination
-        }
+        creation_config["mount_map"] = {model_vfolder_id: action.config.model_mount_destination}
         sudo_session_enabled = action.sudo_session_enabled
 
         # Build SessionCreationSpec for dry-run
@@ -438,11 +488,11 @@ class ModelServingService:
 
         # Prepare mounts and environ
         mounts = [
-            service_prepare_ctx.model_id,
+            model_vfolder_id,
             *[m.vfid for m in service_prepare_ctx.extra_mounts],
         ]
         mount_map: dict[uuid.UUID | VFolderID, str] = {
-            service_prepare_ctx.model_id: action.config.model_mount_destination,
+            model_vfolder_id: action.config.model_mount_destination,
         }
         for m in service_prepare_ctx.extra_mounts:
             mount_map[m.vfid] = str(m.kernel_path)

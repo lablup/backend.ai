@@ -200,6 +200,10 @@ from .sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
+from .sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+    RevisionGeneratorRegistryArgs,
+)
 from .sokovan.deployment.route.route_controller import (
     RouteController,
     RouteControllerArgs,
@@ -759,6 +763,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
                 scheduling_controller=root_ctx.scheduling_controller,
                 deployment_controller=root_ctx.deployment_controller,
+                revision_generator_registry=root_ctx.revision_generator_registry,
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
@@ -1072,6 +1077,12 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             hook_plugin_ctx=root_ctx.hook_plugin_ctx,
         )
     )
+    # Create revision generator registry (singleton)
+    root_ctx.revision_generator_registry = RevisionGeneratorRegistry(
+        RevisionGeneratorRegistryArgs(
+            deployment_repository=root_ctx.repositories.deployment.repository,
+        )
+    )
     # Create deployment controller
     root_ctx.deployment_controller = DeploymentController(
         DeploymentControllerArgs(
@@ -1081,6 +1092,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             storage_manager=root_ctx.storage_manager,
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
+            revision_generator_registry=root_ctx.revision_generator_registry,
         )
     )
     root_ctx.route_controller = RouteController(
