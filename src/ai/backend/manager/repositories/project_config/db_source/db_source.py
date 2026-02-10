@@ -63,7 +63,7 @@ class ProjectConfigDBSource:
             InvalidAPIParameters: If domain_name is missing when project name is provided
             ProjectNotFound: If project is not found
         """
-        async with self._db.begin_read_committed() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             if isinstance(project_id_or_name, str):
                 if domain_name is None:
                     raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -110,7 +110,7 @@ class ProjectConfigDBSource:
         if user is None:
             raise InsufficientPrivilege("Authentication required")
 
-        async with self._db.begin_read_committed() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             if isinstance(project_id_or_name, str):
                 if domain_name is None:
                     raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -164,7 +164,7 @@ class ProjectConfigDBSource:
         if user is None:
             raise InsufficientPrivilege("Authentication required")
 
-        async with self._db.begin_read_committed() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             if isinstance(project_id_or_name, str):
                 if domain_name is None:
                     raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -215,7 +215,7 @@ class ProjectConfigDBSource:
         Raises:
             DotfileNotFound: If project has no dotfiles configured
         """
-        async with self._db.begin_read_committed() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             dotfiles, leftover_space = await query_group_dotfiles(conn, project_id)
             if dotfiles is None:
                 raise DotfileNotFound
@@ -309,7 +309,7 @@ class ProjectConfigDBSource:
 
     async def check_user_in_project(self, user_id: uuid.UUID, project_id: uuid.UUID) -> bool:
         """Check if a user is a member of the project."""
-        async with self._db.begin_read_committed() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             query = (
                 sa.select(AssocGroupUserRow.group_id)
                 .where(AssocGroupUserRow.user_id == user_id)
