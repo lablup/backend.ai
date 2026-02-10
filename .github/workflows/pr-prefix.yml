@@ -2,7 +2,7 @@ name: check-pr-title-prefix
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, reopened]
 
 jobs:
   check-pr-prefix:
