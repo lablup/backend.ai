@@ -129,9 +129,25 @@ NotificationRule ──ref──► User (created_by)
 ### Key Principles
 
 1. **RBAC checks at Root Query only.** After the entry point, `auto`/`ref`/unregistered determines traversal scope.
-2. **Same entity, different roles by entry path.** For example, Agent is `auto` from ScalingGroup but `ref` from Session/Kernel.
+2. **Relationship type is an edge property, not an entity property.** The same entity can have different roles depending on the entry path. For example, Agent is `auto` from ScalingGroup but `ref` from Session/Kernel. An entity does not inherently "know" whether it is auto or ref — the parent→child edge determines this.
 3. **Auto-only entities have no standalone root query.** They are always accessed through their parent.
 4. **RBAC/Visibility separation.** RBAC validates scope + operation. Visibility is resolver-level business logic.
+
+### Resolver Traversal Context
+
+Since relationship type is an edge property, the GQL resolver for a child entity does not inherently know whether it was reached via `auto` or `ref`. However, `ref` edges require traversal termination — nested entity fields should not be resolved further from a ref target.
+
+Example — the same `Agent` entity behaves differently by entry path:
+
+```
+scalingGroup { agents { kernels { ... } } }
+  └─ auto ──► Agent ──► auto continues → Kernel accessible
+
+session { agent { kernels { ... } } }
+  └─ ref ──► Agent ──► traversal terminates → Kernel NOT accessible
+```
+
+To enforce this, the **parent resolver** (which owns the edge metadata) must propagate a traversal context to downstream resolvers. The child entity itself does not need to be aware of its classification — it only needs to check whether traversal is permitted in the current context. The specific mechanism (e.g., resolver context flag, middleware decorator) is an implementation detail to be decided in Phase 2–3.
 
 ### Query Constraints
 
