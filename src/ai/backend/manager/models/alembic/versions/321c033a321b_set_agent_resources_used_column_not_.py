@@ -1,7 +1,7 @@
 """set agent_resources used column not null with default 0
 
 Revision ID: 321c033a321b
-Revises: 4b7b4b040a70
+Revises: acd2e76c1e40
 Create Date: 2026-02-10 09:14:41.686614
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "321c033a321b"
-down_revision = "4b7b4b040a70"
+down_revision = "acd2e76c1e40"
 branch_labels = None
 depends_on = None
 
