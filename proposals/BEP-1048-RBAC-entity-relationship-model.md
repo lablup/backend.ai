@@ -11,8 +11,12 @@ Implemented-Version:
 
 ## Related Issues
 
-- [BEP-1008: RBAC](BEP-1008-RBAC.md) - Original RBAC technical design
-- [BEP-1012: RBAC (detailed)](BEP-1012-RBAC.md) - RBAC feature specification
+- JIRA: [BA-4179](https://lablup.atlassian.net/browse/BA-4179) — Implement RBAC Entity Relationship Model
+- JIRA: [BA-4218](https://lablup.atlassian.net/browse/BA-4218) — BEP-1048 document registration
+- GitHub: #8531
+- Related BEPs:
+  - [BEP-1008: RBAC](BEP-1008-RBAC.md) - Original RBAC technical design
+  - [BEP-1012: RBAC (detailed)](BEP-1012-RBAC.md) - RBAC feature specification
 
 ## Motivation
 
@@ -173,7 +177,7 @@ Single-item queries are supported for all guarded entities. List queries depend 
 - List: Implicit (viewer)
 
 **Project Scope only:**
-- ArtifactRow, SessionTemplate
+- ArtifactRow, SessionTemplate(session_templates)
 - List: Requires `project_id`
 
 **Project + Domain Scope:**
