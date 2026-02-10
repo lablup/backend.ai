@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, override
+from typing import Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -184,7 +185,20 @@ class ModelReplica(Node):
         return ModelRevision.from_dataclass(result.data)
 
     @classmethod
-    def from_dataclass(cls, data: ModelReplicaData) -> ModelReplica:
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.replica_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_dataclass(cls, data: ModelReplicaData) -> Self:
         return cls(
             id=ID(str(data.id)),
             _revision_id=data.revision_id,

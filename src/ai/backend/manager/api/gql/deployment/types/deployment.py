@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, override
+from typing import Any, Self, override
 from uuid import UUID, uuid4
 
 import strawberry
@@ -384,10 +384,23 @@ class ModelDeployment(Node):
         )
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.deployment_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(
         cls,
         data: ModelDeploymentData,
-    ) -> ModelDeployment:
+    ) -> Self:
         metadata = ModelDeploymentMetadata(
             name=data.metadata.name,
             status=DeploymentStatusGQL(data.metadata.status),

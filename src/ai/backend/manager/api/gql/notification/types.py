@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Self, override
 
 import strawberry
-from strawberry import ID, UNSET
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.notification import (
@@ -24,7 +25,7 @@ from ai.backend.common.data.notification.types import (
 )
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
@@ -205,6 +206,19 @@ class NotificationChannel(Node):
     created_at: datetime
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.notification_channel_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(cls, data: NotificationChannelData) -> Self:
         final_spec: NotificationChannelSpecGQL
         match data.channel_type:
@@ -241,6 +255,19 @@ class NotificationRule(Node):
     message_template: str
     enabled: bool
     created_at: datetime
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.notification_rule_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: NotificationRuleData) -> Self:
