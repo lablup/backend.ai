@@ -34,7 +34,9 @@ from .common import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 
 @strawberry.type(
@@ -45,7 +47,7 @@ class ProjectFairShareGQL(Node):
     """Project-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this fair share belongs to."
     )
     project_id: UUID = strawberry.field(
@@ -83,6 +85,48 @@ class ProjectFairShareGQL(Node):
             return None
         return ProjectV2GQL.from_data(project_data)
 
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The domain entity associated with this fair share record."),
+    )
+    async def domain(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+
+        domain_data = await info.context.data_loaders.domain_loader.load(self.domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
+
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The resource group associated with this fair share record."),
+    )
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+        rg_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource_group_name
+        )
+        if rg_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(rg_data)
+
     @classmethod
     def from_dataclass(cls, data: ProjectFairShareData) -> ProjectFairShareGQL:
         """Convert ProjectFairShareData to GraphQL type.
@@ -92,7 +136,7 @@ class ProjectFairShareGQL(Node):
         """
         return cls(
             id=ID(f"{data.resource_group}:{data.project_id}"),
-            resource_group=data.resource_group,
+            resource_group_name=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
             spec=FairShareSpecGQL.from_spec(
