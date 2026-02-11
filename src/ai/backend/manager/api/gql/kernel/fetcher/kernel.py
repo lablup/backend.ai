@@ -10,9 +10,9 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
-    KernelEdgeGQL,
-    KernelFilterGQL,
-    KernelOrderByGQL,
+    KernelV2EdgeGQL,
+    KernelV2FilterGQL,
+    KernelV2OrderByGQL,
     KernelV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -35,8 +35,8 @@ def _get_kernel_pagination_spec() -> PaginationSpec:
 
 async def fetch_kernels(
     info: Info[StrawberryGQLContext],
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
+    filter: KernelV2FilterGQL | None = None,
+    order_by: list[KernelV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -64,7 +64,7 @@ async def fetch_kernels(
         SearchKernelsAction(querier=querier)
     )
     nodes = [KernelV2GQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
-    edges = [KernelEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return KernelConnectionV2GQL(
         edges=edges,

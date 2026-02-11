@@ -17,8 +17,8 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
         KernelConnectionV2GQL,
-        KernelFilterGQL,
-        KernelOrderByGQL,
+        KernelV2FilterGQL,
+        KernelV2OrderByGQL,
     )
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
@@ -408,11 +408,11 @@ class AgentV2GQL(Node):
         self,
         info: Info[StrawberryGQLContext],
         filter: Annotated[
-            KernelFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+            KernelV2FilterGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
         ]
         | None = None,
         order_by: list[
-            Annotated[KernelOrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")]
+            Annotated[KernelV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")]
         ]
         | None = None,
         before: str | None = None,
