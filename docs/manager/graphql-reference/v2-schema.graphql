@@ -1752,18 +1752,11 @@ type DomainFairShare implements Node {
   Added in 26.2.0. The domain entity associated with this fair share record.
   """
   domain: DomainV2
-<<<<<<< HEAD
-<<<<<<< HEAD
 
   """
   Added in 26.2.0. The resource group associated with this fair share record.
   """
   resourceGroup: ResourceGroup
-=======
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
->>>>>>> 96be8119f (chore: update api schema dump)
-=======
->>>>>>> c1d5c6be2 (chore: update api schema dump)
 }
 
 """
@@ -4003,8 +3996,6 @@ type ProjectFairShare implements Node {
   Added in 26.2.0. The project entity associated with this fair share record.
   """
   project: ProjectV2
-<<<<<<< HEAD
-<<<<<<< HEAD
 
   """
   Added in 26.2.0. The domain entity associated with this fair share record.
@@ -4015,11 +4006,6 @@ type ProjectFairShare implements Node {
   Added in 26.2.0. The resource group associated with this fair share record.
   """
   resourceGroup: ResourceGroup
-=======
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
->>>>>>> 96be8119f (chore: update api schema dump)
-=======
->>>>>>> c1d5c6be2 (chore: update api schema dump)
 }
 
 """
