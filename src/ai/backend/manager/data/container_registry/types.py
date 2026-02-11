@@ -38,3 +38,12 @@ class PerProjectContainerRegistryInfo:
     ssl_verify: bool
     is_global: bool
     extra: dict[str, Any]
+
+
+@dataclass
+class KnownContainerRegistry:
+    """Lightweight representation of a registered container registry for discovery purposes."""
+
+    project: str
+    registry_name: str
+    url: str

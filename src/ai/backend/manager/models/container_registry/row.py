@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self, cast
 from urllib.parse import urlparse
@@ -234,31 +234,6 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
         creds = {"username": username, "password": password}
 
         return yarl.URL(url), creds
-
-    @classmethod
-    async def get_known_container_registries(
-        cls,
-        session: AsyncSession,
-    ) -> Mapping[str, Mapping[str, yarl.URL]]:
-        query_stmt = sa.select(ContainerRegistryRow).options(
-            load_only(
-                ContainerRegistryRow.project,
-                ContainerRegistryRow.registry_name,
-                ContainerRegistryRow.url,
-            )
-        )
-        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt)).all())
-        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
-        for registry_row in registries:
-            project = registry_row.project
-            if project is None:
-                continue
-            registry_name = registry_row.registry_name
-            url = registry_row.url
-            if project not in result:
-                result[project] = {}
-            result[project][registry_name] = yarl.URL(url)
-        return result
 
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:

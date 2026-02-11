@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.container_registry.types import KnownContainerRegistry
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
@@ -20,7 +21,7 @@ class GetContainerRegistriesAction(ContainerRegistryAction):
 
 @dataclass
 class GetContainerRegistriesActionResult(BaseActionResult):
-    registries: Any
+    registries: list[KnownContainerRegistry]
 
     @override
     def entity_id(self) -> str | None:

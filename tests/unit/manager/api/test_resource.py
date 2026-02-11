@@ -33,6 +33,7 @@ from ai.backend.manager.api.resource import (
     watcher_agent_start,
     watcher_agent_stop,
 )
+from ai.backend.manager.data.container_registry.types import KnownContainerRegistry
 from ai.backend.manager.errors.auth import AuthorizationFailed
 
 # ---------------------------------------------------------------------------
@@ -172,9 +173,14 @@ class TestGetContainerRegistries:
         mock_root_ctx: MagicMock,
     ) -> None:
         """Verify result.registries is returned as JSON response."""
-        expected_registries = {"docker.io": {"url": "https://docker.io"}}
         mock_result = MagicMock()
-        mock_result.registries = expected_registries
+        mock_result.registries = [
+            KnownContainerRegistry(
+                project="myproject",
+                registry_name="cr.example.com",
+                url="https://cr.example.com",
+            ),
+        ]
         mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete = (
             AsyncMock(return_value=mock_result)
         )
@@ -183,11 +189,10 @@ class TestGetContainerRegistries:
 
         mock_root_ctx.processors.container_registry.get_container_registries.wait_for_complete.assert_called_once()
         assert response.status == HTTPStatus.OK
-        # Verify response body contains expected registries
         json_response = cast(web.Response, response)
         assert json_response._body is not None
         response_body = json.loads(cast(bytes, json_response._body))
-        assert response_body == expected_registries
+        assert response_body == {"myproject/cr.example.com": "https://cr.example.com"}
 
     @pytest.mark.asyncio
     async def test_rejects_non_superadmin_request(
