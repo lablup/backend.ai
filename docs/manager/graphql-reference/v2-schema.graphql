@@ -315,7 +315,7 @@ type AgentV2 implements Node {
   """
   Added in 26.2.0. List of kernels running on this agent with pagination support.
   """
-  kernels(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
+  kernels(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
 }
 
 """
@@ -2836,9 +2836,53 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
+Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
+"""
+type KernelV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Startup command executed when the kernel starts."""
+  startupCommand: String
+
+  """Information about the session this kernel belongs to."""
+  session: KernelV2SessionInfo!
+
+  """User and ownership information."""
+  userInfo: KernelV2UserInfo!
+
+  """Network configuration and exposed ports."""
+  network: KernelV2NetworkInfo!
+
+  """Cluster configuration for distributed computing."""
+  cluster: KernelV2ClusterInfo!
+
+  """Resource allocation and agent information."""
+  resource: KernelV2ResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: KernelV2LifecycleInfo!
+
+  """Added in 26.2.0. The agent running this kernel."""
+  agent: AgentV2
+
+  """Added in 26.2.0. The user who owns this kernel."""
+  user: UserV2
+
+  """Added in 26.2.0. The project this kernel belongs to."""
+  project: ProjectV2
+
+  """Added in 26.2.0. The domain this kernel belongs to."""
+  domain: DomainV2
+
+  """Added in 26.2.0. The resource group this kernel is assigned to."""
+  resourceGroup: ResourceGroup
+}
+
+"""
 Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.
 """
-type KernelClusterInfo {
+type KernelV2ClusterInfo {
   """The role of this kernel in the cluster (e.g., main, sub)."""
   clusterRole: String!
 
@@ -2853,7 +2897,7 @@ type KernelClusterInfo {
 }
 
 """Added in 26.2.0. Connection type for paginated kernel results."""
-type KernelConnectionV2 {
+type KernelV2Connection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
@@ -2862,20 +2906,29 @@ type KernelConnectionV2 {
   count: Int!
 }
 
+"""An edge in a connection."""
+type KernelV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelV2!
+}
+
 """Added in 26.2.0. Filter criteria for querying kernels."""
-input KernelFilter {
+input KernelV2Filter {
   id: UUIDFilter = null
-  status: KernelStatusFilter = null
+  status: KernelV2StatusFilter = null
   sessionId: UUIDFilter = null
 }
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
-type KernelLifecycleInfo {
+type KernelV2LifecycleInfo {
   """
   Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
   Indicates the kernel's position in its lifecycle.
   """
-  status: KernelStatus!
+  status: KernelV2Status!
 
   """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
   result: SessionResult!
@@ -2891,7 +2944,7 @@ type KernelLifecycleInfo {
 }
 
 """Added in 26.2.0. Network configuration for a kernel."""
-type KernelNetworkInfo {
+type KernelV2NetworkInfo {
   """Collection of service ports exposed by this kernel."""
   servicePorts: ServicePorts
 
@@ -2900,13 +2953,13 @@ type KernelNetworkInfo {
 }
 
 """Added in 26.2.0. Ordering specification for kernels."""
-input KernelOrderBy {
-  field: KernelOrderField!
+input KernelV2OrderBy {
+  field: KernelV2OrderField!
   direction: OrderDirection! = DESC
 }
 
 """Added in 26.2.0. Fields available for ordering kernels."""
-enum KernelOrderField {
+enum KernelV2OrderField {
   CREATED_AT
   TERMINATED_AT
   STATUS
@@ -2916,7 +2969,7 @@ enum KernelOrderField {
 }
 
 """Added in 26.2.0. Resource allocation information for a kernel."""
-type KernelResourceInfo {
+type KernelV2ResourceInfo {
   """
   The ID of the agent running this kernel. Null if not yet assigned or hidden.
   """
@@ -2941,7 +2994,7 @@ type KernelResourceInfo {
 }
 
 """Added in 26.2.0. Information about the session this kernel belongs to."""
-type KernelSessionInfo {
+type KernelV2SessionInfo {
   """The unique identifier of the session this kernel belongs to."""
   sessionId: UUID!
 
@@ -2956,7 +3009,7 @@ type KernelSessionInfo {
 }
 
 """Added in 26.2.0. Status of a kernel in its lifecycle."""
-enum KernelStatus {
+enum KernelV2Status {
   PENDING
   SCHEDULED
   PREPARING
@@ -2969,13 +3022,13 @@ enum KernelStatus {
 }
 
 """Added in 26.2.0. Filter for kernel status."""
-input KernelStatusFilter {
-  in: [KernelStatus!] = null
-  notIn: [KernelStatus!] = null
+input KernelV2StatusFilter {
+  in: [KernelV2Status!] = null
+  notIn: [KernelV2Status!] = null
 }
 
 """Added in 26.2.0. User and ownership information for a kernel."""
-type KernelUserInfo {
+type KernelV2UserInfo {
   """The UUID of the user who owns this kernel."""
   userId: UUID
 
@@ -2987,59 +3040,6 @@ type KernelUserInfo {
 
   """The group (project) ID this kernel belongs to."""
   groupId: UUID
-}
-
-"""
-Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
-"""
-type KernelV2 implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Startup command executed when the kernel starts."""
-  startupCommand: String
-
-  """Information about the session this kernel belongs to."""
-  session: KernelSessionInfo!
-
-  """User and ownership information."""
-  userInfo: KernelUserInfo!
-
-  """Network configuration and exposed ports."""
-  network: KernelNetworkInfo!
-
-  """Cluster configuration for distributed computing."""
-  cluster: KernelClusterInfo!
-
-  """Resource allocation and agent information."""
-  resource: KernelResourceInfo!
-
-  """Lifecycle status and timestamps."""
-  lifecycle: KernelLifecycleInfo!
-
-  """Added in 26.2.0. The agent running this kernel."""
-  agent: AgentV2
-
-  """Added in 26.2.0. The user who owns this kernel."""
-  user: UserV2
-
-  """Added in 26.2.0. The project this kernel belongs to."""
-  project: ProjectV2
-
-  """Added in 26.2.0. The domain this kernel belongs to."""
-  domain: DomainV2
-
-  """Added in 26.2.0. The resource group this kernel is assigned to."""
-  resourceGroup: ResourceGroup
-}
-
-"""An edge in a connection."""
-type KernelV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: KernelV2!
 }
 
 """
@@ -4776,7 +4776,7 @@ type Query {
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
-  adminKernelsV2(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
+  adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
 
   """
   Added in 26.2.0.
@@ -4790,7 +4790,7 @@ type Query {
   adminImageAliases(filter: ImageAliasFilterGQL = null, orderBy: [ImageAliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageAliasConnection!
 
   """Added in 26.2.0. Query kernels within a specific session."""
-  sessionKernelsV2(scope: SessionScope!, filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
+  sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
