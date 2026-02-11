@@ -6505,6 +6505,19 @@ enum UsageBucketOrderField {
 }
 
 """
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserDomainNestedFilter {
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.
 """
 type UserFairShare implements Node {
@@ -6665,6 +6678,19 @@ input UserFairShareUserNestedFilter {
 
 extend type UserNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
 }
 
 """
@@ -6939,19 +6965,6 @@ type UserV2ContainerSettings {
   containerGids: [Int!]
 }
 
-"""
-Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
-"""
-input UserV2DomainNestedFilter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by domain active status."""
-  isActive: Boolean = null
-}
-
 """An edge in a connection."""
 type UserV2Edge {
   """A cursor for use in pagination"""
@@ -7011,12 +7024,12 @@ input UserV2Filter {
   """
   Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
   """
-  domain: UserV2DomainNestedFilter = null
+  domain: UserDomainNestedFilter = null
 
   """
   Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
   """
-  project: UserV2ProjectNestedFilter = null
+  project: UserProjectNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
@@ -7071,19 +7084,6 @@ type UserV2OrganizationInfo {
 
   """Primary API access key for this user."""
   mainAccessKey: String
-}
-
-"""
-Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
-"""
-input UserV2ProjectNestedFilter {
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by project active status."""
-  isActive: Boolean = null
 }
 
 """

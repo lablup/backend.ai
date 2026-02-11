@@ -31,13 +31,13 @@ from .enums import UserV2RoleEnumGQL, UserV2StatusEnumGQL
 
 
 @strawberry.input(
-    name="UserV2DomainNestedFilter",
+    name="UserDomainNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for the domain a user belongs to. "
         "Filters users whose domain matches all specified conditions."
     ),
 )
-class UserV2DomainNestedFilter:
+class UserDomainNestedFilter:
     """Nested filter for domain of a user."""
 
     name: StringFilter | None = strawberry.field(
@@ -74,13 +74,13 @@ class UserV2DomainNestedFilter:
 
 
 @strawberry.input(
-    name="UserV2ProjectNestedFilter",
+    name="UserProjectNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for projects a user belongs to. "
         "Filters users that belong to at least one project matching all specified conditions."
     ),
 )
-class UserV2ProjectNestedFilter:
+class UserProjectNestedFilter:
     """Nested filter for projects of a user."""
 
     name: StringFilter | None = strawberry.field(
@@ -214,14 +214,14 @@ class UserV2FilterGQL(GQLFilter):
         default=None,
         description="Filter by creation timestamp. Supports before, after, and between operations.",
     )
-    domain: UserV2DomainNestedFilter | None = strawberry.field(
+    domain: UserDomainNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested domain conditions. "
             "Returns users whose domain matches all specified conditions."
         ),
     )
-    project: UserV2ProjectNestedFilter | None = strawberry.field(
+    project: UserProjectNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested project conditions. "
