@@ -58,7 +58,7 @@ class PrometheusClient:
             "end": time_range.end,
             "step": time_range.step,
         })
-        result = await self._execute_request(HTTPMethod.POST, "/query_range", data=form_data)
+        result = await self._execute_request(HTTPMethod.POST, "query_range", data=form_data)
         return PrometheusQueryRangeResponse.model_validate(result)
 
     async def query_label_values(
@@ -77,7 +77,7 @@ class PrometheusClient:
         """
         form_data = aiohttp.FormData({"match[]": metric_match})
         result = await self._execute_request(
-            HTTPMethod.GET, f"/label/{label_name}/values", data=form_data
+            HTTPMethod.GET, f"label/{label_name}/values", data=form_data
         )
         return LabelValueResponse.model_validate(result)
 

@@ -52,6 +52,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -730,6 +731,19 @@ async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def prometheus_client_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    client_pool = ClientPool(tcp_client_session_factory)
+    root_ctx.prometheus_client = PrometheusClient(
+        endpoint=f"http://{root_ctx.config_provider.config.metric.address.to_legacy()}/api/v1/",
+        client_pool=client_pool,
+    )
+    try:
+        yield
+    finally:
+        await client_pool.close()
+
+
+@asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
@@ -768,6 +782,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 agent_cache=root_ctx.agent_cache,
                 notification_center=root_ctx.notification_center,
                 appproxy_client_pool=root_ctx.appproxy_client_pool,
+                prometheus_client=root_ctx.prometheus_client,
             ),
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -1538,6 +1553,7 @@ def build_root_app(
             leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
+            prometheus_client_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
             gql_adapters_ctx,

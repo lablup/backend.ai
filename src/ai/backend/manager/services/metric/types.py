@@ -1,5 +1,5 @@
 import enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self
 from uuid import UUID
 
@@ -95,22 +95,3 @@ class UtilizationMetricType(enum.Enum):
     Represents a difference of changes calculated from underlying gauge/accumulation values
     (e.g., Utilization msec from CPU usage)
     """
-
-
-@dataclass(kw_only=True)
-class MetricSpecForQuery:
-    metric_name: str
-    metric_type: UtilizationMetricType
-    timewindow: str
-    sum_by: list[str] = field(default_factory=list)
-    labels: list[str] = field(default_factory=list)
-
-    def str_sum_by(self) -> str:
-        if not self.sum_by:
-            return ""
-        return f"sum by ({','.join(self.sum_by)})"
-
-    def str_labels(self) -> str:
-        if not self.labels:
-            return ""
-        return f"{{{','.join(self.labels)}}}"
