@@ -415,12 +415,12 @@ class UserV2OrderByGQL(GQLOrderBy):
 
 
 @strawberry.input(
-    name="UserV2Scope",
+    name="UserScope",
     description=(
         "Added in 26.2.0. Scope for user queries to restrict results to a specific context."
     ),
 )
-class UserV2ScopeGQL:
+class UserScopeGQL:
     """Scope for user queries."""
 
     domain_name: str | None = strawberry.field(

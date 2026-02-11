@@ -39,8 +39,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.user.types import UserData
 
 
-@strawberry.input(name="UserV2FairShareScope")
-class UserV2FairShareScopeGQL:
+@strawberry.input(name="UserFairShareScope")
+class UserFairShareScopeGQL:
     """Scope parameters for filtering user fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -51,8 +51,8 @@ class UserV2FairShareScopeGQL:
     )
 
 
-@strawberry.input(name="UserV2UsageScope")
-class UserV2UsageScopeGQL:
+@strawberry.input(name="UserUsageScope")
+class UserUsageScopeGQL:
     """Scope parameters for filtering user usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -107,7 +107,7 @@ class UserV2GQL(Node):
     async def fair_share(
         self,
         info: Info,
-        scope: UserV2FairShareScopeGQL,
+        scope: UserFairShareScopeGQL,
     ) -> UserFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.user import (
             fetch_single_user_fair_share,
@@ -132,7 +132,7 @@ class UserV2GQL(Node):
     async def usage_buckets(
         self,
         info: Info,
-        scope: UserV2UsageScopeGQL,
+        scope: UserUsageScopeGQL,
         filter: UserUsageBucketFilter | None = None,
         order_by: list[UserUsageBucketOrderBy] | None = None,
         before: str | None = None,

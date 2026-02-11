@@ -6660,6 +6660,16 @@ enum UserFairShareOrderField {
   USER_EMAIL
 }
 
+input UserFairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
+}
+
 """
 Added in 26.2.0. Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.
 """
@@ -6872,6 +6882,14 @@ input UserUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
+input UserUsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
+}
+
 """
 Added in 26.2.0. User entity with structured field groups. Provides comprehensive user information organized into logical categories: basic_info (profile), status (account state), organization (permissions), security (auth settings), container (execution settings), and timestamps.
 """
@@ -6900,12 +6918,12 @@ type UserV2 implements Node @key(fields: "id") {
   """
   Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: UserV2FairShareScope!): UserFairShare!
+  fairShare(scope: UserFairShareScope!): UserFairShare!
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: UserV2UsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 
   """The domain this user belongs to."""
   domain: DomainV2
@@ -6972,16 +6990,6 @@ type UserV2Edge {
 
   """The item at the end of the edge"""
   node: UserV2!
-}
-
-input UserV2FairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-
-  """
-  Project ID that the user belongs to (required for user-level fair shares).
-  """
-  projectId: UUID!
 }
 
 """
@@ -7123,14 +7131,6 @@ type UserV2StatusInfo {
 
   """If true, user must change password on next login."""
   needPasswordChange: Boolean
-}
-
-input UserV2UsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-
-  """Project ID that the user belongs to (required for user-level usage)."""
-  projectId: UUID!
 }
 
 """

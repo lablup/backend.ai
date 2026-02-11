@@ -7,11 +7,11 @@ from .enums import (
 from .filters import (
     UserDomainNestedFilter,
     UserProjectNestedFilter,
+    UserScopeGQL,
     UserV2FilterGQL,
     UserV2OrderByGQL,
     UserV2OrderFieldGQL,
     UserV2RoleEnumFilterGQL,
-    UserV2ScopeGQL,
     UserV2StatusEnumFilterGQL,
 )
 from .inputs import (
@@ -71,7 +71,7 @@ __all__ = [
     "UserV2FilterGQL",
     "UserV2OrderFieldGQL",
     "UserV2OrderByGQL",
-    "UserV2ScopeGQL",
+    "UserScopeGQL",
     "UserV2StatusEnumFilterGQL",
     "UserV2RoleEnumFilterGQL",
     # Scopes
