@@ -2,11 +2,12 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TypeVar, override
+from typing import TypeVar
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
+from ai.backend.manager.data.common.types import SearchResult
 
 
 class BaseAction(ABC):
@@ -49,12 +50,8 @@ class BaseActionResult(ABC):
 
 @dataclass
 class SearchActionResult[T](BaseActionResult):
-    items: list[T]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    result: SearchResult[T]
 
-    @override
     def entity_id(self) -> str | None:
         return None
 

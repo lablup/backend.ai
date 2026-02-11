@@ -11,6 +11,7 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ScopeId
 
@@ -36,11 +37,8 @@ class ScopeData:
     name: str
 
 
-@dataclass
-class ScopeListResult:
+@dataclass(frozen=True)
+class ScopeListResult(SearchResult[ScopeData]):
     """Result of searching scopes."""
 
-    items: list[ScopeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

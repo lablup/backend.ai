@@ -41,7 +41,7 @@ async def load_roles_by_ids(
         SearchRolesAction(querier=querier)
     )
 
-    role_map = {role.id: role for role in action_result.items}
+    role_map = {role.id: role for role in action_result.result.items}
     return [role_map.get(role_id) for role_id in role_ids]
 
 
@@ -61,7 +61,7 @@ async def load_permissions_by_ids(
         SearchPermissionsAction(querier=querier)
     )
 
-    permission_map = {p.id: p for p in action_result.items}
+    permission_map = {p.id: p for p in action_result.result.items}
     return [permission_map.get(pid) for pid in permission_ids]
 
 
@@ -81,7 +81,7 @@ async def load_role_assignments_by_ids(
         SearchUsersAssignedToRoleAction(querier=querier)
     )
 
-    assignment_map = {a.id: a for a in action_result.items}
+    assignment_map = {a.id: a for a in action_result.result.items}
     return [assignment_map.get(aid) for aid in assignment_ids]
 
 
@@ -101,5 +101,5 @@ async def load_role_assignments_by_role_and_user_ids(
         SearchUsersAssignedToRoleAction(querier=querier)
     )
 
-    assignment_map = {(a.role_id, a.user_id): a for a in action_result.items}
+    assignment_map = {(a.role_id, a.user_id): a for a in action_result.result.items}
     return [assignment_map.get(key) for key in keys]

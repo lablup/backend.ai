@@ -15,8 +15,7 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.manager.actions.action import SearchActionResult
-from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
+from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -520,13 +519,13 @@ def build_page_info[TEdge: HasCursor](
 
 def build_connection[TData, TNode: Node, TConn](
     *,
-    result: SearchActionResult[TData],
+    result: SearchResult[TData],
     to_node: Callable[[TData], TNode],
     id_getter: Callable[[TNode], str],
     edge_type: type[Edge[TNode]],
     connection_type: Callable[..., TConn],
 ) -> TConn:
-    """Build a relay Connection from a SearchActionResult."""
+    """Build a relay Connection from a SearchResult."""
     nodes = [to_node(item) for item in result.items]
     edges = [edge_type(node=node, cursor=encode_cursor(id_getter(node))) for node in nodes]
     return connection_type(

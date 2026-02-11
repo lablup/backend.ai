@@ -152,9 +152,9 @@ class RBACAPIHandler:
 
         # Build response
         resp = SearchRolesResponse(
-            roles=[self.role_adapter.convert_to_dto(role) for role in action_result.items],
+            roles=[self.role_adapter.convert_to_dto(role) for role in action_result.result.items],
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=action_result.result.total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),
@@ -356,9 +356,12 @@ class RBACAPIHandler:
 
         # Build response
         resp = SearchUsersAssignedToRoleResponse(
-            users=[self.assigned_user_adapter.convert_to_dto(user) for user in action_result.items],
+            users=[
+                self.assigned_user_adapter.convert_to_dto(user)
+                for user in action_result.result.items
+            ],
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=action_result.result.total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),
@@ -416,9 +419,9 @@ class RBACAPIHandler:
 
         # Build response using adapter
         resp = SearchScopesResponse(
-            items=[self._scope_adapter.convert_to_dto(item) for item in action_result.items],
+            items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=action_result.result.total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),
@@ -480,9 +483,11 @@ class RBACAPIHandler:
 
         # Build response using adapter
         resp = SearchEntitiesResponse(
-            items=[self._entity_adapter.convert_to_dto(item) for item in action_result.items],
+            items=[
+                self._entity_adapter.convert_to_dto(item) for item in action_result.result.items
+            ],
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=action_result.result.total_count,
                 offset=body.parsed.offset,
                 limit=body.parsed.limit,
             ),

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ai.backend.manager.data.common.types import SearchResult
+
 from .types import EntityType
 
 
@@ -18,10 +20,7 @@ class EntityData:
 
 
 @dataclass(frozen=True)
-class EntityListResult:
+class EntityListResult(SearchResult[EntityData]):
     """Result of entity search with pagination info."""
 
-    items: list[EntityData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

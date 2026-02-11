@@ -4,6 +4,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from ai.backend.manager.data.common.types import SearchResult
+
 from .id import ObjectId, ScopeId
 from .object_permission import (
     ObjectPermissionCreateInput,
@@ -147,20 +149,14 @@ class UserRoleRevocationData:
 
 
 @dataclass(frozen=True)
-class RoleListResult:
+class RoleListResult(SearchResult[RoleData]):
     """Result of role search with pagination info."""
 
-    items: list[RoleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass
 
 
 @dataclass(frozen=True)
-class AssignedUserListResult:
+class AssignedUserListResult(SearchResult[AssignedUserData]):
     """Result of assigned user search with pagination info."""
 
-    items: list[AssignedUserData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

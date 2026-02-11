@@ -3,6 +3,14 @@ from dataclasses import dataclass
 from sqlalchemy.sql.elements import ColumnElement
 
 
+@dataclass(frozen=True)
+class SearchResult[T]:
+    items: list[T]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
 @dataclass
 class StringFilterData:
     """Data class that corresponds 1:1 with StringFilter for API requests."""
