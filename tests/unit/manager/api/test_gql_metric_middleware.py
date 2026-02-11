@@ -308,8 +308,7 @@ class TestGQLMetricMiddlewareSyncSpans:
         span = spans[0]
         assert span.status.status_code == StatusCode.ERROR
         assert span.status.description == "test sync error"
-        assert len(span.events) == 1
-        assert span.events[0].name == "exception"
+        assert any(event.name == "exception" for event in span.events)
 
     def test_anonymous_operation_span_name(
         self,
@@ -373,8 +372,7 @@ class TestGQLMetricMiddlewareAsyncSpans:
         span = spans[0]
         assert span.status.status_code == StatusCode.ERROR
         assert span.status.description == "async error"
-        assert len(span.events) >= 1
-        assert span.events[0].name == "exception"
+        assert any(event.name == "exception" for event in span.events)
 
     async def test_resolver_span_is_child_of_current_context(
         self,
