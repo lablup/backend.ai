@@ -17,7 +17,7 @@ from ai.backend.manager.data.permission.object_permission import (
 )
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
-    ScopedPermissionListResult,
+    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
@@ -48,7 +48,7 @@ from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
-    ScopedPermissionSearchScope,
+    PermissionSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -223,13 +223,13 @@ class PermissionControllerRepository:
         return await self._db_source.search_roles(querier=querier)
 
     @permission_controller_repository_resilience.apply()
-    async def search_scoped_permissions(
+    async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: ScopedPermissionSearchScope | None = None,
-    ) -> ScopedPermissionListResult:
-        """Searches scoped permissions with pagination and filtering."""
-        return await self._db_source.search_scoped_permissions(querier=querier, scope=scope)
+        scope: PermissionSearchScope | None = None,
+    ) -> PermissionListResult:
+        """Searches permissions with pagination and filtering."""
+        return await self._db_source.search_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_object_permissions(

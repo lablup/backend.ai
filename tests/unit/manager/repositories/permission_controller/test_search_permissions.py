@@ -46,8 +46,8 @@ class RoleWithObjectPermissions:
     object_permission_ids: list[uuid.UUID]
 
 
-class TestSearchScopedPermissions:
-    """Tests for searching scoped permissions."""
+class TestSearchPermissions:
+    """Tests for searching permissions."""
 
     @pytest.fixture
     async def db_with_rbac_tables(
@@ -109,7 +109,7 @@ class TestSearchScopedPermissions:
 
         return RoleWithPermissions(role_id=role_id, permission_ids=perm_ids)
 
-    async def test_search_scoped_permissions_with_entity_type_filter(
+    async def test_search_permissions_with_entity_type_filter(
         self,
         repository: PermissionControllerRepository,
         role_with_permissions: RoleWithPermissions,
@@ -122,13 +122,13 @@ class TestSearchScopedPermissions:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_scoped_permissions(querier)
+        result = await repository.search_permissions(querier)
 
         assert result.total_count == 2
         for item in result.items:
             assert item.entity_type == EntityType.VFOLDER
 
-    async def test_search_scoped_permissions_ordered_by_entity_type(
+    async def test_search_permissions_ordered_by_entity_type(
         self,
         repository: PermissionControllerRepository,
         role_with_permissions: RoleWithPermissions,
@@ -139,7 +139,7 @@ class TestSearchScopedPermissions:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_scoped_permissions(querier)
+        result = await repository.search_permissions(querier)
 
         entity_types = [item.entity_type for item in result.items]
         assert entity_types == sorted(entity_types, key=lambda et: et.value)
