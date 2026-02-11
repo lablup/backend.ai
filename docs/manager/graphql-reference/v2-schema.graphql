@@ -6783,52 +6783,52 @@ Added in 26.2.0. Input for updating user information. All fields are optional - 
 """
 input UpdateUserV2Input {
   """New username."""
-  username: String = null
+  username: String
 
   """New password."""
-  password: String = null
+  password: String
 
   """New full display name."""
-  fullName: String = null
+  fullName: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New account status."""
-  status: UserStatusV2 = null
+  status: UserStatusV2
 
   """New user role."""
-  role: UserRoleV2 = null
+  role: UserRoleV2
 
   """New domain assignment."""
-  domainName: String = null
+  domainName: String
 
   """New project (group) assignments. Replaces existing assignments."""
-  groupIds: [UUID!] = null
+  groupIds: [UUID!]
 
   """New allowed client IP addresses or CIDR ranges."""
-  allowedClientIp: [String!] = null
+  allowedClientIp: [String!]
 
   """Set password change requirement."""
-  needPasswordChange: Boolean = null
+  needPasswordChange: Boolean
 
   """New user resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 
   """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean = null
+  sudoSessionEnabled: Boolean
 
   """Set the primary API access key."""
-  mainAccessKey: String = null
+  mainAccessKey: String
 
   """New container user ID."""
-  containerUid: Int = null
+  containerUid: Int
 
   """New container primary group ID."""
-  containerMainGid: Int = null
+  containerMainGid: Int
 
   """New container supplementary group IDs."""
-  containerGids: [Int!] = null
+  containerGids: [Int!]
 }
 
 """Added in 26.2.0. Payload for user update mutation."""
