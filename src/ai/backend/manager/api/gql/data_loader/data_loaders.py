@@ -88,24 +88,6 @@ class DataLoaders:
         )
 
     @cached_property
-    def user_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, UserData | None]:
-        return DataLoader(load_fn=partial(load_users_by_ids, self._processors.user))
-
-    @cached_property
-    def project_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, GroupData | None]:
-        return DataLoader(load_fn=partial(load_projects_by_ids, self._processors.group))
-
-    @cached_property
-    def domain_loader(
-        self,
-    ) -> DataLoader[str, DomainData | None]:
-        return DataLoader(load_fn=partial(load_domains_by_names, self._processors.domain))
-
-    @cached_property
     def notification_channel_loader(
         self,
     ) -> DataLoader[uuid.UUID, NotificationChannelData | None]:
@@ -212,6 +194,24 @@ class DataLoaders:
         self,
     ) -> DataLoader[AgentId, int]:
         return DataLoader(load_fn=partial(load_container_counts, self._processors.agent))
+
+    @cached_property
+    def user_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, UserData | None]:
+        return DataLoader(load_fn=partial(load_users_by_ids, self._processors.user))
+
+    @cached_property
+    def project_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, GroupData | None]:
+        return DataLoader(load_fn=partial(load_projects_by_ids, self._processors.group))
+
+    @cached_property
+    def domain_loader(
+        self,
+    ) -> DataLoader[str, DomainData | None]:
+        return DataLoader(load_fn=partial(load_domains_by_names, self._processors.domain))
 
     @cached_property
     def image_loader(
