@@ -1,32 +1,32 @@
 """DomainV2 GraphQL types package."""
 
 from .filters import (
-    DomainProjectNestedFilter,
-    DomainUserNestedFilter,
     DomainV2Filter,
     DomainV2OrderBy,
     DomainV2OrderField,
+    DomainV2ProjectNestedFilter,
+    DomainV2UserNestedFilter,
 )
 from .nested import (
-    DomainBasicInfoGQL,
-    DomainLifecycleInfoGQL,
-    DomainRegistryInfoGQL,
+    DomainV2BasicInfoGQL,
+    DomainV2LifecycleInfoGQL,
+    DomainV2RegistryInfoGQL,
 )
 from .node import DomainV2Connection, DomainV2Edge, DomainV2GQL
 
 __all__ = [
     # Filter and OrderBy
-    "DomainProjectNestedFilter",
-    "DomainUserNestedFilter",
+    "DomainV2ProjectNestedFilter",
+    "DomainV2UserNestedFilter",
     "DomainV2Filter",
     "DomainV2OrderBy",
     "DomainV2OrderField",
     # Nested types - Basic
-    "DomainBasicInfoGQL",
+    "DomainV2BasicInfoGQL",
     # Nested types - Registry
-    "DomainRegistryInfoGQL",
+    "DomainV2RegistryInfoGQL",
     # Nested types - Lifecycle
-    "DomainLifecycleInfoGQL",
+    "DomainV2LifecycleInfoGQL",
     # Node types
     "DomainV2GQL",
     "DomainV2Edge",

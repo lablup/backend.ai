@@ -12,13 +12,13 @@ import strawberry
 
 
 @strawberry.type(
-    name="DomainBasicInfo",
+    name="DomainV2BasicInfo",
     description=(
         "Added in 26.2.0. Basic domain information. "
         "Contains identity and descriptive fields for the domain."
     ),
 )
-class DomainBasicInfoGQL:
+class DomainV2BasicInfoGQL:
     """Basic domain information."""
 
     name: str = strawberry.field(description="Domain name (primary key).")
@@ -34,13 +34,13 @@ class DomainBasicInfoGQL:
 
 
 @strawberry.type(
-    name="DomainRegistryInfo",
+    name="DomainV2RegistryInfo",
     description=(
         "Added in 26.2.0. Domain container registry configuration. "
         "Contains allowed container registry URLs for this domain."
     ),
 )
-class DomainRegistryInfoGQL:
+class DomainV2RegistryInfoGQL:
     """Domain container registry configuration."""
 
     allowed_docker_registries: list[str] = strawberry.field(
@@ -57,13 +57,13 @@ class DomainRegistryInfoGQL:
 
 
 @strawberry.type(
-    name="DomainLifecycleInfo",
+    name="DomainV2LifecycleInfo",
     description=(
         "Added in 26.2.0. Domain lifecycle information. "
         "Contains activation status and timestamp tracking."
     ),
 )
-class DomainLifecycleInfoGQL:
+class DomainV2LifecycleInfoGQL:
     """Domain lifecycle information."""
 
     is_active: bool = strawberry.field(

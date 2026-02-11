@@ -25,13 +25,13 @@ from ai.backend.manager.repositories.user.options import UserConditions
 
 
 @strawberry.input(
-    name="DomainProjectNestedFilter",
+    name="DomainV2ProjectNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for projects belonging to a domain. "
         "Filters domains that have at least one project matching all specified conditions."
     ),
 )
-class DomainProjectNestedFilter:
+class DomainV2ProjectNestedFilter:
     """Nested filter for projects within a domain."""
 
     name: StringFilter | None = strawberry.field(
@@ -68,13 +68,13 @@ class DomainProjectNestedFilter:
 
 
 @strawberry.input(
-    name="DomainUserNestedFilter",
+    name="DomainV2UserNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for users belonging to a domain. "
         "Filters domains that have at least one user matching all specified conditions."
     ),
 )
-class DomainUserNestedFilter:
+class DomainV2UserNestedFilter:
     """Nested filter for users within a domain."""
 
     username: StringFilter | None = strawberry.field(
@@ -157,14 +157,14 @@ class DomainV2Filter(GQLFilter):
         default=None,
         description="Filter by last modification timestamp. Supports before, after, and between operations.",
     )
-    project: DomainProjectNestedFilter | None = strawberry.field(
+    project: DomainV2ProjectNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested project conditions. "
             "Returns domains that have at least one project matching all specified conditions."
         ),
     )
-    user: DomainUserNestedFilter | None = strawberry.field(
+    user: DomainV2UserNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested user conditions. "

@@ -6,15 +6,15 @@ replacing JSON scalars and organized into logical field groups.
 
 from .resolver import admin_domains_v2, domain_v2, rg_domains_v2
 from .types import (
-    DomainBasicInfoGQL,
-    DomainLifecycleInfoGQL,
-    DomainRegistryInfoGQL,
+    DomainV2BasicInfoGQL,
     DomainV2Connection,
     DomainV2Edge,
     DomainV2Filter,
     DomainV2GQL,
+    DomainV2LifecycleInfoGQL,
     DomainV2OrderBy,
     DomainV2OrderField,
+    DomainV2RegistryInfoGQL,
 )
 
 __all__ = [
@@ -27,9 +27,9 @@ __all__ = [
     "DomainV2OrderBy",
     "DomainV2OrderField",
     # Nested types
-    "DomainBasicInfoGQL",
-    "DomainLifecycleInfoGQL",
-    "DomainRegistryInfoGQL",
+    "DomainV2BasicInfoGQL",
+    "DomainV2LifecycleInfoGQL",
+    "DomainV2RegistryInfoGQL",
     # Node types
     "DomainV2GQL",
     "DomainV2Edge",

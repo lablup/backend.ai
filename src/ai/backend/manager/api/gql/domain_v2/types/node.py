@@ -18,9 +18,9 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .nested import (
-    DomainBasicInfoGQL,
-    DomainLifecycleInfoGQL,
-    DomainRegistryInfoGQL,
+    DomainV2BasicInfoGQL,
+    DomainV2LifecycleInfoGQL,
+    DomainV2RegistryInfoGQL,
 )
 
 if TYPE_CHECKING:
@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.domain.types import DomainData
 
 
-@strawberry.input(name="DomainFairShareScope")
-class DomainFairShareScopeGQL:
+@strawberry.input(name="DomainV2FairShareScope")
+class DomainV2FairShareScopeGQL:
     """Scope parameters for filtering domain fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -43,8 +43,8 @@ class DomainFairShareScopeGQL:
     )
 
 
-@strawberry.input(name="DomainUsageScope")
-class DomainUsageScopeGQL:
+@strawberry.input(name="DomainV2UsageScope")
+class DomainV2UsageScopeGQL:
     """Scope parameters for filtering domain usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -68,13 +68,13 @@ class DomainV2GQL(Node):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Domain name (primary key).")
-    basic_info: DomainBasicInfoGQL = strawberry.field(
+    basic_info: DomainV2BasicInfoGQL = strawberry.field(
         description="Basic domain information including name and description."
     )
-    registry: DomainRegistryInfoGQL = strawberry.field(
+    registry: DomainV2RegistryInfoGQL = strawberry.field(
         description="Container registry configuration."
     )
-    lifecycle: DomainLifecycleInfoGQL = strawberry.field(
+    lifecycle: DomainV2LifecycleInfoGQL = strawberry.field(
         description="Lifecycle information including activation status and timestamps."
     )
 
@@ -89,7 +89,7 @@ class DomainV2GQL(Node):
     async def fair_share(
         self,
         info: Info,
-        scope: DomainFairShareScopeGQL,
+        scope: DomainV2FairShareScopeGQL,
     ) -> DomainFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
             fetch_single_domain_fair_share,
@@ -110,7 +110,7 @@ class DomainV2GQL(Node):
     async def usage_buckets(
         self,
         info: Info,
-        scope: DomainUsageScopeGQL,
+        scope: DomainV2UsageScopeGQL,
         filter: DomainUsageBucketFilter | None = None,
         order_by: list[DomainUsageBucketOrderBy] | None = None,
         before: str | None = None,
@@ -273,15 +273,15 @@ class DomainV2GQL(Node):
         """
         return cls(
             id=ID(data.name),  # name is the primary key
-            basic_info=DomainBasicInfoGQL(
+            basic_info=DomainV2BasicInfoGQL(
                 name=data.name,
                 description=data.description,
                 integration_id=data.integration_id,
             ),
-            registry=DomainRegistryInfoGQL(
+            registry=DomainV2RegistryInfoGQL(
                 allowed_docker_registries=data.allowed_docker_registries,
             ),
-            lifecycle=DomainLifecycleInfoGQL(
+            lifecycle=DomainV2LifecycleInfoGQL(
                 is_active=data.is_active,
                 created_at=data.created_at,
                 modified_at=data.modified_at,
