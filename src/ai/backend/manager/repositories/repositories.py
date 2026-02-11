@@ -12,6 +12,9 @@ from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
+from ai.backend.manager.repositories.container_registry_quota.repositories import (
+    PerProjectRegistryQuotaRepositories,
+)
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
@@ -67,6 +70,7 @@ class Repositories:
     app_config: AppConfigRepositories
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
+    container_registry_quota: PerProjectRegistryQuotaRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
     error_log: ErrorLogRepositories
@@ -105,6 +109,7 @@ class Repositories:
         app_config_repositories = AppConfigRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
+        container_registry_quota_repositories = PerProjectRegistryQuotaRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
@@ -142,6 +147,7 @@ class Repositories:
             app_config=app_config_repositories,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
+            container_registry_quota=container_registry_quota_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
             error_log=error_log_repositories,
