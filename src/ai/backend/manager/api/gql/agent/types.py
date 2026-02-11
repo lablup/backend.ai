@@ -73,7 +73,7 @@ class AgentV2OrderFieldGQL(StrEnum):
 @strawberry.input(
     name="AgentV2StatusFilter",
     description=dedent_strip("""
-        Added in 26.1.0. Filter options for agent status within AgentFilter.
+        Added in 26.1.0. Filter options for agent status within AgentV2Filter.
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )
