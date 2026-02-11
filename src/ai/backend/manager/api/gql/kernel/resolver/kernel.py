@@ -8,7 +8,7 @@ from strawberry import Info
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
-    KernelConnectionV2GQL,
+    KernelV2ConnectionGQL,
     KernelV2FilterGQL,
     KernelV2OrderByGQL,
     KernelV2GQL,
@@ -40,7 +40,7 @@ async def admin_kernels_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelConnectionV2GQL:
+) -> KernelV2ConnectionGQL:
     check_admin_only()
     return await fetch_kernels(
         info,
@@ -70,7 +70,7 @@ async def session_kernels_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelConnectionV2GQL:
+) -> KernelV2ConnectionGQL:
     base_conditions = [KernelConditions.by_session_ids([SessionId(scope.session_id)])]
     return await fetch_kernels(
         info,

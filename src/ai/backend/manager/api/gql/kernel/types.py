@@ -538,10 +538,10 @@ KernelV2EdgeGQL = Edge[KernelV2GQL]
 
 
 @strawberry.type(
-    name="KernelConnectionV2",
+    name="KernelV2Connection",
     description="Added in 26.2.0. Connection type for paginated kernel results.",
 )
-class KernelConnectionV2GQL(Connection[KernelV2GQL]):
+class KernelV2ConnectionGQL(Connection[KernelV2GQL]):
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:

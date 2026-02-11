@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .types import (
-    KernelConnectionV2GQL,
+    KernelV2ConnectionGQL,
     KernelV2ClusterInfoGQL,
     KernelV2EdgeGQL,
     KernelV2FilterGQL,
@@ -21,7 +21,7 @@ from .types import (
 )
 
 __all__ = [
-    "KernelConnectionV2GQL",
+    "KernelV2ConnectionGQL",
     "KernelV2ClusterInfoGQL",
     "KernelV2EdgeGQL",
     "KernelV2FilterGQL",

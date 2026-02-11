@@ -9,7 +9,7 @@ from ai.backend.common.types import KernelId
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.kernel.types import (
-    KernelConnectionV2GQL,
+    KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
     KernelV2FilterGQL,
     KernelV2OrderByGQL,
@@ -44,7 +44,7 @@ async def fetch_kernels(
     limit: int | None = None,
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
-) -> KernelConnectionV2GQL:
+) -> KernelV2ConnectionGQL:
     querier = info.context.gql_adapter.build_querier(
         PaginationOptions(
             first=first,
@@ -66,7 +66,7 @@ async def fetch_kernels(
     nodes = [KernelV2GQL.from_kernel_info(kernel_info) for kernel_info in action_result.data]
     edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
-    return KernelConnectionV2GQL(
+    return KernelV2ConnectionGQL(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=action_result.has_next_page,

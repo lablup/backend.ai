@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
-        KernelConnectionV2GQL,
+        KernelV2ConnectionGQL,
         KernelV2FilterGQL,
         KernelV2OrderByGQL,
     )
@@ -422,7 +422,7 @@ class AgentV2GQL(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> Annotated[
-        KernelConnectionV2GQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+        KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
     ]:
         """Fetch kernels associated with this agent."""
         from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
