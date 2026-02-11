@@ -12,8 +12,10 @@ import strawberry
 from graphql import StringValueNode
 from graphql.language.ast import ValueNode
 from graphql_relay.utils import base64, unbase64
+from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.manager.actions.action import SearchActionResult
 from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
 
 if TYPE_CHECKING:
@@ -513,4 +515,27 @@ def build_page_info[TEdge: HasCursor](
         has_previous_page=has_previous_page,
         start_cursor=edges[0].cursor if edges else None,
         end_cursor=edges[-1].cursor if edges else None,
+    )
+
+
+def build_connection[TData, TNode: Node, TConn](
+    *,
+    result: SearchActionResult[TData],
+    to_node: Callable[[TData], TNode],
+    id_getter: Callable[[TNode], str],
+    edge_type: type[Edge[TNode]],
+    connection_type: Callable[..., TConn],
+) -> TConn:
+    """Build a relay Connection from a SearchActionResult."""
+    nodes = [to_node(item) for item in result.items]
+    edges = [edge_type(node=node, cursor=encode_cursor(id_getter(node))) for node in nodes]
+    return connection_type(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
