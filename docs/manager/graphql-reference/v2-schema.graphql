@@ -3000,7 +3000,7 @@ type KernelV2 implements Node {
   startupCommand: String
 
   """Information about the session this kernel belongs to."""
-  session: KernelSessionInfo!
+  sessionInfo: KernelSessionInfo!
 
   """User and ownership information."""
   userInfo: KernelUserInfo!
@@ -3031,6 +3031,9 @@ type KernelV2 implements Node {
 
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
+
+  """Added in 26.2.0. The session this kernel belongs to."""
+  session: SessionV2
 }
 
 """An edge in a connection."""

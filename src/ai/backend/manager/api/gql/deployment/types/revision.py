@@ -21,8 +21,8 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     to_global_id,
 )
-from ai.backend.manager.api.gql.common.types import ClusterModeGQL as ClusterMode
 from ai.backend.manager.api.gql.common.types import (
+    ClusterModeGQL,
     ResourceOptsGQL,
     ResourceOptsInput,
 )
@@ -209,13 +209,13 @@ class ClusterConfig:
     Defines the clustering mode and number of replicas.
     """
 
-    mode: ClusterMode = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
+    mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
     size: int = strawberry.field(description="Number of replicas in the cluster.")
 
     @classmethod
     def from_dataclass(cls, data: ClusterConfigData) -> ClusterConfig:
         return cls(
-            mode=ClusterMode(data.mode.name),
+            mode=ClusterModeGQL(data.mode.name),
             size=data.size,
         )
 
@@ -396,7 +396,7 @@ class ActivateRevisionPayloadGQL:
 # Input Types
 @strawberry.input(description="Added in 25.19.0")
 class ClusterConfigInput:
-    mode: ClusterMode
+    mode: ClusterModeGQL
     size: int
 
 
