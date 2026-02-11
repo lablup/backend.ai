@@ -36,33 +36,33 @@ from ai.backend.manager.repositories.scheduler.options import (
 
 
 @strawberry.enum(
-    name="AgentPermission",
+    name="AgentV2Permission",
     description="Added in 26.1.0. Permissions related to agent operations",
 )
-class AgentPermissionGQL(StrEnum):
+class AgentV2PermissionGQL(StrEnum):
     READ_ATTRIBUTE = "read_attribute"
     UPDATE_ATTRIBUTE = "update_attribute"
     CREATE_COMPUTE_SESSION = "create_compute_session"
     CREATE_SERVICE = "create_service"
 
     @classmethod
-    def from_agent_permission(cls, permission: AgentPermission) -> AgentPermissionGQL:
+    def from_agent_permission(cls, permission: AgentPermission) -> AgentV2PermissionGQL:
         match permission:
             case AgentPermission.READ_ATTRIBUTE:
-                return AgentPermissionGQL.READ_ATTRIBUTE
+                return AgentV2PermissionGQL.READ_ATTRIBUTE
             case AgentPermission.UPDATE_ATTRIBUTE:
-                return AgentPermissionGQL.UPDATE_ATTRIBUTE
+                return AgentV2PermissionGQL.UPDATE_ATTRIBUTE
             case AgentPermission.CREATE_COMPUTE_SESSION:
-                return AgentPermissionGQL.CREATE_COMPUTE_SESSION
+                return AgentV2PermissionGQL.CREATE_COMPUTE_SESSION
             case AgentPermission.CREATE_SERVICE:
-                return AgentPermissionGQL.CREATE_SERVICE
+                return AgentV2PermissionGQL.CREATE_SERVICE
 
 
 @strawberry.enum(
-    name="AgentOrderField",
+    name="AgentV2OrderField",
     description="Added in 26.1.0. Order by specification for agents",
 )
-class AgentOrderFieldGQL(StrEnum):
+class AgentV2OrderFieldGQL(StrEnum):
     ID = "id"
     STATUS = "status"
     FIRST_CONTACT = "first_contact"
@@ -71,29 +71,29 @@ class AgentOrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="AgentStatusFilter",
+    name="AgentV2StatusFilter",
     description=dedent_strip("""
         Added in 26.1.0. Filter options for agent status within AgentFilter.
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )
-class AgentStatusFilterGQL:
+class AgentV2StatusFilterGQL:
     in_: list[AgentStatus] | None = strawberry.field(name="in", default=None)
     equals: AgentStatus | None = None
 
 
 @strawberry.input(
-    name="AgentFilter", description="Added in 26.1.0. Filter options for querying agents"
+    name="AgentV2Filter", description="Added in 26.1.0. Filter options for querying agents"
 )
-class AgentFilterGQL(GQLFilter):
+class AgentV2FilterGQL(GQLFilter):
     id: StringFilter | None = None
-    status: AgentStatusFilterGQL | None = None
+    status: AgentV2StatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
 
-    AND: list[AgentFilterGQL] | None = None
-    OR: list[AgentFilterGQL] | None = None
-    NOT: list[AgentFilterGQL] | None = None
+    AND: list[AgentV2FilterGQL] | None = None
+    OR: list[AgentV2FilterGQL] | None = None
+    NOT: list[AgentV2FilterGQL] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         field_conditions: list[QueryCondition] = []
@@ -146,28 +146,28 @@ class AgentFilterGQL(GQLFilter):
         return field_conditions
 
 
-@strawberry.input(name="AgentOrderBy", description="Added in 26.1.0. Options for ordering agents")
-class AgentOrderByGQL(GQLOrderBy):
-    field: AgentOrderFieldGQL
+@strawberry.input(name="AgentV2OrderBy", description="Added in 26.1.0. Options for ordering agents")
+class AgentV2OrderByGQL(GQLOrderBy):
+    field: AgentV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case AgentOrderFieldGQL.ID:
+            case AgentV2OrderFieldGQL.ID:
                 return AgentOrders.id(ascending)
-            case AgentOrderFieldGQL.STATUS:
+            case AgentV2OrderFieldGQL.STATUS:
                 return AgentOrders.status(ascending)
-            case AgentOrderFieldGQL.FIRST_CONTACT:
+            case AgentV2OrderFieldGQL.FIRST_CONTACT:
                 return AgentOrders.first_contact(ascending)
-            case AgentOrderFieldGQL.SCALING_GROUP:
+            case AgentV2OrderFieldGQL.SCALING_GROUP:
                 return AgentOrders.scaling_group(ascending)
-            case AgentOrderFieldGQL.SCHEDULABLE:
+            case AgentV2OrderFieldGQL.SCHEDULABLE:
                 return AgentOrders.schedulable(ascending)
 
 
-@strawberry.type(name="AgentResource", description="Added in 25.15.0")
-class AgentResourceGQL:
+@strawberry.type(name="AgentV2Resource", description="Added in 25.15.0")
+class AgentV2ResourceGQL:
     capacity: JSON = strawberry.field(
         description=dedent_strip("""
             Total hardware resource capacity available on the agent.
@@ -194,16 +194,16 @@ class AgentResourceGQL:
     )
 
 
-@strawberry.type(name="AgentStats", description="Added in 25.15.0")
-class AgentStatsGQL:
-    total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
+@strawberry.type(name="AgentV2Stats", description="Added in 25.15.0")
+class AgentV2StatsGQL:
+    total_resource: AgentV2ResourceGQL = strawberry.field(description="Added in 25.15.0")
 
 
 @strawberry.type(
-    name="AgentStatusInfo",
+    name="AgentV2StatusInfo",
     description="Added in 26.1.0. Status and lifecycle information for an agent",
 )
-class AgentStatusInfoGQL:
+class AgentV2StatusInfoGQL:
     status: AgentStatus = strawberry.field(
         description=dedent_strip("""
             Current operational status of the agent.
@@ -243,12 +243,12 @@ class AgentStatusInfoGQL:
 
 
 @strawberry.type(
-    name="ComputePluginEntry",
+    name="ComputePluginV2Entry",
     description=(
         "Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata."
     ),
 )
-class ComputePluginEntryGQL:
+class ComputePluginV2EntryGQL:
     """Single compute plugin entry with plugin name and metadata."""
 
     plugin_name: str = strawberry.field(
@@ -266,16 +266,16 @@ class ComputePluginEntryGQL:
 
 
 @strawberry.type(
-    name="ComputePlugins",
+    name="ComputePluginsV2",
     description=(
         "Added in 26.1.0. A collection of compute plugins available on an agent. "
         "Each entry specifies a plugin name and its associated metadata."
     ),
 )
-class ComputePluginsGQL:
+class ComputePluginsV2GQL:
     """Compute plugins container with multiple plugin entries."""
 
-    entries: list[ComputePluginEntryGQL] = strawberry.field(
+    entries: list[ComputePluginV2EntryGQL] = strawberry.field(
         description=(
             "List of compute plugins. Each entry contains a plugin name and its metadata. "
             "The list includes all accelerator and resource type plugins installed on the agent."
@@ -283,19 +283,19 @@ class ComputePluginsGQL:
     )
 
     @classmethod
-    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsGQL:
+    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsV2GQL:
         """Convert a mapping of plugin name to value to GraphQL type."""
         entries = [
-            ComputePluginEntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
+            ComputePluginV2EntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
         ]
         return cls(entries=entries)
 
 
 @strawberry.type(
-    name="AgentSystemInfo",
+    name="AgentV2SystemInfo",
     description="Added in 26.1.0. System and configuration information for an agent",
 )
-class AgentSystemInfoGQL:
+class AgentV2SystemInfoGQL:
     architecture: str = strawberry.field(
         description=dedent_strip("""
             Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
@@ -318,7 +318,7 @@ class AgentSystemInfoGQL:
         """),
         deprecation_reason="Legacy feature no longer in use.",
     )
-    compute_plugins: ComputePluginsGQL = strawberry.field(
+    compute_plugins: ComputePluginsV2GQL = strawberry.field(
         description=dedent_strip("""
             List of compute plugin metadata supported by this agent.
             Each plugin represents a specific accelerator or resource type (e.g., CUDA).
@@ -329,10 +329,10 @@ class AgentSystemInfoGQL:
 
 
 @strawberry.type(
-    name="AgentNetworkInfo",
+    name="AgentV2NetworkInfo",
     description="Added in 26.1.0. Network-related information for an agent",
 )
-class AgentNetworkInfoGQL:
+class AgentV2NetworkInfoGQL:
     region: str = strawberry.field(description="Logical region where the agent is deployed.")
     addr: str = strawberry.field(
         description=dedent_strip("""
@@ -349,34 +349,34 @@ class AgentNetworkInfoGQL:
 class AgentV2GQL(Node):
     _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
-    resource_info: AgentResourceGQL = strawberry.field(
+    resource_info: AgentV2ResourceGQL = strawberry.field(
         description=dedent_strip("""
             Hardware resource capacity, usage, and availability information.
             Contains capacity (total), used (occupied by sessions), and free (available) resource slots
             including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
         """)
     )
-    status_info: AgentStatusInfoGQL = strawberry.field(
+    status_info: AgentV2StatusInfoGQL = strawberry.field(
         description=dedent_strip("""
             Current operational status and lifecycle timestamps.
             Includes the agent's status (ALIVE, LOST, etc.), status change history,
             initial registration time, and schedulability state.
         """)
     )
-    system_info: AgentSystemInfoGQL = strawberry.field(
+    system_info: AgentV2SystemInfoGQL = strawberry.field(
         description=dedent_strip("""
             System configuration and software version information.
             Contains the host architecture, agent software version, and available compute plugins
             for accelerators and specialized hardware.
         """)
     )
-    network_info: AgentNetworkInfoGQL = strawberry.field(
+    network_info: AgentV2NetworkInfoGQL = strawberry.field(
         description=dedent_strip("""
             Network location and connectivity information.
             Provides the agent's region and network address for manager-to-agent communication.
         """)
     )
-    permissions: list[AgentPermissionGQL] = strawberry.field(
+    permissions: list[AgentV2PermissionGQL] = strawberry.field(
         description=dedent_strip("""
             List of permissions the current authenticated user has on this agent.
             Determines which operations (read attributes, create sessions, etc.)
@@ -460,30 +460,30 @@ class AgentV2GQL(Node):
         return cls(
             _agent_id=data.id,
             id=ID(data.id),
-            resource_info=AgentResourceGQL(
+            resource_info=AgentV2ResourceGQL(
                 capacity=data.available_slots.to_json(),
                 used=data.actual_occupied_slots.to_json(),
                 free=(data.available_slots - data.actual_occupied_slots).to_json(),
             ),
-            status_info=AgentStatusInfoGQL(
+            status_info=AgentV2StatusInfoGQL(
                 status=data.status,
                 status_changed=data.status_changed,
                 first_contact=data.first_contact,
                 lost_at=data.lost_at,
                 schedulable=data.schedulable,
             ),
-            system_info=AgentSystemInfoGQL(
+            system_info=AgentV2SystemInfoGQL(
                 architecture=data.architecture,
                 version=data.version,
                 auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
-                compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
+                compute_plugins=ComputePluginsV2GQL.from_mapping(data.compute_plugins),
             ),
-            network_info=AgentNetworkInfoGQL(
+            network_info=AgentV2NetworkInfoGQL(
                 region=data.region,
                 addr=data.addr,
             ),
             permissions=[
-                AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
+                AgentV2PermissionGQL.from_agent_permission(p) for p in detail_data.permissions
             ],
             scaling_group=data.scaling_group,
         )
