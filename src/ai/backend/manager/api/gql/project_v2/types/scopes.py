@@ -12,7 +12,7 @@ import strawberry
         "Used to restrict project queries to a particular domain context."
     ),
 )
-class DomainProjectScope:
+class DomainProjectV2Scope:
     """Scope for domain-level project queries."""
 
     domain_name: str = strawberry.field(

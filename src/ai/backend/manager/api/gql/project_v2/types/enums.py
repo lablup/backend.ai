@@ -8,14 +8,14 @@ import strawberry
 
 
 @strawberry.enum(
-    name="ProjectTypeV2",
+    name="ProjectV2Type",
     description=(
         "Added in 26.2.0. Project type determining its purpose and behavior. "
         "GENERAL: Standard project for general computation. "
         "MODEL_STORE: Project for model storage and management."
     ),
 )
-class ProjectTypeEnum(StrEnum):
+class ProjectV2TypeEnum(StrEnum):
     """Project type enum."""
 
     GENERAL = "general"

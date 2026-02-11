@@ -18,12 +18,12 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
+from .enums import ProjectV2TypeEnum, VFolderHostPermissionEnum
 from .nested import (
-    ProjectBasicInfoGQL,
-    ProjectLifecycleInfoGQL,
-    ProjectOrganizationInfoGQL,
-    ProjectStorageInfoGQL,
+    ProjectV2BasicInfoGQL,
+    ProjectV2LifecycleInfoGQL,
+    ProjectV2OrganizationInfoGQL,
+    ProjectV2StorageInfoGQL,
     VFolderHostPermissionEntryGQL,
 )
 
@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.group.types import GroupData
 
 
-@strawberry.input(name="ProjectFairShareScope")
-class ProjectFairShareScopeGQL:
+@strawberry.input(name="ProjectV2FairShareScope")
+class ProjectV2FairShareScopeGQL:
     """Scope parameters for filtering project fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -43,8 +43,8 @@ class ProjectFairShareScopeGQL:
     )
 
 
-@strawberry.input(name="ProjectUsageScope")
-class ProjectUsageScopeGQL:
+@strawberry.input(name="ProjectV2UsageScope")
+class ProjectV2UsageScopeGQL:
     """Scope parameters for filtering project usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -68,16 +68,16 @@ class ProjectV2GQL(Node):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the project (UUID).")
-    basic_info: ProjectBasicInfoGQL = strawberry.field(
+    basic_info: ProjectV2BasicInfoGQL = strawberry.field(
         description="Basic project information including name, type, and description."
     )
-    organization: ProjectOrganizationInfoGQL = strawberry.field(
+    organization: ProjectV2OrganizationInfoGQL = strawberry.field(
         description="Organizational context including domain membership and resource policy."
     )
-    storage: ProjectStorageInfoGQL = strawberry.field(
+    storage: ProjectV2StorageInfoGQL = strawberry.field(
         description="Storage configuration and vfolder host permissions."
     )
-    lifecycle: ProjectLifecycleInfoGQL = strawberry.field(
+    lifecycle: ProjectV2LifecycleInfoGQL = strawberry.field(
         description="Lifecycle information including activation status and timestamps."
     )
 
@@ -92,7 +92,7 @@ class ProjectV2GQL(Node):
     async def fair_share(
         self,
         info: Info,
-        scope: ProjectFairShareScopeGQL,
+        scope: ProjectV2FairShareScopeGQL,
     ) -> ProjectFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.project import (
             fetch_single_project_fair_share,
@@ -113,7 +113,7 @@ class ProjectV2GQL(Node):
     async def usage_buckets(
         self,
         info: Info,
-        scope: ProjectUsageScopeGQL,
+        scope: ProjectV2UsageScopeGQL,
         filter: ProjectUsageBucketFilter | None = None,
         order_by: list[ProjectUsageBucketOrderBy] | None = None,
         before: str | None = None,
@@ -259,20 +259,20 @@ class ProjectV2GQL(Node):
 
         return cls(
             id=ID(str(data.id)),
-            basic_info=ProjectBasicInfoGQL(
+            basic_info=ProjectV2BasicInfoGQL(
                 name=data.name,
                 description=data.description,
-                type=ProjectTypeEnum(data.type.value),
+                type=ProjectV2TypeEnum(data.type.value),
                 integration_id=data.integration_id,
             ),
-            organization=ProjectOrganizationInfoGQL(
+            organization=ProjectV2OrganizationInfoGQL(
                 domain_name=data.domain_name,
                 resource_policy=data.resource_policy,
             ),
-            storage=ProjectStorageInfoGQL(
+            storage=ProjectV2StorageInfoGQL(
                 allowed_vfolder_hosts=vfolder_host_entries,
             ),
-            lifecycle=ProjectLifecycleInfoGQL(
+            lifecycle=ProjectV2LifecycleInfoGQL(
                 is_active=data.is_active,
                 created_at=data.created_at,
                 modified_at=data.modified_at,

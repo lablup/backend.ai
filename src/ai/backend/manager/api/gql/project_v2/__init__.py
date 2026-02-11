@@ -11,14 +11,14 @@ from .resolver import (
     project_v2,
 )
 from .types import (
-    ProjectBasicInfoGQL,
-    ProjectLifecycleInfoGQL,
-    ProjectOrganizationInfoGQL,
-    ProjectStorageInfoGQL,
-    ProjectTypeEnum,
+    ProjectV2BasicInfoGQL,
     ProjectV2Connection,
     ProjectV2Edge,
     ProjectV2GQL,
+    ProjectV2LifecycleInfoGQL,
+    ProjectV2OrganizationInfoGQL,
+    ProjectV2StorageInfoGQL,
+    ProjectV2TypeEnum,
     VFolderHostPermissionEntryGQL,
     VFolderHostPermissionEnum,
 )
@@ -30,14 +30,14 @@ __all__ = [
     "project_domain_v2",
     "project_v2",
     # Enums
-    "ProjectTypeEnum",
+    "ProjectV2TypeEnum",
     "VFolderHostPermissionEnum",
     # Nested types
-    "ProjectBasicInfoGQL",
-    "ProjectOrganizationInfoGQL",
+    "ProjectV2BasicInfoGQL",
+    "ProjectV2OrganizationInfoGQL",
     "VFolderHostPermissionEntryGQL",
-    "ProjectStorageInfoGQL",
-    "ProjectLifecycleInfoGQL",
+    "ProjectV2StorageInfoGQL",
+    "ProjectV2LifecycleInfoGQL",
     # Node types
     "ProjectV2GQL",
     "ProjectV2Edge",
