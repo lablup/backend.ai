@@ -6,7 +6,7 @@ from typing import cast
 from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import UNSET, Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
@@ -209,7 +209,7 @@ async def admin_bulk_update_users(
 
         # Convert password if provided
         password_state: OptionalState[PasswordInfo] = OptionalState.nop()
-        if user_input.password is not None:
+        if user_input.password is not None and user_input.password is not UNSET:
             password_state = OptionalState.update(
                 PasswordInfo(
                     password=user_input.password,
@@ -221,8 +221,18 @@ async def admin_bulk_update_users(
 
         # Convert group_ids if provided
         group_ids_state: OptionalState[list[str]] = OptionalState.nop()
-        if user_input.group_ids is not None:
+        if user_input.group_ids is not None and user_input.group_ids is not UNSET:
             group_ids_state = OptionalState.update([str(gid) for gid in user_input.group_ids])
+
+        # Convert status enum if provided
+        status_state: OptionalState[UserStatus] = OptionalState.nop()
+        if user_input.status is not None and user_input.status is not UNSET:
+            status_state = OptionalState.update(UserStatus(user_input.status.value))
+
+        # Convert role enum if provided
+        role_state: OptionalState[UserRole] = OptionalState.nop()
+        if user_input.role is not None and user_input.role is not UNSET:
+            role_state = OptionalState.update(UserRole(user_input.role.value))
 
         updater_spec = UserUpdaterSpec(
             username=OptionalState.from_graphql(user_input.username),
@@ -230,13 +240,9 @@ async def admin_bulk_update_users(
             need_password_change=OptionalState.from_graphql(user_input.need_password_change),
             full_name=OptionalState.from_graphql(user_input.full_name),
             description=OptionalState.from_graphql(user_input.description),
-            status=OptionalState.from_graphql(
-                UserStatus(user_input.status.value) if user_input.status is not None else None
-            ),
+            status=status_state,
             domain_name=OptionalState.from_graphql(user_input.domain_name),
-            role=OptionalState.from_graphql(
-                UserRole(user_input.role.value) if user_input.role is not None else None
-            ),
+            role=role_state,
             allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
             resource_policy=OptionalState.from_graphql(user_input.resource_policy),
             sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
