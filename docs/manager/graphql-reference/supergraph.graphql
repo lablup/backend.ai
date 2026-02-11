@@ -200,40 +200,12 @@ type AgentEdge
   cursor: String!
 }
 
-"""Added in 26.1.0. Filter options for querying agents"""
-input AgentFilter
-  @join__type(graph: STRAWBERRY)
-{
-  id: StringFilter = null
-  status: AgentStatusFilter = null
-  schedulable: Boolean = null
-  scalingGroup: StringFilter = null
-  AND: [AgentFilter!] = null
-  OR: [AgentFilter!] = null
-  NOT: [AgentFilter!] = null
-}
-
 type AgentList implements PaginatedList
   @join__implements(graph: GRAPHENE, interface: "PaginatedList")
   @join__type(graph: GRAPHENE)
 {
   items: [Agent]!
   total_count: Int!
-}
-
-"""Added in 26.1.0. Network-related information for an agent"""
-type AgentNetworkInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Logical region where the agent is deployed."""
-  region: String!
-
-  """
-  Network address and port where the agent can be reached (format: "host:port").
-  This is the bind or advertised address used by the manager to communicate
-  with the agent for session lifecycle management and health monitoring.
-  """
-  addr: String!
 }
 
 """Added in 24.12.0."""
@@ -275,77 +247,11 @@ type AgentNode implements Node
   permissions: [AgentPermissionField]
 }
 
-"""Added in 26.1.0. Options for ordering agents"""
-input AgentOrderBy
-  @join__type(graph: STRAWBERRY)
-{
-  field: AgentOrderField!
-  direction: OrderDirection! = ASC
-}
-
-"""Added in 26.1.0. Order by specification for agents"""
-enum AgentOrderField
-  @join__type(graph: STRAWBERRY)
-{
-  ID @join__enumValue(graph: STRAWBERRY)
-  STATUS @join__enumValue(graph: STRAWBERRY)
-  FIRST_CONTACT @join__enumValue(graph: STRAWBERRY)
-  SCALING_GROUP @join__enumValue(graph: STRAWBERRY)
-  SCHEDULABLE @join__enumValue(graph: STRAWBERRY)
-}
-
-"""Added in 26.1.0. Permissions related to agent operations"""
-enum AgentPermission
-  @join__type(graph: STRAWBERRY)
-{
-  READ_ATTRIBUTE @join__enumValue(graph: STRAWBERRY)
-  UPDATE_ATTRIBUTE @join__enumValue(graph: STRAWBERRY)
-  CREATE_COMPUTE_SESSION @join__enumValue(graph: STRAWBERRY)
-  CREATE_SERVICE @join__enumValue(graph: STRAWBERRY)
-}
-
 """
 Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service'].
 """
 scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
-
-"""Added in 25.15.0"""
-type AgentResource
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Total hardware resource capacity available on the agent.
-  Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
-  Each slot represents the maximum amount of that resource type the agent can provide.
-  """
-  capacity: JSON!
-
-  """
-  Total amount of resources currently consumed by running and scheduled compute sessions.
-  Includes both the requested resources for sessions being prepared and already allocated
-  resources for active sessions. The sum of occupied resources across all session states
-  that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
-  Expressed as a JSON object with the same structure as capacity.
-  """
-  used: JSON!
-
-  """
-  Available resources for scheduling new compute sessions (capacity - used).
-  This represents the maximum resources that can be allocated to new sessions
-  without exceeding the agent's capacity. Expressed as a JSON object with
-  the same structure as capacity.
-  """
-  free: JSON!
-}
-
-"""Added in 25.15.0"""
-type AgentStats
-  @join__type(graph: STRAWBERRY)
-{
-  """Added in 25.15.0"""
-  totalResource: AgentResource!
-}
 
 enum AgentStatus
   @join__type(graph: STRAWBERRY)
@@ -354,58 +260,6 @@ enum AgentStatus
   LOST @join__enumValue(graph: STRAWBERRY)
   RESTARTING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
-Added in 26.1.0. Filter options for agent status within AgentFilter.
-It includes options to filter whether agent status is in a specific list or equals a specific value.
-"""
-input AgentStatusFilter
-  @join__type(graph: STRAWBERRY)
-{
-  in: [AgentStatus!] = null
-  equals: AgentStatus = null
-}
-
-"""Added in 26.1.0. Status and lifecycle information for an agent"""
-type AgentStatusInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Current operational status of the agent.
-  Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
-  TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
-  """
-  status: AgentStatus!
-
-  """
-  Timestamp when the agent last changed its status.
-  Updated whenever the agent transitions between different status states
-  (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
-  Will be null if the agent status has never changed since initial registration.
-  """
-  statusChanged: DateTime
-
-  """
-  Timestamp when the agent first registered with the manager.
-  This value remains constant throughout the agent's lifecycle and can be used
-  to track the agent's age or identify when it was initially deployed.
-  """
-  firstContact: DateTime
-
-  """
-  Timestamp when the agent was marked as lost or unreachable.
-  Set when the manager detects the agent has stopped sending heartbeats.
-  Will be null if the agent has never been lost or is currently alive.
-  """
-  lostAt: DateTime
-
-  """
-  Indicates whether the agent is available for scheduling new compute sessions.
-  An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
-  When false, no new sessions will be assigned to this agent.
-  """
-  schedulable: Boolean!
 }
 
 """A schema for normal users."""
@@ -430,40 +284,6 @@ type AgentSummaryList implements PaginatedList
   total_count: Int!
 }
 
-"""Added in 26.1.0. System and configuration information for an agent"""
-type AgentSystemInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
-  Used to match compute sessions with compatible container images and ensure
-  proper binary execution on the agent.
-  """
-  architecture: String!
-
-  """
-  Version string of the Backend.AI agent software running on this node.
-  Follows semantic versioning (e.g., "26.1.0") and helps identify
-  compatibility and available features.
-  """
-  version: String!
-
-  """
-  Legacy configuration flag, no longer actively used in the system.
-  Retained for backward compatibility and schema consistency.
-  Originally intended to control automatic termination of misbehaving sessions.
-  """
-  autoTerminateAbusingKernel: Boolean! @deprecated(reason: "Legacy feature no longer in use.")
-
-  """
-  List of compute plugin metadata supported by this agent.
-  Each plugin represents a specific accelerator or resource type (e.g., CUDA).
-  Entries contain plugin names and their associated metadata with
-  plugin-specific configuration and capabilities.
-  """
-  computePlugins: ComputePlugins!
-}
-
 """Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
 type AgentV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -477,34 +297,34 @@ type AgentV2 implements Node
   Contains capacity (total), used (occupied by sessions), and free (available) resource slots
   including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
   """
-  resourceInfo: AgentResource!
+  resourceInfo: AgentV2Resource!
 
   """
   Current operational status and lifecycle timestamps.
   Includes the agent's status (ALIVE, LOST, etc.), status change history,
   initial registration time, and schedulability state.
   """
-  statusInfo: AgentStatusInfo!
+  statusInfo: AgentV2StatusInfo!
 
   """
   System configuration and software version information.
   Contains the host architecture, agent software version, and available compute plugins
   for accelerators and specialized hardware.
   """
-  systemInfo: AgentSystemInfo!
+  systemInfo: AgentV2SystemInfo!
 
   """
   Network location and connectivity information.
   Provides the agent's region and network address for manager-to-agent communication.
   """
-  networkInfo: AgentNetworkInfo!
+  networkInfo: AgentV2NetworkInfo!
 
   """
   List of permissions the current authenticated user has on this agent.
   Determines which operations (read attributes, create sessions, etc.)
   the user can perform on this specific agent based on RBAC policies.
   """
-  permissions: [AgentPermission!]!
+  permissions: [AgentV2Permission!]!
 
   """
   Name of the scaling group this agent belongs to.
@@ -545,6 +365,186 @@ type AgentV2Edge
 
   """The item at the end of the edge"""
   node: AgentV2!
+}
+
+"""Added in 26.1.0. Filter options for querying agents"""
+input AgentV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  id: StringFilter = null
+  status: AgentV2StatusFilter = null
+  schedulable: Boolean = null
+  scalingGroup: StringFilter = null
+  AND: [AgentV2Filter!] = null
+  OR: [AgentV2Filter!] = null
+  NOT: [AgentV2Filter!] = null
+}
+
+"""Added in 26.1.0. Network-related information for an agent"""
+type AgentV2NetworkInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Logical region where the agent is deployed."""
+  region: String!
+
+  """
+  Network address and port where the agent can be reached (format: "host:port").
+  This is the bind or advertised address used by the manager to communicate
+  with the agent for session lifecycle management and health monitoring.
+  """
+  addr: String!
+}
+
+"""Added in 26.1.0. Options for ordering agents"""
+input AgentV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: AgentV2OrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.1.0. Order by specification for agents"""
+enum AgentV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  ID @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  FIRST_CONTACT @join__enumValue(graph: STRAWBERRY)
+  SCALING_GROUP @join__enumValue(graph: STRAWBERRY)
+  SCHEDULABLE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.1.0. Permissions related to agent operations"""
+enum AgentV2Permission
+  @join__type(graph: STRAWBERRY)
+{
+  READ_ATTRIBUTE @join__enumValue(graph: STRAWBERRY)
+  UPDATE_ATTRIBUTE @join__enumValue(graph: STRAWBERRY)
+  CREATE_COMPUTE_SESSION @join__enumValue(graph: STRAWBERRY)
+  CREATE_SERVICE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.15.0"""
+type AgentV2Resource
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Total hardware resource capacity available on the agent.
+  Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
+  Each slot represents the maximum amount of that resource type the agent can provide.
+  """
+  capacity: JSON!
+
+  """
+  Total amount of resources currently consumed by running and scheduled compute sessions.
+  Includes both the requested resources for sessions being prepared and already allocated
+  resources for active sessions. The sum of occupied resources across all session states
+  that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
+  Expressed as a JSON object with the same structure as capacity.
+  """
+  used: JSON!
+
+  """
+  Available resources for scheduling new compute sessions (capacity - used).
+  This represents the maximum resources that can be allocated to new sessions
+  without exceeding the agent's capacity. Expressed as a JSON object with
+  the same structure as capacity.
+  """
+  free: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentV2Stats
+  @join__type(graph: STRAWBERRY)
+{
+  """Added in 25.15.0"""
+  totalResource: AgentV2Resource!
+}
+
+"""
+Added in 26.1.0. Filter options for agent status within AgentFilter.
+It includes options to filter whether agent status is in a specific list or equals a specific value.
+"""
+input AgentV2StatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [AgentStatus!] = null
+  equals: AgentStatus = null
+}
+
+"""Added in 26.1.0. Status and lifecycle information for an agent"""
+type AgentV2StatusInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Current operational status of the agent.
+  Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
+  TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
+  """
+  status: AgentStatus!
+
+  """
+  Timestamp when the agent last changed its status.
+  Updated whenever the agent transitions between different status states
+  (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
+  Will be null if the agent status has never changed since initial registration.
+  """
+  statusChanged: DateTime
+
+  """
+  Timestamp when the agent first registered with the manager.
+  This value remains constant throughout the agent's lifecycle and can be used
+  to track the agent's age or identify when it was initially deployed.
+  """
+  firstContact: DateTime
+
+  """
+  Timestamp when the agent was marked as lost or unreachable.
+  Set when the manager detects the agent has stopped sending heartbeats.
+  Will be null if the agent has never been lost or is currently alive.
+  """
+  lostAt: DateTime
+
+  """
+  Indicates whether the agent is available for scheduling new compute sessions.
+  An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
+  When false, no new sessions will be assigned to this agent.
+  """
+  schedulable: Boolean!
+}
+
+"""Added in 26.1.0. System and configuration information for an agent"""
+type AgentV2SystemInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
+  Used to match compute sessions with compatible container images and ensure
+  proper binary execution on the agent.
+  """
+  architecture: String!
+
+  """
+  Version string of the Backend.AI agent software running on this node.
+  Follows semantic versioning (e.g., "26.1.0") and helps identify
+  compatibility and available features.
+  """
+  version: String!
+
+  """
+  Legacy configuration flag, no longer actively used in the system.
+  Retained for backward compatibility and schema consistency.
+  Originally intended to control automatic termination of misbehaving sessions.
+  """
+  autoTerminateAbusingKernel: Boolean! @deprecated(reason: "Legacy feature no longer in use.")
+
+  """
+  List of compute plugin metadata supported by this agent.
+  Each plugin represents a specific accelerator or resource type (e.g., CUDA).
+  Entries contain plugin names and their associated metadata with
+  plugin-specific configuration and capabilities.
+  """
+  computePlugins: ComputePluginsV2!
 }
 
 type AliasImage
@@ -1692,9 +1692,21 @@ type ComputeContainerList implements PaginatedList
 }
 
 """
+Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
+"""
+type ComputePluginsV2
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  """
+  entries: [ComputePluginV2Entry!]!
+}
+
+"""
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
-type ComputePluginEntry
+type ComputePluginV2Entry
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -1706,18 +1718,6 @@ type ComputePluginEntry
   Plugin value string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
   """
   value: String!
-}
-
-"""
-Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
-"""
-type ComputePlugins
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
-  """
-  entries: [ComputePluginEntry!]!
 }
 
 type ComputeSession implements Item
@@ -8745,10 +8745,10 @@ type Query
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
   """Added in 25.15.0"""
-  agentStats: AgentStats! @join__field(graph: STRAWBERRY)
+  agentStats: AgentV2Stats! @join__field(graph: STRAWBERRY)
 
   """Added in 26.1.0"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
+  agentsV2(filter: AgentV2Filter = null, orderBy: [AgentV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0.

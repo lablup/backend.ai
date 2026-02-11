@@ -96,19 +96,102 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
+enum AgentStatus {
+  ALIVE
+  LOST
+  RESTARTING
+  TERMINATED
+}
+
+"""Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
+type AgentV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Hardware resource capacity, usage, and availability information.
+  Contains capacity (total), used (occupied by sessions), and free (available) resource slots
+  including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
+  """
+  resourceInfo: AgentV2Resource!
+
+  """
+  Current operational status and lifecycle timestamps.
+  Includes the agent's status (ALIVE, LOST, etc.), status change history,
+  initial registration time, and schedulability state.
+  """
+  statusInfo: AgentV2StatusInfo!
+
+  """
+  System configuration and software version information.
+  Contains the host architecture, agent software version, and available compute plugins
+  for accelerators and specialized hardware.
+  """
+  systemInfo: AgentV2SystemInfo!
+
+  """
+  Network location and connectivity information.
+  Provides the agent's region and network address for manager-to-agent communication.
+  """
+  networkInfo: AgentV2NetworkInfo!
+
+  """
+  List of permissions the current authenticated user has on this agent.
+  Determines which operations (read attributes, create sessions, etc.)
+  the user can perform on this specific agent based on RBAC policies.
+  """
+  permissions: [AgentV2Permission!]!
+
+  """
+  Name of the scaling group this agent belongs to.
+  Scaling groups are logical collections of agents used for resource scheduling,
+  quota management, and workload isolation across different user groups or projects.
+  """
+  scalingGroup: String!
+
+  """Added in 26.1.0. Load the container count for this agent."""
+  containerCount: Int!
+
+  """
+  Added in 26.2.0. List of kernels running on this agent with pagination support.
+  """
+  kernels(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
+}
+
+"""
+Added in 26.1.0. Relay-style connection type for paginated lists of agents
+"""
+type AgentV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AgentV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AgentV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AgentV2!
+}
+
 """Added in 26.1.0. Filter options for querying agents"""
-input AgentFilter {
+input AgentV2Filter {
   id: StringFilter = null
-  status: AgentStatusFilter = null
+  status: AgentV2StatusFilter = null
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
-  AND: [AgentFilter!] = null
-  OR: [AgentFilter!] = null
-  NOT: [AgentFilter!] = null
+  AND: [AgentV2Filter!] = null
+  OR: [AgentV2Filter!] = null
+  NOT: [AgentV2Filter!] = null
 }
 
 """Added in 26.1.0. Network-related information for an agent"""
-type AgentNetworkInfo {
+type AgentV2NetworkInfo {
   """Logical region where the agent is deployed."""
   region: String!
 
@@ -121,13 +204,13 @@ type AgentNetworkInfo {
 }
 
 """Added in 26.1.0. Options for ordering agents"""
-input AgentOrderBy {
-  field: AgentOrderField!
+input AgentV2OrderBy {
+  field: AgentV2OrderField!
   direction: OrderDirection! = ASC
 }
 
 """Added in 26.1.0. Order by specification for agents"""
-enum AgentOrderField {
+enum AgentV2OrderField {
   ID
   STATUS
   FIRST_CONTACT
@@ -136,7 +219,7 @@ enum AgentOrderField {
 }
 
 """Added in 26.1.0. Permissions related to agent operations"""
-enum AgentPermission {
+enum AgentV2Permission {
   READ_ATTRIBUTE
   UPDATE_ATTRIBUTE
   CREATE_COMPUTE_SESSION
@@ -144,7 +227,7 @@ enum AgentPermission {
 }
 
 """Added in 25.15.0"""
-type AgentResource {
+type AgentV2Resource {
   """
   Total hardware resource capacity available on the agent.
   Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
@@ -171,29 +254,22 @@ type AgentResource {
 }
 
 """Added in 25.15.0"""
-type AgentStats {
+type AgentV2Stats {
   """Added in 25.15.0"""
-  totalResource: AgentResource!
-}
-
-enum AgentStatus {
-  ALIVE
-  LOST
-  RESTARTING
-  TERMINATED
+  totalResource: AgentV2Resource!
 }
 
 """
 Added in 26.1.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
 """
-input AgentStatusFilter {
+input AgentV2StatusFilter {
   in: [AgentStatus!] = null
   equals: AgentStatus = null
 }
 
 """Added in 26.1.0. Status and lifecycle information for an agent"""
-type AgentStatusInfo {
+type AgentV2StatusInfo {
   """
   Current operational status of the agent.
   Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
@@ -232,7 +308,7 @@ type AgentStatusInfo {
 }
 
 """Added in 26.1.0. System and configuration information for an agent"""
-type AgentSystemInfo {
+type AgentV2SystemInfo {
   """
   Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
   Used to match compute sessions with compatible container images and ensure
@@ -260,83 +336,7 @@ type AgentSystemInfo {
   Entries contain plugin names and their associated metadata with
   plugin-specific configuration and capabilities.
   """
-  computePlugins: ComputePlugins!
-}
-
-"""Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."""
-type AgentV2 implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """
-  Hardware resource capacity, usage, and availability information.
-  Contains capacity (total), used (occupied by sessions), and free (available) resource slots
-  including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
-  """
-  resourceInfo: AgentResource!
-
-  """
-  Current operational status and lifecycle timestamps.
-  Includes the agent's status (ALIVE, LOST, etc.), status change history,
-  initial registration time, and schedulability state.
-  """
-  statusInfo: AgentStatusInfo!
-
-  """
-  System configuration and software version information.
-  Contains the host architecture, agent software version, and available compute plugins
-  for accelerators and specialized hardware.
-  """
-  systemInfo: AgentSystemInfo!
-
-  """
-  Network location and connectivity information.
-  Provides the agent's region and network address for manager-to-agent communication.
-  """
-  networkInfo: AgentNetworkInfo!
-
-  """
-  List of permissions the current authenticated user has on this agent.
-  Determines which operations (read attributes, create sessions, etc.)
-  the user can perform on this specific agent based on RBAC policies.
-  """
-  permissions: [AgentPermission!]!
-
-  """
-  Name of the scaling group this agent belongs to.
-  Scaling groups are logical collections of agents used for resource scheduling,
-  quota management, and workload isolation across different user groups or projects.
-  """
-  scalingGroup: String!
-
-  """Added in 26.1.0. Load the container count for this agent."""
-  containerCount: Int!
-
-  """
-  Added in 26.2.0. List of kernels running on this agent with pagination support.
-  """
-  kernels(filter: KernelFilter = null, orderBy: [KernelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelConnectionV2!
-}
-
-"""
-Added in 26.1.0. Relay-style connection type for paginated lists of agents
-"""
-type AgentV2Connection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [AgentV2Edge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type AgentV2Edge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: AgentV2!
+  computePlugins: ComputePluginsV2!
 }
 
 """Added in 25.16.0. App configuration data"""
@@ -1053,7 +1053,7 @@ enum ClusterMode {
 """
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
-type ComputePluginEntry {
+type ComputePluginV2Entry {
   """
   Name of the compute plugin (e.g., 'cuda', 'rocm', 'tpu'). This identifier corresponds to the accelerator or resource type supported by the agent.
   """
@@ -1068,11 +1068,11 @@ type ComputePluginEntry {
 """
 Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
 """
-type ComputePlugins {
+type ComputePluginsV2 {
   """
   List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
   """
-  entries: [ComputePluginEntry!]!
+  entries: [ComputePluginV2Entry!]!
 }
 
 extend type ComputeSessionNode @key(fields: "id") {
@@ -4558,10 +4558,10 @@ type Query {
   _service: _Service!
 
   """Added in 25.15.0"""
-  agentStats: AgentStats!
+  agentStats: AgentV2Stats!
 
   """Added in 26.1.0"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
+  agentsV2(filter: AgentV2Filter = null, orderBy: [AgentV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
 
   """
   Added in 25.14.0.
