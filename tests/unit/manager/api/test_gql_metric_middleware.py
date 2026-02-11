@@ -1,13 +1,20 @@
-"""Tests for GQLMetricMiddleware _observe helper and async resolver timing fix."""
+"""Tests for GQLMetricMiddleware metrics and OpenTelemetry span instrumentation."""
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from graphql import OperationType
+from graphql.type import GraphQLNonNull, GraphQLObjectType, GraphQLString
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 from ai.backend.common.exception import (
     ErrorCode,
@@ -245,3 +252,237 @@ class TestGQLMetricMiddlewareDataLoaderBatching:
         assert call_order.index("a_start") < call_order.index("a_end")
         assert call_order.index("b_start") < call_order.index("b_end")
         assert metric_observer.observe_request.call_count == 2
+
+
+_otel_exporter = InMemorySpanExporter()
+_otel_provider = TracerProvider()
+_otel_provider.add_span_processor(SimpleSpanProcessor(_otel_exporter))
+trace.set_tracer_provider(_otel_provider)
+
+
+@pytest.fixture
+def span_exporter() -> Generator[InMemorySpanExporter, None, None]:
+    _otel_exporter.clear()
+    yield _otel_exporter
+
+
+class TestGQLMetricMiddlewareSyncSpans:
+    """Tests for sync resolver OTel span behavior."""
+
+    def test_successful_sync_resolver_produces_ok_span(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "sync_result"
+
+        result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "sync_result"
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "gql.TestQuery.test_field"
+        assert span.attributes is not None
+        assert span.attributes["graphql.operation_name"] == "TestQuery"
+        assert span.attributes["graphql.field_name"] == "test_field"
+        assert span.attributes["graphql.parent_type"] == "Query"
+        assert span.status.status_code == StatusCode.OK
+
+    def test_sync_exception_produces_error_span(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            raise RuntimeError("test sync error")
+
+        with pytest.raises(RuntimeError, match="test sync error"):
+            middleware.resolve(sync_resolver, None, resolve_info)
+
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.status.description == "test sync error"
+        assert len(span.events) == 1
+        assert span.events[0].name == "exception"
+
+    def test_anonymous_operation_span_name(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        resolve_info.operation.name = None
+
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "result"
+
+        middleware.resolve(sync_resolver, None, resolve_info)
+
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].name == "gql.anonymous.test_field"
+        assert spans[0].attributes is not None
+        assert spans[0].attributes["graphql.operation_name"] == "anonymous"
+
+
+class TestGQLMetricMiddlewareAsyncSpans:
+    """Tests for async resolver OTel span behavior."""
+
+    async def test_async_span_not_ended_before_await(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        async def async_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "async_result"
+
+        result_coro = middleware.resolve(async_resolver, None, resolve_info)
+        assert span_exporter.get_finished_spans() == ()
+
+        result = await result_coro
+        assert result == "async_result"
+
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].name == "gql.TestQuery.test_field"
+        assert spans[0].status.status_code == StatusCode.OK
+
+    async def test_failing_async_resolver_produces_error_span(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        async def failing_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            raise ValueError("async error")
+
+        result_coro = middleware.resolve(failing_resolver, None, resolve_info)
+
+        with pytest.raises(ValueError, match="async error"):
+            await result_coro
+
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.status.description == "async error"
+        assert len(span.events) >= 1
+        assert span.events[0].name == "exception"
+
+    async def test_resolver_span_is_child_of_current_context(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        async def async_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "child_result"
+
+        tracer = trace.get_tracer("test")
+
+        with tracer.start_as_current_span("parent_http_span"):
+            result_coro = middleware.resolve(async_resolver, None, resolve_info)
+            result = await result_coro
+
+        assert result == "child_result"
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 2
+        parent = next(s for s in spans if s.name == "parent_http_span")
+        child = next(s for s in spans if s.name == "gql.TestQuery.test_field")
+        assert child.parent is not None
+        assert child.parent.span_id == parent.context.span_id
+        assert child.parent.trace_id == parent.context.trace_id
+
+
+class TestGQLMetricMiddlewareNoTracerProvider:
+    """Tests verifying behavior when OTel is not configured (no-op spans)."""
+
+    def test_sync_resolver_works_without_tracer_provider(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+    ) -> None:
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "result"
+
+        result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "result"
+
+    async def test_async_resolver_works_without_tracer_provider(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+    ) -> None:
+        async def async_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "async_no_otel"
+
+        result_coro = middleware.resolve(async_resolver, None, resolve_info)
+        result = await result_coro
+
+        assert result == "async_no_otel"
+
+
+class TestGQLMetricMiddlewareLeafTypeBypass:
+    """Tests verifying that leaf-type resolvers skip span and metric creation."""
+
+    def test_scalar_return_type_skips_span_and_metrics(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        metric_observer: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        resolve_info.return_type = GraphQLString
+
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "scalar_value"
+
+        result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "scalar_value"
+        assert span_exporter.get_finished_spans() == ()
+        metric_observer.observe_request.assert_not_called()
+
+    def test_nonnull_scalar_return_type_skips_span(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        metric_observer: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        resolve_info.return_type = GraphQLNonNull(GraphQLString)
+
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "nonnull_scalar"
+
+        result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "nonnull_scalar"
+        assert span_exporter.get_finished_spans() == ()
+        metric_observer.observe_request.assert_not_called()
+
+    def test_object_return_type_creates_span(
+        self,
+        middleware: GQLMetricMiddleware,
+        resolve_info: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        resolve_info.return_type = GraphQLObjectType("User", fields={})
+
+        def sync_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "object_value"
+
+        result = middleware.resolve(sync_resolver, None, resolve_info)
+
+        assert result == "object_value"
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].name == "gql.TestQuery.test_field"
