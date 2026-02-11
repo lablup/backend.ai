@@ -9,9 +9,9 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
     KernelConnectionV2GQL,
-    KernelFilterGQL,
-    KernelOrderByGQL,
+    KernelV2FilterGQL,
     KernelV2GQL,
+    KernelV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -32,8 +32,8 @@ async def kernel_v2(
 )  # type: ignore[misc]
 async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
+    filter: KernelV2FilterGQL | None = None,
+    order_by: list[KernelV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -62,8 +62,8 @@ async def admin_kernels_v2(
 async def session_kernels_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScope,
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
+    filter: KernelV2FilterGQL | None = None,
+    order_by: list[KernelV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
