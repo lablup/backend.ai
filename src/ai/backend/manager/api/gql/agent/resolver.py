@@ -5,11 +5,11 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.agent.fetcher import fetch_agents
 from ai.backend.manager.api.gql.agent.types import (
+    AgentV2Connection,
     AgentV2FilterGQL,
     AgentV2OrderByGQL,
     AgentV2ResourceGQL,
     AgentV2StatsGQL,
-    AgentV2Connection,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction

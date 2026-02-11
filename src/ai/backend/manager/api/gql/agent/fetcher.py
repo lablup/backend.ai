@@ -7,11 +7,11 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.agent.types import (
-    AgentV2FilterGQL,
-    AgentV2OrderByGQL,
     AgentV2Connection,
     AgentV2Edge,
+    AgentV2FilterGQL,
     AgentV2GQL,
+    AgentV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
