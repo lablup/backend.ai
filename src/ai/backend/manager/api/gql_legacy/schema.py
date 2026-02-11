@@ -3410,14 +3410,13 @@ class GQLMetricMiddleware:
                 start = time.perf_counter()
                 try:
                     result = await coro
+                    _set_span()
+                    _observe(duration=time.perf_counter() - start)
                 except BaseException as e:
                     _set_span(error=e)
                     _observe(duration=time.perf_counter() - start, error=e)
                     raise
-                else:
-                    _set_span()
-                    _observe(duration=time.perf_counter() - start)
-                    return result
+                return result
 
         start = time.perf_counter()
         try:
