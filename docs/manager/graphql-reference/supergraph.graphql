@@ -9121,9 +9121,6 @@ type Query
   """Added in 25.19.0. List routes for a deployment with optional filters."""
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.2.0. Query a single session by ID."""
-  sessionV2(id: ID!): SessionV2 @join__field(graph: STRAWBERRY)
-
   """Added in 26.2.0. Query sessions with pagination and filtering."""
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionConnectionV2! @join__field(graph: STRAWBERRY)
 

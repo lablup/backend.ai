@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .fetcher import fetch_session, fetch_sessions
-from .resolver import admin_sessions_v2, session_v2
+from .resolver import admin_sessions_v2
 from .types import (
     SessionConnectionV2GQL,
     SessionV2EdgeGQL,
