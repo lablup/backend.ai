@@ -25,6 +25,8 @@ class OpenTelemetrySpec:
     endpoint: str
     service_instance_id: uuid.UUID
     service_instance_name: str
+    max_queue_size: int
+    max_export_batch_size: int
 
     def to_resource(self) -> Resource:
         attributes = {
@@ -62,7 +64,11 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
     tracer_provider = TracerProvider(resource=spec.to_resource())
     span_exporter = OTLPSpanExporter(endpoint=spec.endpoint)
-    span_processor = BatchSpanProcessor(span_exporter)
+    span_processor = BatchSpanProcessor(
+        span_exporter,
+        max_queue_size=spec.max_queue_size,
+        max_export_batch_size=spec.max_export_batch_size,
+    )
     tracer_provider.add_span_processor(span_processor)
     trace.set_tracer_provider(tracer_provider)
     logging.info("OpenTelemetry tracing initialized successfully.")
