@@ -10413,7 +10413,7 @@ type SessionIdentityInfo
   """Unique identifier of the session."""
   id: ID!
 
-  """Client-provided creation ID for idempotent session creation."""
+  """Server-generated unique token for tracking session creation."""
   creationId: String!
 
   """Human-readable name of the session."""

@@ -161,7 +161,7 @@ class SessionOrderByGQL(GQLOrderBy):
 class SessionIdentityInfoGQL:
     id: ID = strawberry.field(description="Unique identifier of the session.")
     creation_id: str = strawberry.field(
-        description="Client-provided creation ID for idempotent session creation."
+        description="Server-generated unique token for tracking session creation."
     )
     name: str = strawberry.field(description="Human-readable name of the session.")
     session_type: SessionTypeGQL = strawberry.field(
