@@ -893,7 +893,7 @@ input BlueGreenConfigInput {
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserError {
+type BulkCreateUserV2Error {
   """Original position in the input list."""
   index: Int!
 
@@ -921,7 +921,7 @@ type BulkCreateUsersV2Payload {
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserError!]!
+  failed: [BulkCreateUserV2Error!]!
 }
 
 """
@@ -6505,19 +6505,6 @@ enum UsageBucketOrderField {
 }
 
 """
-Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
-"""
-input UserDomainNestedFilter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by domain active status."""
-  isActive: Boolean = null
-}
-
-"""
 Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.
 """
 type UserFairShare implements Node {
@@ -6660,16 +6647,6 @@ enum UserFairShareOrderField {
   USER_EMAIL
 }
 
-input UserFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-
-  """
-  Project ID that the user belongs to (required for user-level fair shares).
-  """
-  projectId: UUID!
-}
-
 """
 Added in 26.2.0. Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.
 """
@@ -6688,19 +6665,6 @@ input UserFairShareUserNestedFilter {
 
 extend type UserNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
-"""
-input UserProjectNestedFilter {
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by project active status."""
-  isActive: Boolean = null
 }
 
 """
@@ -6882,14 +6846,6 @@ input UserUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
-input UserUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-
-  """Project ID that the user belongs to (required for user-level usage)."""
-  projectId: UUID!
-}
-
 """
 Added in 26.2.0. User entity with structured field groups. Provides comprehensive user information organized into logical categories: basic_info (profile), status (account state), organization (permissions), security (auth settings), container (execution settings), and timestamps.
 """
@@ -6918,12 +6874,12 @@ type UserV2 implements Node @key(fields: "id") {
   """
   Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: UserFairShareScope!): UserFairShare!
+  fairShare(scope: UserV2FairShareScope!): UserFairShare!
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  usageBuckets(scope: UserV2UsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 
   """The domain this user belongs to."""
   domain: DomainV2
@@ -6983,6 +6939,19 @@ type UserV2ContainerSettings {
   containerGids: [Int!]
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserV2DomainNestedFilter {
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """An edge in a connection."""
 type UserV2Edge {
   """A cursor for use in pagination"""
@@ -6990,6 +6959,16 @@ type UserV2Edge {
 
   """The item at the end of the edge"""
   node: UserV2!
+}
+
+input UserV2FairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
 }
 
 """
@@ -7032,12 +7011,12 @@ input UserV2Filter {
   """
   Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
   """
-  domain: UserDomainNestedFilter = null
+  domain: UserV2DomainNestedFilter = null
 
   """
   Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
   """
-  project: UserProjectNestedFilter = null
+  project: UserV2ProjectNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
@@ -7095,6 +7074,19 @@ type UserV2OrganizationInfo {
 }
 
 """
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserV2ProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. User security settings and authentication configuration. Contains IP restrictions, TOTP settings, and privilege flags.
 """
 type UserV2SecurityInfo {
@@ -7131,6 +7123,14 @@ type UserV2StatusInfo {
 
   """If true, user must change password on next login."""
   needPasswordChange: Boolean
+}
+
+input UserV2UsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
 }
 
 """

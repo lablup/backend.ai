@@ -1403,8 +1403,19 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.2.0. Payload for bulk user creation mutation."""
+type BulkCreateUsersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
+
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserV2Error!]!
+}
+
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserError
+type BulkCreateUserV2Error
   @join__type(graph: STRAWBERRY)
 {
   """Original position in the input list."""
@@ -1418,17 +1429,6 @@ type BulkCreateUserError
 
   """Error message describing the failure."""
   message: String!
-}
-
-"""Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersV2Payload
-  @join__type(graph: STRAWBERRY)
-{
-  """List of successfully created users."""
-  createdUsers: [UserV2!]!
-
-  """List of errors for users that failed to create."""
-  failed: [BulkCreateUserError!]!
 }
 
 """
@@ -11376,21 +11376,6 @@ type UserConnection
   count: Int
 }
 
-"""
-Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
-"""
-input UserDomainNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by domain active status."""
-  isActive: Boolean = null
-}
-
 """Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge
   @join__type(graph: GRAPHENE)
@@ -11558,18 +11543,6 @@ enum UserFairShareOrderField
   USER_EMAIL @join__enumValue(graph: STRAWBERRY)
 }
 
-input UserFairShareScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-
-  """
-  Project ID that the user belongs to (required for user-level fair shares).
-  """
-  projectId: UUID!
-}
-
 """
 Added in 26.2.0. Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.
 """
@@ -11698,21 +11671,6 @@ type UserNode implements Node
 
   """Added in 25.5.0."""
   project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
-}
-
-"""
-Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
-"""
-input UserProjectNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by project active status."""
-  isActive: Boolean = null
 }
 
 type UserResourcePolicy
@@ -11942,16 +11900,6 @@ input UserUsageBucketOrderBy
   direction: OrderDirection! = DESC
 }
 
-input UserUsageScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-
-  """Project ID that the user belongs to (required for user-level usage)."""
-  projectId: UUID!
-}
-
 """Added in 25.6.0."""
 type UserUtilizationMetric
   @join__type(graph: GRAPHENE)
@@ -12013,12 +11961,12 @@ type UserV2 implements Node
   """
   Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: UserFairShareScope!): UserFairShare!
+  fairShare(scope: UserV2FairShareScope!): UserFairShare!
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  usageBuckets(scope: UserV2UsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
 
   """The domain this user belongs to."""
   domain: DomainV2
@@ -12084,6 +12032,21 @@ type UserV2ContainerSettings
   containerGids: [Int!]
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
+"""
+input UserV2DomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """An edge in a connection."""
 type UserV2Edge
   @join__type(graph: STRAWBERRY)
@@ -12093,6 +12056,18 @@ type UserV2Edge
 
   """The item at the end of the edge"""
   node: UserV2!
+}
+
+input UserV2FairShareScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
+
+  """
+  Project ID that the user belongs to (required for user-level fair shares).
+  """
+  projectId: UUID!
 }
 
 """
@@ -12137,12 +12112,12 @@ input UserV2Filter
   """
   Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
   """
-  domain: UserDomainNestedFilter = null
+  domain: UserV2DomainNestedFilter = null
 
   """
   Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
   """
-  project: UserProjectNestedFilter = null
+  project: UserV2ProjectNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
@@ -12206,6 +12181,21 @@ type UserV2OrganizationInfo
 }
 
 """
+Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
+"""
+input UserV2ProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.2.0. User security settings and authentication configuration. Contains IP restrictions, TOTP settings, and privilege flags.
 """
 type UserV2SecurityInfo
@@ -12246,6 +12236,16 @@ type UserV2StatusInfo
 
   """If true, user must change password on next login."""
   needPasswordChange: Boolean
+}
+
+input UserV2UsageScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+
+  """Project ID that the user belongs to (required for user-level usage)."""
+  projectId: UUID!
 }
 
 """
