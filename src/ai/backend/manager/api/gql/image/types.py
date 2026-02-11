@@ -47,38 +47,38 @@ from ai.backend.manager.repositories.image.options import (
 
 
 @strawberry.enum(
-    name="ImageStatus",
+    name="ImageV2Status",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Status of an image in the system.
     """),
 )
-class ImageStatusGQL(enum.Enum):
+class ImageV2StatusGQL(enum.Enum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
 
     @classmethod
-    def from_data(cls, status: ImageStatus) -> ImageStatusGQL:
+    def from_data(cls, status: ImageStatus) -> ImageV2StatusGQL:
         return cls(status.value)
 
 
 @strawberry.enum(
-    name="ImagePermission",
+    name="ImageV2Permission",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Permission types for image operations.
     """),
 )
-class ImagePermissionGQL(enum.Enum):
+class ImageV2PermissionGQL(enum.Enum):
     READ_ATTRIBUTE = "READ_ATTRIBUTE"
     UPDATE_ATTRIBUTE = "UPDATE_ATTRIBUTE"
     CREATE_CONTAINER = "CREATE_CONTAINER"
     FORGET_IMAGE = "FORGET_IMAGE"
 
     @classmethod
-    def from_data(cls, permission: ImagePermission) -> ImagePermissionGQL:
+    def from_data(cls, permission: ImagePermission) -> ImageV2PermissionGQL:
         return cls(permission.value)
 
 
@@ -88,7 +88,7 @@ class ImagePermissionGQL(enum.Enum):
 
 
 @strawberry.type(
-    name="ImageLabelEntry",
+    name="ImageV2LabelEntry",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -96,7 +96,7 @@ class ImagePermissionGQL(enum.Enum):
     Labels contain metadata about the image such as maintainer, version, etc.
     """),
 )
-class ImageLabelEntryGQL:
+class ImageV2LabelEntryGQL:
     key: str = strawberry.field(description="The label key (e.g., 'maintainer').")
     value: str = strawberry.field(description="The label value.")
 
@@ -106,7 +106,7 @@ class ImageLabelEntryGQL:
 
 
 @strawberry.type(
-    name="ImageResourceLimit",
+    name="ImageV2ResourceLimit",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -114,7 +114,7 @@ class ImageLabelEntryGQL:
     Defines minimum and maximum values for a resource slot.
     """),
 )
-class ImageResourceLimitGQL:
+class ImageV2ResourceLimitGQL:
     key: str = strawberry.field(
         description="Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."
     )
@@ -131,7 +131,7 @@ class ImageResourceLimitGQL:
 
 
 @strawberry.type(
-    name="ImageTagEntry",
+    name="ImageV2TagEntry",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -139,7 +139,7 @@ class ImageResourceLimitGQL:
     Tags are extracted from the image reference (e.g., py311, cuda12.1).
     """),
 )
-class ImageTagEntryGQL:
+class ImageV2TagEntryGQL:
     key: str = strawberry.field(description="The tag key (e.g., 'python', 'cuda').")
     value: str = strawberry.field(description="The tag value (e.g., '3.11', '12.1').")
 
@@ -149,7 +149,7 @@ class ImageTagEntryGQL:
 
 
 @strawberry.type(
-    name="ImageAlias",
+    name="ImageV2Alias",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -157,7 +157,7 @@ class ImageTagEntryGQL:
     Aliases provide alternative names for images.
     """),
 )
-class ImageAliasGQL(Node):
+class ImageV2AliasGQL(Node):
     id: NodeID[uuid.UUID]
     alias: str = strawberry.field(description="The alias string for the image.")
 
@@ -185,7 +185,7 @@ class ImageAliasGQL(Node):
 
 
 @strawberry.type(
-    name="ImageIdentityInfo",
+    name="ImageV2IdentityInfo",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -193,7 +193,7 @@ class ImageAliasGQL(Node):
     Contains the canonical name, namespace, and architecture.
     """),
 )
-class ImageIdentityInfoGQL:
+class ImageV2IdentityInfoGQL:
     canonical_name: str = strawberry.field(
         description="Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."
     )
@@ -222,7 +222,7 @@ class ImageIdentityInfoGQL:
 
 
 @strawberry.type(
-    name="ImageMetadataInfo",
+    name="ImageV2MetadataInfo",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -230,16 +230,16 @@ class ImageIdentityInfoGQL:
     Contains tags, labels, digest, size, status, and creation timestamp.
     """),
 )
-class ImageMetadataInfoGQL:
-    tags: list[ImageTagEntryGQL] = strawberry.field(
+class ImageV2MetadataInfoGQL:
+    tags: list[ImageV2TagEntryGQL] = strawberry.field(
         description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
     )
-    labels: list[ImageLabelEntryGQL] = strawberry.field(description="Docker labels.")
+    labels: list[ImageV2LabelEntryGQL] = strawberry.field(description="Docker labels.")
     digest: str | None = strawberry.field(
         description="Config digest (image hash) for verification."
     )
     size_bytes: int = strawberry.field(description="Image size in bytes.")
-    status: ImageStatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
+    status: ImageV2StatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
     created_at: datetime | None = strawberry.field(
         description="Timestamp when the image was created/registered."
     )
@@ -247,30 +247,30 @@ class ImageMetadataInfoGQL:
     @classmethod
     def from_data(cls, data: ImageData) -> Self:
         return cls(
-            tags=[ImageTagEntryGQL.from_dict_item(entry.key, entry.value) for entry in data.tags],
+            tags=[ImageV2TagEntryGQL.from_dict_item(entry.key, entry.value) for entry in data.tags],
             labels=[
-                ImageLabelEntryGQL.from_dict_item(k, v) for k, v in data.labels.label_data.items()
+                ImageV2LabelEntryGQL.from_dict_item(k, v) for k, v in data.labels.label_data.items()
             ],
             digest=data.config_digest,
             size_bytes=data.size_bytes,
-            status=ImageStatusGQL.from_data(data.status),
+            status=ImageV2StatusGQL.from_data(data.status),
             created_at=data.created_at,
         )
 
     @classmethod
     def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
         return cls(
-            tags=[ImageTagEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.tags],
-            labels=[ImageLabelEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.labels],
+            tags=[ImageV2TagEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.tags],
+            labels=[ImageV2LabelEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.labels],
             digest=data.digest,
             size_bytes=data.size_bytes,
-            status=ImageStatusGQL.from_data(data.status),
+            status=ImageV2StatusGQL.from_data(data.status),
             created_at=data.created_at,
         )
 
 
 @strawberry.type(
-    name="ImageRequirementsInfo",
+    name="ImageV2RequirementsInfo",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -278,8 +278,8 @@ class ImageMetadataInfoGQL:
     Contains resource limits and supported accelerators.
     """),
 )
-class ImageRequirementsInfoGQL:
-    resource_limits: list[ImageResourceLimitGQL] = strawberry.field(
+class ImageV2RequirementsInfoGQL:
+    resource_limits: list[ImageV2ResourceLimitGQL] = strawberry.field(
         description="Resource slot limits (cpu, memory, accelerators, etc.)."
     )
     supported_accelerators: list[str] = strawberry.field(
@@ -290,20 +290,20 @@ class ImageRequirementsInfoGQL:
     def from_data(cls, data: ImageData) -> Self:
         accelerators = data.accelerators.split(",") if data.accelerators else []
         return cls(
-            resource_limits=[ImageResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
+            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
             supported_accelerators=[a.strip() for a in accelerators if a.strip()],
         )
 
     @classmethod
     def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
         return cls(
-            resource_limits=[ImageResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
+            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
             supported_accelerators=[a.strip() for a in data.supported_accelerators if a.strip()],
         )
 
 
 @strawberry.type(
-    name="ImagePermissionInfo",
+    name="ImageV2PermissionInfo",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -311,14 +311,14 @@ class ImageRequirementsInfoGQL:
     Contains the list of permissions the current user has on this image.
     """),
 )
-class ImagePermissionInfoGQL:
-    permissions: list[ImagePermissionGQL] = strawberry.field(
+class ImageV2PermissionInfoGQL:
+    permissions: list[ImageV2PermissionGQL] = strawberry.field(
         description="List of permissions the user has on this image."
     )
 
     @classmethod
     def from_permissions(cls, permissions: list[ImagePermission]) -> Self:
-        return cls(permissions=[ImagePermissionGQL.from_data(p) for p in permissions])
+        return cls(permissions=[ImageV2PermissionGQL.from_data(p) for p in permissions])
 
 
 # =============================================================================
@@ -347,16 +347,16 @@ class ImageV2GQL(Node):
     id: NodeID[uuid.UUID]
 
     # Sub-info types
-    identity: ImageIdentityInfoGQL = strawberry.field(
+    identity: ImageV2IdentityInfoGQL = strawberry.field(
         description="Image identity information (name, architecture)."
     )
-    metadata: ImageMetadataInfoGQL = strawberry.field(
+    metadata: ImageV2MetadataInfoGQL = strawberry.field(
         description="Image metadata (labels, digest, size, status, created_at)."
     )
-    requirements: ImageRequirementsInfoGQL = strawberry.field(
+    requirements: ImageV2RequirementsInfoGQL = strawberry.field(
         description="Runtime requirements (supported_accelerators)."
     )
-    permission: ImagePermissionInfoGQL | None = strawberry.field(
+    permission: ImageV2PermissionInfoGQL | None = strawberry.field(
         default=None, description="Permission info for the current user. May be null."
     )
 
@@ -369,13 +369,13 @@ class ImageV2GQL(Node):
     async def aliases(
         self,
         info: Info[StrawberryGQLContext],
-        filter: ImageAliasFilterGQL | None = None,
-        order_by: list[ImageAliasOrderByGQL] | None = None,
+        filter: ImageV2AliasFilterGQL | None = None,
+        order_by: list[ImageV2AliasOrderByGQL] | None = None,
         before: str | None = None,
         after: str | None = None,
         first: int | None = None,
         last: int | None = None,
-    ) -> ImageAliasConnectionGQL:
+    ) -> ImageV2AliasConnectionGQL:
         """Get the aliases for this image with pagination, filtering, and ordering."""
         from .fetcher import fetch_image_aliases
 
@@ -422,10 +422,10 @@ class ImageV2GQL(Node):
         return cls(
             id=data.id,
             _image_id=data.id,
-            identity=ImageIdentityInfoGQL.from_data(data),
-            metadata=ImageMetadataInfoGQL.from_data(data),
-            requirements=ImageRequirementsInfoGQL.from_data(data),
-            permission=ImagePermissionInfoGQL.from_permissions(permissions)
+            identity=ImageV2IdentityInfoGQL.from_data(data),
+            metadata=ImageV2MetadataInfoGQL.from_data(data),
+            requirements=ImageV2RequirementsInfoGQL.from_data(data),
+            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
             if permissions
             else None,
             registry_id=data.registry_id,
@@ -449,10 +449,10 @@ class ImageV2GQL(Node):
         return cls(
             id=data.id,
             _image_id=data.id,
-            identity=ImageIdentityInfoGQL.from_detailed_data(data),
-            metadata=ImageMetadataInfoGQL.from_detailed_data(data),
-            requirements=ImageRequirementsInfoGQL.from_detailed_data(data),
-            permission=ImagePermissionInfoGQL.from_permissions(permissions)
+            identity=ImageV2IdentityInfoGQL.from_detailed_data(data),
+            metadata=ImageV2MetadataInfoGQL.from_detailed_data(data),
+            requirements=ImageV2RequirementsInfoGQL.from_detailed_data(data),
+            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
             if permissions
             else None,
             registry_id=data.registry_id,
@@ -460,11 +460,11 @@ class ImageV2GQL(Node):
 
 
 # Edge type using strawberry.relay.Edge
-ImageEdgeGQL = Edge[ImageV2GQL]
+ImageV2EdgeGQL = Edge[ImageV2GQL]
 
 
 @strawberry.type(
-    name="ImageConnectionV2",
+    name="ImageV2Connection",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -472,7 +472,7 @@ ImageEdgeGQL = Edge[ImageV2GQL]
     Includes total count for pagination UI.
     """),
 )
-class ImageConnectionV2GQL(Connection[ImageV2GQL]):
+class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
     count: int = strawberry.field(description="Total count of images matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
@@ -500,14 +500,14 @@ class ContainerRegistryScopeGQL:
 
 
 @strawberry.input(
-    name="ImageScope",
+    name="ImageV2Scope",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Scope for querying aliases within a specific image.
     """),
 )
-class ImageScopeGQL:
+class ImageV2ScopeGQL:
     image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
 
 
@@ -521,14 +521,14 @@ class ImageScopeGQL:
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
     """)
 )
-class ImageFilterGQL(GQLFilter):
-    status: list[ImageStatusGQL] | None = None
+class ImageV2FilterGQL(GQLFilter):
+    status: list[ImageV2StatusGQL] | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
 
-    AND: list[ImageFilterGQL] | None = None
-    OR: list[ImageFilterGQL] | None = None
-    NOT: list[ImageFilterGQL] | None = None
+    AND: list[ImageV2FilterGQL] | None = None
+    OR: list[ImageV2FilterGQL] | None = None
+    NOT: list[ImageV2FilterGQL] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
@@ -591,14 +591,14 @@ class ImageFilterGQL(GQLFilter):
 
 
 @strawberry.enum(
-    name="ImageOrderField",
+    name="ImageV2OrderField",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Fields available for ordering image queries.
     """),
 )
-class ImageOrderFieldGQL(enum.Enum):
+class ImageV2OrderFieldGQL(enum.Enum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
 
@@ -610,17 +610,17 @@ class ImageOrderFieldGQL(enum.Enum):
     Specifies the field and direction for ordering images in queries.
     """)
 )
-class ImageOrderByGQL(GQLOrderBy):
-    field: ImageOrderFieldGQL
+class ImageV2OrderByGQL(GQLOrderBy):
+    field: ImageV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case ImageOrderFieldGQL.NAME:
+            case ImageV2OrderFieldGQL.NAME:
                 return ImageOrders.name(ascending)
-            case ImageOrderFieldGQL.CREATED_AT:
+            case ImageV2OrderFieldGQL.CREATED_AT:
                 return ImageOrders.created_at(ascending)
 
 
@@ -629,11 +629,11 @@ class ImageOrderByGQL(GQLOrderBy):
 # =============================================================================
 
 # Edge type using strawberry.relay.Edge
-ImageAliasEdgeGQL = Edge[ImageAliasGQL]
+ImageV2AliasEdgeGQL = Edge[ImageV2AliasGQL]
 
 
 @strawberry.type(
-    name="ImageAliasConnection",
+    name="ImageV2AliasConnection",
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -641,7 +641,7 @@ ImageAliasEdgeGQL = Edge[ImageAliasGQL]
     Includes total count for pagination UI.
     """),
 )
-class ImageAliasConnectionGQL(Connection[ImageAliasGQL]):
+class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
     count: int = strawberry.field(description="Total count of aliases matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
@@ -657,7 +657,7 @@ class ImageAliasConnectionGQL(Connection[ImageAliasGQL]):
     Supports filtering by alias string.
     """)
 )
-class ImageAliasFilterGQL(GQLFilter):
+class ImageV2AliasFilterGQL(GQLFilter):
     alias: StringFilter | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
@@ -678,14 +678,14 @@ class ImageAliasFilterGQL(GQLFilter):
 
 
 @strawberry.enum(
-    name="ImageAliasOrderField",
+    name="ImageV2AliasOrderField",
     description=dedent_strip("""
     Added in 26.2.0.
 
     Fields available for ordering image alias queries.
     """),
 )
-class ImageAliasOrderFieldGQL(enum.Enum):
+class ImageV2AliasOrderFieldGQL(enum.Enum):
     ALIAS = "ALIAS"
 
 
@@ -696,13 +696,13 @@ class ImageAliasOrderFieldGQL(enum.Enum):
     Specifies the field and direction for ordering image aliases in queries.
     """)
 )
-class ImageAliasOrderByGQL(GQLOrderBy):
-    field: ImageAliasOrderFieldGQL
+class ImageV2AliasOrderByGQL(GQLOrderBy):
+    field: ImageV2AliasOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder."""
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case ImageAliasOrderFieldGQL.ALIAS:
+            case ImageV2AliasOrderFieldGQL.ALIAS:
                 return ImageAliasOrders.alias(ascending)
