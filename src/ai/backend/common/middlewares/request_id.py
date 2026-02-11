@@ -12,7 +12,7 @@ type Handler = Callable[
 ]
 
 REQUEST_ID_HEADER = "X-BackendAI-RequestID"
-OPERATION_HEADER = "X-BackendAI-Operation"
+OPERATION_HEADER = "X-BackendAI-Client-Operation"
 
 
 @web.middleware
