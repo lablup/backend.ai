@@ -6,7 +6,7 @@ from datetime import datetime
 
 import strawberry
 
-from .enums import UserRoleEnumGQL, UserStatusEnumGQL
+from .enums import UserV2RoleEnumGQL, UserV2StatusEnumGQL
 
 
 @strawberry.type(
@@ -16,7 +16,7 @@ from .enums import UserRoleEnumGQL, UserStatusEnumGQL
         "Contains identity and descriptive fields for the user account."
     ),
 )
-class UserBasicInfoGQL:
+class UserV2BasicInfoGQL:
     """Basic user profile information."""
 
     username: str | None = strawberry.field(
@@ -38,12 +38,12 @@ class UserBasicInfoGQL:
         "Contains current status and password-related flags."
     ),
 )
-class UserStatusInfoGQL:
+class UserV2StatusInfoGQL:
     """User account status information."""
 
-    status: UserStatusEnumGQL = strawberry.field(
+    status: UserV2StatusEnumGQL = strawberry.field(
         description=(
-            "Current account status. See UserStatusV2 enum for possible values. "
+            "Current account status. See UserV2Status enum for possible values. "
             "Replaces the deprecated is_active field."
         )
     )
@@ -62,14 +62,14 @@ class UserStatusInfoGQL:
         "Contains domain membership, role, and resource policy information."
     ),
 )
-class UserOrganizationInfoGQL:
+class UserV2OrganizationInfoGQL:
     """User's organizational context and permissions."""
 
     domain_name: str | None = strawberry.field(
         description="Name of the domain this user belongs to."
     )
-    role: UserRoleEnumGQL | None = strawberry.field(
-        description="User's role determining access permissions. See UserRoleV2 enum."
+    role: UserV2RoleEnumGQL | None = strawberry.field(
+        description="User's role determining access permissions. See UserV2Role enum."
     )
     resource_policy: str = strawberry.field(
         description="Name of the user resource policy applied to this user."
@@ -86,7 +86,7 @@ class UserOrganizationInfoGQL:
         "Contains IP restrictions, TOTP settings, and privilege flags."
     ),
 )
-class UserSecurityInfoGQL:
+class UserV2SecurityInfoGQL:
     """User security settings and authentication configuration."""
 
     allowed_client_ip: list[str] | None = strawberry.field(
@@ -114,7 +114,7 @@ class UserSecurityInfoGQL:
         "Defines UID/GID mappings for containers created by this user."
     ),
 )
-class UserContainerSettingsGQL:
+class UserV2ContainerSettingsGQL:
     """Container execution settings for the user."""
 
     container_uid: int | None = strawberry.field(

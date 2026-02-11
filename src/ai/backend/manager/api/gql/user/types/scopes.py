@@ -14,7 +14,7 @@ import strawberry
         "Used to restrict user queries to a particular domain context."
     ),
 )
-class DomainUserScopeGQL:
+class DomainUserV2ScopeGQL:
     """Scope for domain-level user queries."""
 
     domain_name: str = strawberry.field(
@@ -29,7 +29,7 @@ class DomainUserScopeGQL:
         "Used to restrict user queries to members of a particular project."
     ),
 )
-class ProjectUserScopeGQL:
+class ProjectUserV2ScopeGQL:
     """Scope for project-level user queries."""
 
     project_id: UUID = strawberry.field(

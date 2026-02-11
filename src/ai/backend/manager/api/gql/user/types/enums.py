@@ -8,7 +8,7 @@ import strawberry
 
 
 @strawberry.enum(
-    name="UserStatusV2",
+    name="UserV2Status",
     description=(
         "Added in 26.2.0. User account status. "
         "ACTIVE: User can log in and use the system. "
@@ -17,7 +17,7 @@ import strawberry
         "BEFORE_VERIFICATION: User account is pending email verification."
     ),
 )
-class UserStatusEnumGQL(StrEnum):
+class UserV2StatusEnumGQL(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     DELETED = "deleted"
@@ -25,7 +25,7 @@ class UserStatusEnumGQL(StrEnum):
 
 
 @strawberry.enum(
-    name="UserRoleV2",
+    name="UserV2Role",
     description=(
         "Added in 26.2.0. User role determining access permissions. "
         "USER: Standard user with basic permissions. "
@@ -34,7 +34,7 @@ class UserStatusEnumGQL(StrEnum):
         "MONITOR: Read-only access for monitoring purposes."
     ),
 )
-class UserRoleEnumGQL(StrEnum):
+class UserV2RoleEnumGQL(StrEnum):
     USER = "user"
     ADMIN = "admin"
     SUPERADMIN = "superadmin"
