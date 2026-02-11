@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.types import OptionalState
 
 from .id import ObjectId
@@ -58,10 +59,7 @@ class ObjectPermissionData:
 
 
 @dataclass(frozen=True)
-class ObjectPermissionListResult:
+class ObjectPermissionListResult(SearchResult[ObjectPermissionData]):
     """Result of object permission search with pagination info."""
 
-    items: list[ObjectPermissionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

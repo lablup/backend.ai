@@ -7,6 +7,7 @@ from typing import TypeVar
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
+from ai.backend.manager.data.common.types import SearchResult
 
 
 class BaseAction(ABC):
@@ -45,6 +46,14 @@ class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> str | None:
         raise NotImplementedError
+
+
+@dataclass
+class SearchActionResult[T](BaseActionResult):
+    result: SearchResult[T]
+
+    def entity_id(self) -> str | None:
+        return None
 
 
 @dataclass

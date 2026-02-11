@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from ai.backend.manager.data.common.types import SearchResult
+
 from .id import ScopeId
 from .types import EntityType, OperationType, ScopeType
 
@@ -44,10 +46,7 @@ class ScopedPermissionCreateInput:
 
 
 @dataclass(frozen=True)
-class PermissionListResult:
+class PermissionListResult(SearchResult[PermissionData]):
     """Result of scoped permission search with pagination info."""
 
-    items: list[PermissionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

@@ -19,6 +19,7 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rbac.handler import RBACAPIHandler
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -302,41 +303,47 @@ class TestSearchScopesHandler:
     def single_scope_result(self) -> SearchScopesActionResult:
         """Create action result with single scope item."""
         return SearchScopesActionResult(
-            items=[
-                ScopeData(
-                    id=ScopeId(scope_type=self.TEST_SCOPE_TYPE, scope_id=self.TEST_DOMAIN_NAME),
-                    name=self.TEST_DOMAIN_NAME,
-                ),
-            ],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
+            result=SearchResult(
+                items=[
+                    ScopeData(
+                        id=ScopeId(scope_type=self.TEST_SCOPE_TYPE, scope_id=self.TEST_DOMAIN_NAME),
+                        name=self.TEST_DOMAIN_NAME,
+                    ),
+                ],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            ),
         )
 
     @pytest.fixture
     def paginated_scope_result(self) -> SearchScopesActionResult:
         """Create action result with pagination."""
         return SearchScopesActionResult(
-            items=[
-                ScopeData(
-                    id=ScopeId(scope_type=self.TEST_SCOPE_TYPE, scope_id=f"domain-{i}"),
-                    name=f"domain-{i}",
-                )
-                for i in range(self.PAGINATION_ITEMS_COUNT)
-            ],
-            total_count=self.PAGINATION_TOTAL,
-            has_next_page=True,
-            has_previous_page=False,
+            result=SearchResult(
+                items=[
+                    ScopeData(
+                        id=ScopeId(scope_type=self.TEST_SCOPE_TYPE, scope_id=f"domain-{i}"),
+                        name=f"domain-{i}",
+                    )
+                    for i in range(self.PAGINATION_ITEMS_COUNT)
+                ],
+                total_count=self.PAGINATION_TOTAL,
+                has_next_page=True,
+                has_previous_page=False,
+            ),
         )
 
     @pytest.fixture
     def empty_scope_result(self) -> SearchScopesActionResult:
         """Create empty action result."""
         return SearchScopesActionResult(
-            items=[],
-            total_count=0,
-            has_next_page=False,
-            has_previous_page=False,
+            result=SearchResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            ),
         )
 
     @pytest.mark.asyncio
@@ -370,7 +377,7 @@ class TestSearchScopesHandler:
         response_data = json.loads(cast(bytes, response_body))
         assert "items" in response_data
         assert "pagination" in response_data
-        assert len(response_data["items"]) == len(single_scope_result.items)
+        assert len(response_data["items"]) == len(single_scope_result.result.items)
         assert response_data["items"][0]["scope_type"] == self.TEST_SCOPE_TYPE.value
         assert response_data["items"][0]["name"] == self.TEST_DOMAIN_NAME
 

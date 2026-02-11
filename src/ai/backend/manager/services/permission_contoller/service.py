@@ -190,36 +190,21 @@ class PermissionControllerService:
     async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
-        return SearchRolesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchRolesActionResult(result=result)
 
     async def search_permissions(
         self, action: SearchPermissionsAction
     ) -> SearchPermissionsActionResult:
-        """Search permissions with pagination and filtering."""
+        """Search scoped permissions with pagination and filtering."""
         result = await self._repository.search_permissions(action.querier)
-        return SearchPermissionsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchPermissionsActionResult(result=result)
 
     async def search_object_permissions(
         self, action: SearchObjectPermissionsAction
     ) -> SearchObjectPermissionsActionResult:
         """Search object permissions with pagination and filtering."""
         result = await self._repository.search_object_permissions(action.querier)
-        return SearchObjectPermissionsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchObjectPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction
@@ -228,12 +213,7 @@ class PermissionControllerService:
         result = await self._repository.search_users_assigned_to_role(
             querier=action.querier,
         )
-        return SearchUsersAssignedToRoleActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchUsersAssignedToRoleActionResult(result=result)
 
     async def update_role_permissions(
         self, action: UpdateRolePermissionsAction
@@ -247,12 +227,7 @@ class PermissionControllerService:
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
         """Search scopes based on scope type."""
         result = await self._repository.search_scopes(action.scope_type, action.querier)
-        return SearchScopesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchScopesActionResult(result=result)
 
     async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
@@ -265,9 +240,4 @@ class PermissionControllerService:
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
-        return SearchEntitiesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchEntitiesActionResult(result=result)
