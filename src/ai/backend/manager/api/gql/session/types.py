@@ -47,7 +47,7 @@ class SessionV2StatusGQL(StrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def from_internal(cls, internal_status: SessionStatus) -> SessionV2StatusGQL:
+    def from_internal(cls, internal_status: SessionStatus) -> Self:
         """Convert internal SessionStatus to GraphQL enum."""
         match internal_status:
             case SessionStatus.PENDING:
