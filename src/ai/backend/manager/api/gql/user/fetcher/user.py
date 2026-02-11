@@ -12,11 +12,11 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
-    UserFilterGQL,
-    UserOrderByGQL,
     UserV2Connection,
     UserV2Edge,
+    UserV2FilterGQL,
     UserV2GQL,
+    UserV2OrderByGQL,
 )
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
@@ -73,8 +73,8 @@ async def fetch_user(
 
 async def fetch_admin_users(
     info: Info[StrawberryGQLContext],
-    filter: UserFilterGQL | None = None,
-    order_by: list[UserOrderByGQL] | None = None,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -142,8 +142,8 @@ async def fetch_admin_users(
 async def fetch_domain_users(
     info: Info[StrawberryGQLContext],
     scope: DomainUserSearchScope,
-    filter: UserFilterGQL | None = None,
-    order_by: list[UserOrderByGQL] | None = None,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -210,8 +210,8 @@ async def fetch_domain_users(
 async def fetch_project_users(
     info: Info[StrawberryGQLContext],
     scope: ProjectUserSearchScope,
-    filter: UserFilterGQL | None = None,
-    order_by: list[UserOrderByGQL] | None = None,
+    filter: UserV2FilterGQL | None = None,
+    order_by: list[UserV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,

@@ -15,7 +15,7 @@ from .node import UserV2GQL
     name="CreateUserV2Payload",
     description="Added in 26.2.0. Payload for user creation mutation.",
 )
-class CreateUserPayloadGQL:
+class CreateUserV2PayloadGQL:
     """Payload for single user creation."""
 
     user: UserV2GQL = strawberry.field(description="The newly created user.")
@@ -26,10 +26,10 @@ class CreateUserPayloadGQL:
 
 
 @strawberry.type(
-    name="BulkCreateUserError",
+    name="BulkCreateUserV2Error",
     description="Added in 26.2.0. Error information for a failed user in bulk creation.",
 )
-class BulkCreateUserErrorGQL:
+class BulkCreateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk creation."""
 
     index: int = strawberry.field(description="Original position in the input list.")
@@ -42,13 +42,13 @@ class BulkCreateUserErrorGQL:
     name="BulkCreateUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
-class BulkCreateUsersPayloadGQL:
+class BulkCreateUsersV2PayloadGQL:
     """Payload for bulk user creation."""
 
     created_users: list[UserV2GQL] = strawberry.field(
         description="List of successfully created users."
     )
-    failed: list[BulkCreateUserErrorGQL] = strawberry.field(
+    failed: list[BulkCreateUserV2ErrorGQL] = strawberry.field(
         description="List of errors for users that failed to create."
     )
 
@@ -60,7 +60,7 @@ class BulkCreateUsersPayloadGQL:
     name="UpdateUserV2Payload",
     description="Added in 26.2.0. Payload for user update mutation.",
 )
-class UpdateUserPayloadGQL:
+class UpdateUserV2PayloadGQL:
     """Payload for user update."""
 
     user: UserV2GQL = strawberry.field(description="The updated user.")
@@ -73,7 +73,7 @@ class UpdateUserPayloadGQL:
     name="DeleteUserV2Payload",
     description="Added in 26.2.0. Payload for single user soft-delete mutation.",
 )
-class DeleteUserPayloadGQL:
+class DeleteUserV2PayloadGQL:
     """Payload for single user soft-delete."""
 
     success: bool = strawberry.field(description="Whether the deletion was successful.")
@@ -83,7 +83,7 @@ class DeleteUserPayloadGQL:
     name="DeleteUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
 )
-class DeleteUsersPayloadGQL:
+class DeleteUsersV2PayloadGQL:
     """Payload for bulk user soft-delete."""
 
     deleted_count: int = strawberry.field(description="Number of users successfully soft-deleted.")
@@ -96,7 +96,7 @@ class DeleteUsersPayloadGQL:
     name="PurgeUserV2Payload",
     description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
 )
-class PurgeUserPayloadGQL:
+class PurgeUserV2PayloadGQL:
     """Payload for single user permanent deletion."""
 
     success: bool = strawberry.field(description="Whether the purge was successful.")
@@ -106,7 +106,7 @@ class PurgeUserPayloadGQL:
     name="PurgeUsersV2Payload",
     description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
 )
-class PurgeUsersPayloadGQL:
+class PurgeUsersV2PayloadGQL:
     """Payload for bulk user permanent deletion."""
 
     purged_count: int = strawberry.field(description="Number of users successfully purged.")

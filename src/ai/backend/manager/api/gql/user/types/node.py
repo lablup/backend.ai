@@ -19,14 +19,14 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import UserRoleEnumGQL, UserStatusEnumGQL
+from .enums import UserV2RoleEnumGQL, UserV2StatusEnumGQL
 from .nested import (
     EntityTimestampsGQL,
-    UserBasicInfoGQL,
-    UserContainerSettingsGQL,
-    UserOrganizationInfoGQL,
-    UserSecurityInfoGQL,
-    UserStatusInfoGQL,
+    UserV2BasicInfoGQL,
+    UserV2ContainerSettingsGQL,
+    UserV2OrganizationInfoGQL,
+    UserV2SecurityInfoGQL,
+    UserV2StatusInfoGQL,
 )
 
 if TYPE_CHECKING:
@@ -39,8 +39,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.user.types import UserData
 
 
-@strawberry.input(name="UserFairShareScope")
-class UserFairShareScopeGQL:
+@strawberry.input(name="UserV2FairShareScope")
+class UserV2FairShareScopeGQL:
     """Scope parameters for filtering user fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -51,8 +51,8 @@ class UserFairShareScopeGQL:
     )
 
 
-@strawberry.input(name="UserUsageScope")
-class UserUsageScopeGQL:
+@strawberry.input(name="UserV2UsageScope")
+class UserV2UsageScopeGQL:
     """Scope parameters for filtering user usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -77,19 +77,19 @@ class UserV2GQL(Node):
     """User entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the user (UUID).")
-    basic_info: UserBasicInfoGQL = strawberry.field(
+    basic_info: UserV2BasicInfoGQL = strawberry.field(
         description="Basic profile information including username, email, and display name."
     )
-    status: UserStatusInfoGQL = strawberry.field(
+    status: UserV2StatusInfoGQL = strawberry.field(
         description="Account status and password-related flags."
     )
-    organization: UserOrganizationInfoGQL = strawberry.field(
+    organization: UserV2OrganizationInfoGQL = strawberry.field(
         description="Organizational context including domain, role, and resource policy."
     )
-    security: UserSecurityInfoGQL = strawberry.field(
+    security: UserV2SecurityInfoGQL = strawberry.field(
         description="Security settings including IP restrictions and TOTP configuration."
     )
-    container: UserContainerSettingsGQL = strawberry.field(
+    container: UserV2ContainerSettingsGQL = strawberry.field(
         description="Container execution settings including UID/GID mappings."
     )
     timestamps: EntityTimestampsGQL = strawberry.field(
@@ -107,7 +107,7 @@ class UserV2GQL(Node):
     async def fair_share(
         self,
         info: Info,
-        scope: UserFairShareScopeGQL,
+        scope: UserV2FairShareScopeGQL,
     ) -> UserFairShareGQL:
         from ai.backend.manager.api.gql.fair_share.fetcher.user import (
             fetch_single_user_fair_share,
@@ -132,7 +132,7 @@ class UserV2GQL(Node):
     async def usage_buckets(
         self,
         info: Info,
-        scope: UserUsageScopeGQL,
+        scope: UserV2UsageScopeGQL,
         filter: UserUsageBucketFilter | None = None,
         order_by: list[UserUsageBucketOrderBy] | None = None,
         before: str | None = None,
@@ -270,30 +270,30 @@ class UserV2GQL(Node):
         """
         return cls(
             id=ID(str(data.id)),
-            basic_info=UserBasicInfoGQL(
+            basic_info=UserV2BasicInfoGQL(
                 username=data.username,
                 email=data.email,
                 full_name=data.full_name,
                 description=data.description,
             ),
-            status=UserStatusInfoGQL(
-                status=UserStatusEnumGQL(data.status),
+            status=UserV2StatusInfoGQL(
+                status=UserV2StatusEnumGQL(data.status),
                 status_info=data.status_info,
                 need_password_change=data.need_password_change,
             ),
-            organization=UserOrganizationInfoGQL(
+            organization=UserV2OrganizationInfoGQL(
                 domain_name=data.domain_name,
-                role=UserRoleEnumGQL(data.role.value) if data.role else None,
+                role=UserV2RoleEnumGQL(data.role.value) if data.role else None,
                 resource_policy=data.resource_policy,
                 main_access_key=data.main_access_key,
             ),
-            security=UserSecurityInfoGQL(
+            security=UserV2SecurityInfoGQL(
                 allowed_client_ip=data.allowed_client_ip,
                 totp_activated=data.totp_activated,
                 totp_activated_at=data.totp_activated_at,
                 sudo_session_enabled=data.sudo_session_enabled,
             ),
-            container=UserContainerSettingsGQL(
+            container=UserV2ContainerSettingsGQL(
                 container_uid=data.container_uid,
                 container_main_gid=data.container_main_gid,
                 container_gids=data.container_gids,

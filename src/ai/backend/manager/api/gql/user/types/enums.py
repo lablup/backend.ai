@@ -17,7 +17,7 @@ import strawberry
         "BEFORE_VERIFICATION: User account is pending email verification."
     ),
 )
-class UserStatusEnumGQL(StrEnum):
+class UserV2StatusEnumGQL(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     DELETED = "deleted"
@@ -34,7 +34,7 @@ class UserStatusEnumGQL(StrEnum):
         "MONITOR: Read-only access for monitoring purposes."
     ),
 )
-class UserRoleEnumGQL(StrEnum):
+class UserV2RoleEnumGQL(StrEnum):
     USER = "user"
     ADMIN = "admin"
     SUPERADMIN = "superadmin"

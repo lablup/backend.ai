@@ -10,20 +10,20 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
-    BulkCreateUserErrorGQL,
-    BulkCreateUserInputGQL,
-    BulkCreateUsersPayloadGQL,
-    CreateUserInputGQL,
-    CreateUserPayloadGQL,
-    DeleteUserPayloadGQL,
-    DeleteUsersInputGQL,
-    DeleteUsersPayloadGQL,
-    PurgeUserInputGQL,
-    PurgeUserPayloadGQL,
-    PurgeUsersInputGQL,
-    PurgeUsersPayloadGQL,
-    UpdateUserInputGQL,
-    UpdateUserPayloadGQL,
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUserV2ErrorGQL,
+    BulkCreateUserV2InputGQL,
+    CreateUserV2InputGQL,
+    CreateUserV2PayloadGQL,
+    DeleteUsersV2InputGQL,
+    DeleteUsersV2PayloadGQL,
+    DeleteUserV2PayloadGQL,
+    PurgeUsersV2InputGQL,
+    PurgeUsersV2PayloadGQL,
+    PurgeUserV2InputGQL,
+    PurgeUserV2PayloadGQL,
+    UpdateUserV2InputGQL,
+    UpdateUserV2PayloadGQL,
     UserV2GQL,
 )
 from ai.backend.manager.data.user.types import UserStatus
@@ -47,8 +47,8 @@ from ai.backend.manager.services.user.actions.create_user import (
 )  # type: ignore[misc]
 async def admin_create_user(
     info: Info[StrawberryGQLContext],
-    input: CreateUserInputGQL,
-) -> CreateUserPayloadGQL:
+    input: CreateUserV2InputGQL,
+) -> CreateUserV2PayloadGQL:
     """Create a new user.
 
     Args:
@@ -73,8 +73,8 @@ async def admin_create_user(
 )  # type: ignore[misc]
 async def admin_bulk_create_users(
     info: Info[StrawberryGQLContext],
-    input: BulkCreateUserInputGQL,
-) -> BulkCreateUsersPayloadGQL:
+    input: BulkCreateUserV2InputGQL,
+) -> BulkCreateUsersV2PayloadGQL:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -124,7 +124,7 @@ async def admin_bulk_create_users(
 
     created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
     failed = [
-        BulkCreateUserErrorGQL(
+        BulkCreateUserV2ErrorGQL(
             index=error.index,
             username=cast(UserCreatorSpec, error.spec).username,
             email=cast(UserCreatorSpec, error.spec).email,
@@ -133,7 +133,7 @@ async def admin_bulk_create_users(
         for error in result.data.failures
     ]
 
-    return BulkCreateUsersPayloadGQL(
+    return BulkCreateUsersV2PayloadGQL(
         created_users=created_users,
         failed=failed,
     )
@@ -152,8 +152,8 @@ async def admin_bulk_create_users(
 async def admin_update_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-    input: UpdateUserInputGQL,
-) -> UpdateUserPayloadGQL:
+    input: UpdateUserV2InputGQL,
+) -> UpdateUserV2PayloadGQL:
     """Update a user's information.
 
     Args:
@@ -179,8 +179,8 @@ async def admin_update_user(
 )  # type: ignore[misc]
 async def update_user(
     info: Info[StrawberryGQLContext],
-    input: UpdateUserInputGQL,
-) -> UpdateUserPayloadGQL:
+    input: UpdateUserV2InputGQL,
+) -> UpdateUserV2PayloadGQL:
     """Update the current user's own information.
 
     Args:
@@ -209,7 +209,7 @@ async def update_user(
 async def admin_delete_user(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> DeleteUserPayloadGQL:
+) -> DeleteUserV2PayloadGQL:
     """Soft-delete a single user.
 
     Args:
@@ -234,8 +234,8 @@ async def admin_delete_user(
 )  # type: ignore[misc]
 async def admin_delete_users(
     info: Info[StrawberryGQLContext],
-    input: DeleteUsersInputGQL,
-) -> DeleteUsersPayloadGQL:
+    input: DeleteUsersV2InputGQL,
+) -> DeleteUsersV2PayloadGQL:
     """Soft-delete multiple users.
 
     Args:
@@ -263,8 +263,8 @@ async def admin_delete_users(
 )  # type: ignore[misc]
 async def admin_purge_user(
     info: Info[StrawberryGQLContext],
-    input: PurgeUserInputGQL,
-) -> PurgeUserPayloadGQL:
+    input: PurgeUserV2InputGQL,
+) -> PurgeUserV2PayloadGQL:
     """Permanently delete a single user.
 
     Args:
@@ -289,8 +289,8 @@ async def admin_purge_user(
 )  # type: ignore[misc]
 async def admin_purge_users(
     info: Info[StrawberryGQLContext],
-    input: PurgeUsersInputGQL,
-) -> PurgeUsersPayloadGQL:
+    input: PurgeUsersV2InputGQL,
+) -> PurgeUsersV2PayloadGQL:
     """Permanently delete multiple users.
 
     Args:

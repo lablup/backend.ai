@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.user.types.filters import (
-    UserDomainNestedFilter,
-    UserFilterGQL,
-    UserOrderByGQL,
-    UserOrderFieldGQL,
-    UserProjectNestedFilter,
+    UserV2DomainNestedFilter,
+    UserV2FilterGQL,
+    UserV2OrderByGQL,
+    UserV2OrderFieldGQL,
+    UserV2ProjectNestedFilter,
 )
 
 # Row imports to trigger mapper initialization (FK dependency order).
@@ -73,7 +73,7 @@ class TestUserDomainNestedFilter:
     """Tests for UserDomainNestedFilter.build_conditions()."""
 
     def test_name_filter_generates_exists_with_domains(self) -> None:
-        f = UserDomainNestedFilter(
+        f = UserV2DomainNestedFilter(
             name=StringFilter(contains="test"),
             is_active=None,
         )
@@ -84,7 +84,7 @@ class TestUserDomainNestedFilter:
         assert "domains" in sql
 
     def test_is_active_filter_generates_exists(self) -> None:
-        f = UserDomainNestedFilter(
+        f = UserV2DomainNestedFilter(
             name=None,
             is_active=True,
         )
@@ -95,7 +95,7 @@ class TestUserDomainNestedFilter:
         assert "is_active" in sql
 
     def test_combined_name_and_is_active_single_exists(self) -> None:
-        f = UserDomainNestedFilter(
+        f = UserV2DomainNestedFilter(
             name=StringFilter(equals="my-domain"),
             is_active=True,
         )
@@ -106,7 +106,7 @@ class TestUserDomainNestedFilter:
         assert sql.count("EXISTS") == 1
 
     def test_empty_filter_returns_empty_list(self) -> None:
-        f = UserDomainNestedFilter(
+        f = UserV2DomainNestedFilter(
             name=None,
             is_active=None,
         )
@@ -118,7 +118,7 @@ class TestUserProjectNestedFilter:
     """Tests for UserProjectNestedFilter.build_conditions()."""
 
     def test_name_filter_generates_exists_with_join(self) -> None:
-        f = UserProjectNestedFilter(
+        f = UserV2ProjectNestedFilter(
             name=StringFilter(contains="ml-team"),
             is_active=None,
         )
@@ -130,7 +130,7 @@ class TestUserProjectNestedFilter:
         assert "groups" in sql
 
     def test_is_active_filter_generates_exists(self) -> None:
-        f = UserProjectNestedFilter(
+        f = UserV2ProjectNestedFilter(
             name=None,
             is_active=False,
         )
@@ -141,7 +141,7 @@ class TestUserProjectNestedFilter:
         assert "is_active" in sql
 
     def test_combined_name_and_is_active_single_exists(self) -> None:
-        f = UserProjectNestedFilter(
+        f = UserV2ProjectNestedFilter(
             name=StringFilter(equals="project-x"),
             is_active=True,
         )
@@ -152,7 +152,7 @@ class TestUserProjectNestedFilter:
         assert sql.count("EXISTS") == 1
 
     def test_empty_filter_returns_empty_list(self) -> None:
-        f = UserProjectNestedFilter(
+        f = UserV2ProjectNestedFilter(
             name=None,
             is_active=None,
         )
@@ -164,8 +164,8 @@ class TestUserFilterGQLWithNestedFilters:
     """Tests for UserFilterGQL integration with nested domain/project filters."""
 
     def test_domain_nested_adds_exists_condition(self) -> None:
-        f = UserFilterGQL(
-            domain=UserDomainNestedFilter(
+        f = UserV2FilterGQL(
+            domain=UserV2DomainNestedFilter(
                 name=StringFilter(contains="example"),
                 is_active=None,
             ),
@@ -177,8 +177,8 @@ class TestUserFilterGQLWithNestedFilters:
         assert "domains" in sql
 
     def test_project_nested_adds_exists_condition(self) -> None:
-        f = UserFilterGQL(
-            project=UserProjectNestedFilter(
+        f = UserV2FilterGQL(
+            project=UserV2ProjectNestedFilter(
                 name=StringFilter(contains="team"),
                 is_active=None,
             ),
@@ -190,12 +190,12 @@ class TestUserFilterGQLWithNestedFilters:
         assert "association_groups_users" in sql
 
     def test_both_nested_filters_combined(self) -> None:
-        f = UserFilterGQL(
-            domain=UserDomainNestedFilter(
+        f = UserV2FilterGQL(
+            domain=UserV2DomainNestedFilter(
                 name=StringFilter(contains="corp"),
                 is_active=None,
             ),
-            project=UserProjectNestedFilter(
+            project=UserV2ProjectNestedFilter(
                 name=StringFilter(contains="dev"),
                 is_active=None,
             ),
@@ -204,9 +204,9 @@ class TestUserFilterGQLWithNestedFilters:
         assert len(conditions) == 2
 
     def test_nested_with_existing_fields(self) -> None:
-        f = UserFilterGQL(
+        f = UserV2FilterGQL(
             username=StringFilter(contains="admin"),
-            domain=UserDomainNestedFilter(
+            domain=UserV2DomainNestedFilter(
                 name=StringFilter(contains="corp"),
                 is_active=None,
             ),
@@ -215,9 +215,9 @@ class TestUserFilterGQLWithNestedFilters:
         assert len(conditions) == 2
 
     def test_empty_nested_filters_no_extra_conditions(self) -> None:
-        f = UserFilterGQL(
-            domain=UserDomainNestedFilter(name=None, is_active=None),
-            project=UserProjectNestedFilter(name=None, is_active=None),
+        f = UserV2FilterGQL(
+            domain=UserV2DomainNestedFilter(name=None, is_active=None),
+            project=UserV2ProjectNestedFilter(name=None, is_active=None),
         )
         conditions = f.build_conditions()
         assert len(conditions) == 0
@@ -227,8 +227,8 @@ class TestUserOrderByGQLNewFields:
     """Tests for new DOMAIN_NAME and PROJECT_NAME order fields."""
 
     def test_domain_name_ascending(self) -> None:
-        order = UserOrderByGQL(
-            field=UserOrderFieldGQL.DOMAIN_NAME,
+        order = UserV2OrderByGQL(
+            field=UserV2OrderFieldGQL.DOMAIN_NAME,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -237,8 +237,8 @@ class TestUserOrderByGQLNewFields:
         assert "ASC" in sql.upper()
 
     def test_domain_name_descending(self) -> None:
-        order = UserOrderByGQL(
-            field=UserOrderFieldGQL.DOMAIN_NAME,
+        order = UserV2OrderByGQL(
+            field=UserV2OrderFieldGQL.DOMAIN_NAME,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -247,8 +247,8 @@ class TestUserOrderByGQLNewFields:
         assert "DESC" in sql.upper()
 
     def test_project_name_ascending(self) -> None:
-        order = UserOrderByGQL(
-            field=UserOrderFieldGQL.PROJECT_NAME,
+        order = UserV2OrderByGQL(
+            field=UserV2OrderFieldGQL.PROJECT_NAME,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -258,8 +258,8 @@ class TestUserOrderByGQLNewFields:
         assert "ASC" in sql.upper()
 
     def test_project_name_descending(self) -> None:
-        order = UserOrderByGQL(
-            field=UserOrderFieldGQL.PROJECT_NAME,
+        order = UserV2OrderByGQL(
+            field=UserV2OrderFieldGQL.PROJECT_NAME,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -269,8 +269,8 @@ class TestUserOrderByGQLNewFields:
         assert "DESC" in sql.upper()
 
     def test_existing_fields_still_work(self) -> None:
-        order = UserOrderByGQL(
-            field=UserOrderFieldGQL.CREATED_AT,
+        order = UserV2OrderByGQL(
+            field=UserV2OrderFieldGQL.CREATED_AT,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()

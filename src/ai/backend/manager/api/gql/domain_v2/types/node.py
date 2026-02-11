@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
-    from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
+    from ai.backend.manager.api.gql.user.types.filters import UserV2FilterGQL, UserV2OrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
     from ai.backend.manager.data.domain.types import DomainData
 
@@ -203,12 +203,12 @@ class DomainV2GQL(Node):
         self,
         info: Info,
         filter: Annotated[
-            UserFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.user.types.filters")
+            UserV2FilterGQL, strawberry.lazy("ai.backend.manager.api.gql.user.types.filters")
         ]
         | None = None,
         order_by: list[
             Annotated[
-                UserOrderByGQL,
+                UserV2OrderByGQL,
                 strawberry.lazy("ai.backend.manager.api.gql.user.types.filters"),
             ]
         ]

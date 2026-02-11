@@ -6,7 +6,7 @@ from uuid import UUID
 
 import strawberry
 
-from .enums import UserRoleEnumGQL, UserStatusEnumGQL
+from .enums import UserV2RoleEnumGQL, UserV2StatusEnumGQL
 
 # Create User Inputs
 
@@ -18,7 +18,7 @@ from .enums import UserRoleEnumGQL, UserStatusEnumGQL
         "Required fields: email, username, password, domain_name, need_password_change, status, role."
     ),
 )
-class CreateUserInputGQL:
+class CreateUserV2InputGQL:
     """Input for creating a single user."""
 
     email: str = strawberry.field(
@@ -30,8 +30,8 @@ class CreateUserInputGQL:
     need_password_change: bool = strawberry.field(
         description="If true, user must change password on first login."
     )
-    status: UserStatusEnumGQL = strawberry.field(description="Initial account status.")
-    role: UserRoleEnumGQL = strawberry.field(
+    status: UserV2StatusEnumGQL = strawberry.field(description="Initial account status.")
+    role: UserV2RoleEnumGQL = strawberry.field(
         description="User role determining access permissions."
     )
     full_name: str | None = strawberry.field(
@@ -83,10 +83,12 @@ class CreateUserInputGQL:
         "Each user has individual specifications."
     ),
 )
-class BulkCreateUserInputGQL:
+class BulkCreateUserV2InputGQL:
     """Input for bulk creating users with individual specs."""
 
-    users: list[CreateUserInputGQL] = strawberry.field(description="List of user creation inputs.")
+    users: list[CreateUserV2InputGQL] = strawberry.field(
+        description="List of user creation inputs."
+    )
 
 
 # Update User Inputs
@@ -99,7 +101,7 @@ class BulkCreateUserInputGQL:
         "All fields are optional - only provided fields will be updated."
     ),
 )
-class UpdateUserInputGQL:
+class UpdateUserV2InputGQL:
     """Input for updating user information. All fields optional."""
 
     username: str | None = strawberry.field(
@@ -118,11 +120,11 @@ class UpdateUserInputGQL:
         default=None,
         description="New description.",
     )
-    status: UserStatusEnumGQL | None = strawberry.field(
+    status: UserV2StatusEnumGQL | None = strawberry.field(
         default=None,
         description="New account status.",
     )
-    role: UserRoleEnumGQL | None = strawberry.field(
+    role: UserV2RoleEnumGQL | None = strawberry.field(
         default=None,
         description="New user role.",
     )
@@ -178,7 +180,7 @@ class UpdateUserInputGQL:
         "Soft delete changes user status to DELETED but preserves data."
     ),
 )
-class DeleteUsersInputGQL:
+class DeleteUsersV2InputGQL:
     """Input for soft-deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to soft-delete.")
@@ -194,7 +196,7 @@ class DeleteUsersInputGQL:
         "This action is irreversible."
     ),
 )
-class PurgeUserInputGQL:
+class PurgeUserV2InputGQL:
     """Input for permanently deleting a single user."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to purge.")
@@ -207,7 +209,7 @@ class PurgeUserInputGQL:
         "This action is irreversible."
     ),
 )
-class PurgeUsersInputGQL:
+class PurgeUsersV2InputGQL:
     """Input for permanently deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to purge.")
