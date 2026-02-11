@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action import SearchActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -33,14 +33,5 @@ class SearchScopesAction(RoleAction):
 
 
 @dataclass
-class SearchScopesActionResult(BaseActionResult):
-    """Result of searching scopes."""
-
-    items: list[ScopeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class SearchScopesActionResult(SearchActionResult[ScopeData]):
+    pass

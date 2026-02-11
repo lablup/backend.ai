@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import final
 
 from ai.backend.manager.api.gql.base import decode_cursor
@@ -33,6 +33,51 @@ class PaginationOptions:
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+@dataclass(frozen=True)
+class QuerierInput:
+    """Internal input for build_querier_from_input. Contains adapter-level types only."""
+
+    pagination: PaginationOptions = field(default_factory=PaginationOptions)
+    filter: GQLFilter | None = None
+    order_by: Sequence[GQLOrderBy] | None = None
+    base_conditions: Sequence[QueryCondition] | None = None
+
+
+@dataclass(frozen=True)
+class FetchInput:
+    """Resolver-to-fetcher DTO. Wraps raw GraphQL pagination/filter/order arguments.
+
+    Example::
+
+        fetch_input = FetchInput(first=10, after="cursor_abc", filter=my_filter)
+        querier_input = fetch_input.to_querier_input()
+        querier = adapter.build_querier_from_input(querier_input, pagination_spec)
+    """
+
+    filter: GQLFilter | None = None
+    order_by: Sequence[GQLOrderBy] | None = None
+    before: str | None = None
+    after: str | None = None
+    first: int | None = None
+    last: int | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+    def to_querier_input(self) -> QuerierInput:
+        return QuerierInput(
+            pagination=PaginationOptions(
+                first=self.first,
+                after=self.after,
+                last=self.last,
+                before=self.before,
+                limit=self.limit,
+                offset=self.offset,
+            ),
+            filter=self.filter,
+            order_by=self.order_by,
+        )
 
 
 @dataclass(frozen=True)
@@ -191,3 +236,18 @@ class BaseGQLAdapter:
         )
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    @final
+    def build_querier_from_input(
+        self,
+        input: QuerierInput,
+        pagination_spec: PaginationSpec,
+    ) -> BatchQuerier:
+        """Build BatchQuerier from a QuerierInput dataclass."""
+        return self.build_querier(
+            input.pagination,
+            pagination_spec,
+            filter=input.filter,
+            order_by=input.order_by,
+            base_conditions=input.base_conditions,
+        )

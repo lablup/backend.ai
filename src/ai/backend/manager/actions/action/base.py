@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TypeVar
+from typing import TypeVar, override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
@@ -45,6 +45,18 @@ class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> str | None:
         raise NotImplementedError
+
+
+@dataclass
+class SearchActionResult[T](BaseActionResult):
+    items: list[T]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
 
 
 @dataclass

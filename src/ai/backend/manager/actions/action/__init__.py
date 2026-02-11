@@ -4,6 +4,7 @@ from .base import (
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
+    SearchActionResult,
     TAction,
     TActionResult,
 )
@@ -20,6 +21,7 @@ __all__ = (
     "BaseBatchAction",
     "BaseBatchActionResult",
     "ProcessResult",
+    "SearchActionResult",
     "TAction",
     "TActionResult",
 )
