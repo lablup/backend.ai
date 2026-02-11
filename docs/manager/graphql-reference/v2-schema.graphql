@@ -930,6 +930,43 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserError!]!
 }
 
+"""Added in 26.2.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserError {
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in 26.2.0. Input for bulk updating multiple users. Each user has individual update specifications.
+"""
+input BulkUpdateUserV2Input {
+  """List of user update inputs."""
+  users: [BulkUpdateUserV2ItemInput!]!
+}
+
+"""
+Added in 26.2.0. Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.
+"""
+input BulkUpdateUserV2ItemInput {
+  """UUID of the user to update."""
+  userId: UUID!
+
+  """Fields to update for this user."""
+  input: UpdateUserV2Input!
+}
+
+"""Added in 26.2.0. Payload for bulk user update mutation."""
+type BulkUpdateUsersV2Payload {
+  """List of successfully updated users."""
+  updatedUsers: [UserV2!]!
+
+  """List of errors for users that failed to update."""
+  failed: [BulkUpdateUserError!]!
+}
+
 """
 Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.
 """
@@ -3823,6 +3860,11 @@ type Mutation {
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
   adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
+
+  """
+  Added in 26.2.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
+  """
+  adminBulkUpdateUsers(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload!
 
   """
   Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
