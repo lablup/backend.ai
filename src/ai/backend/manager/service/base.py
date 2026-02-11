@@ -5,9 +5,10 @@ from .container_registry.harbor import (
 
 class ServicesContext:
     """
-    In the API layer, requests are processed through the ServicesContext and
-    its subordinate layers, including the DB, Client, and Repository layers.
-    Each layer separates the responsibilities specific to its respective level.
+    Deprecated: This class is being replaced by the new service layer
+    (services/container_registry_quota/). Once GraphQL mutations are migrated
+    to use processors, this class and service/container_registry/harbor.py
+    can be removed.
     """
 
     per_project_container_registries_quota: AbstractPerProjectContainerRegistryQuotaService
