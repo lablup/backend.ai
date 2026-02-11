@@ -730,7 +730,7 @@ async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def prometheus_client_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     client_pool = ClientPool(tcp_client_session_factory)
     root_ctx.prometheus_client = PrometheusClient(
-        endpoint=f"http://{root_ctx.config_provider.config.metric.address.to_legacy()}/api/v1",
+        endpoint=f"http://{root_ctx.config_provider.config.metric.address.to_legacy()}/api/v1/",
         client_pool=client_pool,
     )
     try:
