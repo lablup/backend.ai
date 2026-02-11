@@ -15,7 +15,7 @@ from ai.backend.manager.api.gql.project_v2.fetcher import (
     fetch_project_domain,
 )
 from ai.backend.manager.api.gql.project_v2.types import (
-    DomainProjectScope,
+    DomainProjectV2Scope,
     ProjectV2Connection,
     ProjectV2Filter,
     ProjectV2GQL,
@@ -102,7 +102,7 @@ async def admin_projects_v2(
 )  # type: ignore[misc]
 async def domain_projects_v2(
     info: Info[StrawberryGQLContext],
-    scope: DomainProjectScope,
+    scope: DomainProjectV2Scope,
     filter: ProjectV2Filter | None = None,
     order_by: list[ProjectV2OrderBy] | None = None,
     before: str | None = None,

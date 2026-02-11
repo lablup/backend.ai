@@ -15,7 +15,7 @@ import strawberry
         "MODEL_STORE: Project for model storage and management."
     ),
 )
-class ProjectTypeEnum(StrEnum):
+class ProjectV2TypeEnum(StrEnum):
     """Project type enum."""
 
     GENERAL = "general"

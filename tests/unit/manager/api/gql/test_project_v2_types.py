@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission, VFolderHostPermissionMap
 from ai.backend.manager.api.gql.project_v2.types import (
-    ProjectTypeEnum,
     ProjectV2GQL,
+    ProjectV2TypeEnum,
     VFolderHostPermissionEnum,
 )
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -43,7 +43,7 @@ class TestProjectV2GQL:
         # Verify basic info
         assert project_gql.basic_info.name == "test-project"
         assert project_gql.basic_info.description == "Test project description"
-        assert project_gql.basic_info.type == ProjectTypeEnum.GENERAL
+        assert project_gql.basic_info.type == ProjectV2TypeEnum.GENERAL
         assert project_gql.basic_info.integration_id == "integration-123"
 
         # Verify organization
@@ -56,10 +56,10 @@ class TestProjectV2GQL:
         assert project_gql.lifecycle.modified_at == datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC)
 
     def test_from_data_project_type_conversion(self) -> None:
-        """Test ProjectType to ProjectTypeEnum conversion."""
+        """Test ProjectType to ProjectV2TypeEnum conversion."""
         for project_type, expected_enum in [
-            (ProjectType.GENERAL, ProjectTypeEnum.GENERAL),
-            (ProjectType.MODEL_STORE, ProjectTypeEnum.MODEL_STORE),
+            (ProjectType.GENERAL, ProjectV2TypeEnum.GENERAL),
+            (ProjectType.MODEL_STORE, ProjectV2TypeEnum.MODEL_STORE),
         ]:
             data = GroupData(
                 id=uuid.uuid4(),

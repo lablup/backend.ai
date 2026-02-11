@@ -25,17 +25,17 @@ from ai.backend.manager.repositories.domain.options import DomainConditions
 from ai.backend.manager.repositories.group.options import GroupConditions, GroupOrders
 from ai.backend.manager.repositories.user.options import UserConditions
 
-from .enums import ProjectTypeEnum
+from .enums import ProjectV2TypeEnum
 
 
 @strawberry.input(
-    name="ProjectDomainNestedFilter",
+    name="ProjectV2DomainNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for the domain a project belongs to. "
         "Filters projects whose domain matches all specified conditions."
     ),
 )
-class ProjectDomainNestedFilter:
+class ProjectV2DomainNestedFilter:
     """Nested filter for domain of a project."""
 
     name: StringFilter | None = strawberry.field(
@@ -72,13 +72,13 @@ class ProjectDomainNestedFilter:
 
 
 @strawberry.input(
-    name="ProjectUserNestedFilter",
+    name="ProjectV2UserNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for users belonging to a project. "
         "Filters projects that have at least one user matching all specified conditions."
     ),
 )
-class ProjectUserNestedFilter:
+class ProjectV2UserNestedFilter:
     """Nested filter for users within a project."""
 
     username: StringFilter | None = strawberry.field(
@@ -134,23 +134,23 @@ class ProjectUserNestedFilter:
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
-class ProjectTypeEnumFilter:
+class ProjectV2TypeEnumFilter:
     """Filter for project type enum fields."""
 
-    equals: ProjectTypeEnum | None = strawberry.field(
+    equals: ProjectV2TypeEnum | None = strawberry.field(
         default=None,
         description="Exact match for project type.",
     )
-    in_: list[ProjectTypeEnum] | None = strawberry.field(
+    in_: list[ProjectV2TypeEnum] | None = strawberry.field(
         name="in",
         default=None,
         description="Match any of the provided types.",
     )
-    not_equals: ProjectTypeEnum | None = strawberry.field(
+    not_equals: ProjectV2TypeEnum | None = strawberry.field(
         default=None,
         description="Exclude exact type match.",
     )
-    not_in: list[ProjectTypeEnum] | None = strawberry.field(
+    not_in: list[ProjectV2TypeEnum] | None = strawberry.field(
         default=None,
         description="Exclude any of the provided types.",
     )
@@ -179,7 +179,7 @@ class ProjectV2Filter(GQLFilter):
         default=None,
         description="Filter by domain name. Supports equals, contains, startsWith, and endsWith.",
     )
-    type: ProjectTypeEnumFilter | None = strawberry.field(
+    type: ProjectV2TypeEnumFilter | None = strawberry.field(
         default=None,
         description="Filter by project type. Supports equals, in, not_equals, and not_in operations.",
     )
@@ -195,14 +195,14 @@ class ProjectV2Filter(GQLFilter):
         default=None,
         description="Filter by last modification timestamp. Supports before, after, and between operations.",
     )
-    domain: ProjectDomainNestedFilter | None = strawberry.field(
+    domain: ProjectV2DomainNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested domain conditions. "
             "Returns projects whose domain matches all specified conditions."
         ),
     )
-    user: ProjectUserNestedFilter | None = strawberry.field(
+    user: ProjectV2UserNestedFilter | None = strawberry.field(
         default=None,
         description=(
             "Filter by nested user conditions. "

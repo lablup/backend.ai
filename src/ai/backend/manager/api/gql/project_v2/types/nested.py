@@ -6,7 +6,7 @@ from datetime import datetime
 
 import strawberry
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
+from .enums import ProjectV2TypeEnum, VFolderHostPermissionEnum
 
 # ============================================================================
 # Basic Information
@@ -14,18 +14,18 @@ from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 
 
 @strawberry.type(
-    name="ProjectBasicInfo",
+    name="ProjectV2BasicInfo",
     description=(
         "Added in 26.2.0. Basic project information. "
         "Contains identity and descriptive fields for the project."
     ),
 )
-class ProjectBasicInfoGQL:
+class ProjectV2BasicInfoGQL:
     """Basic project information."""
 
     name: str = strawberry.field(description="Project name.")
     description: str | None = strawberry.field(description="Optional description of the project.")
-    type: ProjectTypeEnum = strawberry.field(
+    type: ProjectV2TypeEnum = strawberry.field(
         description="Project type determining its purpose. See ProjectTypeV2 enum."
     )
     integration_id: str | None = strawberry.field(
@@ -39,13 +39,13 @@ class ProjectBasicInfoGQL:
 
 
 @strawberry.type(
-    name="ProjectOrganizationInfo",
+    name="ProjectV2OrganizationInfo",
     description=(
         "Added in 26.2.0. Project's organizational context. "
         "Contains domain membership and resource policy information."
     ),
 )
-class ProjectOrganizationInfoGQL:
+class ProjectV2OrganizationInfoGQL:
     """Project's organizational context."""
 
     domain_name: str = strawberry.field(description="Name of the domain this project belongs to.")
@@ -81,13 +81,13 @@ class VFolderHostPermissionEntryGQL:
 
 
 @strawberry.type(
-    name="ProjectStorageInfo",
+    name="ProjectV2StorageInfo",
     description=(
         "Added in 26.2.0. Project storage configuration. "
         "Contains allowed virtual folder hosts and their permissions."
     ),
 )
-class ProjectStorageInfoGQL:
+class ProjectV2StorageInfoGQL:
     """Project storage configuration."""
 
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = strawberry.field(
@@ -105,13 +105,13 @@ class ProjectStorageInfoGQL:
 
 
 @strawberry.type(
-    name="ProjectLifecycleInfo",
+    name="ProjectV2LifecycleInfo",
     description=(
         "Added in 26.2.0. Project lifecycle information. "
         "Contains activation status and timestamp tracking."
     ),
 )
-class ProjectLifecycleInfoGQL:
+class ProjectV2LifecycleInfoGQL:
     """Project lifecycle information."""
 
     is_active: bool | None = strawberry.field(

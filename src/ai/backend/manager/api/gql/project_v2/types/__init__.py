@@ -1,44 +1,46 @@
 """ProjectV2 GraphQL types package."""
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
+from .enums import ProjectV2TypeEnum, VFolderHostPermissionEnum
 from .filters import (
-    ProjectDomainNestedFilter,
-    ProjectUserNestedFilter,
+    ProjectV2DomainNestedFilter,
     ProjectV2Filter,
     ProjectV2OrderBy,
     ProjectV2OrderField,
+    ProjectV2TypeEnumFilter,
+    ProjectV2UserNestedFilter,
 )
 from .nested import (
-    ProjectBasicInfoGQL,
-    ProjectLifecycleInfoGQL,
-    ProjectOrganizationInfoGQL,
-    ProjectStorageInfoGQL,
+    ProjectV2BasicInfoGQL,
+    ProjectV2LifecycleInfoGQL,
+    ProjectV2OrganizationInfoGQL,
+    ProjectV2StorageInfoGQL,
     VFolderHostPermissionEntryGQL,
 )
 from .node import ProjectV2Connection, ProjectV2Edge, ProjectV2GQL
-from .scopes import DomainProjectScope
+from .scopes import DomainProjectV2Scope
 
 __all__ = [
     # Enums
-    "ProjectTypeEnum",
+    "ProjectV2TypeEnum",
     "VFolderHostPermissionEnum",
     # Filters and OrderBy
-    "ProjectDomainNestedFilter",
-    "ProjectUserNestedFilter",
+    "ProjectV2DomainNestedFilter",
+    "ProjectV2UserNestedFilter",
+    "ProjectV2TypeEnumFilter",
     "ProjectV2Filter",
     "ProjectV2OrderBy",
     "ProjectV2OrderField",
     # Scopes
-    "DomainProjectScope",
+    "DomainProjectV2Scope",
     # Nested types - Basic
-    "ProjectBasicInfoGQL",
+    "ProjectV2BasicInfoGQL",
     # Nested types - Organization
-    "ProjectOrganizationInfoGQL",
+    "ProjectV2OrganizationInfoGQL",
     # Nested types - Storage
     "VFolderHostPermissionEntryGQL",
-    "ProjectStorageInfoGQL",
+    "ProjectV2StorageInfoGQL",
     # Nested types - Lifecycle
-    "ProjectLifecycleInfoGQL",
+    "ProjectV2LifecycleInfoGQL",
     # Node types
     "ProjectV2GQL",
     "ProjectV2Edge",
