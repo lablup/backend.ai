@@ -19,12 +19,28 @@ class APIMetricObserver:
         self._request_count = Counter(
             name="backendai_api_request_count",
             documentation="Total number of API requests",
-            labelnames=["method", "endpoint", "domain", "operation", "error_detail", "status_code"],
+            labelnames=[
+                "method",
+                "endpoint",
+                "client_operation",
+                "domain",
+                "operation",
+                "error_detail",
+                "status_code",
+            ],
         )
         self._request_duration_sec = Histogram(
             name="backendai_api_request_duration_sec",
             documentation="Duration of API requests in milliseconds",
-            labelnames=["method", "endpoint", "domain", "operation", "error_detail", "status_code"],
+            labelnames=[
+                "method",
+                "endpoint",
+                "client_operation",
+                "domain",
+                "operation",
+                "error_detail",
+                "status_code",
+            ],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -46,8 +62,9 @@ class APIMetricObserver:
         self._request_count.labels(
             method=method,
             endpoint=endpoint,
+            client_operation=client_operation,
             domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else client_operation,
+            operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
             status_code=status_code,
         ).inc()
@@ -65,8 +82,9 @@ class APIMetricObserver:
         self._request_duration_sec.labels(
             method=method,
             endpoint=endpoint,
+            client_operation=client_operation,
             domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else client_operation,
+            operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
             status_code=status_code,
         ).observe(duration)

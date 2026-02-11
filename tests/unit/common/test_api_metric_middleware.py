@@ -69,9 +69,7 @@ class TestAPIMetricMiddlewareWithOperation:
         assert call_kwargs["client_operation"] == ""
         assert call_kwargs["error_code"] is None
 
-    async def test_failed_request_still_passes_client_operation_to_observer(
-        self, aiohttp_client: Any
-    ) -> None:
+    async def test_failed_request_preserves_client_operation(self, aiohttp_client: Any) -> None:
         mock_metric = MagicMock()
 
         async def test_handler(request: web.Request) -> web.Response:
@@ -86,13 +84,13 @@ class TestAPIMetricMiddlewareWithOperation:
         app.router.add_get("/test", test_handler)
 
         client = await aiohttp_client(app)
-        resp = await client.get("/test", headers={OPERATION_HEADER: "should_be_ignored"})
+        resp = await client.get("/test", headers={OPERATION_HEADER: "create_session"})
         assert resp.status == 400
 
         mock_metric.observe_request.assert_called_once()
         call_kwargs = mock_metric.observe_request.call_args.kwargs
         assert call_kwargs["error_code"] is not None
-        assert call_kwargs["client_operation"] == "should_be_ignored"
+        assert call_kwargs["client_operation"] == "create_session"
 
     async def test_invalid_operation_header_is_sanitized(self, aiohttp_client: Any) -> None:
         mock_metric = MagicMock()
@@ -148,7 +146,15 @@ class TestAPIMetricObserverClientOperation:
         """Use a fresh registry to avoid cross-test collisions."""
         registry = CollectorRegistry()
         self.observer = APIMetricObserver.__new__(APIMetricObserver)
-        label_names = ["method", "endpoint", "domain", "operation", "error_detail", "status_code"]
+        label_names = [
+            "method",
+            "endpoint",
+            "client_operation",
+            "domain",
+            "operation",
+            "error_detail",
+            "status_code",
+        ]
         self.observer._request_count = Counter(
             name="test_api_request_count",
             documentation="test",
@@ -175,8 +181,9 @@ class TestAPIMetricObserverClientOperation:
         sample = self.observer._request_count.labels(
             method="GET",
             endpoint="/test",
+            client_operation="list_sessions",
             domain="",
-            operation="list_sessions",
+            operation="",
             error_detail="",
             status_code=200,
         )
@@ -193,6 +200,7 @@ class TestAPIMetricObserverClientOperation:
         sample = self.observer._request_count.labels(
             method="GET",
             endpoint="/test",
+            client_operation="",
             domain="",
             operation="",
             error_detail="",
@@ -200,7 +208,7 @@ class TestAPIMetricObserverClientOperation:
         )
         assert sample._value.get() == 1.0
 
-    def test_error_code_takes_precedence_over_client_operation(self) -> None:
+    def test_error_preserves_client_operation_alongside_error_code(self) -> None:
         error_code = ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -212,11 +220,12 @@ class TestAPIMetricObserverClientOperation:
             error_code=error_code,
             status_code=400,
             duration=0.2,
-            client_operation="should_be_ignored",
+            client_operation="create_session",
         )
         sample = self.observer._request_count.labels(
             method="POST",
             endpoint="/test",
+            client_operation="create_session",
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.BAD_REQUEST,
