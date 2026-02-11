@@ -1,10 +1,11 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import attrs
@@ -3376,9 +3377,21 @@ class GQLMetricMiddleware:
                 duration=duration,
             )
 
+        async def _observe_coroutine(coro: Awaitable[Any]) -> Any:
+            start = time.perf_counter()
+            try:
+                result = await coro
+                _observe(duration=time.perf_counter() - start)
+            except BaseException as e:
+                _observe(duration=time.perf_counter() - start, error=e)
+                raise
+            return result
+
         start = time.perf_counter()
         try:
             res = next(root, info, **args)
+            if asyncio.iscoroutine(res):
+                return _observe_coroutine(res)
             _observe(duration=time.perf_counter() - start)
         except BaseException as e:
             _observe(duration=time.perf_counter() - start, error=e)
