@@ -60,13 +60,13 @@ from ai.backend.manager.services.permission_contoller.actions.search_object_perm
     SearchObjectPermissionsAction,
     SearchObjectPermissionsActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
+    SearchPermissionsAction,
+    SearchPermissionsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_scoped_permissions import (
-    SearchScopedPermissionsAction,
-    SearchScopedPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
@@ -197,12 +197,12 @@ class PermissionControllerService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def search_scoped_permissions(
-        self, action: SearchScopedPermissionsAction
-    ) -> SearchScopedPermissionsActionResult:
-        """Search scoped permissions with pagination and filtering."""
-        result = await self._repository.search_scoped_permissions(action.querier)
-        return SearchScopedPermissionsActionResult(
+    async def search_permissions(
+        self, action: SearchPermissionsAction
+    ) -> SearchPermissionsActionResult:
+        """Search permissions with pagination and filtering."""
+        result = await self._repository.search_permissions(action.querier)
+        return SearchPermissionsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

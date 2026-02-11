@@ -279,6 +279,26 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.id < cursor_uuid
+
+        return inner
+
 
 class AssignedUserOrders:
     """Query orders for assigned users."""
@@ -598,6 +618,20 @@ class ScopedPermissionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.id < cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type == scope_type
 
         return inner
 

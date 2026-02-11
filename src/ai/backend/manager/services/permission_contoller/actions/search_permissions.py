@@ -9,7 +9,7 @@ from ai.backend.manager.services.permission_contoller.actions.base import RoleAc
 
 
 @dataclass
-class SearchScopedPermissionsAction(RoleAction):
+class SearchPermissionsAction(RoleAction):
     querier: BatchQuerier
 
     @override
@@ -23,7 +23,7 @@ class SearchScopedPermissionsAction(RoleAction):
 
 
 @dataclass
-class SearchScopedPermissionsActionResult(BaseActionResult):
+class SearchPermissionsActionResult(BaseActionResult):
     items: list[PermissionData]
     total_count: int
     has_next_page: bool

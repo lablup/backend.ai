@@ -558,12 +558,12 @@ class PermissionDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_scoped_permissions(
+    async def search_permissions(
         self,
         querier: BatchQuerier,
         scope: ScopedPermissionSearchScope | None = None,
     ) -> ScopedPermissionListResult:
-        """Searches scoped permissions with pagination and filtering."""
+        """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(PermissionRow)
 
