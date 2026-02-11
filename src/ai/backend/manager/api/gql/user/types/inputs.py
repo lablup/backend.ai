@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import strawberry
+from strawberry import UNSET
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
@@ -103,67 +104,67 @@ class UpdateUserInputGQL:
     """Input for updating user information. All fields optional."""
 
     username: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New username.",
     )
     password: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New password.",
     )
     full_name: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New full display name.",
     )
     description: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New description.",
     )
     status: UserStatusEnumGQL | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New account status.",
     )
     role: UserRoleEnumGQL | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New user role.",
     )
     domain_name: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New domain assignment.",
     )
     group_ids: list[UUID] | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New project (group) assignments. Replaces existing assignments.",
     )
     allowed_client_ip: list[str] | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New allowed client IP addresses or CIDR ranges.",
     )
     need_password_change: bool | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="Set password change requirement.",
     )
     resource_policy: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New user resource policy name.",
     )
     sudo_session_enabled: bool | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="Enable or disable sudo session capability.",
     )
     main_access_key: str | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="Set the primary API access key.",
     )
     container_uid: int | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New container user ID.",
     )
     container_main_gid: int | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New container primary group ID.",
     )
     container_gids: list[int] | None = strawberry.field(
-        default=None,
+        default=UNSET,
         description="New container supplementary group IDs.",
     )
 
