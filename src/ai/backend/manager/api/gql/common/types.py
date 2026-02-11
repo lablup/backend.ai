@@ -57,10 +57,20 @@ class SessionTypeGQL(StrEnum):
 
 @strawberry.enum(
     name="SessionResult",
-    description="Added in 26.2.0. Result status of a session execution.",
+    description=(
+        "Added in 26.2.0. Result status of a session or kernel execution. "
+        "Indicates the final outcome after the session/kernel has terminated. "
+        "UNDEFINED: The session has not yet finished or its result is unknown. "
+        "SUCCESS: The session completed normally without errors. "
+        "FAILURE: The session terminated abnormally due to an error or user cancellation."
+    ),
 )
 class SessionResultGQL(StrEnum):
-    """GraphQL enum for session result."""
+    """GraphQL enum for session result.
+
+    Represents the final outcome of a session or kernel execution.
+    Used in lifecycle info fields to indicate how the workload finished.
+    """
 
     UNDEFINED = "undefined"
     SUCCESS = "success"
