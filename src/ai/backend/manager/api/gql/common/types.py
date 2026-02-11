@@ -47,10 +47,10 @@ class ClusterModeGQL(StrEnum):
 
 
 @strawberry.enum(
-    name="SessionType",
+    name="SessionV2Type",
     description="Added in 26.2.0. Type of compute session.",
 )
-class SessionTypeGQL(StrEnum):
+class SessionV2TypeGQL(StrEnum):
     """GraphQL enum for session types."""
 
     INTERACTIVE = "interactive"
@@ -59,7 +59,7 @@ class SessionTypeGQL(StrEnum):
     SYSTEM = "system"
 
     @classmethod
-    def from_internal(cls, internal: SessionTypes) -> SessionTypeGQL:
+    def from_internal(cls, internal: SessionTypes) -> SessionV2TypeGQL:
         """Convert internal SessionTypes to GraphQL enum."""
         match internal:
             case SessionTypes.INTERACTIVE:
@@ -74,18 +74,18 @@ class SessionTypeGQL(StrEnum):
     def to_internal(self) -> SessionTypes:
         """Convert GraphQL enum to internal SessionTypes."""
         match self:
-            case SessionTypeGQL.INTERACTIVE:
+            case SessionV2TypeGQL.INTERACTIVE:
                 return SessionTypes.INTERACTIVE
-            case SessionTypeGQL.BATCH:
+            case SessionV2TypeGQL.BATCH:
                 return SessionTypes.BATCH
-            case SessionTypeGQL.INFERENCE:
+            case SessionV2TypeGQL.INFERENCE:
                 return SessionTypes.INFERENCE
-            case SessionTypeGQL.SYSTEM:
+            case SessionV2TypeGQL.SYSTEM:
                 return SessionTypes.SYSTEM
 
 
 @strawberry.enum(
-    name="SessionResult",
+    name="SessionV2Result",
     description=(
         "Added in 26.2.0. Result status of a session or kernel execution. "
         "Indicates the final outcome after the session/kernel has terminated. "
@@ -94,7 +94,7 @@ class SessionTypeGQL(StrEnum):
         "FAILURE: The session terminated abnormally due to an error or user cancellation."
     ),
 )
-class SessionResultGQL(StrEnum):
+class SessionV2ResultGQL(StrEnum):
     """GraphQL enum for session result.
 
     Represents the final outcome of a session or kernel execution.
@@ -106,7 +106,7 @@ class SessionResultGQL(StrEnum):
     FAILURE = "failure"
 
     @classmethod
-    def from_internal(cls, internal: SessionResult) -> SessionResultGQL:
+    def from_internal(cls, internal: SessionResult) -> SessionV2ResultGQL:
         """Convert internal SessionResult to GraphQL enum."""
         match internal:
             case SessionResult.UNDEFINED:
@@ -119,11 +119,11 @@ class SessionResultGQL(StrEnum):
     def to_internal(self) -> SessionResult:
         """Convert GraphQL enum to internal SessionResult."""
         match self:
-            case SessionResultGQL.UNDEFINED:
+            case SessionV2ResultGQL.UNDEFINED:
                 return SessionResult.UNDEFINED
-            case SessionResultGQL.SUCCESS:
+            case SessionV2ResultGQL.SUCCESS:
                 return SessionResult.SUCCESS
-            case SessionResultGQL.FAILURE:
+            case SessionV2ResultGQL.FAILURE:
                 return SessionResult.FAILURE
 
 

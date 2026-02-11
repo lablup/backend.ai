@@ -12,8 +12,8 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
-    SessionResultGQL,
-    SessionTypeGQL,
+    SessionV2ResultGQL,
+    SessionV2TypeGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
@@ -29,10 +29,10 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
 @strawberry.enum(
-    name="SessionStatus",
+    name="SessionV2Status",
     description="Added in 26.2.0. Status of a session in its lifecycle.",
 )
-class SessionStatusGQL(StrEnum):
+class SessionV2StatusGQL(StrEnum):
     """GraphQL enum for session status."""
 
     PENDING = "PENDING"
@@ -47,7 +47,7 @@ class SessionStatusGQL(StrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def from_internal(cls, internal_status: SessionStatus) -> SessionStatusGQL:
+    def from_internal(cls, internal_status: SessionStatus) -> SessionV2StatusGQL:
         """Convert internal SessionStatus to GraphQL enum."""
         match internal_status:
             case SessionStatus.PENDING:
@@ -77,25 +77,25 @@ class SessionStatusGQL(StrEnum):
     def to_internal(self) -> SessionStatus:
         """Convert GraphQL enum to internal SessionStatus."""
         match self:
-            case SessionStatusGQL.PENDING:
+            case SessionV2StatusGQL.PENDING:
                 return SessionStatus.PENDING
-            case SessionStatusGQL.SCHEDULED:
+            case SessionV2StatusGQL.SCHEDULED:
                 return SessionStatus.SCHEDULED
-            case SessionStatusGQL.PREPARING:
+            case SessionV2StatusGQL.PREPARING:
                 return SessionStatus.PREPARING
-            case SessionStatusGQL.PREPARED:
+            case SessionV2StatusGQL.PREPARED:
                 return SessionStatus.PREPARED
-            case SessionStatusGQL.CREATING:
+            case SessionV2StatusGQL.CREATING:
                 return SessionStatus.CREATING
-            case SessionStatusGQL.RUNNING:
+            case SessionV2StatusGQL.RUNNING:
                 return SessionStatus.RUNNING
-            case SessionStatusGQL.DEPRIORITIZING:
+            case SessionV2StatusGQL.DEPRIORITIZING:
                 return SessionStatus.DEPRIORITIZING
-            case SessionStatusGQL.TERMINATING:
+            case SessionV2StatusGQL.TERMINATING:
                 return SessionStatus.TERMINATING
-            case SessionStatusGQL.TERMINATED:
+            case SessionV2StatusGQL.TERMINATED:
                 return SessionStatus.TERMINATED
-            case SessionStatusGQL.CANCELLED:
+            case SessionV2StatusGQL.CANCELLED:
                 return SessionStatus.CANCELLED
 
 
@@ -103,10 +103,10 @@ class SessionStatusGQL(StrEnum):
 
 
 @strawberry.enum(
-    name="SessionOrderField",
+    name="SessionV2OrderField",
     description="Added in 26.2.0. Fields available for ordering sessions.",
 )
-class SessionOrderFieldGQL(StrEnum):
+class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     TERMINATED_AT = "terminated_at"
     STATUS = "status"
@@ -115,22 +115,22 @@ class SessionOrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="SessionStatusFilter", description="Added in 26.2.0. Filter for session status."
+    name="SessionV2StatusFilter", description="Added in 26.2.0. Filter for session status."
 )
-class SessionStatusFilterGQL:
-    in_: list[SessionStatusGQL] | None = strawberry.field(name="in", default=None)
-    not_in: list[SessionStatusGQL] | None = None
+class SessionV2StatusFilterGQL:
+    in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
+    not_in: list[SessionV2StatusGQL] | None = None
 
     def build_condition(self) -> QueryCondition | None:
         raise NotImplementedError
 
 
 @strawberry.input(
-    name="SessionFilter", description="Added in 26.2.0. Filter criteria for querying sessions."
+    name="SessionV2Filter", description="Added in 26.2.0. Filter criteria for querying sessions."
 )
-class SessionFilterGQL(GQLFilter):
+class SessionV2FilterGQL(GQLFilter):
     id: UUIDFilter | None = None
-    status: SessionStatusFilterGQL | None = None
+    status: SessionV2StatusFilterGQL | None = None
     name: str | None = None
     domain_name: str | None = None
     project_id: UUIDFilter | None = None
@@ -141,10 +141,10 @@ class SessionFilterGQL(GQLFilter):
 
 
 @strawberry.input(
-    name="SessionOrderBy", description="Added in 26.2.0. Ordering specification for sessions."
+    name="SessionV2OrderBy", description="Added in 26.2.0. Ordering specification for sessions."
 )
-class SessionOrderByGQL(GQLOrderBy):
-    field: SessionOrderFieldGQL
+class SessionV2OrderByGQL(GQLOrderBy):
+    field: SessionV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
     def to_query_order(self) -> QueryOrder:
@@ -155,15 +155,15 @@ class SessionOrderByGQL(GQLOrderBy):
 
 
 @strawberry.type(
-    name="SessionMetadataInfo",
+    name="SessionV2MetadataInfo",
     description="Added in 26.2.0. Metadata information for a session.",
 )
-class SessionMetadataInfoGQL:
+class SessionV2MetadataInfoGQL:
     creation_id: str = strawberry.field(
         description="Server-generated unique token for tracking session creation."
     )
     name: str = strawberry.field(description="Human-readable name of the session.")
-    session_type: SessionTypeGQL = strawberry.field(
+    session_type: SessionV2TypeGQL = strawberry.field(
         description="Type of the session (interactive, batch, inference)."
     )
     access_key: str = strawberry.field(description="Access key used to create this session.")
@@ -179,10 +179,10 @@ class SessionMetadataInfoGQL:
 
 
 @strawberry.type(
-    name="SessionResourceInfo",
+    name="SessionV2ResourceInfo",
     description="Added in 26.2.0. Resource allocation information for a session.",
 )
-class SessionResourceInfoGQL:
+class SessionV2ResourceInfoGQL:
     allocation: ResourceAllocationGQL = strawberry.field(
         description="Resource allocation with requested and occupied slots."
     )
@@ -195,12 +195,12 @@ class SessionResourceInfoGQL:
 
 
 @strawberry.type(
-    name="SessionLifecycleInfo",
+    name="SessionV2LifecycleInfo",
     description="Added in 26.2.0. Lifecycle status and timestamps for a session.",
 )
-class SessionLifecycleInfoGQL:
-    status: SessionStatusGQL = strawberry.field(description="Current status of the session.")
-    result: SessionResultGQL = strawberry.field(
+class SessionV2LifecycleInfoGQL:
+    status: SessionV2StatusGQL = strawberry.field(description="Current status of the session.")
+    result: SessionV2ResultGQL = strawberry.field(
         description="Result of the session execution (success, failure, etc.)."
     )
     created_at: datetime | None = strawberry.field(
@@ -218,10 +218,10 @@ class SessionLifecycleInfoGQL:
 
 
 @strawberry.type(
-    name="SessionRuntimeInfo",
+    name="SessionV2RuntimeInfo",
     description="Added in 26.2.0. Runtime execution configuration for a session.",
 )
-class SessionRuntimeInfoGQL:
+class SessionV2RuntimeInfoGQL:
     environ: EnvironmentVariablesGQL | None = strawberry.field(
         description="Environment variables for the session."
     )
@@ -237,10 +237,10 @@ class SessionRuntimeInfoGQL:
 
 
 @strawberry.type(
-    name="SessionNetworkInfo",
+    name="SessionV2NetworkInfo",
     description="Added in 26.2.0. Network configuration for a session.",
 )
-class SessionNetworkInfoGQL:
+class SessionV2NetworkInfoGQL:
     use_host_network: bool = strawberry.field(
         description="Whether the session uses the host network directly."
     )
@@ -260,19 +260,19 @@ class SessionV2GQL(Node):
 
     id: NodeID[str]
 
-    metadata: SessionMetadataInfoGQL = strawberry.field(
+    metadata: SessionV2MetadataInfoGQL = strawberry.field(
         description="Metadata including domain, project, and user information."
     )
-    resource: SessionResourceInfoGQL = strawberry.field(
+    resource: SessionV2ResourceInfoGQL = strawberry.field(
         description="Resource allocation and cluster information."
     )
-    lifecycle: SessionLifecycleInfoGQL = strawberry.field(
+    lifecycle: SessionV2LifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
     )
-    runtime: SessionRuntimeInfoGQL = strawberry.field(
+    runtime: SessionV2RuntimeInfoGQL = strawberry.field(
         description="Runtime execution configuration."
     )
-    network: SessionNetworkInfoGQL = strawberry.field(description="Network configuration.")
+    network: SessionV2NetworkInfoGQL = strawberry.field(description="Network configuration.")
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this session belongs to."
@@ -327,7 +327,7 @@ class SessionV2GQL(Node):
 # ========== Connection Types ==========
 
 
-SessionEdgeGQL = Edge[SessionV2GQL]
+SessionV2EdgeGQL = Edge[SessionV2GQL]
 
 
 @strawberry.type(
