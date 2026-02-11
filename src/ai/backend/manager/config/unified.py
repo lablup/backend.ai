@@ -2502,8 +2502,8 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Timeout for archive download session creation. Consider increasing for large "
-                "archive downloads or slow network connections."
+                "Timeout for archive download session creation (token issuance). "
+                "Does not affect the subsequent archive download streaming."
             ),
             added_version="25.8.0",
             composite=CompositeType.FIELD,

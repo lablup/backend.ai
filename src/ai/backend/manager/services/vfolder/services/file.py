@@ -165,6 +165,10 @@ class VFolderFileService:
         )
         if not vfolder_data:
             raise VFolderInvalidParameter("VFolder not found")
+        if is_unmanaged(vfolder_data.unmanaged_path):
+            raise VFolderInvalidParameter(
+                "Archive download is not supported for unmanaged vfolders"
+            )
 
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -179,7 +183,7 @@ class VFolderFileService:
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+            vfolder_data.host, False
         )
 
         vfolder_id = VFolderID(
