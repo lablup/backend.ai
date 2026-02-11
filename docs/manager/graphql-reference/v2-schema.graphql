@@ -893,7 +893,7 @@ input BlueGreenConfigInput {
 }
 
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserV2Error {
+type BulkCreateUserError {
   """Original position in the input list."""
   index: Int!
 
@@ -921,7 +921,7 @@ type BulkCreateUsersV2Payload {
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserV2Error!]!
+  failed: [BulkCreateUserError!]!
 }
 
 """

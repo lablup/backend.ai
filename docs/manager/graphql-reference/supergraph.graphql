@@ -1403,19 +1403,8 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
-"""Added in 26.2.0. Payload for bulk user creation mutation."""
-type BulkCreateUsersV2Payload
-  @join__type(graph: STRAWBERRY)
-{
-  """List of successfully created users."""
-  createdUsers: [UserV2!]!
-
-  """List of errors for users that failed to create."""
-  failed: [BulkCreateUserV2Error!]!
-}
-
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserV2Error
+type BulkCreateUserError
   @join__type(graph: STRAWBERRY)
 {
   """Original position in the input list."""
@@ -1429,6 +1418,17 @@ type BulkCreateUserV2Error
 
   """Error message describing the failure."""
   message: String!
+}
+
+"""Added in 26.2.0. Payload for bulk user creation mutation."""
+type BulkCreateUsersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
+
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
 }
 
 """
