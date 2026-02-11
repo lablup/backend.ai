@@ -9,12 +9,41 @@ from typing import Any
 import strawberry
 
 from ai.backend.common.types import (
+    ClusterMode,
     ServicePortProtocols,
     SessionResult,
     SessionTypes,
 )
 
 # ========== Common Enums ==========
+
+
+@strawberry.enum(
+    name="ClusterMode",
+    description="Added in 25.19.0. Cluster mode for compute sessions and deployments.",
+)
+class ClusterModeGQL(StrEnum):
+    """GraphQL enum for cluster mode."""
+
+    SINGLE_NODE = "SINGLE_NODE"
+    MULTI_NODE = "MULTI_NODE"
+
+    @classmethod
+    def from_internal(cls, internal: ClusterMode) -> ClusterModeGQL:
+        """Convert internal ClusterMode to GraphQL enum."""
+        match internal:
+            case ClusterMode.SINGLE_NODE:
+                return cls.SINGLE_NODE
+            case ClusterMode.MULTI_NODE:
+                return cls.MULTI_NODE
+
+    def to_internal(self) -> ClusterMode:
+        """Convert GraphQL enum to internal ClusterMode."""
+        match self:
+            case ClusterModeGQL.SINGLE_NODE:
+                return ClusterMode.SINGLE_NODE
+            case ClusterModeGQL.MULTI_NODE:
+                return ClusterMode.MULTI_NODE
 
 
 @strawberry.enum(

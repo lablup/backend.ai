@@ -1632,7 +1632,7 @@ input ClusterConfigInput
   size: Int!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Cluster mode for compute sessions and deployments."""
 enum ClusterMode
   @join__type(graph: STRAWBERRY)
 {
@@ -10457,7 +10457,7 @@ type SessionMetadataInfo
   accessKey: String!
 
   """Cluster mode for distributed sessions (single-node, multi-node)."""
-  clusterMode: String!
+  clusterMode: ClusterMode!
 
   """Number of nodes in the cluster."""
   clusterSize: Int!

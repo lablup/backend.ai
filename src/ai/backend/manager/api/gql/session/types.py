@@ -12,6 +12,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.common.types import (
+    ClusterModeGQL,
     SessionResultGQL,
     SessionTypeGQL,
 )
@@ -176,7 +177,7 @@ class SessionIdentityInfoGQL:
 class SessionMetadataInfoGQL:
     name: str = strawberry.field(description="Human-readable name of the session.")
     access_key: str = strawberry.field(description="Access key used to create this session.")
-    cluster_mode: str = strawberry.field(
+    cluster_mode: ClusterModeGQL = strawberry.field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
