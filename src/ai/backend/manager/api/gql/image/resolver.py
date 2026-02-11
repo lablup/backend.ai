@@ -19,15 +19,15 @@ from ai.backend.manager.repositories.image.options import ImageAliasConditions, 
 from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .types import (
     ContainerRegistryScopeGQL,
-    ImageAliasConnectionGQL,
-    ImageAliasFilterGQL,
-    ImageAliasGQL,
-    ImageAliasOrderByGQL,
-    ImageConnectionV2GQL,
-    ImageFilterGQL,
-    ImageOrderByGQL,
-    ImageScopeGQL,
+    ImageV2AliasConnectionGQL,
+    ImageV2AliasFilterGQL,
+    ImageV2AliasGQL,
+    ImageV2AliasOrderByGQL,
+    ImageV2ConnectionGQL,
+    ImageV2FilterGQL,
     ImageV2GQL,
+    ImageV2OrderByGQL,
+    ImageV2ScopeGQL,
 )
 
 
@@ -47,15 +47,15 @@ from .types import (
 )
 async def admin_images_v2(
     info: Info[StrawberryGQLContext],
-    filter: ImageFilterGQL | None = None,
-    order_by: list[ImageOrderByGQL] | None = None,
+    filter: ImageV2FilterGQL | None = None,
+    order_by: list[ImageV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageConnectionV2GQL:
+) -> ImageV2ConnectionGQL:
     check_admin_only()
     return await fetch_images(
         info,
@@ -99,15 +99,15 @@ async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | Non
 async def container_registry_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ContainerRegistryScopeGQL,
-    filter: ImageFilterGQL | None = None,
-    order_by: list[ImageOrderByGQL] | None = None,
+    filter: ImageV2FilterGQL | None = None,
+    order_by: list[ImageV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageConnectionV2GQL:
+) -> ImageV2ConnectionGQL:
     # Add registry scope as base condition
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
     return await fetch_images(
@@ -138,15 +138,15 @@ async def container_registry_images_v2(
 )
 async def admin_image_aliases(
     info: Info[StrawberryGQLContext],
-    filter: ImageAliasFilterGQL | None = None,
-    order_by: list[ImageAliasOrderByGQL] | None = None,
+    filter: ImageV2AliasFilterGQL | None = None,
+    order_by: list[ImageV2AliasOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageAliasConnectionGQL:
+) -> ImageV2AliasConnectionGQL:
     check_admin_only()
     return await fetch_image_aliases(
         info,
@@ -170,7 +170,7 @@ async def admin_image_aliases(
     Returns the alias information including the alias string.
     """)
 )
-async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageAliasGQL | None:
+async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
     return await fetch_image_alias(info, UUID(id))
 
 
@@ -187,16 +187,16 @@ async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageAliasGQL
 )
 async def image_scoped_aliases(
     info: Info[StrawberryGQLContext],
-    scope: ImageScopeGQL,
-    filter: ImageAliasFilterGQL | None = None,
-    order_by: list[ImageAliasOrderByGQL] | None = None,
+    scope: ImageV2ScopeGQL,
+    filter: ImageV2AliasFilterGQL | None = None,
+    order_by: list[ImageV2AliasOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageAliasConnectionGQL:
+) -> ImageV2AliasConnectionGQL:
     # Add image scope as base condition
     base_conditions = [ImageAliasConditions.by_image_ids([ImageID(scope.image_id)])]
     return await fetch_image_aliases(
