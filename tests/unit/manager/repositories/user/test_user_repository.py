@@ -51,6 +51,7 @@ from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
+from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -700,6 +701,128 @@ class TestUserRepository:
         assert len(result.failures) == 1
         # Verify the successful user
         assert result.successes[0].email == shared_email
+        # Verify the failure has the correct index
+        assert result.failures[0].index == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_users_validated_success(
+        self,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> None:
+        """Test successful bulk user update with multiple users."""
+        # First, create 3 users via bulk create
+        items: list[UserCreateSpec] = []
+        for i in range(3):
+            password_info = create_test_password_info(f"password_{i}")
+            spec = UserCreatorSpec(
+                username=f"bulkupdate-{uuid.uuid4().hex[:8]}",
+                email=f"bulkupdate-{uuid.uuid4().hex[:8]}@example.com",
+                password=password_info,
+                need_password_change=False,
+                full_name=f"Bulk Update User {i}",
+                description=f"Bulk update test user {i}",
+                status=UserStatus.ACTIVE,
+                domain_name=sample_domain,
+                role=UserRole.USER,
+                resource_policy=user_resource_policy,
+                allowed_client_ip=None,
+                totp_activated=False,
+                sudo_session_enabled=False,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
+            )
+            items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=None))
+
+        create_result = await user_repository.bulk_create_users_validated(items)
+        assert create_result.success_count() == 3
+
+        # Now bulk update all 3 users
+        update_items: list[UserUpdateSpec] = []
+        for i, user_data in enumerate(create_result.successes):
+            updater_spec = UserUpdaterSpec(
+                full_name=OptionalState.update(f"Updated Name {i}"),
+                description=OptionalState.update(f"Updated Description {i}"),
+            )
+            update_items.append(UserUpdateSpec(user_id=user_data.uuid, updater_spec=updater_spec))
+
+        result = await user_repository.bulk_update_users_validated(update_items)
+
+        assert result.success_count() == 3
+        assert result.failure_count() == 0
+        assert len(result.successes) == 3
+        # Verify each updated user has the expected data
+        for i, user_data in enumerate(result.successes):
+            assert user_data.full_name == f"Updated Name {i}"
+            assert user_data.description == f"Updated Description {i}"
+            assert user_data.domain_name == sample_domain
+            assert user_data.role == UserRole.USER
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_users_validated_partial_failure(
+        self,
+        user_repository: UserRepository,
+        sample_domain: str,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> None:
+        """Test partial failure in bulk update - first succeeds, second fails due to non-existent user."""
+        # Create one real user
+        password_info = create_test_password_info("password_0")
+        spec = UserCreatorSpec(
+            username=f"bulkupdate-{uuid.uuid4().hex[:8]}",
+            email=f"bulkupdate-{uuid.uuid4().hex[:8]}@example.com",
+            password=password_info,
+            need_password_change=False,
+            full_name="Bulk Update User",
+            description="Bulk update test user",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+        create_result = await user_repository.bulk_create_users_validated([
+            UserCreateSpec(creator=Creator(spec=spec), group_ids=None)
+        ])
+        assert create_result.success_count() == 1
+        real_user = create_result.successes[0]
+
+        # Build update items: one real user, one non-existent user
+        non_existent_user_id = uuid.uuid4()
+        update_items: list[UserUpdateSpec] = [
+            UserUpdateSpec(
+                user_id=real_user.uuid,
+                updater_spec=UserUpdaterSpec(
+                    full_name=OptionalState.update("Updated Name"),
+                ),
+            ),
+            UserUpdateSpec(
+                user_id=non_existent_user_id,
+                updater_spec=UserUpdaterSpec(
+                    full_name=OptionalState.update("Should Fail"),
+                ),
+            ),
+        ]
+
+        result = await user_repository.bulk_update_users_validated(update_items)
+
+        # First user succeeds, second fails due to non-existent user_id
+        assert result.success_count() == 1
+        assert result.failure_count() == 1
+        assert len(result.successes) == 1
+        assert len(result.failures) == 1
+        # Verify the successful user
+        assert result.successes[0].full_name == "Updated Name"
+        assert result.successes[0].uuid == real_user.uuid
         # Verify the failure has the correct index
         assert result.failures[0].index == 1
 

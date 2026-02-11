@@ -29,6 +29,8 @@ from ai.backend.manager.services.user.actions.get_user import (
     GetUserActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    BulkModifyUserActionResult,
     ModifyUserAction,
     ModifyUserActionResult,
 )
@@ -101,6 +103,10 @@ class UserService:
         return ModifyUserActionResult(
             data=user_data_result,
         )
+
+    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkModifyUserActionResult:
+        result = await self._user_repository.bulk_update_users_validated(action.items)
+        return BulkModifyUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
         await self._user_repository.soft_delete_user_validated(

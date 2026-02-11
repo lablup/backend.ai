@@ -213,6 +213,7 @@ from .storage_namespace import (
 from .user import (
     # Mutations
     admin_bulk_create_users,
+    admin_bulk_update_users,
     admin_create_user,
     admin_delete_user,
     admin_delete_users,
@@ -437,6 +438,7 @@ class Mutation:
     # User V2 APIs
     admin_create_user = admin_create_user
     admin_bulk_create_users = admin_bulk_create_users
+    admin_bulk_update_users = admin_bulk_update_users
     admin_update_user = admin_update_user
     update_user = update_user
     admin_delete_user = admin_delete_user

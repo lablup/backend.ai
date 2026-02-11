@@ -21,6 +21,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
+    BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
     UserSearchResult,
@@ -35,6 +36,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
 from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
+from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -108,6 +110,16 @@ class UserRepository:
         Update user with ownership validation and handle role/group changes.
         """
         return await self._db_source.update_user_validated(email, updater)
+
+    @user_repository_resilience.apply()
+    async def bulk_update_users_validated(
+        self,
+        items: list[UserUpdateSpec],
+    ) -> BulkUserUpdateResultData:
+        """
+        Update multiple users with partial failure support.
+        """
+        return await self._db_source.bulk_update_users_validated(items)
 
     @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str) -> None:

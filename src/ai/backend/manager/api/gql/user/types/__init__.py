@@ -16,6 +16,8 @@ from .filters import (
 )
 from .inputs import (
     BulkCreateUserInputGQL,
+    BulkUpdateUserInputGQL,
+    BulkUpdateUserItemInputGQL,
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
@@ -38,6 +40,8 @@ from .node import (
 from .payloads import (
     BulkCreateUserErrorGQL,
     BulkCreateUsersPayloadGQL,
+    BulkUpdateUserErrorGQL,
+    BulkUpdateUsersPayloadGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
     DeleteUsersPayloadGQL,
@@ -80,6 +84,8 @@ __all__ = [
     # Inputs
     "CreateUserInputGQL",
     "BulkCreateUserInputGQL",
+    "BulkUpdateUserItemInputGQL",
+    "BulkUpdateUserInputGQL",
     "UpdateUserInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
@@ -88,6 +94,8 @@ __all__ = [
     "CreateUserPayloadGQL",
     "BulkCreateUserErrorGQL",
     "BulkCreateUsersPayloadGQL",
+    "BulkUpdateUserErrorGQL",
+    "BulkUpdateUsersPayloadGQL",
     "UpdateUserPayloadGQL",
     "DeleteUserPayloadGQL",
     "DeleteUsersPayloadGQL",
