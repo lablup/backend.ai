@@ -3414,9 +3414,10 @@ class GQLMetricMiddleware:
                     _set_span(error=e)
                     _observe(duration=time.perf_counter() - start, error=e)
                     raise
-                _set_span()
-                _observe(duration=time.perf_counter() - start)
-                return result
+                else:
+                    _set_span()
+                    _observe(duration=time.perf_counter() - start)
+                    return result
 
         start = time.perf_counter()
         try:
