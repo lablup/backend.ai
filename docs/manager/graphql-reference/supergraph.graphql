@@ -10402,7 +10402,7 @@ input SessionFilter
   status: SessionStatusFilter = null
   name: String = null
   domainName: String = null
-  groupId: UUIDFilter = null
+  projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
 }
 
@@ -10723,7 +10723,7 @@ type SessionV2 implements Node
   """Basic identity information for the session."""
   identity: SessionIdentityInfo!
 
-  """Metadata including domain, group, and user information."""
+  """Metadata including domain, project, and user information."""
   metadata: SessionMetadataInfo!
 
   """Resource allocation and cluster information."""

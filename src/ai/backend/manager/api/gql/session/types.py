@@ -133,7 +133,7 @@ class SessionFilterGQL(GQLFilter):
     status: SessionStatusFilterGQL | None = None
     name: str | None = None
     domain_name: str | None = None
-    group_id: UUIDFilter | None = None
+    project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
@@ -276,7 +276,7 @@ class SessionV2GQL(Node):
         description="Basic identity information for the session."
     )
     metadata: SessionMetadataInfoGQL = strawberry.field(
-        description="Metadata including domain, group, and user information."
+        description="Metadata including domain, project, and user information."
     )
     resource: SessionResourceInfoGQL = strawberry.field(
         description="Resource allocation and cluster information."
