@@ -9,11 +9,11 @@ from .search_object_permissions import (
     SearchObjectPermissionsAction,
     SearchObjectPermissionsActionResult,
 )
-from .search_roles import SearchRolesAction, SearchRolesActionResult
-from .search_scoped_permissions import (
-    SearchScopedPermissionsAction,
-    SearchScopedPermissionsActionResult,
+from .search_permissions import (
+    SearchPermissionsAction,
+    SearchPermissionsActionResult,
 )
+from .search_roles import SearchRolesAction, SearchRolesActionResult
 from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
@@ -43,8 +43,8 @@ __all__ = [
     "SearchObjectPermissionsActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
-    "SearchScopedPermissionsAction",
-    "SearchScopedPermissionsActionResult",
+    "SearchPermissionsAction",
+    "SearchPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
     "UpdateRoleAction",

@@ -33,9 +33,19 @@ from .actions.get_scope_types import (
     GetScopeTypesAction,
     GetScopeTypesActionResult,
 )
+from .actions.permission import (
+    CreatePermissionAction,
+    CreatePermissionActionResult,
+    DeletePermissionAction,
+    DeletePermissionActionResult,
+)
 from .actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
+)
+from .actions.search_permissions import (
+    SearchPermissionsAction,
+    SearchPermissionsActionResult,
 )
 from .actions.search_scopes import (
     SearchScopesAction,
@@ -64,6 +74,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
     get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
     search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
+    search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
+    create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
+    delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
 
     def __init__(
         self, service: PermissionControllerService, action_monitors: list[ActionMonitor]
@@ -86,6 +99,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
         self.search_entities = ActionProcessor(service.search_entities, action_monitors)
+        self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
+        self.create_permission = ActionProcessor(service.create_permission, action_monitors)
+        self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -104,4 +120,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),
             SearchEntitiesAction.spec(),
+            SearchPermissionsAction.spec(),
+            CreatePermissionAction.spec(),
+            DeletePermissionAction.spec(),
         ]

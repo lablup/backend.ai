@@ -35,7 +35,9 @@ class RoleData:
 class AssignedUserData:
     """Information about a user assigned to a role."""
 
+    id: uuid.UUID
     user_id: uuid.UUID
+    role_id: uuid.UUID
     granted_by: uuid.UUID | None
     granted_at: datetime
 
@@ -95,6 +97,7 @@ class UserRoleAssignmentInput:
 
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
+    id: uuid.UUID
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: uuid.UUID | None = None

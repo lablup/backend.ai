@@ -223,13 +223,13 @@ class PermissionControllerRepository:
         return await self._db_source.search_roles(querier=querier)
 
     @permission_controller_repository_resilience.apply()
-    async def search_scoped_permissions(
+    async def search_permissions(
         self,
         querier: BatchQuerier,
         scope: ScopedPermissionSearchScope | None = None,
     ) -> ScopedPermissionListResult:
-        """Searches scoped permissions with pagination and filtering."""
-        return await self._db_source.search_scoped_permissions(querier=querier, scope=scope)
+        """Searches permissions with pagination and filtering."""
+        return await self._db_source.search_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_object_permissions(
