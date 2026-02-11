@@ -46,41 +46,6 @@ class QuerierInput:
 
 
 @dataclass(frozen=True)
-class FetchInput:
-    """Resolver-to-fetcher DTO. Wraps raw GraphQL pagination/filter/order arguments.
-
-    Example::
-
-        fetch_input = FetchInput(first=10, after="cursor_abc", filter=my_filter)
-        querier_input = fetch_input.to_querier_input()
-        querier = adapter.build_querier_from_input(querier_input, pagination_spec)
-    """
-
-    filter: GQLFilter | None = None
-    order_by: Sequence[GQLOrderBy] | None = None
-    before: str | None = None
-    after: str | None = None
-    first: int | None = None
-    last: int | None = None
-    limit: int | None = None
-    offset: int | None = None
-
-    def to_querier_input(self) -> QuerierInput:
-        return QuerierInput(
-            pagination=PaginationOptions(
-                first=self.first,
-                after=self.after,
-                last=self.last,
-                before=self.before,
-                limit=self.limit,
-                offset=self.offset,
-            ),
-            filter=self.filter,
-            order_by=self.order_by,
-        )
-
-
-@dataclass(frozen=True)
 class PaginationSpec:
     """Specification for pagination behavior.
 
