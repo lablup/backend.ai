@@ -14,6 +14,8 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.file import (
+    CreateArchiveDownloadSessionAction,
+    CreateArchiveDownloadSessionActionResult,
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
@@ -150,6 +152,52 @@ class VFolderFileService:
             vfolder_uuid=action.vfolder_uuid,
             token=storage_reply["token"],
             url=str(client_api_url / "download"),
+        )
+
+    async def download_archive_file(
+        self, action: CreateArchiveDownloadSessionAction
+    ) -> CreateArchiveDownloadSessionActionResult:
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_uuid, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("VFolder not found")
+
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.download_archive_file(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            files=action.files,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
+        return CreateArchiveDownloadSessionActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            token=storage_reply["token"],
+            url=str(client_api_url / "download-archive"),
         )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
