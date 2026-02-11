@@ -2,8 +2,9 @@
 Tests for ContainerUtilizationMetricService with PrometheusClient.
 """
 
+from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID
 
 import pytest
@@ -526,7 +527,7 @@ class TestMetricTypeDetection:
 class TestContainerMetricDataTypes:
     """Test data types used in container metric service."""
 
-    def test_container_metric_action_fields(self) -> None:
+    async def test_container_metric_action_fields(self) -> None:
         """Test that ContainerMetricAction has all expected fields."""
         action = ContainerMetricAction(
             metric_name="container_cpu_percent",
@@ -554,7 +555,7 @@ class TestContainerMetricDataTypes:
         assert isinstance(action.labels.user_id, UUID)
         assert isinstance(action.labels.project_id, UUID)
 
-    def test_container_metric_response_fields(self) -> None:
+    async def test_container_metric_response_fields(self) -> None:
         """Test that ContainerMetricResponseInfo supports all expected fields."""
         response_info = ContainerMetricResponseInfo(
             value_type="current",
@@ -577,3 +578,205 @@ class TestContainerMetricDataTypes:
         assert response_info.owner_project_id == "87654321-4321-8765-4321-876543218765"
         assert response_info.owner_user_id == "11223344-5566-7788-99aa-bbccddeeff00"
         assert response_info.session_id == "aabbccdd-eeff-0011-2233-445566778899"
+
+
+class TestTimewindowInitialization:
+    """Tests for _timewindow initialization."""
+
+    @pytest.fixture
+    async def mock_prometheus_client(self) -> MagicMock:
+        return MagicMock(spec=PrometheusClient)
+
+    @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
+    async def test_timewindow_stored_correctly(
+        self, mock_prometheus_client: MagicMock, timewindow: str
+    ) -> None:
+        service = ContainerUtilizationMetricService(mock_prometheus_client, timewindow=timewindow)
+        assert service._timewindow == timewindow
+
+    @pytest.mark.parametrize(
+        "metric_name,value_type",
+        [
+            ("mem", ValueType.CURRENT),  # GAUGE
+            ("net_rx", ValueType.CURRENT),  # RATE
+            ("cpu_util", ValueType.CURRENT),  # DIFF
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_timewindow_applied_to_preset(
+        self, mock_prometheus_client: MagicMock, metric_name: str, value_type: ValueType
+    ) -> None:
+        service = ContainerUtilizationMetricService(mock_prometheus_client, timewindow="3m")
+        label = ContainerMetricOptionalLabel(value_type=value_type)
+
+        preset = service._build_preset(metric_name, label)
+
+        assert preset.window == "3m"
+
+
+@dataclass
+class BuildPresetTestCase:
+    id: str
+    metric_name: str
+    labels: ContainerMetricOptionalLabel
+    timewindow: str
+    expected_query: str
+
+
+class TestBuildPreset:
+    """Characterization tests: verify _build_preset produces expected PromQL queries."""
+
+    @pytest.fixture
+    async def mock_prometheus_client(self) -> MagicMock:
+        return MagicMock(spec=PrometheusClient)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            # GAUGE - no window in template
+            BuildPresetTestCase(
+                id="gauge_mem_current",
+                metric_name="mem",
+                labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (value_type)(backendai_container_utilization"
+                    '{container_metric_name="mem",value_type="current"})'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="gauge_mem_capacity_with_user_id",
+                metric_name="mem",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CAPACITY,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(backendai_container_utilization"
+                    '{container_metric_name="mem",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="gauge_cuda_util_with_user_id",
+                metric_name="cuda_util",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CURRENT,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(backendai_container_utilization"
+                    '{container_metric_name="cuda_util",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="gauge_io_read_with_user_id",
+                metric_name="io_read",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CURRENT,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(backendai_container_utilization"
+                    '{container_metric_name="io_read",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                ),
+            ),
+            # RATE - uses window and interval divisor
+            BuildPresetTestCase(
+                id="rate_net_rx_current",
+                metric_name="net_rx",
+                labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (value_type)(rate(backendai_container_utilization"
+                    '{container_metric_name="net_rx",value_type="current"}[5m])) / 5.0'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="rate_net_tx_with_user_id",
+                metric_name="net_tx",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CURRENT,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(rate(backendai_container_utilization"
+                    '{container_metric_name="net_tx",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="rate_net_rx_capacity_with_user_id",
+                metric_name="net_rx",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CAPACITY,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(rate(backendai_container_utilization"
+                    '{container_metric_name="net_rx",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                ),
+            ),
+            # DIFF - uses window but no interval divisor
+            BuildPresetTestCase(
+                id="diff_cpu_util_current",
+                metric_name="cpu_util",
+                labels=ContainerMetricOptionalLabel(value_type=ValueType.CURRENT),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (value_type)(rate(backendai_container_utilization"
+                    '{container_metric_name="cpu_util",value_type="current"}[5m]))'
+                ),
+            ),
+            BuildPresetTestCase(
+                id="diff_cpu_util_with_user_id",
+                metric_name="cpu_util",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CURRENT,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(rate(backendai_container_utilization"
+                    '{container_metric_name="cpu_util",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
+                ),
+            ),
+            # GAUGE for cpu_util with capacity (not DIFF since value_type != current)
+            BuildPresetTestCase(
+                id="gauge_cpu_util_capacity_with_user_id",
+                metric_name="cpu_util",
+                labels=ContainerMetricOptionalLabel(
+                    value_type=ValueType.CAPACITY,
+                    user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                ),
+                timewindow="5m",
+                expected_query=(
+                    "sum by (user_id,value_type)(backendai_container_utilization"
+                    '{container_metric_name="cpu_util",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                ),
+            ),
+        ],
+        ids=lambda c: c.id,
+    )
+    @pytest.mark.asyncio
+    async def test_build_preset_renders_expected_query(
+        self, mock_prometheus_client: MagicMock, case: BuildPresetTestCase
+    ) -> None:
+        service = ContainerUtilizationMetricService(
+            mock_prometheus_client, timewindow=case.timewindow
+        )
+
+        preset = service._build_preset(case.metric_name, case.labels)
+        rendered_query = preset.render()
+
+        assert rendered_query == case.expected_query
