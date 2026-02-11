@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from ai.backend.manager.api.gql.agent.types import (
-    AgentFilterGQL,
-    AgentOrderByGQL,
-    AgentOrderFieldGQL,
-    AgentStatusFilterGQL,
+    AgentV2FilterGQL,
+    AgentV2OrderByGQL,
+    AgentV2OrderFieldGQL,
+    AgentV2StatusFilterGQL,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -69,43 +69,43 @@ def _compile(condition_callable: QueryCondition) -> str:
 
 
 class TestAgentFilter:
-    """Tests for AgentFilterGQL.build_conditions()."""
+    """Tests for AgentV2FilterGQL.build_conditions()."""
 
     def test_id_filter(self) -> None:
-        f = AgentFilterGQL(id=StringFilter(contains="agent-01"))
+        f = AgentV2FilterGQL(id=StringFilter(contains="agent-01"))
         conditions = f.build_conditions()
         assert len(conditions) == 1
         sql = _compile(conditions[0])
         assert "agents" in sql
 
     def test_status_in_filter(self) -> None:
-        f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(in_=[AgentStatus.ALIVE, AgentStatus.LOST]),
+        f = AgentV2FilterGQL(
+            status=AgentV2StatusFilterGQL(in_=[AgentStatus.ALIVE, AgentStatus.LOST]),
         )
         conditions = f.build_conditions()
         assert len(conditions) == 1
 
     def test_status_equals_filter(self) -> None:
-        f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(equals=AgentStatus.ALIVE),
+        f = AgentV2FilterGQL(
+            status=AgentV2StatusFilterGQL(equals=AgentStatus.ALIVE),
         )
         conditions = f.build_conditions()
         assert len(conditions) == 1
 
     def test_schedulable_filter(self) -> None:
-        f = AgentFilterGQL(schedulable=True)
+        f = AgentV2FilterGQL(schedulable=True)
         conditions = f.build_conditions()
         assert len(conditions) == 1
 
     def test_scaling_group_filter(self) -> None:
-        f = AgentFilterGQL(scaling_group=StringFilter(equals="default"))
+        f = AgentV2FilterGQL(scaling_group=StringFilter(equals="default"))
         conditions = f.build_conditions()
         assert len(conditions) == 1
         sql = _compile(conditions[0])
         assert "scaling_group" in sql
 
     def test_combined_filters(self) -> None:
-        f = AgentFilterGQL(
+        f = AgentV2FilterGQL(
             id=StringFilter(contains="agent"),
             schedulable=True,
             scaling_group=StringFilter(equals="gpu"),
@@ -114,17 +114,17 @@ class TestAgentFilter:
         assert len(conditions) == 3
 
     def test_empty_filter_returns_empty_list(self) -> None:
-        f = AgentFilterGQL()
+        f = AgentV2FilterGQL()
         conditions = f.build_conditions()
         assert conditions == []
 
 
 class TestAgentOrderBy:
-    """Tests for AgentOrderByGQL.to_query_order()."""
+    """Tests for AgentV2OrderByGQL.to_query_order()."""
 
     def test_id_ascending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.ID,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.ID,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -132,8 +132,8 @@ class TestAgentOrderBy:
         assert "ASC" in sql.upper()
 
     def test_status_ascending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.STATUS,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.STATUS,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -142,8 +142,8 @@ class TestAgentOrderBy:
         assert "ASC" in sql.upper()
 
     def test_status_descending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.STATUS,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.STATUS,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -152,8 +152,8 @@ class TestAgentOrderBy:
         assert "DESC" in sql.upper()
 
     def test_first_contact_ascending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.FIRST_CONTACT,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.FIRST_CONTACT,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()
@@ -162,8 +162,8 @@ class TestAgentOrderBy:
         assert "ASC" in sql.upper()
 
     def test_scaling_group_descending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.SCALING_GROUP,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.SCALING_GROUP,
             direction=OrderDirection.DESC,
         )
         result = order.to_query_order()
@@ -172,8 +172,8 @@ class TestAgentOrderBy:
         assert "DESC" in sql.upper()
 
     def test_schedulable_ascending(self) -> None:
-        order = AgentOrderByGQL(
-            field=AgentOrderFieldGQL.SCHEDULABLE,
+        order = AgentV2OrderByGQL(
+            field=AgentV2OrderFieldGQL.SCHEDULABLE,
             direction=OrderDirection.ASC,
         )
         result = order.to_query_order()

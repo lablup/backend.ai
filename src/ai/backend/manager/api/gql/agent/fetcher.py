@@ -7,11 +7,11 @@ from strawberry import Info
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.agent.types import (
-    AgentFilterGQL,
-    AgentOrderByGQL,
     AgentV2Connection,
     AgentV2Edge,
+    AgentV2FilterGQL,
     AgentV2GQL,
+    AgentV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -33,8 +33,8 @@ def _get_agent_pagination_spec() -> PaginationSpec:
 
 async def fetch_agents(
     info: Info[StrawberryGQLContext],
-    filter: AgentFilterGQL | None = None,
-    order_by: list[AgentOrderByGQL] | None = None,
+    filter: AgentV2FilterGQL | None = None,
+    order_by: list[AgentV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
