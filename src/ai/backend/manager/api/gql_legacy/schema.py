@@ -3373,9 +3373,7 @@ class GQLMetricMiddleware:
             },
         )
 
-        def _observe(
-            *, duration: float, error: BaseException | None = None, end_span: bool = True
-        ) -> None:
+        def _set_span(*, error: BaseException | None = None, end_span: bool = False) -> None:
             if error is not None:
                 span.record_exception(error)
                 span.set_status(StatusCode.ERROR, str(error))
@@ -3383,6 +3381,8 @@ class GQLMetricMiddleware:
                 span.set_status(StatusCode.OK)
             if end_span:
                 span.end()
+
+        def _observe(*, duration: float, error: BaseException | None = None) -> None:
             match error:
                 case None:
                     error_code = None
@@ -3411,9 +3411,11 @@ class GQLMetricMiddleware:
                 try:
                     result = await coro
                 except BaseException as e:
-                    _observe(duration=time.perf_counter() - start, error=e, end_span=False)
+                    _set_span(error=e)
+                    _observe(duration=time.perf_counter() - start, error=e)
                     raise
-                _observe(duration=time.perf_counter() - start, end_span=False)
+                _set_span()
+                _observe(duration=time.perf_counter() - start)
                 return result
 
         start = time.perf_counter()
@@ -3421,8 +3423,10 @@ class GQLMetricMiddleware:
             res = next(root, info, **args)
             if asyncio.iscoroutine(res):
                 return _observe_coroutine(res)
+            _set_span(end_span=True)
             _observe(duration=time.perf_counter() - start)
         except BaseException as e:
+            _set_span(error=e, end_span=True)
             _observe(duration=time.perf_counter() - start, error=e)
             raise
         return res
