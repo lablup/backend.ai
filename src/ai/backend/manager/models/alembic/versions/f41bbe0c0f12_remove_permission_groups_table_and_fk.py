@@ -19,25 +19,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop FK constraints from permissions and object_permissions
+    # Drop FK constraints
     op.drop_constraint(
         op.f("fk_permissions_permission_group_id_permission_groups"),
         "permissions",
         type_="foreignkey",
     )
-    op.drop_constraint(
-        op.f("fk_object_permissions_permission_group_id_permission_groups"),
-        "object_permissions",
-        type_="foreignkey",
+    op.execute(
+        "ALTER TABLE object_permissions"
+        " DROP CONSTRAINT IF EXISTS fk_object_permissions_permission_group_id_permission_groups"
     )
 
     # Drop indexes on permission_group_id columns
     op.drop_index("ix_id_permission_group_id", table_name="permissions")
-    op.drop_index("ix_object_permissions_permission_group_id", table_name="object_permissions")
+    op.execute("DROP INDEX IF EXISTS ix_object_permissions_permission_group_id")
 
     # Drop permission_group_id columns
     op.drop_column("permissions", "permission_group_id")
-    op.drop_column("object_permissions", "permission_group_id")
+    op.execute("ALTER TABLE object_permissions DROP COLUMN IF EXISTS permission_group_id")
 
     # Drop indexes and constraints on permission_groups table
     op.drop_index("ix_id_role_id_scope_id", table_name="permission_groups")
