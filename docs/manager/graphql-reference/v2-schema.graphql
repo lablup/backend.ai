@@ -1710,20 +1710,6 @@ enum DeploymentStrategyType {
 }
 
 """
-Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
-"""
-type DomainBasicInfo {
-  """Domain name (primary key)."""
-  name: String!
-
-  """Optional description of the domain."""
-  description: String
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
-"""
 Added in 26.1.0. Domain-level fair share data representing scheduling priority for an entire domain. The fair share factor determines resource allocation relative to other domains.
 """
 type DomainFairShare implements Node {
@@ -1848,42 +1834,8 @@ enum DomainFairShareOrderField {
   DOMAIN_IS_ACTIVE
 }
 
-input DomainFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-}
-
-"""
-Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
-"""
-type DomainLifecycleInfo {
-  """
-  Whether the domain is active. Inactive domains cannot create new projects or perform operations.
-  """
-  isActive: Boolean!
-
-  """Timestamp when the domain was created."""
-  createdAt: DateTime!
-
-  """Timestamp when the domain was last modified."""
-  modifiedAt: DateTime!
-}
-
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
-}
-
-"""
-Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
-"""
-input DomainProjectNestedFilter {
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by project active status."""
-  isActive: Boolean = null
 }
 
 """
@@ -1894,16 +1846,6 @@ input DomainProjectV2Scope {
   Domain name to scope the query. Only projects belonging to this domain will be returned.
   """
   domainName: String!
-}
-
-"""
-Added in 26.2.0. Domain container registry configuration. Contains allowed container registry URLs for this domain.
-"""
-type DomainRegistryInfo {
-  """
-  List of allowed container registry URLs. Empty list means no restrictions on registry access.
-  """
-  allowedDockerRegistries: [String!]!
 }
 
 """
@@ -2022,29 +1964,6 @@ input DomainUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
-input DomainUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-}
-
-"""
-Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
-"""
-input DomainUserNestedFilter {
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
-  email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
-  isActive: Boolean = null
-}
-
 """
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
@@ -2063,29 +1982,43 @@ type DomainV2 implements Node @key(fields: "id") {
   id: ID!
 
   """Basic domain information including name and description."""
-  basicInfo: DomainBasicInfo!
+  basicInfo: DomainV2BasicInfo!
 
   """Container registry configuration."""
-  registry: DomainRegistryInfo!
+  registry: DomainV2RegistryInfo!
 
   """Lifecycle information including activation status and timestamps."""
-  lifecycle: DomainLifecycleInfo!
+  lifecycle: DomainV2LifecycleInfo!
 
   """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: DomainFairShareScope!): DomainFairShare!
+  fairShare(scope: DomainV2FairShareScope!): DomainFairShare!
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+  usageBuckets(scope: DomainV2UsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
 
   """Projects belonging to this domain."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+}
+
+"""
+Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
+"""
+type DomainV2BasicInfo {
+  """Domain name (primary key)."""
+  name: String!
+
+  """Optional description of the domain."""
+  description: String
+
+  """External system integration identifier."""
+  integrationId: String
 }
 
 """
@@ -2109,6 +2042,11 @@ type DomainV2Edge {
 
   """The item at the end of the edge"""
   node: DomainV2!
+}
+
+input DomainV2FairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
 }
 
 """
@@ -2143,12 +2081,12 @@ input DomainV2Filter {
   """
   Filter by nested project conditions. Returns domains that have at least one project matching all specified conditions.
   """
-  project: DomainProjectNestedFilter = null
+  project: DomainV2ProjectNestedFilter = null
 
   """
   Filter by nested user conditions. Returns domains that have at least one user matching all specified conditions.
   """
-  user: DomainUserNestedFilter = null
+  user: DomainV2UserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainV2Filter!] = null
@@ -2162,6 +2100,22 @@ input DomainV2Filter {
   Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [DomainV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
+"""
+type DomainV2LifecycleInfo {
+  """
+  Whether the domain is active. Inactive domains cannot create new projects or perform operations.
+  """
+  isActive: Boolean!
+
+  """Timestamp when the domain was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the domain was last modified."""
+  modifiedAt: DateTime!
 }
 
 """
@@ -2186,6 +2140,52 @@ enum DomainV2OrderField {
   PROJECT_NAME
   USER_USERNAME
   USER_EMAIL
+}
+
+"""
+Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
+"""
+input DomainV2ProjectNestedFilter {
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
+
+"""
+Added in 26.2.0. Domain container registry configuration. Contains allowed container registry URLs for this domain.
+"""
+type DomainV2RegistryInfo {
+  """
+  List of allowed container registry URLs. Empty list means no restrictions on registry access.
+  """
+  allowedDockerRegistries: [String!]!
+}
+
+input DomainV2UsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+}
+
+"""
+Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
+"""
+input DomainV2UserNestedFilter {
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
 }
 
 """

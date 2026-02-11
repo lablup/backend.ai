@@ -3291,22 +3291,6 @@ type Domain
   scaling_groups: [String]
 }
 
-"""
-Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
-"""
-type DomainBasicInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Domain name (primary key)."""
-  name: String!
-
-  """Optional description of the domain."""
-  description: String
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
 """Added in 24.12.0"""
 type DomainConnection
   @join__type(graph: GRAPHENE)
@@ -3472,13 +3456,6 @@ enum DomainFairShareOrderField
   DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
-input DomainFairShareScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-}
-
 input DomainInput
   @join__type(graph: GRAPHENE)
 {
@@ -3488,24 +3465,6 @@ input DomainInput
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
   integration_id: String = null
-}
-
-"""
-Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
-"""
-type DomainLifecycleInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Whether the domain is active. Inactive domains cannot create new projects or perform operations.
-  """
-  isActive: Boolean!
-
-  """Timestamp when the domain was created."""
-  createdAt: DateTime!
-
-  """Timestamp when the domain was last modified."""
-  modifiedAt: DateTime!
 }
 
 """Added in 24.12.0."""
@@ -3536,21 +3495,6 @@ scalar DomainPermissionValueField
   @join__type(graph: GRAPHENE)
 
 """
-Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
-"""
-input DomainProjectNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by project active status."""
-  isActive: Boolean = null
-}
-
-"""
 Added in 26.2.0. Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.
 """
 input DomainProjectV2Scope
@@ -3560,18 +3504,6 @@ input DomainProjectV2Scope
   Domain name to scope the query. Only projects belonging to this domain will be returned.
   """
   domainName: String!
-}
-
-"""
-Added in 26.2.0. Domain container registry configuration. Contains allowed container registry URLs for this domain.
-"""
-type DomainRegistryInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  List of allowed container registry URLs. Empty list means no restrictions on registry access.
-  """
-  allowedDockerRegistries: [String!]!
 }
 
 """
@@ -3701,33 +3633,6 @@ input DomainUsageBucketOrderBy
   direction: OrderDirection! = DESC
 }
 
-input DomainUsageScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-}
-
-"""
-Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
-"""
-input DomainUserNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
-  email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
-  isActive: Boolean = null
-}
-
 """
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
@@ -3751,29 +3656,45 @@ type DomainV2 implements Node
   id: ID!
 
   """Basic domain information including name and description."""
-  basicInfo: DomainBasicInfo!
+  basicInfo: DomainV2BasicInfo!
 
   """Container registry configuration."""
-  registry: DomainRegistryInfo!
+  registry: DomainV2RegistryInfo!
 
   """Lifecycle information including activation status and timestamps."""
-  lifecycle: DomainLifecycleInfo!
+  lifecycle: DomainV2LifecycleInfo!
 
   """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: DomainFairShareScope!): DomainFairShare!
+  fairShare(scope: DomainV2FairShareScope!): DomainFairShare!
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+  usageBuckets(scope: DomainV2UsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
 
   """Projects belonging to this domain."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
 
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+}
+
+"""
+Added in 26.2.0. Basic domain information. Contains identity and descriptive fields for the domain.
+"""
+type DomainV2BasicInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Domain name (primary key)."""
+  name: String!
+
+  """Optional description of the domain."""
+  description: String
+
+  """External system integration identifier."""
+  integrationId: String
 }
 
 """
@@ -3801,6 +3722,13 @@ type DomainV2Edge
 
   """The item at the end of the edge"""
   node: DomainV2!
+}
+
+input DomainV2FairShareScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
 }
 
 """
@@ -3837,12 +3765,12 @@ input DomainV2Filter
   """
   Filter by nested project conditions. Returns domains that have at least one project matching all specified conditions.
   """
-  project: DomainProjectNestedFilter = null
+  project: DomainV2ProjectNestedFilter = null
 
   """
   Filter by nested user conditions. Returns domains that have at least one user matching all specified conditions.
   """
-  user: DomainUserNestedFilter = null
+  user: DomainV2UserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainV2Filter!] = null
@@ -3856,6 +3784,24 @@ input DomainV2Filter
   Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [DomainV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Domain lifecycle information. Contains activation status and timestamp tracking.
+"""
+type DomainV2LifecycleInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Whether the domain is active. Inactive domains cannot create new projects or perform operations.
+  """
+  isActive: Boolean!
+
+  """Timestamp when the domain was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the domain was last modified."""
+  modifiedAt: DateTime!
 }
 
 """
@@ -3884,6 +3830,60 @@ enum DomainV2OrderField
   PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
   USER_USERNAME @join__enumValue(graph: STRAWBERRY)
   USER_EMAIL @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
+"""
+input DomainV2ProjectNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by project name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by project active status."""
+  isActive: Boolean = null
+}
+
+"""
+Added in 26.2.0. Domain container registry configuration. Contains allowed container registry URLs for this domain.
+"""
+type DomainV2RegistryInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of allowed container registry URLs. Empty list means no restrictions on registry access.
+  """
+  allowedDockerRegistries: [String!]!
+}
+
+input DomainV2UsageScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+}
+
+"""
+Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
+"""
+input DomainV2UserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
 }
 
 """
