@@ -83,3 +83,23 @@ async def load_role_assignments_by_ids(
 
     assignment_map = {a.id: a for a in action_result.items}
     return [assignment_map.get(aid) for aid in assignment_ids]
+
+
+async def load_role_assignments_by_role_and_user_ids(
+    processor: PermissionControllerProcessors,
+    keys: Sequence[tuple[uuid.UUID, uuid.UUID]],
+) -> list[AssignedUserData | None]:
+    if not keys:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[AssignedUserConditions.by_role_and_user_ids(keys)],
+    )
+
+    action_result = await processor.search_users_assigned_to_role.wait_for_complete(
+        SearchUsersAssignedToRoleAction(querier=querier)
+    )
+
+    assignment_map = {(a.role_id, a.user_id): a for a in action_result.items}
+    return [assignment_map.get(key) for key in keys]

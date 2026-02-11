@@ -314,6 +314,15 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def by_role_and_user_ids(
+        pairs: Collection[tuple[uuid.UUID, uuid.UUID]],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(UserRoleRow.role_id, UserRoleRow.user_id).in_(pairs)
+
+        return inner
+
 
 class AssignedUserOrders:
     """Query orders for assigned users."""

@@ -55,7 +55,12 @@ from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
-from .rbac import load_permissions_by_ids, load_role_assignments_by_ids, load_roles_by_ids
+from .rbac import (
+    load_permissions_by_ids,
+    load_role_assignments_by_ids,
+    load_role_assignments_by_role_and_user_ids,
+    load_roles_by_ids,
+)
 from .reservoir_registry import load_reservoir_registries_by_ids
 from .resource_group import load_resource_groups_by_names
 from .scheduling_history import (
@@ -295,4 +300,15 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, AssignedUserData | None]:
         return DataLoader(
             load_fn=partial(load_role_assignments_by_ids, self._processors.permission_controller)
+        )
+
+    @cached_property
+    def role_assignment_by_role_and_user_loader(
+        self,
+    ) -> DataLoader[tuple[uuid.UUID, uuid.UUID], AssignedUserData | None]:
+        return DataLoader(
+            load_fn=partial(
+                load_role_assignments_by_role_and_user_ids,
+                self._processors.permission_controller,
+            )
         )
