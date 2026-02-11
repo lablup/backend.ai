@@ -4,6 +4,8 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.vfolder.actions.file import (
+    CreateArchiveDownloadSessionAction,
+    CreateArchiveDownloadSessionActionResult,
     CreateDownloadSessionAction,
     CreateDownloadSessionActionResult,
     CreateUploadSessionAction,
@@ -25,6 +27,9 @@ from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 class VFolderFileProcessors(AbstractProcessorPackage):
     upload_file: ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
     download_file: ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
+    download_archive_file: ActionProcessor[
+        CreateArchiveDownloadSessionAction, CreateArchiveDownloadSessionActionResult
+    ]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     rename_file: ActionProcessor[RenameFileAction, RenameFileActionResult]
     delete_files: ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
@@ -34,6 +39,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
     def __init__(self, service: VFolderFileService, action_monitors: list[ActionMonitor]) -> None:
         self.upload_file = ActionProcessor(service.upload_file, action_monitors)
         self.download_file = ActionProcessor(service.download_file, action_monitors)
+        self.download_archive_file = ActionProcessor(service.download_archive_file, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
@@ -45,6 +51,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         return [
             CreateUploadSessionAction.spec(),
             CreateDownloadSessionAction.spec(),
+            CreateArchiveDownloadSessionAction.spec(),
             ListFilesAction.spec(),
             RenameFileAction.spec(),
             DeleteFilesAction.spec(),
