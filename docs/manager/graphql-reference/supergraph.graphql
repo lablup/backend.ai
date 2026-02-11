@@ -544,7 +544,7 @@ type AgentV2SystemInfo
   Entries contain plugin names and their associated metadata with
   plugin-specific configuration and capabilities.
   """
-  computePlugins: ComputePluginsV2!
+  computePlugins: ComputePlugins!
 }
 
 type AliasImage
@@ -1692,21 +1692,9 @@ type ComputeContainerList implements PaginatedList
 }
 
 """
-Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
-"""
-type ComputePluginsV2
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
-  """
-  entries: [ComputePluginV2Entry!]!
-}
-
-"""
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
-type ComputePluginV2Entry
+type ComputePluginEntry
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -1718,6 +1706,18 @@ type ComputePluginV2Entry
   Plugin value string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
   """
   value: String!
+}
+
+"""
+Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
+"""
+type ComputePlugins
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  """
+  entries: [ComputePluginEntry!]!
 }
 
 type ComputeSession implements Item

@@ -336,7 +336,7 @@ type AgentV2SystemInfo {
   Entries contain plugin names and their associated metadata with
   plugin-specific configuration and capabilities.
   """
-  computePlugins: ComputePluginsV2!
+  computePlugins: ComputePlugins!
 }
 
 """Added in 25.16.0. App configuration data"""
@@ -1053,7 +1053,7 @@ enum ClusterMode {
 """
 Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata.
 """
-type ComputePluginV2Entry {
+type ComputePluginEntry {
   """
   Name of the compute plugin (e.g., 'cuda', 'rocm', 'tpu'). This identifier corresponds to the accelerator or resource type supported by the agent.
   """
@@ -1068,11 +1068,11 @@ type ComputePluginV2Entry {
 """
 Added in 26.1.0. A collection of compute plugins available on an agent. Each entry specifies a plugin name and its associated metadata.
 """
-type ComputePluginsV2 {
+type ComputePlugins {
   """
   List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
   """
-  entries: [ComputePluginV2Entry!]!
+  entries: [ComputePluginEntry!]!
 }
 
 extend type ComputeSessionNode @key(fields: "id") {
