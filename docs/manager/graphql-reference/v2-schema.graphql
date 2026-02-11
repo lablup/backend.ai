@@ -5832,21 +5832,6 @@ input SessionFilter {
   userUuid: UUIDFilter = null
 }
 
-"""Added in 26.2.0. Basic identity information for a session."""
-type SessionIdentityInfo {
-  """Unique identifier of the session."""
-  id: ID!
-
-  """Server-generated unique token for tracking session creation."""
-  creationId: String!
-
-  """Human-readable name of the session."""
-  name: String!
-
-  """Type of the session (interactive, batch, inference)."""
-  sessionType: SessionType!
-}
-
 """Added in 26.2.0. Lifecycle status and timestamps for a session."""
 type SessionLifecycleInfo {
   """Current status of the session."""
@@ -5870,8 +5855,14 @@ type SessionLifecycleInfo {
 
 """Added in 26.2.0. Metadata information for a session."""
 type SessionMetadataInfo {
+  """Server-generated unique token for tracking session creation."""
+  creationId: String!
+
   """Human-readable name of the session."""
   name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
 
   """Access key used to create this session."""
   accessKey: String!
@@ -5881,9 +5872,6 @@ type SessionMetadataInfo {
 
   """Number of nodes in the cluster."""
   clusterSize: Int!
-
-  """Type of the session (interactive, batch, inference)."""
-  sessionType: SessionType!
 
   """Scheduling priority of the session."""
   priority: Int!
@@ -6068,9 +6056,6 @@ enum SessionTypes {
 type SessionV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-
-  """Basic identity information for the session."""
-  identity: SessionIdentityInfo!
 
   """Metadata including domain, project, and user information."""
   metadata: SessionMetadataInfo!

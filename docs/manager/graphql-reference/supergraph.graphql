@@ -10406,23 +10406,6 @@ input SessionFilter
   userUuid: UUIDFilter = null
 }
 
-"""Added in 26.2.0. Basic identity information for a session."""
-type SessionIdentityInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Unique identifier of the session."""
-  id: ID!
-
-  """Server-generated unique token for tracking session creation."""
-  creationId: String!
-
-  """Human-readable name of the session."""
-  name: String!
-
-  """Type of the session (interactive, batch, inference)."""
-  sessionType: SessionType!
-}
-
 """Added in 26.2.0. Lifecycle status and timestamps for a session."""
 type SessionLifecycleInfo
   @join__type(graph: STRAWBERRY)
@@ -10450,8 +10433,14 @@ type SessionLifecycleInfo
 type SessionMetadataInfo
   @join__type(graph: STRAWBERRY)
 {
+  """Server-generated unique token for tracking session creation."""
+  creationId: String!
+
   """Human-readable name of the session."""
   name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionType!
 
   """Access key used to create this session."""
   accessKey: String!
@@ -10461,9 +10450,6 @@ type SessionMetadataInfo
 
   """Number of nodes in the cluster."""
   clusterSize: Int!
-
-  """Type of the session (interactive, batch, inference)."""
-  sessionType: SessionType!
 
   """Scheduling priority of the session."""
   priority: Int!
@@ -10719,9 +10705,6 @@ type SessionV2 implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-
-  """Basic identity information for the session."""
-  identity: SessionIdentityInfo!
 
   """Metadata including domain, project, and user information."""
   metadata: SessionMetadataInfo!

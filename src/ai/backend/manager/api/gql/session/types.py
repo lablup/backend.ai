@@ -7,7 +7,6 @@ from enum import StrEnum
 from typing import Any, Self
 
 import strawberry
-from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
@@ -156,11 +155,10 @@ class SessionOrderByGQL(GQLOrderBy):
 
 
 @strawberry.type(
-    name="SessionIdentityInfo",
-    description="Added in 26.2.0. Basic identity information for a session.",
+    name="SessionMetadataInfo",
+    description="Added in 26.2.0. Metadata information for a session.",
 )
-class SessionIdentityInfoGQL:
-    id: ID = strawberry.field(description="Unique identifier of the session.")
+class SessionMetadataInfoGQL:
     creation_id: str = strawberry.field(
         description="Server-generated unique token for tracking session creation."
     )
@@ -168,22 +166,11 @@ class SessionIdentityInfoGQL:
     session_type: SessionTypeGQL = strawberry.field(
         description="Type of the session (interactive, batch, inference)."
     )
-
-
-@strawberry.type(
-    name="SessionMetadataInfo",
-    description="Added in 26.2.0. Metadata information for a session.",
-)
-class SessionMetadataInfoGQL:
-    name: str = strawberry.field(description="Human-readable name of the session.")
     access_key: str = strawberry.field(description="Access key used to create this session.")
     cluster_mode: ClusterModeGQL = strawberry.field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
-    session_type: SessionTypeGQL = strawberry.field(
-        description="Type of the session (interactive, batch, inference)."
-    )
     priority: int = strawberry.field(description="Scheduling priority of the session.")
     created_at: datetime | None = strawberry.field(
         description="Timestamp when the session was created."
@@ -273,9 +260,6 @@ class SessionV2GQL(Node):
 
     id: NodeID[str]
 
-    identity: SessionIdentityInfoGQL = strawberry.field(
-        description="Basic identity information for the session."
-    )
     metadata: SessionMetadataInfoGQL = strawberry.field(
         description="Metadata including domain, project, and user information."
     )
