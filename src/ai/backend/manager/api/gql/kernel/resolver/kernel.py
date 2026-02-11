@@ -10,8 +10,8 @@ from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernel
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
     KernelV2FilterGQL,
-    KernelV2OrderByGQL,
     KernelV2GQL,
+    KernelV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext

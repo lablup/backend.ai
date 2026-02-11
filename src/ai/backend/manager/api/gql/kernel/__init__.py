@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from .types import (
-    KernelV2ConnectionGQL,
     KernelV2ClusterInfoGQL,
+    KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
     KernelV2FilterGQL,
+    KernelV2GQL,
     KernelV2LifecycleInfoGQL,
     KernelV2NetworkInfoGQL,
     KernelV2OrderByGQL,
@@ -16,7 +17,6 @@ from .types import (
     KernelV2StatusFilterGQL,
     KernelV2StatusGQL,
     KernelV2UserInfoGQL,
-    KernelV2GQL,
     ResourceAllocationGQL,
 )
 

@@ -12,8 +12,8 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
     KernelV2FilterGQL,
-    KernelV2OrderByGQL,
     KernelV2GQL,
+    KernelV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.kernel import KernelRow

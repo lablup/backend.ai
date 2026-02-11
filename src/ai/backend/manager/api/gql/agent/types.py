@@ -412,7 +412,9 @@ class AgentV2GQL(Node):
         ]
         | None = None,
         order_by: list[
-            Annotated[KernelV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")]
+            Annotated[
+                KernelV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+            ]
         ]
         | None = None,
         before: str | None = None,
