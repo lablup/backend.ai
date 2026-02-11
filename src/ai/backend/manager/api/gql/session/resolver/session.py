@@ -4,7 +4,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.manager.api.gql.session.types import (
-    SessionConnectionV2GQL,
+    SessionV2ConnectionGQL,
     SessionV2FilterGQL,
     SessionV2OrderByGQL,
 )
@@ -22,6 +22,6 @@ async def admin_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionConnectionV2GQL:
+) -> SessionV2ConnectionGQL:
     _ = info, filter, order_by, before, after, first, last, limit, offset
     raise NotImplementedError

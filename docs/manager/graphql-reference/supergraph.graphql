@@ -9122,7 +9122,7 @@ type Query
   routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Query sessions with pagination and filtering."""
-  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionConnectionV2! @join__field(graph: STRAWBERRY)
+  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
   """List session scheduling history (superadmin only)"""
   sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -10382,18 +10382,6 @@ type ServicePorts
   entries: [ServicePortEntry!]!
 }
 
-"""Added in 26.2.0. Connection type for paginated session results."""
-type SessionConnectionV2
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [SessionV2Edge!]!
-  count: Int!
-}
-
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -10567,6 +10555,18 @@ type SessionV2 implements Node
 
   """Added in 26.2.0. The kernels belonging to this session."""
   kernels: KernelConnectionV2!
+}
+
+"""Added in 26.2.0. Connection type for paginated session results."""
+type SessionV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionV2Edge!]!
+  count: Int!
 }
 
 """An edge in a connection."""

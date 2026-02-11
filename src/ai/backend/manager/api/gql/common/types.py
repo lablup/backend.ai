@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any
 
 import strawberry
 
@@ -29,7 +29,7 @@ class ClusterModeGQL(StrEnum):
     MULTI_NODE = "MULTI_NODE"
 
     @classmethod
-    def from_internal(cls, internal: ClusterMode) -> Self:
+    def from_internal(cls, internal: ClusterMode) -> ClusterModeGQL:
         """Convert internal ClusterMode to GraphQL enum."""
         match internal:
             case ClusterMode.SINGLE_NODE:
@@ -59,7 +59,7 @@ class SessionV2TypeGQL(StrEnum):
     SYSTEM = "system"
 
     @classmethod
-    def from_internal(cls, internal: SessionTypes) -> Self:
+    def from_internal(cls, internal: SessionTypes) -> SessionV2TypeGQL:
         """Convert internal SessionTypes to GraphQL enum."""
         match internal:
             case SessionTypes.INTERACTIVE:
@@ -106,7 +106,7 @@ class SessionV2ResultGQL(StrEnum):
     FAILURE = "failure"
 
     @classmethod
-    def from_internal(cls, internal: SessionResult) -> Self:
+    def from_internal(cls, internal: SessionResult) -> SessionV2ResultGQL:
         """Convert internal SessionResult to GraphQL enum."""
         match internal:
             case SessionResult.UNDEFINED:
@@ -142,7 +142,7 @@ class ServicePortProtocolGQL(StrEnum):
     RDP = "rdp"
 
     @classmethod
-    def from_internal(cls, internal: ServicePortProtocols) -> Self:
+    def from_internal(cls, internal: ServicePortProtocols) -> ServicePortProtocolGQL:
         """Convert internal ServicePortProtocols to GraphQL enum."""
         match internal:
             case ServicePortProtocols.HTTP:

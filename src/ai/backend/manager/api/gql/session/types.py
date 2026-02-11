@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Self
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
@@ -22,7 +24,7 @@ from ai.backend.manager.api.gql.kernel.types import KernelConnectionV2GQL, Resou
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.resource_group.resolver import ResourceGroupConnection
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -47,7 +49,7 @@ class SessionV2StatusGQL(StrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def from_internal(cls, internal_status: SessionStatus) -> Self:
+    def from_internal(cls, internal_status: SessionStatus) -> SessionV2StatusGQL:
         """Convert internal SessionStatus to GraphQL enum."""
         match internal_status:
             case SessionStatus.PENDING:
@@ -319,6 +321,16 @@ class SessionV2GQL(Node):
     # TODO: Add `vfolder_mounts` dynamic field (VFolderV2 connection type needed)
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        raise NotImplementedError
+
+    @classmethod
     def from_session_info(cls, session_info: SessionInfo) -> Self:
         """Create SessionV2GQL from SessionInfo dataclass."""
         raise NotImplementedError
@@ -331,10 +343,10 @@ SessionV2EdgeGQL = Edge[SessionV2GQL]
 
 
 @strawberry.type(
-    name="SessionConnectionV2",
+    name="SessionV2Connection",
     description="Added in 26.2.0. Connection type for paginated session results.",
 )
-class SessionConnectionV2GQL(Connection[SessionV2GQL]):
+class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:

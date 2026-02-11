@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from .fetcher import fetch_session, fetch_sessions
+from .fetcher import fetch_sessions
 from .resolver import admin_sessions_v2
 from .types import (
-    SessionConnectionV2GQL,
+    SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
     SessionV2GQL,
@@ -21,13 +21,12 @@ from .types import (
 
 __all__ = [
     # Fetchers
-    "fetch_session",
     "fetch_sessions",
     # Resolvers
     "session_v2",
     "admin_sessions_v2",
     # V2 types
-    "SessionConnectionV2GQL",
+    "SessionV2ConnectionGQL",
     "SessionV2EdgeGQL",
     "SessionV2FilterGQL",
     "SessionV2LifecycleInfoGQL",
