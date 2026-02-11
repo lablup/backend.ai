@@ -11,3 +11,11 @@ class RoleAction(BaseAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.ROLE
+
+
+@dataclass
+class PermissionAction(BaseAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.PERMISSION

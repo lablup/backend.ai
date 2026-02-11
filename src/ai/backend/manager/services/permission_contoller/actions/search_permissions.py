@@ -5,11 +5,11 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.services.permission_contoller.actions.base import PermissionAction
 
 
 @dataclass
-class SearchPermissionsAction(RoleAction):
+class SearchPermissionsAction(PermissionAction):
     querier: BatchQuerier
 
     @override
