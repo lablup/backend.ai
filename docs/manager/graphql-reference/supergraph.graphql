@@ -7549,40 +7549,6 @@ type PreloadImage
 }
 
 """
-Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
-"""
-type ProjectBasicInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Project name."""
-  name: String!
-
-  """Optional description of the project."""
-  description: String
-
-  """Project type determining its purpose. See ProjectTypeV2 enum."""
-  type: ProjectTypeV2!
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
-"""
-Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
-"""
-input ProjectDomainNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by domain active status."""
-  isActive: Boolean = null
-}
-
-"""
 Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
 """
 type ProjectFairShare implements Node
@@ -7745,13 +7711,6 @@ input ProjectFairShareProjectNestedFilter
   type: ProjectFairShareTypeEnumFilter = null
 }
 
-input ProjectFairShareScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-}
-
 """Added in 26.2.0. Project type enum for fair share filtering."""
 enum ProjectFairShareTypeEnum
   @join__type(graph: STRAWBERRY)
@@ -7779,37 +7738,6 @@ input ProjectFairShareTypeEnumFilter
   notIn: [ProjectFairShareTypeEnum!] = null
 }
 
-"""
-Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
-"""
-type ProjectLifecycleInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
-  """
-  isActive: Boolean
-
-  """Timestamp when the project was created."""
-  createdAt: DateTime
-
-  """Timestamp when the project was last modified."""
-  modifiedAt: DateTime
-}
-
-"""
-Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
-"""
-type ProjectOrganizationInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """Name of the project resource policy applied to this project."""
-  resourcePolicy: String!
-}
-
 type ProjectResourcePolicy
   @join__type(graph: GRAPHENE)
 {
@@ -7832,18 +7760,6 @@ type ProjectResourcePolicy
   Added in 24.12.0. Limitation of the number of networks created on behalf of project.
   """
   max_network_count: Int
-}
-
-"""
-Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
-"""
-type ProjectStorageInfo
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
-  """
-  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
 }
 
 """
@@ -8010,33 +7926,6 @@ input ProjectUsageBucketOrderBy
   direction: OrderDirection! = DESC
 }
 
-input ProjectUsageScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-}
-
-"""
-Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
-"""
-input ProjectUserNestedFilter
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
-  email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
-  isActive: Boolean = null
-}
-
 """
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
@@ -8060,34 +7949,53 @@ type ProjectV2 implements Node
   id: ID!
 
   """Basic project information including name, type, and description."""
-  basicInfo: ProjectBasicInfo!
+  basicInfo: ProjectV2BasicInfo!
 
   """
   Organizational context including domain membership and resource policy.
   """
-  organization: ProjectOrganizationInfo!
+  organization: ProjectV2OrganizationInfo!
 
   """Storage configuration and vfolder host permissions."""
-  storage: ProjectStorageInfo!
+  storage: ProjectV2StorageInfo!
 
   """Lifecycle information including activation status and timestamps."""
-  lifecycle: ProjectLifecycleInfo!
+  lifecycle: ProjectV2LifecycleInfo!
 
   """
   Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
+  fairShare(scope: ProjectV2FairShareScope!): ProjectFairShare!
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  usageBuckets(scope: ProjectV2UsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
 
   """The domain this project belongs to."""
   domain: DomainV2!
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+}
+
+"""
+Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
+"""
+type ProjectV2BasicInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Project name."""
+  name: String!
+
+  """Optional description of the project."""
+  description: String
+
+  """Project type determining its purpose. See ProjectTypeV2 enum."""
+  type: ProjectTypeV2!
+
+  """External system integration identifier."""
+  integrationId: String
 }
 
 """
@@ -8106,6 +8014,21 @@ type ProjectV2Connection
   count: Int!
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
+"""
+input ProjectV2DomainNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """An edge in a connection."""
 type ProjectV2Edge
   @join__type(graph: STRAWBERRY)
@@ -8115,6 +8038,13 @@ type ProjectV2Edge
 
   """The item at the end of the edge"""
   node: ProjectV2!
+}
+
+input ProjectV2FairShareScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
 }
 
 """
@@ -8159,12 +8089,12 @@ input ProjectV2Filter
   """
   Filter by nested domain conditions. Returns projects whose domain matches all specified conditions.
   """
-  domain: ProjectDomainNestedFilter = null
+  domain: ProjectV2DomainNestedFilter = null
 
   """
   Filter by nested user conditions. Returns projects that have at least one user matching all specified conditions.
   """
-  user: ProjectUserNestedFilter = null
+  user: ProjectV2UserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectV2Filter!] = null
@@ -8178,6 +8108,24 @@ input ProjectV2Filter
   Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [ProjectV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
+"""
+type ProjectV2LifecycleInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
+  """
+  isActive: Boolean
+
+  """Timestamp when the project was created."""
+  createdAt: DateTime
+
+  """Timestamp when the project was last modified."""
+  modifiedAt: DateTime
 }
 
 """
@@ -8207,6 +8155,58 @@ enum ProjectV2OrderField
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
   USER_USERNAME @join__enumValue(graph: STRAWBERRY)
   USER_EMAIL @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
+"""
+type ProjectV2OrganizationInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """Name of the project resource policy applied to this project."""
+  resourcePolicy: String!
+}
+
+"""
+Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
+"""
+type ProjectV2StorageInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
+  """
+  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
+}
+
+input ProjectV2UsageScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+}
+
+"""
+Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
+"""
+input ProjectV2UserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
 }
 
 """

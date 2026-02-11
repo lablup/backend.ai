@@ -3935,36 +3935,6 @@ type PageInfo @shareable {
 }
 
 """
-Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
-"""
-type ProjectBasicInfo {
-  """Project name."""
-  name: String!
-
-  """Optional description of the project."""
-  description: String
-
-  """Project type determining its purpose. See ProjectTypeV2 enum."""
-  type: ProjectTypeV2!
-
-  """External system integration identifier."""
-  integrationId: String
-}
-
-"""
-Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
-"""
-input ProjectDomainNestedFilter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
-  name: StringFilter = null
-
-  """Filter by domain active status."""
-  isActive: Boolean = null
-}
-
-"""
 Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.
 """
 type ProjectFairShare implements Node {
@@ -4112,11 +4082,6 @@ input ProjectFairShareProjectNestedFilter {
   type: ProjectFairShareTypeEnumFilter = null
 }
 
-input ProjectFairShareScope {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
-}
-
 """Added in 26.2.0. Project type enum for fair share filtering."""
 enum ProjectFairShareTypeEnum {
   GENERAL
@@ -4138,43 +4103,6 @@ input ProjectFairShareTypeEnumFilter {
 
   """Exclude any of the provided types."""
   notIn: [ProjectFairShareTypeEnum!] = null
-}
-
-"""
-Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
-"""
-type ProjectLifecycleInfo {
-  """
-  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
-  """
-  isActive: Boolean
-
-  """Timestamp when the project was created."""
-  createdAt: DateTime
-
-  """Timestamp when the project was last modified."""
-  modifiedAt: DateTime
-}
-
-"""
-Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
-"""
-type ProjectOrganizationInfo {
-  """Name of the domain this project belongs to."""
-  domainName: String!
-
-  """Name of the project resource policy applied to this project."""
-  resourcePolicy: String!
-}
-
-"""
-Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
-"""
-type ProjectStorageInfo {
-  """
-  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
-  """
-  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
 }
 
 """
@@ -4326,29 +4254,6 @@ input ProjectUsageBucketOrderBy {
   direction: OrderDirection! = DESC
 }
 
-input ProjectUsageScope {
-  """Resource group to filter usage buckets by."""
-  resourceGroupName: String!
-}
-
-"""
-Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
-"""
-input ProjectUserNestedFilter {
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
-  username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
-  email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
-  isActive: Boolean = null
-}
-
 """
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
@@ -4367,34 +4272,51 @@ type ProjectV2 implements Node @key(fields: "id") {
   id: ID!
 
   """Basic project information including name, type, and description."""
-  basicInfo: ProjectBasicInfo!
+  basicInfo: ProjectV2BasicInfo!
 
   """
   Organizational context including domain membership and resource policy.
   """
-  organization: ProjectOrganizationInfo!
+  organization: ProjectV2OrganizationInfo!
 
   """Storage configuration and vfolder host permissions."""
-  storage: ProjectStorageInfo!
+  storage: ProjectV2StorageInfo!
 
   """Lifecycle information including activation status and timestamps."""
-  lifecycle: ProjectLifecycleInfo!
+  lifecycle: ProjectV2LifecycleInfo!
 
   """
   Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
+  fairShare(scope: ProjectV2FairShareScope!): ProjectFairShare!
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  usageBuckets(scope: ProjectV2UsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
 
   """The domain this project belongs to."""
   domain: DomainV2!
 
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+}
+
+"""
+Added in 26.2.0. Basic project information. Contains identity and descriptive fields for the project.
+"""
+type ProjectV2BasicInfo {
+  """Project name."""
+  name: String!
+
+  """Optional description of the project."""
+  description: String
+
+  """Project type determining its purpose. See ProjectTypeV2 enum."""
+  type: ProjectTypeV2!
+
+  """External system integration identifier."""
+  integrationId: String
 }
 
 """
@@ -4411,6 +4333,19 @@ type ProjectV2Connection {
   count: Int!
 }
 
+"""
+Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
+"""
+input ProjectV2DomainNestedFilter {
+  """
+  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
+  """
+  name: StringFilter = null
+
+  """Filter by domain active status."""
+  isActive: Boolean = null
+}
+
 """An edge in a connection."""
 type ProjectV2Edge {
   """A cursor for use in pagination"""
@@ -4418,6 +4353,11 @@ type ProjectV2Edge {
 
   """The item at the end of the edge"""
   node: ProjectV2!
+}
+
+input ProjectV2FairShareScope {
+  """Resource group to filter fair shares by."""
+  resourceGroupName: String!
 }
 
 """
@@ -4460,12 +4400,12 @@ input ProjectV2Filter {
   """
   Filter by nested domain conditions. Returns projects whose domain matches all specified conditions.
   """
-  domain: ProjectDomainNestedFilter = null
+  domain: ProjectV2DomainNestedFilter = null
 
   """
   Filter by nested user conditions. Returns projects that have at least one user matching all specified conditions.
   """
-  user: ProjectUserNestedFilter = null
+  user: ProjectV2UserNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectV2Filter!] = null
@@ -4479,6 +4419,22 @@ input ProjectV2Filter {
   Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [ProjectV2Filter!] = null
+}
+
+"""
+Added in 26.2.0. Project lifecycle information. Contains activation status and timestamp tracking.
+"""
+type ProjectV2LifecycleInfo {
+  """
+  Whether the project is active. Inactive projects cannot create new sessions or perform operations.
+  """
+  isActive: Boolean
+
+  """Timestamp when the project was created."""
+  createdAt: DateTime
+
+  """Timestamp when the project was last modified."""
+  modifiedAt: DateTime
 }
 
 """
@@ -4504,6 +4460,50 @@ enum ProjectV2OrderField {
   DOMAIN_NAME
   USER_USERNAME
   USER_EMAIL
+}
+
+"""
+Added in 26.2.0. Project's organizational context. Contains domain membership and resource policy information.
+"""
+type ProjectV2OrganizationInfo {
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """Name of the project resource policy applied to this project."""
+  resourcePolicy: String!
+}
+
+"""
+Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
+"""
+type ProjectV2StorageInfo {
+  """
+  Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access.
+  """
+  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
+}
+
+input ProjectV2UsageScope {
+  """Resource group to filter usage buckets by."""
+  resourceGroupName: String!
+}
+
+"""
+Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
+"""
+input ProjectV2UserNestedFilter {
+  """
+  Filter by username. Supports equals, contains, startsWith, and endsWith.
+  """
+  username: StringFilter = null
+
+  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
+  email: StringFilter = null
+
+  """
+  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
+  """
+  isActive: Boolean = null
 }
 
 """
