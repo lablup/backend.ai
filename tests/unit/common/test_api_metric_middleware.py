@@ -196,6 +196,7 @@ class TestAPIMetricObserverClientOperation:
             error_code=None,
             status_code=200,
             duration=0.1,
+            client_operation=None,
         )
         sample = self.observer._request_count.labels(
             method="GET",

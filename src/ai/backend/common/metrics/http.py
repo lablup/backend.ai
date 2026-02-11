@@ -20,7 +20,7 @@ class APIMetricObserverProtocol(Protocol):
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
-        client_operation: str = "",
+        client_operation: str | None,
     ) -> None: ...
 
 

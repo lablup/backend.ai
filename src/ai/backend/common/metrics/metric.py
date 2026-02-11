@@ -57,12 +57,12 @@ class APIMetricObserver:
         endpoint: str,
         error_code: ErrorCode | None,
         status_code: int,
-        client_operation: str = "",
+        client_operation: str | None,
     ) -> None:
         self._request_count.labels(
             method=method,
             endpoint=endpoint,
-            client_operation=client_operation,
+            client_operation=client_operation or "",
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -77,12 +77,12 @@ class APIMetricObserver:
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
-        client_operation: str = "",
+        client_operation: str | None,
     ) -> None:
         self._request_duration_sec.labels(
             method=method,
             endpoint=endpoint,
-            client_operation=client_operation,
+            client_operation=client_operation or "",
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -97,7 +97,7 @@ class APIMetricObserver:
         error_code: ErrorCode | None,
         status_code: int,
         duration: float,
-        client_operation: str = "",
+        client_operation: str | None,
     ) -> None:
         self._inc_request_total(
             method=method,
