@@ -372,7 +372,11 @@ async def get_container_registries(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result.registries, status=HTTPStatus.OK)
+    registries_dict = {
+        f"{registry.project}/{registry.registry_name}": registry.url
+        for registry in result.registries
+    }
+    return web.json_response(registries_dict, status=HTTPStatus.OK)
 
 
 def create_app(

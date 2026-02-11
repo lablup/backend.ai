@@ -14,7 +14,10 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.container_registry import get_container_registry_cls
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    KnownContainerRegistry,
+)
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageLabelsData,
@@ -186,14 +189,24 @@ def sample_image_data() -> ImageData:
 
 
 @pytest.fixture
-def sample_known_registries() -> dict[str, str]:
+def sample_known_registries() -> list[KnownContainerRegistry]:
     """Create sample known registries data."""
-    return {
-        "project1/registry1": "https://registry1.example.com",
-        "project2/registry2": "https://registry2.example.com",
-        "global-registry": "https://global.example.com",
-        "special-project/special-registry": "https://special.registry.com",
-    }
+    return [
+        KnownContainerRegistry(
+            project="project1", registry_name="registry1", url="https://registry1.example.com"
+        ),
+        KnownContainerRegistry(
+            project="project2", registry_name="registry2", url="https://registry2.example.com"
+        ),
+        KnownContainerRegistry(
+            project="global", registry_name="global-registry", url="https://global.example.com"
+        ),
+        KnownContainerRegistry(
+            project="special-project",
+            registry_name="special-registry",
+            url="https://special.registry.com",
+        ),
+    ]
 
 
 # ==================== GetContainerRegistries Tests ====================
@@ -206,7 +219,7 @@ class TestGetContainerRegistries:
         self,
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
-        sample_known_registries: dict[str, str],
+        sample_known_registries: list[KnownContainerRegistry],
     ) -> None:
         """Test successfully getting known container registries"""
         mock_container_registry_repository.get_known_registries.return_value = (
@@ -218,8 +231,8 @@ class TestGetContainerRegistries:
 
         assert result.registries == sample_known_registries
         assert len(result.registries) == 4
-        assert "project1/registry1" in result.registries
-        assert result.registries["project1/registry1"] == "https://registry1.example.com"
+        assert result.registries[0].registry_name == "registry1"
+        assert result.registries[0].url == "https://registry1.example.com"
         mock_container_registry_repository.get_known_registries.assert_called_once()
 
     async def test_empty(
@@ -228,12 +241,12 @@ class TestGetContainerRegistries:
         mock_container_registry_repository: MagicMock,
     ) -> None:
         """Test getting known registries when none exist"""
-        mock_container_registry_repository.get_known_registries.return_value = {}
+        mock_container_registry_repository.get_known_registries.return_value = []
 
         action = GetContainerRegistriesAction()
         result = await container_registry_service.get_container_registries(action)
 
-        assert result.registries == {}
+        assert result.registries == []
         mock_container_registry_repository.get_known_registries.assert_called_once()
 
     async def test_various_formats(
@@ -241,23 +254,31 @@ class TestGetContainerRegistries:
         container_registry_service: ContainerRegistryService,
         mock_container_registry_repository: MagicMock,
     ) -> None:
-        """Test getting registries with various key formats"""
-        known_registries = {
-            "simple": "https://simple.com",
-            "project/registry": "https://project-registry.com",
-            "deep/nested/registry": "https://nested.com",
-            "special-chars/reg-123": "https://special.com",
-        }
+        """Test getting registries with various project/registry_name combinations"""
+        known_registries = [
+            KnownContainerRegistry(
+                project="simple", registry_name="simple", url="https://simple.com"
+            ),
+            KnownContainerRegistry(
+                project="project", registry_name="registry", url="https://project-registry.com"
+            ),
+            KnownContainerRegistry(
+                project="deep/nested", registry_name="registry", url="https://nested.com"
+            ),
+            KnownContainerRegistry(
+                project="special-chars", registry_name="reg-123", url="https://special.com"
+            ),
+        ]
         mock_container_registry_repository.get_known_registries.return_value = known_registries
 
         action = GetContainerRegistriesAction()
         result = await container_registry_service.get_container_registries(action)
 
         assert result.registries == known_registries
-        assert result.registries["simple"] == "https://simple.com"
-        assert result.registries["project/registry"] == "https://project-registry.com"
-        assert result.registries["deep/nested/registry"] == "https://nested.com"
-        assert result.registries["special-chars/reg-123"] == "https://special.com"
+        assert result.registries[0].url == "https://simple.com"
+        assert result.registries[1].url == "https://project-registry.com"
+        assert result.registries[2].url == "https://nested.com"
+        assert result.registries[3].url == "https://special.com"
 
     async def test_error_handling(
         self,

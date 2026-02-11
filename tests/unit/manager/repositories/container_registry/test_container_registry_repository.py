@@ -12,7 +12,10 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    KnownContainerRegistry,
+)
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
@@ -1278,3 +1281,51 @@ class TestContainerRegistryRepository:
         assert result.password == "test-pass"
         assert result.ssl_verify is False
         assert result.is_global is False
+
+    @pytest.fixture
+    async def registry_with_null_project(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> ContainerRegistryData:
+        """Pre-created registry with project=None."""
+        async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=uuid.uuid4(),
+                url="https://no-project.example.com",
+                registry_name="no-project-registry",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+            )
+            session.add(registry)
+            await session.commit()
+            await session.refresh(registry)
+            return registry.to_dataclass()
+
+    @pytest.mark.asyncio
+    async def test_get_known_registries_returns_list_of_known_container_registry(
+        self,
+        repository: ContainerRegistryRepository,
+        two_registries_different_names: _TwoRegistries,
+    ) -> None:
+        """Test that get_known_registries returns list[KnownContainerRegistry]"""
+        result = await repository.get_known_registries()
+
+        assert len(result) == 2
+        for item in result:
+            assert isinstance(item, KnownContainerRegistry)
+        urls = {item.url for item in result}
+        assert two_registries_different_names.registry1.url in urls
+        assert two_registries_different_names.registry2.url in urls
+
+    @pytest.mark.asyncio
+    async def test_get_known_registries_excludes_null_project(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registry: ContainerRegistryData,
+        registry_with_null_project: ContainerRegistryData,
+    ) -> None:
+        """Test that registries with project=None are excluded"""
+        result = await repository.get_known_registries()
+
+        assert len(result) == 1
+        assert result[0].registry_name == sample_registry.registry_name
+        assert result[0].project == sample_registry.project

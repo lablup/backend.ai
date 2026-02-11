@@ -10,6 +10,7 @@ from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
+    KnownContainerRegistry,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import (
@@ -174,19 +175,24 @@ class ContainerRegistryDBSource:
                 raise ContainerRegistryNotFound()
             return row.to_dataclass()
 
-    async def fetch_known_registries(self) -> dict[str, str]:
+    async def fetch_known_registries(self) -> list[KnownContainerRegistry]:
         async with self._db.begin_readonly_session_read_committed() as session:
-            known_registries_map = await ContainerRegistryRow.get_known_container_registries(
-                session
+            query_stmt = sa.select(
+                ContainerRegistryRow.project,
+                ContainerRegistryRow.registry_name,
+                ContainerRegistryRow.url,
+            ).where(
+                ContainerRegistryRow.project.isnot(None),
             )
-
-            known_registries = {}
-            for project, registries in known_registries_map.items():
-                for registry_name, url in registries.items():
-                    if project not in known_registries:
-                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
-
-            return known_registries
+            rows = (await session.execute(query_stmt)).all()
+            return [
+                KnownContainerRegistry(
+                    project=row.project,
+                    registry_name=row.registry_name,
+                    url=row.url,
+                )
+                for row in rows
+            ]
 
     async def fetch_registry_row_for_scanner(
         self,

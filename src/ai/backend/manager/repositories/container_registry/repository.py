@@ -6,7 +6,10 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    KnownContainerRegistry,
+)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
 )
@@ -85,7 +88,7 @@ class ContainerRegistryRepository:
         return await self._db_source.clear_registry_images(registry_name, project)
 
     @container_registry_repository_resilience.apply()
-    async def get_known_registries(self) -> dict[str, str]:
+    async def get_known_registries(self) -> list[KnownContainerRegistry]:
         return await self._db_source.fetch_known_registries()
 
     @container_registry_repository_resilience.apply()
