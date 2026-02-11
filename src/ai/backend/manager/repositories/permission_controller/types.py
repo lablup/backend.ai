@@ -25,7 +25,7 @@ class AssignedUserBatchQuerierResult(BatchQuerierResult[UserRow]):
 
 
 @dataclass(frozen=True)
-class ScopedPermissionSearchScope(SearchScope):
+class PermissionSearchScope(SearchScope):
     """Scope for searching scoped permissions by role."""
 
     role_id: uuid.UUID

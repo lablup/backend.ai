@@ -44,7 +44,7 @@ class ScopedPermissionCreateInput:
 
 
 @dataclass(frozen=True)
-class ScopedPermissionListResult:
+class PermissionListResult:
     """Result of scoped permission search with pagination info."""
 
     items: list[PermissionData]

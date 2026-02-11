@@ -15,7 +15,7 @@ from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionListResult,
 )
 from ai.backend.manager.data.permission.permission import (
-    ScopedPermissionListResult,
+    PermissionListResult,
 )
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -57,7 +57,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
-    ScopedPermissionSearchScope,
+    PermissionSearchScope,
 )
 
 
@@ -561,8 +561,8 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: ScopedPermissionSearchScope | None = None,
-    ) -> ScopedPermissionListResult:
+        scope: PermissionSearchScope | None = None,
+    ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(PermissionRow)
@@ -576,7 +576,7 @@ class PermissionDBSource:
 
             items = [row.PermissionRow.to_data() for row in result.rows]
 
-            return ScopedPermissionListResult(
+            return PermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
