@@ -13,7 +13,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.types import AgentId, KernelId, SessionResult, SessionTypes
+from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
 if TYPE_CHECKING:
@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ServicePortEntryGQL,
     ServicePortsGQL,
+    SessionResultGQL,
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
@@ -340,7 +341,7 @@ class KernelLifecycleInfoGQL:
             Indicates the kernel's position in its lifecycle.
         """)
     )
-    result: SessionResult = strawberry.field(
+    result: SessionResultGQL = strawberry.field(
         description="The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."
     )
     created_at: datetime | None = strawberry.field(
@@ -526,7 +527,7 @@ class KernelV2GQL(Node):
             ),
             lifecycle=KernelLifecycleInfoGQL(
                 status=KernelStatusGQL.from_internal(kernel_info.lifecycle.status),
-                result=SessionResult(kernel_info.lifecycle.result),
+                result=SessionResultGQL.from_internal(kernel_info.lifecycle.result),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
                 starts_at=kernel_info.lifecycle.starts_at,

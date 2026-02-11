@@ -41,18 +41,16 @@ class SessionStatusGQL(StrEnum):
     PREPARED = "PREPARED"
     CREATING = "CREATING"
     RUNNING = "RUNNING"
-    RESTARTING = "RESTARTING"
-    RUNNING_DEGRADED = "RUNNING_DEGRADED"
+    DEPRIORITIZING = "DEPRIORITIZING"
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
-    ERROR = "ERROR"
     CANCELLED = "CANCELLED"
 
     @classmethod
     def from_internal(cls, internal_status: SessionStatus) -> SessionStatusGQL:
         """Convert internal SessionStatus to GraphQL enum."""
         match internal_status:
-            case SessionStatus.PENDING | SessionStatus.DEPRIORITIZING:
+            case SessionStatus.PENDING:
                 return cls.PENDING
             case SessionStatus.SCHEDULED:
                 return cls.SCHEDULED
@@ -64,17 +62,16 @@ class SessionStatusGQL(StrEnum):
                 return cls.CREATING
             case SessionStatus.RUNNING:
                 return cls.RUNNING
-            case SessionStatus.RESTARTING:
-                return cls.RESTARTING
-            case SessionStatus.RUNNING_DEGRADED:
-                return cls.RUNNING_DEGRADED
+            case SessionStatus.DEPRIORITIZING:
+                return cls.DEPRIORITIZING
             case SessionStatus.TERMINATING:
                 return cls.TERMINATING
             case SessionStatus.TERMINATED:
                 return cls.TERMINATED
-            case SessionStatus.ERROR:
-                return cls.ERROR
             case SessionStatus.CANCELLED:
+                return cls.CANCELLED
+            case _:
+                # RESTARTING, RUNNING_DEGRADED, ERROR are not exposed via GQL
                 return cls.CANCELLED
 
     def to_internal(self) -> SessionStatus:
@@ -92,16 +89,12 @@ class SessionStatusGQL(StrEnum):
                 return SessionStatus.CREATING
             case SessionStatusGQL.RUNNING:
                 return SessionStatus.RUNNING
-            case SessionStatusGQL.RESTARTING:
-                return SessionStatus.RESTARTING
-            case SessionStatusGQL.RUNNING_DEGRADED:
-                return SessionStatus.RUNNING_DEGRADED
+            case SessionStatusGQL.DEPRIORITIZING:
+                return SessionStatus.DEPRIORITIZING
             case SessionStatusGQL.TERMINATING:
                 return SessionStatus.TERMINATING
             case SessionStatusGQL.TERMINATED:
                 return SessionStatus.TERMINATED
-            case SessionStatusGQL.ERROR:
-                return SessionStatus.ERROR
             case SessionStatusGQL.CANCELLED:
                 return SessionStatus.CANCELLED
 
