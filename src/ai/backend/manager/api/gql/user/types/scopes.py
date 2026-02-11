@@ -1,4 +1,4 @@
-"""User V2 GraphQL scope types."""
+"""User GraphQL scope types."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import strawberry
         "Used to restrict user queries to a particular domain context."
     ),
 )
-class DomainUserScope:
+class DomainUserScopeGQL:
     """Scope for domain-level user queries."""
 
     domain_name: str = strawberry.field(
@@ -29,7 +29,7 @@ class DomainUserScope:
         "Used to restrict user queries to members of a particular project."
     ),
 )
-class ProjectUserScope:
+class ProjectUserScopeGQL:
     """Scope for project-level user queries."""
 
     project_id: UUID = strawberry.field(

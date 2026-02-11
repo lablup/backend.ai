@@ -1403,15 +1403,32 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.2.0. Error information for a failed user in bulk creation."""
+type BulkCreateUserError
+  @join__type(graph: STRAWBERRY)
+{
+  """Original position in the input list."""
+  index: Int!
+
+  """Username of the user that failed."""
+  username: String!
+
+  """Email of the user that failed."""
+  email: String!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of users successfully created."""
-  createdCount: Int!
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
 
-  """List of newly created users."""
-  users: [UserV2!]!
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
 }
 
 """
@@ -11740,7 +11757,7 @@ enum UserRoleV2
 }
 
 """
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserRoleV2EnumFilter
   @join__type(graph: STRAWBERRY)
@@ -11771,7 +11788,7 @@ enum UserStatusV2
 }
 
 """
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserStatusV2EnumFilter
   @join__type(graph: STRAWBERRY)
@@ -12147,7 +12164,7 @@ Added in 26.2.0. Specifies ordering for user query results. Combine field select
 input UserV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """The field to order by. See UserV2OrderField for available options."""
+  """The field to order by. See UserOrderField for available options."""
   field: UserV2OrderField!
 
   """Sort direction. ASC for ascending, DESC for descending."""

@@ -1,4 +1,4 @@
-"""User V2 GraphQL enum types."""
+"""User GraphQL enum types."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import strawberry
         "BEFORE_VERIFICATION: User account is pending email verification."
     ),
 )
-class UserStatusEnum(StrEnum):
+class UserStatusEnumGQL(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     DELETED = "deleted"
@@ -34,7 +34,7 @@ class UserStatusEnum(StrEnum):
         "MONITOR: Read-only access for monitoring purposes."
     ),
 )
-class UserRoleEnum(StrEnum):
+class UserRoleEnumGQL(StrEnum):
     USER = "user"
     ADMIN = "admin"
     SUPERADMIN = "superadmin"

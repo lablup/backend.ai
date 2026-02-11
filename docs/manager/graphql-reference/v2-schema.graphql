@@ -892,6 +892,21 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.2.0. Error information for a failed user in bulk creation."""
+type BulkCreateUserError {
+  """Original position in the input list."""
+  index: Int!
+
+  """Username of the user that failed."""
+  username: String!
+
+  """Email of the user that failed."""
+  email: String!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """
 Added in 26.2.0. Input for bulk creating multiple users. Each user has individual specifications.
 """
@@ -902,11 +917,11 @@ input BulkCreateUserV2Input {
 
 """Added in 26.2.0. Payload for bulk user creation mutation."""
 type BulkCreateUsersV2Payload {
-  """Number of users successfully created."""
-  createdCount: Int!
+  """List of successfully created users."""
+  createdUsers: [UserV2!]!
 
-  """List of newly created users."""
-  users: [UserV2!]!
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserError!]!
 }
 
 """
@@ -6699,7 +6714,7 @@ enum UserRoleV2 {
 }
 
 """
-Added in 26.2.0. Filter for UserRoleEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserRoleV2EnumFilter {
   """Exact match for user role."""
@@ -6726,7 +6741,7 @@ enum UserStatusV2 {
 }
 
 """
-Added in 26.2.0. Filter for UserStatusEnum fields. Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
 """
 input UserStatusV2EnumFilter {
   """Exact match for user status."""
@@ -7042,7 +7057,7 @@ input UserV2Filter {
 Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input UserV2OrderBy {
-  """The field to order by. See UserV2OrderField for available options."""
+  """The field to order by. See UserOrderField for available options."""
   field: UserV2OrderField!
 
   """Sort direction. ASC for ascending, DESC for descending."""

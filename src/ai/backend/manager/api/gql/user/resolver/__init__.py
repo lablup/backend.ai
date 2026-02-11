@@ -1,11 +1,6 @@
-"""User V2 GraphQL API package.
+"""User GraphQL resolver package."""
 
-Added in 26.2.0. Provides structured user management API with typed fields
-replacing JSON scalars and organized into logical field groups.
-"""
-
-from .resolver import (
-    # Mutations
+from .mutation import (
     admin_bulk_create_users,
     admin_create_user,
     admin_delete_user,
@@ -13,13 +8,14 @@ from .resolver import (
     admin_purge_user,
     admin_purge_users,
     admin_update_user,
-    # Queries
+    update_user,
+)
+from .query import (
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
     my_user_v2,
     project_users_v2,
-    update_user,
 )
 
 __all__ = [

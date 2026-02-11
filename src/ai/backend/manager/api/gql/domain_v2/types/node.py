@@ -29,8 +29,8 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
-    from ai.backend.manager.api.gql.user_v2.types.filters import UserV2Filter, UserV2OrderBy
-    from ai.backend.manager.api.gql.user_v2.types.node import UserV2Connection
+    from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2Connection
     from ai.backend.manager.data.domain.types import DomainData
 
 
@@ -203,13 +203,13 @@ class DomainV2GQL(Node):
         self,
         info: Info,
         filter: Annotated[
-            UserV2Filter, strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters")
+            UserFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.user.types.filters")
         ]
         | None = None,
         order_by: list[
             Annotated[
-                UserV2OrderBy,
-                strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.filters"),
+                UserOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.user.types.filters"),
             ]
         ]
         | None = None,
@@ -221,9 +221,9 @@ class DomainV2GQL(Node):
         offset: int | None = None,
     ) -> Annotated[
         UserV2Connection,
-        strawberry.lazy("ai.backend.manager.api.gql.user_v2.types.node"),
+        strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
     ]:
-        from ai.backend.manager.api.gql.user_v2.fetcher.user import fetch_domain_users
+        from ai.backend.manager.api.gql.user.fetcher.user import fetch_domain_users
         from ai.backend.manager.repositories.user.types import DomainUserSearchScope
 
         scope = DomainUserSearchScope(domain_name=str(self.id))
