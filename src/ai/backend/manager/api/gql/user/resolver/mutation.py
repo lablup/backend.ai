@@ -13,6 +13,9 @@ from ai.backend.manager.api.gql.user.types import (
     BulkCreateUserErrorGQL,
     BulkCreateUserInputGQL,
     BulkCreateUsersPayloadGQL,
+    BulkUpdateUserErrorGQL,
+    BulkUpdateUserInputGQL,
+    BulkUpdateUsersPayloadGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
@@ -28,12 +31,19 @@ from ai.backend.manager.api.gql.user.types import (
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
+from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    UserUpdateSpec,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
 
@@ -168,6 +178,93 @@ async def admin_update_user(
         NotImplementedError: This mutation is not yet implemented.
     """
     raise NotImplementedError("admin_update_user is not yet implemented")
+
+
+@strawberry.mutation(
+    description=(
+        "Added in 26.2.0. Update multiple users in bulk (admin only). "
+        "Requires superadmin privileges. "
+        "Each user has individual update specifications."
+    )
+)  # type: ignore[misc]
+async def admin_bulk_update_users(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpdateUserInputGQL,
+) -> BulkUpdateUsersPayloadGQL:
+    """Update multiple users in bulk with individual specifications.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Bulk user update input with individual specs.
+
+    Returns:
+        BulkUpdateUsersPayloadGQL with updated users and failures.
+    """
+    ctx = info.context
+    auth_config = ctx.config_provider.config.auth
+
+    items: list[UserUpdateSpec] = []
+    for user_item in input.users:
+        user_input = user_item.input
+
+        # Convert password if provided
+        password_state: OptionalState[PasswordInfo] = OptionalState.nop()
+        if user_input.password is not None:
+            password_state = OptionalState.update(
+                PasswordInfo(
+                    password=user_input.password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                )
+            )
+
+        # Convert group_ids if provided
+        group_ids_state: OptionalState[list[str]] = OptionalState.nop()
+        if user_input.group_ids is not None:
+            group_ids_state = OptionalState.update([str(gid) for gid in user_input.group_ids])
+
+        updater_spec = UserUpdaterSpec(
+            username=OptionalState.from_graphql(user_input.username),
+            password=password_state,
+            need_password_change=OptionalState.from_graphql(user_input.need_password_change),
+            full_name=OptionalState.from_graphql(user_input.full_name),
+            description=OptionalState.from_graphql(user_input.description),
+            status=OptionalState.from_graphql(
+                UserStatus(user_input.status.value) if user_input.status is not None else None
+            ),
+            domain_name=OptionalState.from_graphql(user_input.domain_name),
+            role=OptionalState.from_graphql(
+                UserRole(user_input.role.value) if user_input.role is not None else None
+            ),
+            allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
+            resource_policy=OptionalState.from_graphql(user_input.resource_policy),
+            sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
+            main_access_key=TriState.from_graphql(user_input.main_access_key),
+            container_uid=TriState.from_graphql(user_input.container_uid),
+            container_main_gid=TriState.from_graphql(user_input.container_main_gid),
+            container_gids=TriState.from_graphql(user_input.container_gids),
+            group_ids=group_ids_state,
+        )
+
+        items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
+
+    action = BulkModifyUserAction(items=items)
+    result = await ctx.processors.user.bulk_modify_users.wait_for_complete(action)
+
+    updated_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    failed = [
+        BulkUpdateUserErrorGQL(
+            user_id=items[error.index].user_id,
+            message=str(error.exception),
+        )
+        for error in result.data.failures
+    ]
+
+    return BulkUpdateUsersPayloadGQL(
+        updated_users=updated_users,
+        failed=failed,
+    )
 
 
 @strawberry.mutation(

@@ -168,6 +168,35 @@ class UpdateUserInputGQL:
     )
 
 
+@strawberry.input(
+    name="BulkUpdateUserV2ItemInput",
+    description=(
+        "Added in 26.2.0. Input for a single user update within a bulk operation. "
+        "Pairs a user ID with the fields to update."
+    ),
+)
+class BulkUpdateUserItemInputGQL:
+    """Input for a single user update in bulk operation."""
+
+    user_id: UUID = strawberry.field(description="UUID of the user to update.")
+    input: UpdateUserInputGQL = strawberry.field(description="Fields to update for this user.")
+
+
+@strawberry.input(
+    name="BulkUpdateUserV2Input",
+    description=(
+        "Added in 26.2.0. Input for bulk updating multiple users. "
+        "Each user has individual update specifications."
+    ),
+)
+class BulkUpdateUserInputGQL:
+    """Input for bulk updating users with individual specs."""
+
+    users: list[BulkUpdateUserItemInputGQL] = strawberry.field(
+        description="List of user update inputs."
+    )
+
+
 # Delete User Inputs
 
 

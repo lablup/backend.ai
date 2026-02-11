@@ -67,6 +67,7 @@ from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkUpdaterError,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -145,6 +146,8 @@ __all__ = [
     "BatchUpdater",
     "BatchUpdaterResult",
     "execute_batch_updater",
+    # BulkUpdater
+    "BulkUpdaterError",
     # Upserter
     "UpserterSpec",
     "Upserter",
