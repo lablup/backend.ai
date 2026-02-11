@@ -108,6 +108,8 @@ class SessionStatusGQL(StrEnum):
 )
 class SessionOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
+    TERMINATED_AT = "terminated_at"
+    STATUS = "status"
     ID = "id"
     NAME = "name"
 

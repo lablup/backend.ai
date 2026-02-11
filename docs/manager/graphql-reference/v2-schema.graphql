@@ -5916,6 +5916,8 @@ input SessionOrderBy {
 """Added in 26.2.0. Fields available for ordering sessions."""
 enum SessionOrderField {
   CREATED_AT
+  TERMINATED_AT
+  STATUS
   ID
   NAME
 }
@@ -5932,7 +5934,9 @@ type SessionResourceInfo {
   targetResourceGroupNames: [String!]
 }
 
-"""Added in 26.2.0. Result status of a session execution."""
+"""
+Added in 26.2.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
+"""
 enum SessionResult {
   UNDEFINED
   SUCCESS

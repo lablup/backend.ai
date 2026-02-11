@@ -10502,6 +10502,8 @@ enum SessionOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  TERMINATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
   ID @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
 }
@@ -10553,7 +10555,9 @@ type SessionResourceInfo
   targetResourceGroupNames: [String!]
 }
 
-"""Added in 26.2.0. Result status of a session execution."""
+"""
+Added in 26.2.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
+"""
 enum SessionResult
   @join__type(graph: STRAWBERRY)
 {
