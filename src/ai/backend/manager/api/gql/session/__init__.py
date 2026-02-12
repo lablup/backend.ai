@@ -23,7 +23,6 @@ __all__ = [
     # Fetchers
     "fetch_sessions",
     # Resolvers
-    "session_v2",
     "admin_sessions_v2",
     # V2 types
     "SessionV2ConnectionGQL",
