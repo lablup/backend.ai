@@ -11,10 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
+    ValidatedVFolderInfo,
     VFolderData,
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -188,15 +187,25 @@ class TestVFolderFileServiceDownloadArchive:
         return manager
 
     @pytest.fixture
+    def sample_validated_info(self, sample_vfolder_uuid: uuid.UUID) -> ValidatedVFolderInfo:
+        return ValidatedVFolderInfo(
+            vfolder_id=VFolderID(
+                quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
+                folder_id=sample_vfolder_uuid,
+            ),
+            host="local:volume1",
+            unmanaged_path=None,
+        )
+
+    @pytest.fixture
     def file_service(
         self,
         mock_config_provider: MagicMock,
         mock_storage_manager: MagicMock,
-        sample_vfolder_data: VFolderData,
+        sample_validated_info: ValidatedVFolderInfo,
     ) -> VFolderFileService:
         mock_vfolder_repo = MagicMock()
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(return_value=sample_vfolder_data)
-        mock_vfolder_repo.ensure_host_permission_allowed = AsyncMock()
+        mock_vfolder_repo.get_validated_vfolder_id = AsyncMock(return_value=sample_validated_info)
         return VFolderFileService(
             config_provider=mock_config_provider,
             storage_manager=mock_storage_manager,
@@ -216,21 +225,10 @@ class TestVFolderFileServiceDownloadArchive:
         self,
         file_service: VFolderFileService,
         sample_action: CreateArchiveDownloadSessionAction,
-        sample_user_uuid: uuid.UUID,
         sample_vfolder_uuid: uuid.UUID,
     ) -> None:
         """Test successful archive download session creation."""
-        with with_user(
-            UserData(
-                user_id=sample_user_uuid,
-                is_authorized=True,
-                is_admin=False,
-                is_superadmin=False,
-                role=UserRole.USER,
-                domain_name="default",
-            )
-        ):
-            result = await file_service.download_archive_file(sample_action)
+        result = await file_service.download_archive_file(sample_action)
 
         assert isinstance(result, CreateArchiveDownloadSessionActionResult)
         assert result.token == self.STORAGE_TOKEN
@@ -239,10 +237,22 @@ class TestVFolderFileServiceDownloadArchive:
 
     async def test_download_archive_rejects_when_no_user_context(
         self,
-        file_service: VFolderFileService,
+        mock_config_provider: MagicMock,
+        mock_storage_manager: MagicMock,
         sample_action: CreateArchiveDownloadSessionAction,
     ) -> None:
-        """Test that missing user context is rejected."""
+        """Test that AuthorizationFailed from repository is propagated."""
+        mock_vfolder_repo = MagicMock()
+        mock_vfolder_repo.get_validated_vfolder_id = AsyncMock(
+            side_effect=AuthorizationFailed("User context is not available")
+        )
+        file_service = VFolderFileService(
+            config_provider=mock_config_provider,
+            storage_manager=mock_storage_manager,
+            vfolder_repository=mock_vfolder_repo,
+            user_repository=MagicMock(),
+        )
+
         with pytest.raises(AuthorizationFailed):
             await file_service.download_archive_file(sample_action)
 
@@ -250,21 +260,10 @@ class TestVFolderFileServiceDownloadArchive:
         self,
         file_service: VFolderFileService,
         mock_storage_manager: MagicMock,
-        sample_user_uuid: uuid.UUID,
         sample_action: CreateArchiveDownloadSessionAction,
     ) -> None:
         """Test that storage proxy client is called with correct parameters."""
-        with with_user(
-            UserData(
-                user_id=sample_user_uuid,
-                is_authorized=True,
-                is_admin=False,
-                is_superadmin=False,
-                role=UserRole.USER,
-                domain_name="default",
-            )
-        ):
-            await file_service.download_archive_file(sample_action)
+        await file_service.download_archive_file(sample_action)
 
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.download_archive_file.assert_called_once()

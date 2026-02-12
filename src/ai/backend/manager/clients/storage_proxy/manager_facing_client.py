@@ -593,7 +593,7 @@ class StorageProxyManagerFacingClient:
         self,
         *,
         volume: str,
-        vfid: str,
+        virtual_folder_id: str,
         files: list[str],
     ) -> Mapping[str, Any]:
         """
@@ -609,7 +609,7 @@ class StorageProxyManagerFacingClient:
             "folder/file/download-archive",
             body={
                 "volume": volume,
-                "virtual_folder_id": vfid,
+                "virtual_folder_id": virtual_folder_id,
                 "files": files,
             },
             request_timeout=self._timeout_config.download_archive_file.to_client_timeout(),

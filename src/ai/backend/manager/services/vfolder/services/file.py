@@ -1,13 +1,11 @@
 from pathlib import PurePosixPath
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
 from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
@@ -159,44 +157,25 @@ class VFolderFileService:
     async def download_archive_file(
         self, action: CreateArchiveDownloadSessionAction
     ) -> CreateArchiveDownloadSessionActionResult:
-        user = current_user()
-        if user is None:
-            raise AuthorizationFailed("User context is not available")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.user_id, user.domain_name
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
-        if is_unmanaged(vfolder_data.unmanaged_path):
+        info = await self._vfolder_repository.get_validated_vfolder_id(
+            action.vfolder_uuid,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+            allowed_vfolder_types=allowed_vfolder_types,
+            resource_policy=action.keypair_resource_policy,
+        )
+        if is_unmanaged(info.unmanaged_path):
             raise VFolderInvalidParameter(
                 "Archive download is not supported for unmanaged vfolders"
             )
 
-        allowed_vfolder_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
-        await self._vfolder_repository.ensure_host_permission_allowed(
-            vfolder_data.host,
-            permission=VFolderHostPermission.DOWNLOAD_FILE,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user.user_id,
-            resource_policy=action.keypair_resource_policy,
-            domain_name=vfolder_data.domain_name,
-        )
-
-        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_data.host, False
-        )
-
-        vfolder_id = VFolderID(
-            quota_scope_id=vfolder_data.quota_scope_id,
-            folder_id=vfolder_data.id,
-        )
-
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(info.host, False)
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
         storage_reply = await manager_client.download_archive_file(
             volume=volume_name,
-            vfid=str(vfolder_id),
+            virtual_folder_id=str(info.vfolder_id),
             files=action.files,
         )
         client_api_url = self._storage_manager.get_client_api_url(proxy_name)
