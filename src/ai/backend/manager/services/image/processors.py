@@ -41,9 +41,15 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.get_aliases_by_image_ids import (
+    GetAliasesByImageIdsAction,
+    GetAliasesByImageIdsActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
+    ModifyImageByIdAction,
+    ModifyImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -93,6 +99,7 @@ class ImageProcessors(AbstractProcessorPackage):
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
     modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
+    modify_image_by_id: ActionProcessor[ModifyImageByIdAction, ModifyImageByIdActionResult]
     preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: ActionProcessor[UnloadImageAction, UnloadImageActionResult]
     untag_image_from_registry: ActionProcessor[
@@ -125,6 +132,9 @@ class ImageProcessors(AbstractProcessorPackage):
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
+    get_aliases_by_image_ids: ActionProcessor[
+        GetAliasesByImageIdsAction, GetAliasesByImageIdsActionResult
+    ]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
         self.get_image_installed_agents = ActionProcessor(
@@ -145,6 +155,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
         self.modify_image = ActionProcessor(service.modify_image, action_monitors)
+        self.modify_image_by_id = ActionProcessor(service.modify_image_by_id, action_monitors)
         self.preload_image = ActionProcessor(service.preload_image, action_monitors)
         self.unload_image = ActionProcessor(service.unload_image, action_monitors)
         self.untag_image_from_registry = ActionProcessor(
@@ -164,6 +175,9 @@ class ImageProcessors(AbstractProcessorPackage):
         )
         self.search_images = ActionProcessor(service.search_images, action_monitors)
         self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
+        self.get_aliases_by_image_ids = ActionProcessor(
+            service.get_aliases_by_image_ids, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

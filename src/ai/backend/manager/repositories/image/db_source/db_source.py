@@ -450,6 +450,66 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def scan_images_by_ids(self, image_ids: list[UUID]) -> RescanImagesResult:
+        """
+        Scans multiple images by their IDs and upserts them into the database.
+        Returns RescanImagesResult with the scanned image data.
+        """
+        all_images: list[ImageData] = []
+        all_errors: list[str] = []
+
+        async with self._db.begin_session() as session:
+            for image_id in image_ids:
+                try:
+                    image_row = await self._get_image_by_id(session, image_id)
+
+                    # Get the registry info
+                    registry_parts = []
+                    if image_row.registry:
+                        registry_parts.append(image_row.registry)
+                    if image_row.project:
+                        registry_parts.append(image_row.project)
+                    registry_key = "/".join(registry_parts) if registry_parts else ""
+
+                    # Get the registry row
+                    registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
+                    if not registry_row:
+                        all_errors.append(f"Registry not found for image {image_row.name}")
+                        continue
+
+                    # Call the original scan function
+                    result = await scan_single_image(
+                        self._db, registry_key, registry_row, image_row.name
+                    )
+                    all_images.extend(result.images)
+                    all_errors.extend(result.errors)
+                except ImageNotFound:
+                    all_errors.append(f"Image not found: {image_id}")
+
+        return RescanImagesResult(images=all_images, errors=all_errors)
+
+    async def query_aliases_by_image_ids(self, image_ids: list[UUID]) -> dict[UUID, list[str]]:
+        """
+        Queries image aliases by image IDs.
+        Returns a dictionary mapping image ID to list of alias strings.
+        """
+        if not image_ids:
+            return {}
+
+        query = sa.select(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
+
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(query)
+            alias_rows = result.scalars().all()
+
+        # Group aliases by image_id
+        aliases_map: dict[UUID, list[str]] = {image_id: [] for image_id in image_ids}
+        for alias_row in alias_rows:
+            if alias_row.alias is not None:
+                aliases_map[alias_row.image_id].append(alias_row.alias)
+
+        return aliases_map
+
     async def rescan_images(
         self,
         registry_or_image: str | None = None,
