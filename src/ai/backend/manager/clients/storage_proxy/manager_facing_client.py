@@ -600,7 +600,7 @@ class StorageProxyManagerFacingClient:
         Create an archive download session for multiple files from the storage proxy.
 
         :param volume: Volume name
-        :param vfid: Virtual folder ID
+        :param virtual_folder_id: Virtual folder ID
         :param files: List of relative file paths to include in the archive
         :return: Response from the storage proxy containing JWT token
         """
