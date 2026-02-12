@@ -5,16 +5,24 @@ Tests for VFolderService and VFolderFileService functionality.
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
 
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderMountPermission,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
-    VFolderInvalidParameter,
     VFolderNotFound,
 )
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -44,21 +52,28 @@ def sample_user_uuid() -> uuid.UUID:
 
 
 @pytest.fixture
-def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> MagicMock:
-    return MagicMock(
+def sample_vfolder_data(sample_vfolder_uuid: uuid.UUID) -> VFolderData:
+    return VFolderData(
         id=sample_vfolder_uuid,
+        name="test-vfolder",
         host="local:volume1",
-        unmanaged_path=None,
         domain_name="default",
         quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
-    )
-
-
-@pytest.fixture
-def sample_user_data(sample_user_uuid: uuid.UUID) -> MagicMock:
-    return MagicMock(
-        id=sample_user_uuid,
-        domain_name="default",
+        usage_mode=VFolderUsageMode.GENERAL,
+        permission=VFolderMountPermission.READ_WRITE,
+        max_files=0,
+        max_size=None,
+        num_files=0,
+        cur_size=0,
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
+        last_used=None,
+        creator="test@example.com",
+        unmanaged_path=None,
+        ownership_type=VFolderOwnershipType.USER,
+        user=sample_vfolder_uuid,
+        group=None,
+        cloneable=False,
+        status=VFolderOperationStatus.READY,
     )
 
 
@@ -110,7 +125,7 @@ class TestVFolderServicePurge:
         mock_vfolder_repository: MagicMock,
         sample_vfolder_uuid: uuid.UUID,
         sample_action: PurgeVFolderAction,
-        sample_vfolder_data: MagicMock,
+        sample_vfolder_data: VFolderData,
     ) -> None:
         """Test successful purge of vfolder."""
         mock_vfolder_repository.purge_vfolder = AsyncMock(return_value=sample_vfolder_data)
@@ -177,11 +192,8 @@ class TestVFolderFileServiceDownloadArchive:
         self,
         mock_config_provider: MagicMock,
         mock_storage_manager: MagicMock,
-        sample_user_data: MagicMock,
-        sample_vfolder_data: MagicMock,
+        sample_vfolder_data: VFolderData,
     ) -> VFolderFileService:
-        mock_user_repo = MagicMock()
-        mock_user_repo.get_user_by_uuid = AsyncMock(return_value=sample_user_data)
         mock_vfolder_repo = MagicMock()
         mock_vfolder_repo.get_by_id_validated = AsyncMock(return_value=sample_vfolder_data)
         mock_vfolder_repo.ensure_host_permission_allowed = AsyncMock()
@@ -189,16 +201,13 @@ class TestVFolderFileServiceDownloadArchive:
             config_provider=mock_config_provider,
             storage_manager=mock_storage_manager,
             vfolder_repository=mock_vfolder_repo,
-            user_repository=mock_user_repo,
+            user_repository=MagicMock(),
         )
 
     @pytest.fixture
-    def sample_action(
-        self, sample_user_uuid: uuid.UUID, sample_vfolder_uuid: uuid.UUID
-    ) -> CreateArchiveDownloadSessionAction:
+    def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> CreateArchiveDownloadSessionAction:
         return CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            user_uuid=sample_user_uuid,
             vfolder_uuid=sample_vfolder_uuid,
             files=self.SAMPLE_FILES,
         )
@@ -207,38 +216,55 @@ class TestVFolderFileServiceDownloadArchive:
         self,
         file_service: VFolderFileService,
         sample_action: CreateArchiveDownloadSessionAction,
+        sample_user_uuid: uuid.UUID,
         sample_vfolder_uuid: uuid.UUID,
     ) -> None:
         """Test successful archive download session creation."""
-        result = await file_service.download_archive_file(sample_action)
+        with with_user(
+            UserData(
+                user_id=sample_user_uuid,
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role=UserRole.USER,
+                domain_name="default",
+            )
+        ):
+            result = await file_service.download_archive_file(sample_action)
 
         assert isinstance(result, CreateArchiveDownloadSessionActionResult)
         assert result.token == self.STORAGE_TOKEN
         assert result.url == str(self.STORAGE_URL / "download-archive")
         assert result.vfolder_uuid == sample_vfolder_uuid
 
-    async def test_download_archive_rejects_user_without_domain(
+    async def test_download_archive_rejects_when_no_user_context(
         self,
         file_service: VFolderFileService,
         sample_action: CreateArchiveDownloadSessionAction,
     ) -> None:
-        """Test that users without domain are rejected."""
-        no_domain_user = MagicMock(domain_name=None)
-        cast(MagicMock, file_service._user_repository).get_user_by_uuid = AsyncMock(
-            return_value=no_domain_user
-        )
-
-        with pytest.raises(VFolderInvalidParameter):
+        """Test that missing user context is rejected."""
+        with pytest.raises(AuthorizationFailed):
             await file_service.download_archive_file(sample_action)
 
     async def test_download_archive_calls_storage_proxy_with_correct_params(
         self,
         file_service: VFolderFileService,
         mock_storage_manager: MagicMock,
+        sample_user_uuid: uuid.UUID,
         sample_action: CreateArchiveDownloadSessionAction,
     ) -> None:
         """Test that storage proxy client is called with correct parameters."""
-        await file_service.download_archive_file(sample_action)
+        with with_user(
+            UserData(
+                user_id=sample_user_uuid,
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role=UserRole.USER,
+                domain_name="default",
+            )
+        ):
+            await file_service.download_archive_file(sample_action)
 
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.download_archive_file.assert_called_once()
