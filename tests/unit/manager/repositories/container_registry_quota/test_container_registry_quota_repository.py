@@ -41,6 +41,12 @@ class _ProjectWithRegistry:
     registry_name: str
     project_name: str
     registry_url: str
+    type: ContainerRegistryType
+    username: str
+    password: str
+    ssl_verify: bool
+    is_global: bool
+    extra: dict[str, str]
 
 
 @dataclass
@@ -53,6 +59,13 @@ class _ProjectWithoutRegistry:
 @dataclass
 class _ProjectWithInvalidRegistry:
     """A project (group) with invalid container_registry JSON (missing keys)."""
+
+    project_id: uuid.UUID
+
+
+@dataclass
+class _ProjectWithOrphanedRegistry:
+    """A project (group) whose container_registry config points to a non-existent registry."""
 
     project_id: uuid.UUID
 
@@ -120,19 +133,25 @@ class TestPerProjectRegistryQuotaRepository:
         """Pre-created project with valid container_registry config linked to a ContainerRegistryRow."""
         registry_name = "harbor-" + str(uuid.uuid4())[:8] + ".example.com"
         registry_project = "project-" + str(uuid.uuid4())[:8]
+        registry_type = ContainerRegistryType.HARBOR2
+        registry_username = "test-user"
+        registry_password = "test-pass"
+        registry_ssl_verify = True
+        registry_is_global = False
+        registry_extra: dict[str, str] = {"key": "value"}
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
                 id=uuid.uuid4(),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
-                type=ContainerRegistryType.HARBOR2,
+                type=registry_type,
                 project=registry_project,
-                username="test-user",
-                password="test-pass",
-                ssl_verify=True,
-                is_global=False,
-                extra={"key": "value"},
+                username=registry_username,
+                password=registry_password,
+                ssl_verify=registry_ssl_verify,
+                is_global=registry_is_global,
+                extra=registry_extra,
             )
             session.add(registry)
 
@@ -158,6 +177,12 @@ class TestPerProjectRegistryQuotaRepository:
             registry_name=registry_name,
             project_name=registry_project,
             registry_url=f"https://{registry_name}",
+            type=registry_type,
+            username=registry_username,
+            password=registry_password,
+            ssl_verify=registry_ssl_verify,
+            is_global=registry_is_global,
+            extra=registry_extra,
         )
 
     @pytest.fixture
@@ -206,71 +231,14 @@ class TestPerProjectRegistryQuotaRepository:
 
         return _ProjectWithInvalidRegistry(project_id=project_id)
 
-    @pytest.mark.asyncio
-    async def test_fetch_container_registry_row_success(
-        self,
-        repository: PerProjectRegistryQuotaRepository,
-        project_with_registry: _ProjectWithRegistry,
-    ) -> None:
-        """Test successful fetch of registry info from a project with valid config."""
-        # When
-        scope_id = ProjectScope(project_id=project_with_registry.project_id)
-        result = await repository.fetch_container_registry_row(scope_id)
-
-        # Then
-        assert isinstance(result, PerProjectContainerRegistryInfo)
-        assert result.id == project_with_registry.registry_id
-        assert result.url == project_with_registry.registry_url
-        assert result.registry_name == project_with_registry.registry_name
-        assert result.type == ContainerRegistryType.HARBOR2
-        assert result.project == project_with_registry.project_name
-        assert result.username == "test-user"
-        assert result.password == "test-pass"
-        assert result.ssl_verify is True
-        assert result.is_global is False
-        assert result.extra == {"key": "value"}
-
-    @pytest.mark.asyncio
-    async def test_fetch_container_registry_row_project_not_found(
-        self,
-        repository: PerProjectRegistryQuotaRepository,
-    ) -> None:
-        """Test ContainerRegistryNotFound when project does not exist."""
-        scope_id = ProjectScope(project_id=uuid.uuid4())
-        with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
-
-    @pytest.mark.asyncio
-    async def test_fetch_container_registry_row_no_registry_config(
-        self,
-        repository: PerProjectRegistryQuotaRepository,
-        project_without_registry: _ProjectWithoutRegistry,
-    ) -> None:
-        """Test ContainerRegistryNotFound when project has no container_registry config."""
-        scope_id = ProjectScope(project_id=project_without_registry.project_id)
-        with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
-
-    @pytest.mark.asyncio
-    async def test_fetch_container_registry_row_invalid_registry_config(
-        self,
-        repository: PerProjectRegistryQuotaRepository,
-        project_with_invalid_registry: _ProjectWithInvalidRegistry,
-    ) -> None:
-        """Test ContainerRegistryNotFound when config is empty dict (missing required keys)."""
-        scope_id = ProjectScope(project_id=project_with_invalid_registry.project_id)
-        with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
-
-    @pytest.mark.asyncio
-    async def test_fetch_container_registry_row_registry_row_not_found(
+    @pytest.fixture
+    async def project_with_orphaned_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        repository: PerProjectRegistryQuotaRepository,
         sample_domain: str,
         sample_resource_policy: str,
-    ) -> None:
-        """Test ContainerRegistryNotFound when config points to non-existent registry."""
+    ) -> _ProjectWithOrphanedRegistry:
+        """Pre-created project whose container_registry config points to a non-existent registry."""
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
                 name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
@@ -287,28 +255,26 @@ class TestPerProjectRegistryQuotaRepository:
             project_id = group.id
             await session.commit()
 
-        scope_id = ProjectScope(project_id=project_id)
-        with pytest.raises(ContainerRegistryNotFound):
-            await repository.fetch_container_registry_row(scope_id)
+        return _ProjectWithOrphanedRegistry(project_id=project_id)
 
-    @pytest.mark.asyncio
-    async def test_fetch_registry_row_with_minimal_fields(
+    @pytest.fixture
+    async def project_with_minimal_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        repository: PerProjectRegistryQuotaRepository,
         sample_domain: str,
         sample_resource_policy: str,
-    ) -> None:
-        """Test fetch with registry that has only required fields (no username/password/extra)."""
+    ) -> _ProjectWithRegistry:
+        """Pre-created project with a registry that has only required fields (no username/password/extra)."""
         registry_name = "minimal-" + str(uuid.uuid4())[:8] + ".example.com"
         registry_project = "project-" + str(uuid.uuid4())[:8]
+        registry_type = ContainerRegistryType.HARBOR2
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
                 id=uuid.uuid4(),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
-                type=ContainerRegistryType.HARBOR2,
+                type=registry_type,
                 project=registry_project,
             )
             session.add(registry)
@@ -326,18 +292,100 @@ class TestPerProjectRegistryQuotaRepository:
             session.add(group)
             await session.flush()
             project_id = group.id
+            registry_id = registry.id
             await session.commit()
 
-        scope_id = ProjectScope(project_id=project_id)
+        return _ProjectWithRegistry(
+            project_id=project_id,
+            registry_id=registry_id,
+            registry_name=registry_name,
+            project_name=registry_project,
+            registry_url=f"https://{registry_name}",
+            type=registry_type,
+            username="",
+            password="",
+            ssl_verify=True,
+            is_global=True,
+            extra={},
+        )
+
+    async def test_fetch_container_registry_row_success(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+        project_with_registry: _ProjectWithRegistry,
+    ) -> None:
+        """Test successful fetch of registry info from a project with valid config."""
+        # When
+        scope_id = ProjectScope(project_id=project_with_registry.project_id)
         result = await repository.fetch_container_registry_row(scope_id)
 
-        # Verify fallback defaults for nullable text fields
-        assert result.username == ""
-        assert result.password == ""
-        assert result.extra == {}
-        # ssl_verify and is_global have server_default=true in the DB schema
-        assert result.ssl_verify is True
-        assert result.is_global is True
+        # Then
+        assert isinstance(result, PerProjectContainerRegistryInfo)
+        assert result.id == project_with_registry.registry_id
+        assert result.url == project_with_registry.registry_url
+        assert result.registry_name == project_with_registry.registry_name
+        assert result.type == project_with_registry.type
+        assert result.project == project_with_registry.project_name
+        assert result.username == project_with_registry.username
+        assert result.password == project_with_registry.password
+        assert result.ssl_verify is project_with_registry.ssl_verify
+        assert result.is_global is project_with_registry.is_global
+        assert result.extra == project_with_registry.extra
+
+    async def test_fetch_container_registry_row_project_not_found(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+    ) -> None:
+        """Test ContainerRegistryNotFound when project does not exist."""
+        scope_id = ProjectScope(project_id=uuid.uuid4())
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.fetch_container_registry_row(scope_id)
+
+    async def test_fetch_container_registry_row_no_registry_config(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+        project_without_registry: _ProjectWithoutRegistry,
+    ) -> None:
+        """Test ContainerRegistryNotFound when project has no container_registry config."""
+        scope_id = ProjectScope(project_id=project_without_registry.project_id)
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.fetch_container_registry_row(scope_id)
+
+    async def test_fetch_container_registry_row_invalid_registry_config(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+        project_with_invalid_registry: _ProjectWithInvalidRegistry,
+    ) -> None:
+        """Test ContainerRegistryNotFound when config is empty dict (missing required keys)."""
+        scope_id = ProjectScope(project_id=project_with_invalid_registry.project_id)
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.fetch_container_registry_row(scope_id)
+
+    async def test_fetch_container_registry_row_registry_row_not_found(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+        project_with_orphaned_registry: _ProjectWithOrphanedRegistry,
+    ) -> None:
+        """Test ContainerRegistryNotFound when config points to non-existent registry."""
+        scope_id = ProjectScope(project_id=project_with_orphaned_registry.project_id)
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.fetch_container_registry_row(scope_id)
+
+    async def test_fetch_registry_row_with_minimal_fields(
+        self,
+        repository: PerProjectRegistryQuotaRepository,
+        project_with_minimal_registry: _ProjectWithRegistry,
+    ) -> None:
+        """Test fetch with registry that has only required fields (no username/password/extra)."""
+        scope_id = ProjectScope(project_id=project_with_minimal_registry.project_id)
+        result = await repository.fetch_container_registry_row(scope_id)
+
+        # Verify fallback defaults for nullable text fields and server_default columns
+        assert result.username == project_with_minimal_registry.username
+        assert result.password == project_with_minimal_registry.password
+        assert result.extra == project_with_minimal_registry.extra
+        assert result.ssl_verify is project_with_minimal_registry.ssl_verify
+        assert result.is_global is project_with_minimal_registry.is_global
 
 
 class TestPerProjectRegistryQuotaRepositories:
