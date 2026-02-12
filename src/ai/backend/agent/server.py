@@ -88,6 +88,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -1698,13 +1699,16 @@ def main(
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=1,
-                    args=(server_config, log_endpoint),
-                    wait_timeout=5.0,
-                    runner=runner,
-                )
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=1,
+                        args=(server_config, log_endpoint),
+                        wait_timeout=5.0,
+                        runner=runner,
+                    )
+                finally:
+                    cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
             if server_config.agent_common.pid_file.is_file():
