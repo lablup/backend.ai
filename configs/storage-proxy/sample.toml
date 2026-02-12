@@ -103,6 +103,11 @@
   # false, VFolder creation fails when the quota scope doesn't exist.
   # Added in 25.19.0
   allow-auto-quota-scope-creation = false
+  # Configuration for volume performance metrics observation and caching.
+  # Controls the background observer that periodically collects metrics from
+  # storage volumes and caches them in Redis.
+  # Added in 25.12.0
+  volume-stats = "..."
 
 # Pyroscope continuous profiling configuration. Pyroscope provides real-time CPU
 # and memory profiling for performance analysis. Enable this to collect
@@ -376,6 +381,46 @@
   # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
   # Added in 25.9.0
   type = "redis"
+  # Unique instance identifier for this service instance.
+  # Added in 26.3.0
+  ## instance-id = "..."
+  # Logical group name for this service (e.g., 'manager', 'agent', 'storage-
+  # proxy').
+  # Added in 26.3.0
+  ## service-group = "..."
+  # Human-readable display name for this service instance.
+  # Added in 26.3.0
+  ## display-name = "..."
+
+  # Additional labels for service categorization and filtering.
+  # Added in 26.3.0
+  # Replace <name> with your actual key (e.g., 'default', 'local')
+  [service-discovery.extra-labels.<name>]
+
+  # List of endpoints exposed by this service instance.
+  # Added in 26.3.0
+  [[service-discovery.endpoints]]
+  # Add multiple [[service-discovery.endpoints]] sections as needed
+    # Role of this endpoint (e.g., 'main', 'health', 'internal').
+    # Added in 26.3.0
+    role = "main"
+    # Network scope of this endpoint (e.g., 'public', 'private', 'internal').
+    # Added in 26.3.0
+    scope = "public"
+    # Hostname or IP address of the endpoint.
+    # Added in 26.3.0
+    address = "manager.example.com"
+    # Port number of the endpoint.
+    # Added in 26.3.0
+    port = 443
+    # Protocol used by the endpoint (e.g., 'grpc', 'http', 'https').
+    # Added in 26.3.0
+    protocol = "https"
+
+    # Additional metadata for the endpoint.
+    # Added in 26.3.0
+    # Replace <name> with your actual key (e.g., 'default', 'local')
+    [service-discovery.endpoints.metadata.<name>]
 
 # OpenTelemetry (OTEL) configuration for distributed tracing and metrics.
 # Enables integration with observability platforms like Jaeger, Zipkin, or
