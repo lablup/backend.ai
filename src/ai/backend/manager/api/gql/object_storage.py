@@ -131,7 +131,7 @@ async def object_storages(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ObjectStorageConnection:
+) -> ObjectStorageConnection | None:
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
 

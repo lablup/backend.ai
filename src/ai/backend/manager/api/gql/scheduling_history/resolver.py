@@ -333,7 +333,7 @@ async def admin_session_scheduling_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionSchedulingHistoryConnection:
+) -> SessionSchedulingHistoryConnection | None:
     check_admin_only()
 
     processors = info.context.processors
@@ -392,7 +392,7 @@ async def session_scheduling_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionSchedulingHistoryConnection:
+) -> SessionSchedulingHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
@@ -447,7 +447,7 @@ async def admin_deployment_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DeploymentHistoryConnection:
+) -> DeploymentHistoryConnection | None:
     check_admin_only()
 
     processors = info.context.processors
@@ -503,7 +503,7 @@ async def deployment_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DeploymentHistoryConnection:
+) -> DeploymentHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
@@ -555,7 +555,7 @@ async def admin_route_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RouteHistoryConnection:
+) -> RouteHistoryConnection | None:
     check_admin_only()
 
     processors = info.context.processors
@@ -611,7 +611,7 @@ async def route_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RouteHistoryConnection:
+) -> RouteHistoryConnection | None:
     me = current_user()
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access scheduling history.")
@@ -669,7 +669,7 @@ async def session_scoped_scheduling_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionSchedulingHistoryConnection:
+) -> SessionSchedulingHistoryConnection | None:
     """Get scheduling history for a specific session.
 
     Returns all scheduling history records for the specified session.
@@ -703,7 +703,7 @@ async def deployment_scoped_scheduling_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DeploymentHistoryConnection:
+) -> DeploymentHistoryConnection | None:
     """Get scheduling history for a specific deployment.
 
     Returns all scheduling history records for the specified deployment.
@@ -737,7 +737,7 @@ async def route_scoped_scheduling_histories(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RouteHistoryConnection:
+) -> RouteHistoryConnection | None:
     """Get scheduling history for a specific route.
 
     Returns all scheduling history records for the specified route.

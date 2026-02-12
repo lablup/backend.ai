@@ -34,7 +34,7 @@ from ai.backend.manager.services.user.actions.get_user import GetUserAction
 async def admin_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> UserV2GQL:
+) -> UserV2GQL | None:
     """Get a single user by UUID.
 
     Args:
@@ -73,7 +73,7 @@ async def admin_users_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserV2Connection:
+) -> UserV2Connection | None:
     """List all users with optional filtering, ordering, and pagination.
 
     Args:
@@ -120,7 +120,7 @@ async def domain_users_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserV2Connection:
+) -> UserV2Connection | None:
     """List users within a specific domain.
 
     Args:
@@ -171,7 +171,7 @@ async def project_users_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserV2Connection:
+) -> UserV2Connection | None:
     """List users within a specific project.
 
     Args:
@@ -214,7 +214,7 @@ async def project_users_v2(
 )  # type: ignore[misc]
 async def my_user_v2(
     info: Info[StrawberryGQLContext],
-) -> UserV2GQL:
+) -> UserV2GQL | None:
     """Get the current authenticated user's information.
 
     Args:

@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.domain.types import DomainSearchScope
 async def domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
-) -> DomainV2GQL:
+) -> DomainV2GQL | None:
     """Get a single domain by name.
 
     Args:
@@ -60,7 +60,7 @@ async def admin_domains_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainV2Connection:
+) -> DomainV2Connection | None:
     """List all domains with optional filtering, ordering, and pagination.
 
     Args:
@@ -102,7 +102,7 @@ async def rg_domains_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainV2Connection:
+) -> DomainV2Connection | None:
     """List domains within a resource group scope.
 
     Args:

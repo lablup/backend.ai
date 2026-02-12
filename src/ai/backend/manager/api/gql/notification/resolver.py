@@ -158,7 +158,7 @@ async def admin_notification_channels(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> NotificationChannelConnection:
+) -> NotificationChannelConnection | None:
     check_admin_only()
     processors = info.context.processors
 
@@ -216,7 +216,7 @@ async def notification_channels(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> NotificationChannelConnection:
+) -> NotificationChannelConnection | None:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
@@ -294,7 +294,7 @@ async def admin_notification_rules(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> NotificationRuleConnection:
+) -> NotificationRuleConnection | None:
     check_admin_only()
     processors = info.context.processors
 
@@ -350,7 +350,7 @@ async def notification_rules(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> NotificationRuleConnection:
+) -> NotificationRuleConnection | None:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter
@@ -389,7 +389,7 @@ async def notification_rules(
 
 
 @strawberry.field(description="List available notification rule types")  # type: ignore[misc]
-async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
+async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
     """Return all available notification rule types."""
     from ai.backend.common.data.notification import NotificationRuleType
 

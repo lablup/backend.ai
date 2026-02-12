@@ -40,7 +40,7 @@ async def admin_kernels_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelV2ConnectionGQL:
+) -> KernelV2ConnectionGQL | None:
     check_admin_only()
     return await fetch_kernels(
         info,
@@ -70,7 +70,7 @@ async def session_kernels_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelV2ConnectionGQL:
+) -> KernelV2ConnectionGQL | None:
     base_conditions = [KernelConditions.by_session_ids([SessionId(scope.session_id)])]
     return await fetch_kernels(
         info,

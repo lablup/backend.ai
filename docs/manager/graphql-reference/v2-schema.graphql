@@ -4558,10 +4558,10 @@ type Query {
   _service: _Service!
 
   """Added in 25.15.0"""
-  agentStats: AgentStats!
+  agentStats: AgentStats
 
   """Added in 26.1.0"""
-  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection!
+  agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection
 
   """
   Added in 25.14.0.
@@ -4585,7 +4585,7 @@ type Query {
   Use filters to narrow down results by type, name, registry, or availability.
   Supports cursor-based pagination for efficient browsing of large datasets.
   """
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection
 
   """
   Added in 25.14.0.
@@ -4608,7 +4608,7 @@ type Query {
   Use filters to find revisions by status, version, or artifact ID.
   Supports cursor-based pagination for efficient browsing.
   """
-  artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+  artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection
 
   """
   Added in 25.16.0.
@@ -4633,49 +4633,49 @@ type Query {
   mergedAppConfig: AppConfig!
 
   """Added in 25.16.0"""
-  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection!
+  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
 
   """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment
 
   """Added in 25.16.0"""
-  revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
+  revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection
 
   """Added in 25.16.0"""
-  revision(id: ID!): ModelRevision!
+  revision(id: ID!): ModelRevision
 
   """Added in 25.16.0"""
-  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica
 
   """List available notification rule types"""
-  notificationRuleTypes: [NotificationRuleType!]!
+  notificationRuleTypes: [NotificationRuleType!]
 
   """Added in 25.14.0"""
   objectStorage(id: ID!): ObjectStorage
 
   """Added in 25.14.0"""
-  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection
 
   """Added in 25.16.0. Get a VFS storage by ID"""
   vfsStorage(id: ID!): VFSStorage
 
   """Added in 25.16.0. List all VFS storages"""
-  vfsStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFSStorageConnection!
+  vfsStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFSStorageConnection
 
   """Added in 25.14.0"""
   huggingfaceRegistry(id: ID!): HuggingFaceRegistry
 
   """Added in 25.14.0"""
-  huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
+  huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection
 
   """Added in 25.14.0"""
   reservoirRegistry(id: ID!): ReservoirRegistry
 
   """Added in 25.14.0"""
-  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection
 
   """
   Added in 26.2.0.
@@ -4700,28 +4700,28 @@ type Query {
   imageAlias(id: ID!): ImageV2Alias
 
   """Added in 26.2.0. List resource groups (admin only)"""
-  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection!
+  adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
   """List session scheduling history (admin only)"""
-  adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+  adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
   """List deployment history (admin only)"""
-  adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+  adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
 
   """List route history (admin only)"""
-  adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+  adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection
 
   """Get a notification channel by ID (admin only)"""
   adminNotificationChannel(id: ID!): NotificationChannel
 
   """List notification channels (admin only)"""
-  adminNotificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+  adminNotificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection
 
   """Get a notification rule by ID (admin only)"""
   adminNotificationRule(id: ID!): NotificationRule
 
   """List notification rules (admin only)"""
-  adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
+  adminNotificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection
 
   """
   Added in 26.2.0.
@@ -4734,31 +4734,31 @@ type Query {
   adminDomainAppConfig(domainName: String!): AppConfig
 
   """Added in 26.2.0. Get domain fair share data (admin only)."""
-  adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare!
+  adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare
 
   """Added in 26.2.0. List domain fair shares (admin only)."""
-  adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+  adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection
 
   """Added in 26.2.0. Get project fair share data (admin only)."""
-  adminProjectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare!
+  adminProjectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare
 
   """Added in 26.2.0. List project fair shares (admin only)."""
-  adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+  adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection
 
   """Added in 26.2.0. Get user fair share data (admin only)."""
-  adminUserFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare!
+  adminUserFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare
 
   """Added in 26.2.0. List user fair shares (admin only)."""
-  adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+  adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection
 
   """Added in 26.2.0. List domain usage buckets (admin only)."""
-  adminDomainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+  adminDomainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection
 
   """Added in 26.2.0. List project usage buckets (admin only)."""
-  adminProjectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  adminProjectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection
 
   """Added in 26.2.0. List user usage buckets (admin only)."""
-  adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  adminUserUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection
 
   """
   Added in 26.2.0.
@@ -4771,12 +4771,12 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection!
+  adminImagesV2(filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
-  adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
+  adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
   """
   Added in 26.2.0.
@@ -4787,47 +4787,47 @@ type Query {
   Use filters to search by alias string.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection!
+  adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.2.0. Query kernels within a specific session."""
-  sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
+  sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
   """
   Added in 26.2.0. Get domain fair share data within resource group scope.
   """
-  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare!
+  rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare
 
   """Added in 26.2.0. List domain fair shares within resource group scope."""
-  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection!
+  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection
 
   """
   Added in 26.2.0. Get project fair share data within resource group scope.
   """
-  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare!
+  rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare
 
   """Added in 26.2.0. List project fair shares within resource group scope."""
-  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection!
+  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection
 
   """Added in 26.2.0. Get user fair share data within resource group scope."""
-  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare!
+  rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare
 
   """Added in 26.2.0. List user fair shares within resource group scope."""
-  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection!
+  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection
 
   """
   Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
   """
-  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+  rgDomainUsageBuckets(scope: ResourceGroupDomainScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection
 
   """
   Added in 26.2.0. List project usage buckets within resource group scope. This API is not yet implemented.
   """
-  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  rgProjectUsageBuckets(scope: ResourceGroupProjectScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection
 
   """
   Added in 26.2.0. List user usage buckets within resource group scope. This API is not yet implemented.
   """
-  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  rgUserUsageBuckets(scope: ResourceGroupUserScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection
 
   """
   Added in 26.2.0.
@@ -4839,7 +4839,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection!
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0.
@@ -4850,19 +4850,19 @@ type Query {
   Returns image aliases that belong to the specified image.
   Supports both cursor-based and offset-based pagination.
   """
-  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection!
+  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
-  sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection!
+  sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
   """Added in 26.2.0. Get scheduling history for a specific deployment."""
-  deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection!
+  deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
-  routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection!
+  routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection
 
   """Added in 26.2.0. List resource groups"""
-  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection! @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 25.16.0.
@@ -4876,43 +4876,43 @@ type Query {
   domainAppConfig(domainName: String!): AppConfig @deprecated(reason: "Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get domain fair share data (superadmin only)."""
-  domainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare! @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare @deprecated(reason: "Use admin_domain_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List domain fair shares (superadmin only)."""
-  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection! @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection @deprecated(reason: "Use admin_domain_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get project fair share data (superadmin only)."""
-  projectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare! @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare @deprecated(reason: "Use admin_project_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List project fair shares (superadmin only)."""
-  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection! @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection @deprecated(reason: "Use admin_project_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. Get user fair share data (superadmin only)."""
-  userFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare! @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @deprecated(reason: "Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List user fair shares (superadmin only)."""
-  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection! @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @deprecated(reason: "Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List domain usage buckets (superadmin only)."""
-  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection! @deprecated(reason: "Use admin_domain_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  domainUsageBuckets(filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection @deprecated(reason: "Use admin_domain_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List project usage buckets (superadmin only)."""
-  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection! @deprecated(reason: "Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection @deprecated(reason: "Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.1.0. List user usage buckets (superadmin only)."""
-  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection! @deprecated(reason: "Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection @deprecated(reason: "Use admin_user_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Get a notification channel by ID"""
   notificationChannel(id: ID!): NotificationChannel @deprecated(reason: "Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List notification channels"""
-  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @deprecated(reason: "Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: [NotificationChannelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection @deprecated(reason: "Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Get a notification rule by ID"""
   notificationRule(id: ID!): NotificationRule @deprecated(reason: "Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List notification rules"""
-  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @deprecated(reason: "Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: [NotificationRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection @deprecated(reason: "Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
@@ -4929,74 +4929,74 @@ type Query {
   route(id: ID!): Route
 
   """Added in 25.19.0. List routes for a deployment with optional filters."""
-  routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection!
+  routes(deploymentId: ID!, filter: RouteFilter = null, orderBy: [RouteOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteConnection
 
   """List session scheduling history (superadmin only)"""
-  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection! @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  sessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @deprecated(reason: "Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List deployment history (superadmin only)"""
-  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection! @deprecated(reason: "Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection @deprecated(reason: "Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """List route history (superadmin only)"""
-  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection! @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  routeHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @deprecated(reason: "Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.2.0. Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.
   """
-  adminUserV2(userId: UUID!): UserV2!
+  adminUserV2(userId: UUID!): UserV2
 
   """
   Added in 26.2.0. List all users with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  adminUsersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
-  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
   """
-  myUserV2: UserV2!
+  myUserV2: UserV2
 
   """
   Added in 26.2.0. List users within a specific project. Requires project membership or higher privileges.
   """
-  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
   Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found.
   """
-  domainV2(domainName: String!): DomainV2!
+  domainV2(domainName: String!): DomainV2
 
   """
   Added in 26.2.0. List all domains with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminDomainsV2(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection!
+  adminDomainsV2(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
   """Added in 26.2.0. List domains within resource group scope."""
-  rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection!
+  rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
   """
   Added in 26.2.0. Get a single project by ID. Returns an error if project is not found.
   """
-  projectV2(projectId: UUID!): ProjectV2!
+  projectV2(projectId: UUID!): ProjectV2
 
   """
   Added in 26.2.0. List all projects with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
+  adminProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
   Added in 26.2.0. List projects within a specific domain. Requires domain admin privileges or higher.
   """
-  domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
+  domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
-  projectDomainV2(projectId: UUID!): DomainV2!
+  projectDomainV2(projectId: UUID!): DomainV2
 }
 
 """

@@ -57,7 +57,7 @@ async def revisions(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ModelRevisionConnection:
+) -> ModelRevisionConnection | None:
     """List revisions with optional filtering and pagination."""
     return await fetch_revisions(
         info=info,
@@ -73,7 +73,7 @@ async def revisions(
 
 
 @strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
-async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
+async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
     processor = info.context.processors.deployment

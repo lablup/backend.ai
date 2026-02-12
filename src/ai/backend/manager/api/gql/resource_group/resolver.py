@@ -93,7 +93,7 @@ async def admin_resource_groups(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ResourceGroupConnection:
+) -> ResourceGroupConnection | None:
     check_admin_only()
 
     processors = info.context.processors
@@ -150,7 +150,7 @@ async def resource_groups(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ResourceGroupConnection:
+) -> ResourceGroupConnection | None:
     processors = info.context.processors
 
     # Build querier from filter, order_by, and pagination using adapter

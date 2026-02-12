@@ -55,7 +55,7 @@ async def admin_images_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageV2ConnectionGQL:
+) -> ImageV2ConnectionGQL | None:
     check_admin_only()
     return await fetch_images(
         info,
@@ -107,7 +107,7 @@ async def container_registry_images_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageV2ConnectionGQL:
+) -> ImageV2ConnectionGQL | None:
     # Add registry scope as base condition
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
     return await fetch_images(
@@ -146,7 +146,7 @@ async def admin_image_aliases(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageV2AliasConnectionGQL:
+) -> ImageV2AliasConnectionGQL | None:
     check_admin_only()
     return await fetch_image_aliases(
         info,
@@ -196,7 +196,7 @@ async def image_scoped_aliases(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ImageV2AliasConnectionGQL:
+) -> ImageV2AliasConnectionGQL | None:
     # Add image scope as base condition
     base_conditions = [ImageAliasConditions.by_image_ids([ImageID(scope.image_id)])]
     return await fetch_image_aliases(

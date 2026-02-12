@@ -83,7 +83,7 @@ async def vfs_storages(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> VFSStorageConnection:
+) -> VFSStorageConnection | None:
     processors = info.context.processors
 
     action_result = await processors.vfs_storage.list_storages.wait_for_complete(
