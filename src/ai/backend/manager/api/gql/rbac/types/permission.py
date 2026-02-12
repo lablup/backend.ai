@@ -142,7 +142,7 @@ class PermissionGQL(Node):
         self,
         *,
         info: Info[StrawberryGQLContext],
-    ) -> EntityNode:
+    ) -> EntityNode | None:
         raise NotImplementedError
 
     @classmethod
