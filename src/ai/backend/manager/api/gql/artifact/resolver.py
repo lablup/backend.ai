@@ -118,7 +118,7 @@ async def artifacts(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ArtifactConnection:
+) -> ArtifactConnection | None:
     if filter is None:
         filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
     return await fetch_artifacts(
@@ -171,7 +171,7 @@ async def artifact_revisions(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ArtifactRevisionConnection:
+) -> ArtifactRevisionConnection | None:
     return await fetch_artifact_revisions(
         info,
         filter,

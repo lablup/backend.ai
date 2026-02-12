@@ -52,7 +52,7 @@ async def deployments(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ModelDeploymentConnection:
+) -> ModelDeploymentConnection | None:
     """List deployments with optional filtering and pagination."""
     return await fetch_deployments(
         info=info,

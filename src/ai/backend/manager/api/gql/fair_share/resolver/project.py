@@ -43,7 +43,7 @@ async def admin_project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
     project_id: uuid.UUID,
-) -> ProjectFairShareGQL:
+) -> ProjectFairShareGQL | None:
     """Get a single project fair share record (admin only)."""
     check_admin_only()
 
@@ -69,7 +69,7 @@ async def admin_project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares with pagination (admin only)."""
     check_admin_only()
 
@@ -96,7 +96,7 @@ async def rg_project_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
     project_id: uuid.UUID,
-) -> ProjectFairShareGQL:
+) -> ProjectFairShareGQL | None:
     """Get a single project fair share record within resource group scope."""
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
@@ -123,7 +123,7 @@ async def rg_project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares within resource group scope."""
     repo_scope = ProjectFairShareSearchScope(
         resource_group=scope.resource_group_name,
@@ -157,7 +157,7 @@ async def project_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
     project_id: uuid.UUID,
-) -> ProjectFairShareGQL:
+) -> ProjectFairShareGQL | None:
     """Get a single project fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -191,7 +191,7 @@ async def project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:

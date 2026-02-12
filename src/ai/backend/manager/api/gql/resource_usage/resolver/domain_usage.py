@@ -30,7 +30,7 @@ async def admin_domain_usage_buckets(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainUsageBucketConnection:
+) -> DomainUsageBucketConnection | None:
     """Search domain usage buckets with pagination (admin only)."""
     check_admin_only()
 
@@ -67,7 +67,7 @@ async def rg_domain_usage_buckets(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainUsageBucketConnection:
+) -> DomainUsageBucketConnection | None:
     """Search domain usage buckets within resource group scope."""
     raise NotImplementedError("rg_domain_usage_buckets is not yet implemented")
 
@@ -92,7 +92,7 @@ async def domain_usage_buckets(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainUsageBucketConnection:
+) -> DomainUsageBucketConnection | None:
     """Search domain usage buckets with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:

@@ -44,7 +44,7 @@ async def admin_user_fair_share(
     resource_group_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL:
+) -> UserFairShareGQL | None:
     """Get a single user fair share record (admin only)."""
     check_admin_only()
 
@@ -71,7 +71,7 @@ async def admin_user_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserFairShareConnection:
+) -> UserFairShareConnection | None:
     """Search user fair shares with pagination (admin only)."""
     check_admin_only()
 
@@ -98,7 +98,7 @@ async def rg_user_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL:
+) -> UserFairShareGQL | None:
     """Get a single user fair share record within resource group scope."""
     processors = info.context.processors
     action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
@@ -126,7 +126,7 @@ async def rg_user_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserFairShareConnection:
+) -> UserFairShareConnection | None:
     """Search user fair shares within resource group scope."""
     repo_scope = UserFairShareSearchScope(
         resource_group=scope.resource_group_name,
@@ -162,7 +162,7 @@ async def user_fair_share(
     resource_group_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-) -> UserFairShareGQL:
+) -> UserFairShareGQL | None:
     """Get a single user fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -197,7 +197,7 @@ async def user_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> UserFairShareConnection:
+) -> UserFairShareConnection | None:
     """Search user fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:

@@ -32,7 +32,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 async def project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> ProjectV2GQL:
+) -> ProjectV2GQL | None:
     """Get a single project by UUID.
 
     Args:
@@ -64,7 +64,7 @@ async def admin_projects_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectV2Connection:
+) -> ProjectV2Connection | None:
     """List all projects with optional filtering, ordering, and pagination.
 
     Args:
@@ -111,7 +111,7 @@ async def domain_projects_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectV2Connection:
+) -> ProjectV2Connection | None:
     """List projects within a specific domain.
 
     Args:
@@ -154,7 +154,7 @@ async def domain_projects_v2(
 async def project_domain_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> DomainV2GQL:
+) -> DomainV2GQL | None:
     """Get the domain that a project belongs to.
 
     Args:

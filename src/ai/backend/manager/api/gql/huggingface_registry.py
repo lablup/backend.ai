@@ -120,7 +120,7 @@ async def huggingface_registries(
     last: int | None = None,
     offset: int | None = None,
     limit: int | None = None,
-) -> HuggingFaceRegistryConnection:
+) -> HuggingFaceRegistryConnection | None:
     # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors

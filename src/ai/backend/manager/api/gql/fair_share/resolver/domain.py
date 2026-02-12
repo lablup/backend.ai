@@ -41,7 +41,7 @@ async def admin_domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
     domain_name: str,
-) -> DomainFairShareGQL:
+) -> DomainFairShareGQL | None:
     """Get a single domain fair share record (admin only)."""
     check_admin_only()
 
@@ -67,7 +67,7 @@ async def admin_domain_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainFairShareConnection:
+) -> DomainFairShareConnection | None:
     """Search domain fair shares with pagination (admin only)."""
     check_admin_only()
 
@@ -94,7 +94,7 @@ async def rg_domain_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,
     domain_name: str,
-) -> DomainFairShareGQL:
+) -> DomainFairShareGQL | None:
     """Get a single domain fair share record within resource group scope."""
     processors = info.context.processors
     action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
@@ -121,7 +121,7 @@ async def rg_domain_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainFairShareConnection:
+) -> DomainFairShareConnection | None:
     """Search domain fair shares within resource group scope."""
     repo_scope = DomainFairShareSearchScope(resource_group=scope.resource_group_name)
     return await fetch_rg_domain_fair_shares(
@@ -152,7 +152,7 @@ async def domain_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
     domain_name: str,
-) -> DomainFairShareGQL:
+) -> DomainFairShareGQL | None:
     """Get a single domain fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -186,7 +186,7 @@ async def domain_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> DomainFairShareConnection:
+) -> DomainFairShareConnection | None:
     """Search domain fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
