@@ -799,7 +799,7 @@ type ArtifactVerifierResultEntry {
   result: ArtifactVerifierResult!
 }
 
-"""Input for assigning a role to a user"""
+"""Added in 26.3.0. Input for assigning a role to a user"""
 input AssignRoleInput {
   userId: UUID!
   roleId: UUID!
@@ -1195,10 +1195,10 @@ type CreateObjectStoragePayload {
   objectStorage: ObjectStorage!
 }
 
-"""Input for creating a scoped permission"""
+"""Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: ScopeType!
+  scopeType: EntityType!
   scopeId: String!
   entityType: EntityType!
   operation: OperationType!
@@ -1236,7 +1236,7 @@ type CreateRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Input for creating a role"""
+"""Added in 26.3.0. Input for creating a role"""
 input CreateRoleInput {
   name: String!
   description: String = null
@@ -1516,6 +1516,16 @@ type DeleteObjectStoragePayload {
   id: ID!
 }
 
+"""Added in 26.3.0. Input for deleting a scoped permission"""
+input DeletePermissionInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for delete permission mutation"""
+type DeletePermissionPayload {
+  id: ID!
+}
+
 """Added in 25.14.0"""
 input DeleteReservoirRegistryInput {
   id: ID!
@@ -1523,6 +1533,16 @@ input DeleteReservoirRegistryInput {
 
 """Added in 25.14.0"""
 type DeleteReservoirRegistryPayload {
+  id: ID!
+}
+
+"""Added in 26.3.0. Input for soft-deleting a role"""
+input DeleteRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for delete role mutation"""
+type DeleteRolePayload {
   id: ID!
 }
 
@@ -2237,6 +2257,21 @@ input EmailSpecInput {
   auth: SMTPAuthInput = null
 }
 
+"""Added in 26.3.0. Entity connection"""
+type EntityConnection {
+  edges: [EntityEdge!]!
+  pageInfo: PageInfo!
+  count: Int!
+}
+
+"""Added in 26.3.0. Entity edge"""
+type EntityEdge {
+  node: EntityNode!
+  cursor: String!
+}
+
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | RoleGQL
+
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
 """
@@ -2248,7 +2283,7 @@ type EntityTimestamps {
   modifiedAt: DateTime
 }
 
-"""RBAC entity type"""
+"""Added in 26.3.0. RBAC entity type"""
 enum EntityType {
   USER
   PROJECT
@@ -2258,10 +2293,16 @@ enum EntityType {
   SESSION
   ARTIFACT
   ARTIFACT_REGISTRY
+  ARTIFACT_REVISION
   APP_CONFIG
   NOTIFICATION_CHANNEL
   NOTIFICATION_RULE
   MODEL_DEPLOYMENT
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  DEPLOYMENT
+  ROLE
 }
 
 """
@@ -3779,28 +3820,28 @@ type Mutation {
   """
   adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
 
-  """Added in 26.2.0. Create a new role (admin only)."""
+  """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): RoleGQL!
 
-  """Added in 26.2.0. Update an existing role (admin only)."""
+  """Added in 26.3.0. Update an existing role (admin only)."""
   adminUpdateRole(input: UpdateRoleInput!): RoleGQL!
 
-  """Added in 26.2.0. Soft-delete a role (admin only)."""
-  adminDeleteRole(id: UUID!): RoleGQL!
+  """Added in 26.3.0. Soft-delete a role (admin only)."""
+  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload!
 
-  """Added in 26.2.0. Permanently remove a role (admin only)."""
-  adminPurgeRole(id: UUID!): RoleGQL!
+  """Added in 26.3.0. Permanently remove a role (admin only)."""
+  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload!
 
-  """Added in 26.2.0. Create a scoped permission (admin only)."""
+  """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): PermissionGQL!
 
-  """Added in 26.2.0. Delete a scoped permission (admin only)."""
-  adminDeletePermission(id: UUID!): PermissionGQL!
+  """Added in 26.3.0. Delete a scoped permission (admin only)."""
+  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
 
-  """Added in 26.2.0. Assign a role to a user (admin only)."""
+  """Added in 26.3.0. Assign a role to a user (admin only)."""
   adminAssignRole(input: AssignRoleInput!): RoleAssignmentGQL!
 
-  """Added in 26.2.0. Revoke a role from a user (admin only)."""
+  """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignmentGQL!
 }
 
@@ -3976,7 +4017,7 @@ type ObjectStorageEdge {
   node: ObjectStorage!
 }
 
-"""RBAC operation type"""
+"""Added in 26.3.0. RBAC operation type"""
 enum OperationType {
   CREATE
   READ
@@ -4010,7 +4051,7 @@ type PageInfo @shareable {
   endCursor: String
 }
 
-"""Permission connection"""
+"""Added in 26.3.0. Permission connection"""
 type PermissionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4020,24 +4061,28 @@ type PermissionConnection {
   count: Int!
 }
 
-"""Filter for scoped permissions"""
+"""Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUID = null
-  scopeType: ScopeType = null
+  scopeType: EntityType = null
   entityType: EntityType = null
 }
 
-"""RBAC scoped permission"""
+"""Added in 26.3.0. RBAC scoped permission"""
 type PermissionGQL implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: ScopeType!
+  roleId: UUID!
+  scopeType: EntityType!
   scopeId: String!
   entityType: EntityType!
   operation: OperationType!
 
-  """The role ID this permission belongs to."""
-  roleId: ID!
+  """The role this permission belongs to."""
+  role: RoleGQL
+
+  """The scope this permission applies to."""
+  scope: EntityNode!
 }
 
 """An edge in a connection."""
@@ -4049,12 +4094,13 @@ type PermissionGQLEdge {
   node: PermissionGQL!
 }
 
-"""Order by specification for permissions"""
+"""Added in 26.3.0. Order by specification for permissions"""
 input PermissionOrderBy {
   field: PermissionOrderField!
   direction: OrderDirection! = DESC
 }
 
+"""Added in 26.3.0. Permission ordering field"""
 enum PermissionOrderField {
   ID
   ENTITY_TYPE
@@ -4648,6 +4694,16 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.3.0. Input for purging a role"""
+input PurgeRoleInput {
+  id: UUID!
+}
+
+"""Added in 26.3.0. Payload for purge role mutation"""
+type PurgeRolePayload {
+  id: ID!
+}
+
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
@@ -4915,28 +4971,33 @@ type Query {
   """
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
-  """Added in 26.2.0. Get a single role by ID (admin only)."""
+  """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): RoleGQL
 
   """
-  Added in 26.2.0. List roles with filtering and pagination (admin only).
+  Added in 26.3.0. List roles with filtering and pagination (admin only).
   """
   adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
 
   """
-  Added in 26.2.0. List scoped permissions with filtering and pagination (admin only).
+  Added in 26.3.0. List scoped permissions with filtering and pagination (admin only).
   """
   adminPermissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
 
   """
-  Added in 26.2.0. List role assignments with filtering and pagination (admin only).
+  Added in 26.3.0. List role assignments with filtering and pagination (admin only).
   """
   adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
-  """Added in 26.2.0. List available scope types."""
-  scopeTypes: [ScopeType!]!
+  """
+  Added in 26.3.0. Search entities by type (admin only). Only entity_type selection and pagination are supported. Use each entity's dedicated query for detailed options.
+  """
+  adminEntities(entityType: EntityType!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
-  """Added in 26.2.0. List available entity types."""
+  """Added in 26.3.0. List available scope types."""
+  scopeTypes: [EntityType!]!
+
+  """Added in 26.3.0. List available entity types."""
   entityTypes: [EntityType!]!
 
   """Added in 26.2.0. Query kernels within a specific session."""
@@ -5621,13 +5682,13 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-"""Input for revoking a role from a user"""
+"""Added in 26.3.0. Input for revoking a role from a user"""
 input RevokeRoleInput {
   userId: UUID!
   roleId: UUID!
 }
 
-"""Role assignment connection"""
+"""Added in 26.3.0. Role assignment connection"""
 type RoleAssignmentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -5637,25 +5698,31 @@ type RoleAssignmentConnection {
   count: Int!
 }
 
-"""Filter for role assignments"""
+"""Added in 26.3.0. Filter for role assignments"""
 input RoleAssignmentFilter {
   roleId: UUID = null
 }
 
-"""RBAC role assignment (user-role association)"""
+"""Added in 26.3.0. RBAC role assignment (user-role association)"""
 type RoleAssignmentGQL implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  grantedAt: DateTime!
 
   """The assigned user ID."""
-  userId: ID!
+  userId: UUID!
 
   """The assigned role ID."""
-  roleId: ID!
+  roleId: UUID!
 
   """The user who granted this assignment."""
-  grantedBy: ID
+  grantedBy: UUID
+  grantedAt: DateTime!
+
+  """The assigned role."""
+  role: RoleGQL
+
+  """The assigned user."""
+  user: UserV2
 }
 
 """An edge in a connection."""
@@ -5667,7 +5734,7 @@ type RoleAssignmentGQLEdge {
   node: RoleAssignmentGQL!
 }
 
-"""Role connection"""
+"""Added in 26.3.0. Role connection"""
 type RoleConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -5677,7 +5744,7 @@ type RoleConnection {
   count: Int!
 }
 
-"""Filter for roles"""
+"""Added in 26.3.0. Filter for roles"""
 input RoleFilter {
   name: StringFilter = null
   source: [RoleSource!] = null
@@ -5687,7 +5754,7 @@ input RoleFilter {
   NOT: RoleFilter = null
 }
 
-"""RBAC role"""
+"""Added in 26.3.0. RBAC role"""
 type RoleGQL implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -5709,25 +5776,26 @@ type RoleGQLEdge {
   node: RoleGQL!
 }
 
-"""Order by specification for roles"""
+"""Added in 26.3.0. Order by specification for roles"""
 input RoleOrderBy {
   field: RoleOrderField!
   direction: OrderDirection! = DESC
 }
 
+"""Added in 26.3.0. Role ordering field"""
 enum RoleOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
 }
 
-"""Role definition source"""
+"""Added in 26.3.0. Role definition source"""
 enum RoleSource {
   SYSTEM
   CUSTOM
 }
 
-"""Role status"""
+"""Added in 26.3.0. Role status"""
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -6029,14 +6097,6 @@ enum SchedulingStatus {
   TERMINATED
   CANCELLED
   ERROR
-}
-
-"""RBAC scope type"""
-enum ScopeType {
-  DOMAIN
-  PROJECT
-  USER
-  GLOBAL
 }
 
 """
@@ -6541,7 +6601,7 @@ type UpdateResourceGroupPayload {
   resourceGroup: ResourceGroup!
 }
 
-"""Input for updating a role"""
+"""Added in 26.3.0. Input for updating a role"""
 input UpdateRoleInput {
   id: UUID!
   name: String = null
