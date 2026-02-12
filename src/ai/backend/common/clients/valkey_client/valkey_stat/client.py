@@ -66,6 +66,7 @@ _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
 _COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.concurrency_used."
 _SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.sftp_concurrency_used."
 _TOTAL_RESOURCE_SLOTS_KEY: Final[str] = "system.total_resource_slots"
+_RESOURCE_PRESET_CHECK_INDEX_KEY: Final[str] = "resource_preset:check:_index_"
 
 
 class ValkeyStatClient:
@@ -762,11 +763,15 @@ class ValkeyStatClient:
         :param expire_sec: Expiration time in seconds (default 60).
         """
         key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
-        await self._client.client.set(
+        batch = self._create_batch()
+        batch.set(
             key=key,
             value=value,
             expiry=ExpirySet(ExpiryType.SEC, expire_sec),
         )
+        batch.sadd(_RESOURCE_PRESET_CHECK_INDEX_KEY, [key])
+        batch.expire(_RESOURCE_PRESET_CHECK_INDEX_KEY, expire_sec)
+        await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
     async def delete_resource_preset(
@@ -808,10 +813,11 @@ class ValkeyStatClient:
             keys = await self._keys(pattern)
             all_keys.extend(keys)
 
-        # Delete all keys in batch
+        # Delete all keys in batch, including the check index SET
         if all_keys:
             batch = self._create_batch()
             batch = self._invalidate_resource_presets(batch, all_keys)
+            batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
             await self._client.client.exec(batch, raise_on_error=True)
 
     # TODO: Remove this too generalized methods
@@ -1491,12 +1497,15 @@ class ValkeyStatClient:
         and keypair concurrencies for the given access keys.
         """
 
-        # There is no batch `scan` operation, so we need to get all keys first
-        pattern = "resource_preset:check:*"
-        resource_preset_keys = await self._keys(pattern)
+        # Use the index SET to look up tracked keys instead of SCAN over the entire keyspace.
+        resource_preset_keys = list(
+            await self._client.client.smembers(_RESOURCE_PRESET_CHECK_INDEX_KEY)
+        )
 
         batch = self._create_batch()
         batch = self._invalidate_resource_presets(batch, resource_preset_keys)
+        if resource_preset_keys:
+            batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
         batch = self._invalidate_total_resource_slots(batch)
         batch = self._invalidate_keypair_concurrencies(batch, access_keys)
 
