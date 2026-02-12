@@ -4,10 +4,11 @@ import os
 from typing import Self
 
 import psutil
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import Counter, Gauge, Histogram
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
 
 
 class APIMetricObserver:
@@ -285,6 +286,7 @@ class BgTaskMetricObserver:
             name="backendai_bgtask_count",
             documentation="Total number of background tasks processed",
             labelnames=["task_name"],
+            multiprocess_mode="livesum",
         )
         self._bgtask_done_count = Counter(
             name="backendai_bgtask_done_count",
@@ -495,6 +497,7 @@ class LayerMetricObserver:
             name="backendai_layer_operation_triggered_count",
             documentation="Number of layer operations triggered",
             labelnames=["domain", "layer", "operation"],
+            multiprocess_mode="livesum",
         )
         self._layer_operation_count = Counter(
             name="backendai_layer_operation_count",
@@ -602,18 +605,22 @@ class SystemMetricObserver:
         self._async_task_count = Gauge(
             name="backendai_async_task_count",
             documentation="Number of active async tasks",
+            multiprocess_mode="livesum",
         )
         self._cpu_usage_percent = Gauge(
             name="backendai_cpu_usage_percent",
             documentation="CPU usage of the process",
+            multiprocess_mode="livesum",
         )
         self._memory_used_rss = Gauge(
             name="backendai_memory_used_rss",
             documentation="Memory used by the process in RSS",
+            multiprocess_mode="livesum",
         )
         self._memory_used_vms = Gauge(
             name="backendai_memory_used_vms",
             documentation="Memory used by the process in VMS",
+            multiprocess_mode="livesum",
         )
 
     @classmethod
@@ -673,11 +680,13 @@ class EventPropagatorMetricObserver:
         self._propagator_count = Gauge(
             name="backendai_event_propagator_count",
             documentation="Current number of active event propagators",
+            multiprocess_mode="livesum",
         )
         self._propagator_alias_count = Gauge(
             name="backendai_event_propagator_alias_count",
             documentation="Current number of event propagator aliases",
             labelnames=["domain", "alias_id"],
+            multiprocess_mode="livesum",
         )
         self._propagator_registration_count = Counter(
             name="backendai_event_propagator_registration_count",
@@ -735,7 +744,7 @@ class CommonMetricRegistry:
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 class StageObserver:

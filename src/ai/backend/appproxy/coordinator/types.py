@@ -15,7 +15,6 @@ from uuid import UUID
 
 import aiohttp_cors
 import attrs
-from prometheus_client import generate_latest
 from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
@@ -39,6 +38,7 @@ from ai.backend.common.metrics.metric import (
     EventMetricObserver,
     SystemMetricObserver,
 )
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
 from ai.backend.common.types import AgentId, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
@@ -70,7 +70,7 @@ class CoordinatorMetricRegistry:
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 class DistributedLockFactory(Protocol):

@@ -112,6 +112,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
@@ -1933,6 +1934,7 @@ def main(
                         runner=runner,
                     )
                 finally:
+                    cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
             if bootstrap_cfg.manager.pid_file.is_file():

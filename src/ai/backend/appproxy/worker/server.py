@@ -91,6 +91,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
@@ -1007,6 +1008,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                         runner=runner,
                     )
                 finally:
+                    cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
             if server_config.proxy_worker.pid_file.is_file():

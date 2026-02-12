@@ -103,6 +103,7 @@ class UtilizationMetricObserver:
                 "project_id",
                 "value_type",
             ],
+            multiprocess_mode="livemostrecent",
         )
         self._device_metric = Gauge(
             name="backendai_device_utilization",
@@ -113,6 +114,7 @@ class UtilizationMetricObserver:
                 "device_id",
                 "value_type",
             ],
+            multiprocess_mode="livemostrecent",
         )
         self._process_metric = Gauge(
             name="backendai_process_utilization",
@@ -128,6 +130,7 @@ class UtilizationMetricObserver:
                 "pid",
                 "value_type",
             ],
+            multiprocess_mode="livemostrecent",
         )
 
     @classmethod

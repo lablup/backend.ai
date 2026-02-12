@@ -47,7 +47,12 @@ def main(
 
     This is a thin wrapper that defers the heavy import of server module.
     """
+    from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
     from ai.backend.logging import LogLevel
+
+    # Must be called before importing server module (which triggers prometheus_client import)
+    setup_prometheus_multiprocess_dir("manager")
+
     from ai.backend.manager.server import main as server_main
 
     ctx.invoke(

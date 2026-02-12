@@ -53,6 +53,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -865,13 +866,16 @@ def main(
                 else:
                     extra_procs = tuple()
 
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=num_workers,
-                    extra_procs=extra_procs,
-                    args=(local_config, log_endpoint),
-                    runner=runner,
-                )
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=num_workers,
+                        extra_procs=extra_procs,
+                        args=(local_config, log_endpoint),
+                        runner=runner,
+                    )
+                finally:
+                    cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
             if local_config.storage_proxy.pid_file.is_file():
