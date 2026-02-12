@@ -1,0 +1,43 @@
+name: update-seccomp-profile
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # monthly, 1st day at 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update-seccomp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Run seccomp profile update script
+        run: bash scripts/update-default-seccomp.sh
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet src/ai/backend/runner/default-seccomp.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Pull Request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.OCTODOG }}
+          commit-message: "chore: update default seccomp profile from upstream moby/moby"
+          branch: chore/update-seccomp-profile
+          title: "chore: update default seccomp profile from upstream moby/moby"
+          body: |
+            ## Summary
+            - Update `src/ai/backend/runner/default-seccomp.json` to the latest version from [moby/moby](https://github.com/moby/moby/blob/master/profiles/seccomp/default.json).
+
+            This PR was automatically created by the `update-seccomp-profile` workflow.
+          labels: auto-update
