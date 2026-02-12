@@ -2505,7 +2505,7 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "Timeout for archive download session creation (token issuance). "
                 "Does not affect the subsequent archive download streaming."
             ),
-            added_version="25.8.0",
+            added_version="26.1.0",
             composite=CompositeType.FIELD,
         ),
     ]
