@@ -886,8 +886,11 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
+                active_routings = [
+                    r for r in self.routings if r.status in RouteStatus.active_route_statuses()
+                ]
                 healthy_count = sum(
-                    1 for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                    1 for r in active_routings if r.status == RouteStatus.HEALTHY.name
                 )
                 if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY
