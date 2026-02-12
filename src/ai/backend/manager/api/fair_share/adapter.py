@@ -7,6 +7,7 @@ Also provides data-to-DTO conversion functions.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 
@@ -50,7 +51,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketOrder,
     UserUsageBucketOrderField,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
@@ -597,7 +598,7 @@ class FairShareAdapter:
         """Convert FairShareCalculationSnapshot to DTO."""
         return FairShareCalculationSnapshotDTO(
             fair_share_factor=snapshot.fair_share_factor,
-            total_decayed_usage=self._convert_resource_slot(snapshot.total_decayed_usage),
+            total_decayed_usage=self._convert_slot_quantities(snapshot.total_decayed_usage),
             normalized_usage=snapshot.normalized_usage,
             lookback_start=snapshot.lookback_start,
             lookback_end=snapshot.lookback_end,
@@ -610,6 +611,15 @@ class FairShareAdapter:
         entries = [
             ResourceSlotEntryDTO(resource_type=key, quantity=str(value))
             for key, value in slot.items()
+        ]
+        return ResourceSlotDTO(entries=entries)
+
+    @staticmethod
+    def _convert_slot_quantities(quantities: Sequence[SlotQuantity]) -> ResourceSlotDTO:
+        """Convert list[SlotQuantity] to ResourceSlotDTO."""
+        entries = [
+            ResourceSlotEntryDTO(resource_type=sq.slot_name, quantity=str(sq.quantity))
+            for sq in quantities
         ]
         return ResourceSlotDTO(entries=entries)
 

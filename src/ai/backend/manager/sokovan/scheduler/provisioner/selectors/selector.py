@@ -71,13 +71,17 @@ class AgentInfo:
             AgentInfo instance with occupancy data looked up by agent ID
         """
         occupancy = occupancy_map.get(meta.id)
+        if occupancy:
+            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
+        else:
+            occupied = ResourceSlot()
         return cls(
             agent_id=meta.id,
             agent_addr=meta.addr,
             architecture=meta.architecture,
             scaling_group=meta.scaling_group,
             available_slots=meta.available_slots,
-            occupied_slots=occupancy.occupied_slots if occupancy else ResourceSlot(),
+            occupied_slots=occupied,
             container_count=occupancy.container_count if occupancy else 0,
         )
 

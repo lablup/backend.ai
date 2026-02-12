@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Self
 
 import strawberry
 
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
 
@@ -96,6 +97,15 @@ class ResourceSlotGQL:
                 quantity=Decimal(v) if isinstance(v, str) else v,
             )
             for k, v in slot.items()
+        ]
+        return cls(entries=entries)
+
+    @classmethod
+    def from_slot_quantities(cls, quantities: Sequence[SlotQuantity]) -> ResourceSlotGQL:
+        """Convert a list of SlotQuantity to GraphQL type."""
+        entries = [
+            ResourceSlotEntryGQL(resource_type=sq.slot_name, quantity=sq.quantity)
+            for sq in quantities
         ]
         return cls(entries=entries)
 

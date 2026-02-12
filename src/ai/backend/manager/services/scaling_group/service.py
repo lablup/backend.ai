@@ -183,7 +183,7 @@ class ScalingGroupService:
 
         # 2. Get ResourceInfo for capacity
         resource_info = await self._repository.get_resource_info(action.resource_group)
-        capacity_keys = set(resource_info.capacity.data.keys())
+        capacity_keys = {sq.slot_name for sq in resource_info.capacity}
 
         # 3. Validate: input resource_weights with non-None weight must exist in capacity
         if action.resource_weights:

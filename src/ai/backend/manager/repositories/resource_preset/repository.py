@@ -14,7 +14,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.common.types import AccessKey, SlotQuantity
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -237,9 +237,9 @@ class ResourcePresetRepository:
 
         # Apply group resource visibility settings
         if not group_resource_visibility:
-            nan_slots = ResourceSlot({
-                str(k): Decimal("NaN") for k in db_data.known_slot_types.keys()
-            })
+            nan_slots = [
+                SlotQuantity(str(k), Decimal("NaN")) for k in db_data.known_slot_types.keys()
+            ]
             group_limits = nan_slots
             group_occupied = nan_slots
             group_remaining = nan_slots

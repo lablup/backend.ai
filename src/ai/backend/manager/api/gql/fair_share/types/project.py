@@ -146,7 +146,7 @@ class ProjectFairShareGQL(Node):
             ),
             calculation_snapshot=FairShareCalculationSnapshotGQL(
                 fair_share_factor=data.data.calculation_snapshot.fair_share_factor,
-                total_decayed_usage=ResourceSlotGQL.from_resource_slot(
+                total_decayed_usage=ResourceSlotGQL.from_slot_quantities(
                     data.data.calculation_snapshot.total_decayed_usage
                 ),
                 normalized_usage=data.data.calculation_snapshot.normalized_usage,

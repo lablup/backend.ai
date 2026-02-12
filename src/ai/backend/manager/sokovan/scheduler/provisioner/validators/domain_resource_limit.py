@@ -28,10 +28,13 @@ class DomainResourceLimitValidator(ValidatorRule):
             # If no limit is defined, we can't validate - let it pass
             return
 
-        # Get current domain occupancy
-        domain_occupied = snapshot.resource_occupancy.by_domain.get(
-            workload.domain_name, ResourceSlot()
+        # Get current domain occupancy (list[SlotQuantity]) and convert to ResourceSlot
+        domain_occupied_quantities = snapshot.resource_occupancy.by_domain.get(
+            workload.domain_name, []
         )
+        domain_occupied = ResourceSlot({
+            sq.slot_name: sq.quantity for sq in domain_occupied_quantities
+        })
 
         # Check if adding this workload would exceed the limit
         total_after = domain_occupied + workload.requested_slots

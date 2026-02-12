@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
@@ -19,7 +18,7 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -42,6 +41,7 @@ from ai.backend.manager.repositories.base.purger import (
     execute_purger,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 
 if TYPE_CHECKING:
@@ -318,6 +318,7 @@ class ScalingGroupDBSource:
         """
         ar = AgentResourceRow.__table__
         ag = AgentRow.__table__
+        rst = ResourceSlotTypeRow.__table__
 
         async with self._db.begin_readonly_session() as db_sess:
             # Validate scaling group exists
@@ -327,41 +328,47 @@ class ScalingGroupDBSource:
             if not sg_exists:
                 raise ScalingGroupNotFound(scaling_group)
 
-            # Capacity: ALIVE + schedulable agents
+            # Capacity: ALIVE + schedulable agents, JOIN rst for rank ordering
             capacity_stmt = (
                 sa.select(ar.c.slot_name, sa.func.sum(ar.c.capacity).label("total"))
-                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .select_from(
+                    ar.join(ag, ar.c.agent_id == ag.c.id).join(
+                        rst, ar.c.slot_name == rst.c.slot_name
+                    )
+                )
                 .where(
                     ag.c.scaling_group == scaling_group,
                     ag.c.status == AgentStatus.ALIVE,
                     ag.c.schedulable == sa.true(),
                 )
-                .group_by(ar.c.slot_name)
+                .group_by(ar.c.slot_name, rst.c.rank)
+                .order_by(rst.c.rank)
             )
             capacity_result = await db_sess.execute(capacity_stmt)
-            capacity_dict: dict[str, Decimal] = {
-                row.slot_name: row.total for row in capacity_result
-            }
+            capacity_list = [SlotQuantity(row.slot_name, row.total) for row in capacity_result]
 
-            # Used: ALIVE agents (regardless of schedulable)
+            # Used: ALIVE agents (regardless of schedulable), JOIN rst for rank ordering
             used_stmt = (
                 sa.select(ar.c.slot_name, sa.func.sum(ar.c.used).label("total"))
-                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .select_from(
+                    ar.join(ag, ar.c.agent_id == ag.c.id).join(
+                        rst, ar.c.slot_name == rst.c.slot_name
+                    )
+                )
                 .where(
                     ag.c.scaling_group == scaling_group,
                     ag.c.status == AgentStatus.ALIVE,
                 )
-                .group_by(ar.c.slot_name)
+                .group_by(ar.c.slot_name, rst.c.rank)
+                .order_by(rst.c.rank)
             )
             used_result = await db_sess.execute(used_stmt)
-            used_dict: dict[str, Decimal] = {row.slot_name: row.total for row in used_result}
+            used_list = [SlotQuantity(row.slot_name, row.total) for row in used_result]
 
-        capacity = ResourceSlot({k: v for k, v in capacity_dict.items()})
-        used = ResourceSlot({k: v for k, v in used_dict.items()})
-        free = capacity - used
+        free_list = subtract_quantities(capacity_list, used_list)
 
         return ResourceInfo(
-            capacity=capacity,
-            used=used,
-            free=free,
+            capacity=capacity_list,
+            used=used_list,
+            free=free_list,
         )

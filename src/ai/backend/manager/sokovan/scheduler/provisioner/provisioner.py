@@ -9,8 +9,8 @@ from datetime import datetime
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
     AgentSelectionStrategy,
-    ResourceSlot,
     SessionId,
+    SlotQuantity,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -18,6 +18,10 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.resource_slot.types import (
+    add_quantities,
+    resource_slot_to_quantities,
+)
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
@@ -347,21 +351,26 @@ class SessionProvisioner:
         :param allocation: The session allocation result containing agent allocations
         """
         # Calculate total allocated resources from allocation
-        total_allocated_slots = ResourceSlot()
+        # allocated_slots are list[ResourceSlot]; convert to list[SlotQuantity] for occupancy
+        total_quantities: list[SlotQuantity] = []
         for agent_alloc in allocation.agent_allocations:
             for slot in agent_alloc.allocated_slots:
-                total_allocated_slots += slot
+                total_quantities = add_quantities(
+                    total_quantities, resource_slot_to_quantities(slot)
+                )
 
         # 1. Update resource occupancy - add the session's allocated slots
         # Update keypair occupancy
         current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
         if current_keypair is None:
             current_keypair = KeypairOccupancy(
-                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+                occupied_slots=[], session_count=0, sftp_session_count=0
             )
 
         # Update occupied slots and session counts
-        current_keypair.occupied_slots += total_allocated_slots
+        current_keypair.occupied_slots = add_quantities(
+            current_keypair.occupied_slots, total_quantities
+        )
         if workload.is_private:
             current_keypair.sftp_session_count += 1
         else:
@@ -370,23 +379,21 @@ class SessionProvisioner:
         snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
 
         # Update user occupancy
-        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, ResourceSlot())
-        snapshot.resource_occupancy.by_user[workload.user_uuid] = (
-            current_user + total_allocated_slots
+        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
+        snapshot.resource_occupancy.by_user[workload.user_uuid] = add_quantities(
+            current_user, total_quantities
         )
 
         # Update group occupancy
-        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, ResourceSlot())
-        snapshot.resource_occupancy.by_group[workload.group_id] = (
-            current_group + total_allocated_slots
+        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, [])
+        snapshot.resource_occupancy.by_group[workload.group_id] = add_quantities(
+            current_group, total_quantities
         )
 
         # Update domain occupancy
-        current_domain = snapshot.resource_occupancy.by_domain.get(
-            workload.domain_name, ResourceSlot()
-        )
-        snapshot.resource_occupancy.by_domain[workload.domain_name] = (
-            current_domain + total_allocated_slots
+        current_domain = snapshot.resource_occupancy.by_domain.get(workload.domain_name, [])
+        snapshot.resource_occupancy.by_domain[workload.domain_name] = add_quantities(
+            current_domain, total_quantities
         )
 
         # 2. Update concurrency counts

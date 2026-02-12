@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
@@ -53,7 +53,7 @@ DEFAULT_DECAY_UNIT_DAYS = 1
 def _merge_resource_weights(
     row_weights: ResourceSlot,
     default_weight: Decimal,
-    available_slots: ResourceSlot,
+    available_slots: list[SlotQuantity],
 ) -> tuple[ResourceSlot, frozenset[str]]:
     """Merge explicit and default resource weights.
 
@@ -70,7 +70,8 @@ def _merge_resource_weights(
     merged = {}
     uses_default = []
 
-    for resource_type in available_slots:
+    for sq in available_slots:
+        resource_type = sq.slot_name
         if resource_type in row_weights:
             # Use explicit weight
             merged[resource_type] = row_weights[resource_type]
@@ -80,6 +81,11 @@ def _merge_resource_weights(
             uses_default.append(resource_type)
 
     return ResourceSlot(merged), frozenset(uses_default)
+
+
+def _resource_slot_to_slot_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
+    """Convert a ResourceSlot to list[SlotQuantity] (unordered)."""
+    return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items()]
 
 
 def _get_domain_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
@@ -243,7 +249,7 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
     def to_data(
         self,
         default_weight: Decimal,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
     ) -> DomainFairShareData:
         """Convert to DomainFairShareData with merged resource weights.
 
@@ -284,7 +290,7 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=self.fair_share_factor,
-                    total_decayed_usage=self.total_decayed_usage,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
                     normalized_usage=self.normalized_usage,
                     lookback_start=self.lookback_start,
                     lookback_end=self.lookback_end,
@@ -459,7 +465,7 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
     def to_data(
         self,
         default_weight: Decimal,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
     ) -> ProjectFairShareData:
         """Convert to ProjectFairShareData with merged resource weights.
 
@@ -501,7 +507,7 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=self.fair_share_factor,
-                    total_decayed_usage=self.total_decayed_usage,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
                     normalized_usage=self.normalized_usage,
                     lookback_start=self.lookback_start,
                     lookback_end=self.lookback_end,
@@ -706,7 +712,7 @@ class UserFairShareRow(Base):  # type: ignore[misc]
     def to_data(
         self,
         default_weight: Decimal,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
     ) -> UserFairShareData:
         """Convert to UserFairShareData with merged resource weights.
 
@@ -749,7 +755,7 @@ class UserFairShareRow(Base):  # type: ignore[misc]
                 ),
                 calculation_snapshot=FairShareCalculationSnapshot(
                     fair_share_factor=self.fair_share_factor,
-                    total_decayed_usage=self.total_decayed_usage,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
                     normalized_usage=self.normalized_usage,
                     lookback_start=self.lookback_start,
                     lookback_end=self.lookback_end,

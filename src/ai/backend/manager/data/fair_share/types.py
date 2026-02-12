@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ class FairShareCalculationSnapshot:
     fair_share_factor: Decimal
     """Computed fair share factor (0-1 range, higher = more entitled)."""
 
-    total_decayed_usage: ResourceSlot
+    total_decayed_usage: list[SlotQuantity]
     """Sum of decayed historical usage across all resource types."""
 
     normalized_usage: Decimal
@@ -80,7 +80,7 @@ class FairShareCalculationSnapshot:
     def create_default(
         cls,
         lookback_days: int,
-        available_slots: ResourceSlot,
+        available_slots: list[SlotQuantity],
         now: datetime,
     ) -> FairShareCalculationSnapshot:
         """Create default snapshot with zero usage.
@@ -97,7 +97,7 @@ class FairShareCalculationSnapshot:
         lookback_start = today - timedelta(days=lookback_days)
 
         # Initialize total_decayed_usage with zeros based on available_slots keys
-        zero_usage = ResourceSlot({key: Decimal("0.0") for key in available_slots})
+        zero_usage = [SlotQuantity(sq.slot_name, Decimal("0.0")) for sq in available_slots]
 
         return cls(
             fair_share_factor=Decimal("1.0"),  # No usage history
@@ -296,7 +296,7 @@ class FairShareCalculationContext:
     resource_weights: ResourceSlot
     """Default resource weights for normalized usage calculation."""
 
-    cluster_capacity: ResourceSlot
+    cluster_capacity: list[SlotQuantity]
     """Total available slots from all ALIVE schedulable agents in the scaling group.
     Used to normalize usage: usage[r] / (capacity[r] * lookback_days * SECONDS_PER_DAY).
     """

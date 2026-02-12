@@ -12,6 +12,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SlotName,
+    SlotQuantity,
     SlotTypes,
 )
 
@@ -27,7 +28,7 @@ from .workload import (
 class KeypairOccupancy:
     """Keypair occupancy information including resources and session counts."""
 
-    occupied_slots: ResourceSlot
+    occupied_slots: list[SlotQuantity]
     session_count: int
     sftp_session_count: int
 
@@ -36,7 +37,7 @@ class KeypairOccupancy:
 class AgentOccupancy:
     """Agent occupancy information including resources and container count."""
 
-    occupied_slots: ResourceSlot
+    occupied_slots: list[SlotQuantity]
     container_count: int
 
 
@@ -45,9 +46,9 @@ class ResourceOccupancySnapshot:
     """Snapshot of current resource occupancy across different scopes."""
 
     by_keypair: MutableMapping[AccessKey, KeypairOccupancy]
-    by_user: MutableMapping[UUID, ResourceSlot]
-    by_group: MutableMapping[UUID, ResourceSlot]
-    by_domain: MutableMapping[str, ResourceSlot]
+    by_user: MutableMapping[UUID, list[SlotQuantity]]
+    by_group: MutableMapping[UUID, list[SlotQuantity]]
+    by_domain: MutableMapping[str, list[SlotQuantity]]
     by_agent: MutableMapping[AgentId, AgentOccupancy]  # Agent-level occupancy from actual kernels
 
 
