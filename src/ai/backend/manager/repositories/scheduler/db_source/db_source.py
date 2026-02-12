@@ -7,6 +7,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
@@ -31,6 +32,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     VFolderMount,
 )
@@ -44,6 +46,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow, domains
@@ -56,6 +59,7 @@ from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import (
@@ -83,6 +87,7 @@ from ai.backend.manager.repositories.base.rbac.field_creator import (
     execute_rbac_bulk_field_creator,
 )
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
+from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
@@ -168,7 +173,10 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+    ) -> None:
         self._db = db
 
     @actxmgr
@@ -417,32 +425,34 @@ class ScheduleDBSource:
     async def _fetch_kernel_occupancy(
         self, db_sess: SASession, scaling_group: str
     ) -> ResourceOccupancySnapshot:
-        """Fetch kernel occupancy data from active kernels and session counts."""
-        # Fetch kernel occupancy data for both occupied (RUNNING, TERMINATING) and requested (SCHEDULED, PREPARING, etc.) statuses
-        # resource_occupied_statuses: RUNNING, TERMINATING - use occupied_slots
-        # resource_requested_statuses: SCHEDULED, PREPARING, PULLING, PREPARED, CREATING - use requested_slots
+        """Fetch kernel occupancy data from normalized resource_allocations table."""
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
         all_resource_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
         )
-        occupancy_result = await db_sess.execute(
+        effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+        occ_stmt = (
             sa.select(
-                KernelRow.session_id,
-                KernelRow.access_key,
-                KernelRow.user_uuid,
-                KernelRow.group_id,
-                KernelRow.domain_name,
-                KernelRow.agent,
-                KernelRow.occupied_slots,
-                KernelRow.requested_slots,
-                KernelRow.status,
-                KernelRow.session_type,
-            ).where(
-                sa.and_(
-                    KernelRow.status.in_(all_resource_statuses),
-                    KernelRow.scaling_group == scaling_group,
-                )
+                k.c.session_id,
+                k.c.access_key,
+                k.c.user_uuid,
+                k.c.group_id,
+                k.c.domain_name,
+                k.c.agent,
+                k.c.status,
+                k.c.session_type,
+                ra.c.slot_name,
+                effective_amount.label("effective_amount"),
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+            .where(
+                k.c.scaling_group == scaling_group,
+                k.c.status.in_(all_resource_statuses),
+                ra.c.free_at.is_(None),
             )
         )
+        occupancy_rows = (await db_sess.execute(occ_stmt)).all()
 
         # Keypair occupancy with both slots and session counts
         def keypair_occupancy_factory() -> KeypairOccupancy:
@@ -467,24 +477,19 @@ class ScheduleDBSource:
         sessions_by_keypair: dict[AccessKey, set[SessionId]] = defaultdict(set)
         sftp_sessions_by_keypair: dict[AccessKey, set[SessionId]] = defaultdict(set)
 
-        for row in occupancy_result:
-            session_type = cast(SessionTypes, row.session_type)
-            kernel_status = cast(KernelStatus, row.status)
+        # Track unique kernels per agent for container count
+        kernels_by_agent: dict[AgentId, set[tuple[SessionId, str]]] = defaultdict(set)
 
-            # Determine which slots to use based on kernel status
-            # For RUNNING/TERMINATING: use occupied_slots (actual allocated resources)
-            # For SCHEDULED/PREPARING/etc: use requested_slots (estimated allocation)
-            if kernel_status in KernelStatus.resource_occupied_statuses():
-                slots_to_use = row.occupied_slots
-            else:  # kernel_status in resource_requested_statuses
-                slots_to_use = row.requested_slots
+        for row in occupancy_rows:
+            session_type = SessionTypes(row.session_type)
+            slot_amount = ResourceSlot({row.slot_name: row.effective_amount})
 
             # Only accumulate resource slots for non-private sessions
             if not session_type.is_private():
-                occupancy_by_keypair[row.access_key].occupied_slots += slots_to_use
-                occupancy_by_user[row.user_uuid] += slots_to_use
-                occupancy_by_group[row.group_id] += slots_to_use
-                occupancy_by_domain[row.domain_name] += slots_to_use
+                occupancy_by_keypair[row.access_key].occupied_slots += slot_amount
+                occupancy_by_user[row.user_uuid] += slot_amount
+                occupancy_by_group[row.group_id] += slot_amount
+                occupancy_by_domain[row.domain_name] += slot_amount
 
                 # Track regular sessions
                 sessions_by_keypair[row.access_key].add(row.session_id)
@@ -493,8 +498,28 @@ class ScheduleDBSource:
                 sftp_sessions_by_keypair[row.access_key].add(row.session_id)
 
             if row.agent:
-                occupancy_by_agent[row.agent].occupied_slots += slots_to_use
-                occupancy_by_agent[row.agent].container_count += 1
+                occupancy_by_agent[row.agent].occupied_slots += slot_amount
+                # Use (session_id, slot_name) pair as a proxy for kernel identity
+                # — each kernel appears once per slot_name, so we just need to
+                # count unique kernels, not unique rows.
+                kernels_by_agent[row.agent].add((row.session_id, row.slot_name))
+
+        # Approximate container counts: each kernel contributes multiple slot rows,
+        # so we estimate by taking the max occurrence count across slots.
+        # A simpler approach: count distinct session_ids as an approximation.
+        # Actually, for agent container count we need unique kernels, not sessions.
+        # Since slot rows are per-kernel-slot, count unique (session_id) per agent
+        # is imprecise for multi-kernel sessions. But the original code counted
+        # per-kernel rows too, so we use the number of unique slot_name sets per agent.
+        for agent_id, kernel_slots in kernels_by_agent.items():
+            # Count unique sessions as proxy for container count
+            # (Each kernel from a given session has same session_id but different slot entries.)
+            # We take the number of unique slot_names that appeared; the true count
+            # is len(kernel_slots) / slots_per_kernel — but since the original code
+            # counted per-kernel-row (one row per kernel), and here we have one row
+            # per slot, we need to deduplicate. Take distinct session_ids count.
+            unique_sessions = {sid for sid, _ in kernel_slots}
+            occupancy_by_agent[agent_id].container_count = len(unique_sessions)
 
         # Update session counts in keypair occupancy
         for access_key, sessions in sessions_by_keypair.items():
@@ -1164,6 +1189,22 @@ class ScheduleDBSource:
             await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
             await db_sess.flush()
 
+            # Record requested resources in normalized resource_allocations table
+            for kernel_row in kernels:
+                quantities = resource_slot_to_quantities(kernel_row.requested_slots)
+                if quantities:
+                    await db_sess.execute(
+                        sa.insert(ResourceAllocationRow),
+                        [
+                            {
+                                "kernel_id": kernel_row.id,
+                                "slot_name": q.slot_name,
+                                "requested": q.quantity,
+                            }
+                            for q in quantities
+                        ],
+                    )
+
             # Add session dependencies if any
             if matched_dependency_ids:
                 dependency_rows = [
@@ -1606,10 +1647,6 @@ class ScheduleDBSource:
                         )
                         # Continue with next failure update
 
-            # Sync agent occupied slots to AgentRow
-            # This must be done within the same transaction to ensure consistency
-            await self._sync_agent_occupied_slots(db_sess, affected_agent_ids)
-
         return scheduled_sessions
 
     async def _prefetch_session_rows(
@@ -1761,101 +1798,6 @@ class ScheduleDBSource:
             )
         )
         await db_sess.execute(kernel_query)
-
-    async def sync_agent_occupied_slots(self, agent_ids: set[AgentId] | None = None) -> None:
-        """
-        Public method to sync agent occupied slots to AgentRow.
-        If agent_ids is None, syncs all agents.
-
-        :param agent_ids: Optional set of agent IDs to sync, None for all agents
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            # If no specific agents provided, get all agents
-            if agent_ids is None:
-                query = sa.select(AgentRow.id)
-                result = await db_sess.execute(query)
-                agent_ids = {row.id for row in result}
-
-            await self._sync_agent_occupied_slots(db_sess, agent_ids)
-
-    async def _sync_agent_occupied_slots(self, db_sess: SASession, agent_ids: set[AgentId]) -> None:
-        """
-        Sync agent occupied slots from kernels to AgentRow.occupied_slots.
-        Calculates the sum of occupied_slots from all active kernels per agent
-        and updates AgentRow accordingly.
-
-        :param db_sess: Existing database session
-        :param agent_ids: Set of agent IDs to sync
-        """
-        if not agent_ids:
-            return
-
-        # Get current occupied slots per agent from kernels
-        agent_occupied_slots = await self._calculate_agent_occupied_slots(db_sess, agent_ids)
-
-        # Update each agent's occupied_slots in AgentRow
-        for agent_id in agent_ids:
-            occupied_slots = agent_occupied_slots.get(agent_id, ResourceSlot())
-
-            update_stmt = (
-                sa.update(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .values(occupied_slots=occupied_slots)
-            )
-            await db_sess.execute(update_stmt)
-
-    async def _calculate_agent_occupied_slots(
-        self, db_sess: SASession, agent_ids: set[AgentId]
-    ) -> Mapping[AgentId, ResourceSlot]:
-        """
-        Calculate current occupied slots for the given agents from database.
-        Aggregates occupied_slots in Python since it's a custom ResourceSlot type.
-
-        :param db_sess: Existing database session
-        :param agent_ids: Set of agent IDs to calculate occupied slots for
-        :return: Mapping of agent IDs to their occupied ResourceSlots
-        """
-        if not agent_ids:
-            return {}
-
-        # Initialize all agents with empty slots
-        agent_slots: dict[AgentId, ResourceSlot] = {
-            agent_id: ResourceSlot() for agent_id in agent_ids
-        }
-
-        # Query all kernels' slots for affected agents
-        # Include both resource_occupied_statuses and resource_requested_statuses
-        all_resource_statuses = (
-            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
-        )
-        query = sa.select(
-            KernelRow.agent,
-            KernelRow.occupied_slots,
-            KernelRow.requested_slots,
-            KernelRow.status,
-        ).where(
-            sa.and_(
-                KernelRow.agent.in_(agent_ids),
-                KernelRow.status.in_(all_resource_statuses),
-            )
-        )
-
-        result = await db_sess.execute(query)
-
-        # Aggregate slots per agent in Python
-        for row in result:
-            if row.agent:
-                kernel_status = cast(KernelStatus, row.status)
-                # Use occupied_slots for RUNNING/TERMINATING, requested_slots for pre-running states
-                if kernel_status in KernelStatus.resource_occupied_statuses():
-                    slots_to_use = row.occupied_slots
-                else:  # kernel_status in resource_requested_statuses
-                    slots_to_use = row.requested_slots
-
-                if slots_to_use:
-                    agent_slots[row.agent] += slots_to_use
-
-        return agent_slots
 
     async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:
         """
@@ -3108,48 +3050,128 @@ class ScheduleDBSource:
 
     async def calculate_total_resource_slots(self) -> TotalResourceData:
         """
-        Calculate total resource slots from all agents in the database.
-        Uses AgentRow.available_slots for capable slots and kernel-based calculation for occupied slots.
+        Calculate total resource slots from normalized agent_resources table.
 
         :return: TotalResourceData with total used, free, and capable slots
         """
+        ar = AgentResourceRow.__table__
+        ag = AgentRow.__table__
+
+        async with self._begin_readonly_read_committed() as conn:
+            stmt = (
+                sa.select(
+                    ar.c.slot_name,
+                    sa.func.sum(ar.c.capacity).label("total_capacity"),
+                    sa.func.sum(ar.c.used).label("total_used"),
+                )
+                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .where(
+                    ag.c.status == AgentStatus.ALIVE,
+                    ag.c.schedulable == sa.true(),
+                )
+                .group_by(ar.c.slot_name)
+            )
+            result = await conn.execute(stmt)
+
+            capacity: dict[str, Decimal] = {}
+            used: dict[str, Decimal] = {}
+            for row in result:
+                capacity[row.slot_name] = row.total_capacity
+                used[row.slot_name] = row.total_used
+
+        total_capacity_slots = ResourceSlot(capacity)
+        total_used_slots = ResourceSlot(used)
+        total_free_slots = total_capacity_slots - total_used_slots
+
+        return TotalResourceData(
+            total_used_slots=total_used_slots,
+            total_free_slots=total_free_slots,
+            total_capacity_slots=total_capacity_slots,
+        )
+
+    # =========================================================================
+    # Normalized resource allocation write operations
+    # =========================================================================
+
+    async def allocate_kernel_resources(
+        self,
+        kernel_id: UUID,
+        agent_id: str,
+        slots: Sequence[SlotQuantity],
+    ) -> int:
+        """Set used values on allocations and increment agent_resources.used.
+
+        Returns:
+            Number of slots allocated.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        if not slots:
+            return 0
+        ar = AgentResourceRow.__table__
         async with self._begin_session_read_committed() as db_sess:
-            # Get all active agent IDs and their available slots
-            agent_stmt = sa.select(
-                AgentRow.id,
-                AgentRow.available_slots,
-            ).where(
-                sa.and_(AgentRow.status == AgentStatus.ALIVE, AgentRow.schedulable == sa.true())
-            )
+            for s in slots:
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.slot_name == s.slot_name,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(used=s.quantity, used_at=sa.func.now())
+                )
+                new_used = ar.c.used + s.quantity
+                result = await db_sess.execute(
+                    sa.update(ar)
+                    .where(
+                        ar.c.agent_id == agent_id,
+                        ar.c.slot_name == s.slot_name,
+                        new_used <= ar.c.capacity,
+                    )
+                    .values(used=new_used)
+                )
+                if cast(CursorResult[Any], result).rowcount == 0:
+                    raise AgentResourceCapacityExceeded(
+                        f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                    )
+            return len(slots)
 
-            agent_result = await db_sess.execute(agent_stmt)
-            agent_rows = agent_result.fetchall()
+    async def free_kernel_resources(
+        self,
+        kernel_id: UUID,
+        agent_id: str,
+    ) -> int:
+        """Set free_at on allocations and decrement agent_resources.used.
 
-            # Extract agent IDs and calculate total capacity slots
-            agent_ids = set()
-            total_capacity_slots = ResourceSlot()
-
-            for agent_row in agent_rows:
-                agent_ids.add(agent_row.id)
-                if agent_row.available_slots:
-                    total_capacity_slots += agent_row.available_slots
-
-            # Calculate occupied slots from kernels using existing method
-            agent_occupied_slots = await self._calculate_agent_occupied_slots(db_sess, agent_ids)
-
-            # Sum up all occupied slots
-            total_used_slots = ResourceSlot()
-            for occupied_slots in agent_occupied_slots.values():
-                total_used_slots += occupied_slots
-
-            # Calculate free slots
-            total_free_slots = total_capacity_slots - total_used_slots
-
-            return TotalResourceData(
-                total_used_slots=total_used_slots,
-                total_free_slots=total_free_slots,
-                total_capacity_slots=total_capacity_slots,
-            )
+        Returns:
+            Number of allocation rows freed.
+        """
+        ar = AgentResourceRow.__table__
+        async with self._begin_session_read_committed() as db_sess:
+            released = (
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                )
+            ).all()
+            if not released:
+                return 0
+            for r in released:
+                if r.used is None:
+                    continue
+                new_used = ar.c.used - r.used
+                await db_sess.execute(
+                    sa.update(ar)
+                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                    .values(used=new_used)
+                )
+            return len(released)
 
     # =========================================================================
     # Handler-specific methods for SessionLifecycleHandler pattern

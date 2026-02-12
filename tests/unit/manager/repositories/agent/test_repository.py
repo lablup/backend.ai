@@ -56,6 +56,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
@@ -117,8 +118,21 @@ class TestAgentRepositoryDB:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
             ],
         ):
+            # Seed default resource slot types (FK target for agent_resources)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [
+                    ("cpu", "count"),
+                    ("mem", "bytes"),
+                    ("cuda.shares", "count"),
+                    ("rocm.device", "count"),
+                ]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
             yield database_connection
 
     @pytest.fixture

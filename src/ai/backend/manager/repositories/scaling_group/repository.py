@@ -57,7 +57,10 @@ class ScalingGroupRepository:
 
     _db_source: ScalingGroupDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+    ) -> None:
         self._db_source = ScalingGroupDBSource(db)
 
     @scaling_group_repository_resilience.apply()

@@ -23,9 +23,11 @@ from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PER
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -176,3 +178,23 @@ class AgentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def upsert_agent_resource_capacity(
+        self,
+        bulk_upserter: BulkUpserter[AgentResourceRow],
+    ) -> int:
+        """Bulk UPSERT agent resource capacity rows.
+
+        On INSERT: sets capacity (used defaults to 0).
+        On CONFLICT: updates capacity only.
+
+        Returns:
+            Number of rows upserted.
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            result = await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["agent_id", "slot_name"],
+            )
+            return result.upserted_count

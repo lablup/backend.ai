@@ -34,10 +34,13 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
+from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
+from ai.backend.manager.repositories.resource_slot.upserters import AgentResourceUpserterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -120,6 +123,21 @@ class AgentRepository:
             await self._config_provider.legacy_etcd_config_loader.update_resource_slots(
                 upsert_data.resource_info.slot_key_and_units
             )
+
+        # Sync agent capacity to normalized agent_resources table
+        quantities = resource_slot_to_quantities(upsert_data.resource_info.available_slots)
+        if quantities:
+            bulk_upserter = BulkUpserter(
+                specs=[
+                    AgentResourceUpserterSpec(
+                        agent_id=str(agent_id),
+                        slot_name=q.slot_name,
+                        capacity=q.quantity,
+                    )
+                    for q in quantities
+                ]
+            )
+            await self._db_source.upsert_agent_resource_capacity(bulk_upserter)
 
         return upsert_result
 

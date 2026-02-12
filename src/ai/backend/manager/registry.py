@@ -6,7 +6,6 @@ import itertools
 import logging
 import secrets
 import uuid
-from collections import defaultdict
 from collections.abc import (
     Mapping,
     MutableMapping,
@@ -114,6 +113,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -155,7 +155,6 @@ from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
 from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
-    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     SESSION_KERNEL_STATUS_MAPPING,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -1232,22 +1231,15 @@ class AgentRegistry:
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
-            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-                lambda: ResourceSlot({"cpu": 0, "mem": 0})
-            )
             access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
 
             async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK and
-                # occupied_slots per agent.
+                # Query running containers and calculate concurrency_used per AK.
+                # Agent occupied slots are now managed by the normalized
+                # agent_resources table, so only concurrency tracking remains here.
                 session_query = (
                     sa.select(SessionRow)
-                    .where(
-                        SessionRow.status.in_({
-                            *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                            *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                        })
-                    )
+                    .where(SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
                     .options(
                         load_only(
                             SessionRow.id,
@@ -1255,62 +1247,20 @@ class AgentRegistry:
                             SessionRow.status,
                             SessionRow.session_type,
                         ),
-                        selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.occupied_slots)
-                        ),
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    for kernel in session_row.kernels:
-                        session_status = session_row.status
-                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            if kernel.agent is not None:
-                                occupied_slots_per_agent[kernel.agent] += ResourceSlot(
-                                    kernel.occupied_slots
-                                )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            access_key = cast(AccessKey, session_row.access_key)
-                            if access_key not in access_key_to_concurrency_used:
-                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
-                                    access_key
-                                )
-                            if session_row.session_type in PRIVATE_SESSION_TYPES:
-                                access_key_to_concurrency_used[access_key].system_session_ids.add(
-                                    session_row.id
-                                )
-                            else:
-                                access_key_to_concurrency_used[access_key].compute_session_ids.add(
-                                    session_row.id
-                                )
-
-                if len(occupied_slots_per_agent) > 0:
-                    # Update occupied_slots for agents with running containers.
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow.__table__)
-                            .where(AgentRow.id == sa.bindparam("agent_id"))
-                            .values(occupied_slots=sa.bindparam("occupied_slots"))
-                        ),
-                        [
-                            {"agent_id": aid, "occupied_slots": slots}
-                            for aid, slots in occupied_slots_per_agent.items()
-                        ],
-                    )
-                    await db_sess.execute(
-                        sa.update(AgentRow.__table__)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys()))),
-                    )
-                else:
-                    query = (
-                        sa.update(AgentRow.__table__)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                    )
-                    await db_sess.execute(
-                        query,
-                    )
+                    access_key = cast(AccessKey, session_row.access_key)
+                    if access_key not in access_key_to_concurrency_used:
+                        access_key_to_concurrency_used[access_key] = ConcurrencyUsed(access_key)
+                    if session_row.session_type in PRIVATE_SESSION_TYPES:
+                        access_key_to_concurrency_used[access_key].system_session_ids.add(
+                            session_row.id
+                        )
+                    else:
+                        access_key_to_concurrency_used[access_key].compute_session_ids.add(
+                            session_row.id
+                        )
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
@@ -2238,7 +2188,44 @@ class AgentRegistry:
 
         if result is None:
             return
+
+        # Free resources in normalized tables
+        if result.agent is not None:
+            await self._free_kernel_resources(kernel_id, result.agent)
+
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+
+    async def _free_kernel_resources(
+        self,
+        kernel_id: uuid.UUID,
+        agent_id: str,
+    ) -> int:
+        """Free normalized resource allocations and decrement agent_resources.used."""
+        ar = AgentResourceRow.__table__
+        async with self.db.begin_session() as db_sess:
+            released = (
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                )
+            ).all()
+            if not released:
+                return 0
+            for r in released:
+                if r.used is None:
+                    continue
+                new_used = ar.c.used - r.used
+                await db_sess.execute(
+                    sa.update(ar)
+                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                    .values(used=new_used)
+                )
+            return len(released)
 
     async def _get_user_email(
         self,

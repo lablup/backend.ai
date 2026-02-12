@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     AgentId,
     SessionId,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     VFolderMount,
 )
@@ -348,6 +349,25 @@ class SchedulerRepository:
         Update sessions from CREATING to RUNNING state with occupying_slots.
         """
         await self._db_source.update_sessions_to_running(sessions_data)
+
+    @scheduler_repository_resilience.apply()
+    async def allocate_kernel_resources(
+        self,
+        kernel_id: UUID,
+        agent_id: str,
+        slots: Sequence[SlotQuantity],
+    ) -> int:
+        """Set used values on allocations and increment agent_resources.used."""
+        return await self._db_source.allocate_kernel_resources(kernel_id, agent_id, slots)
+
+    @scheduler_repository_resilience.apply()
+    async def free_kernel_resources(
+        self,
+        kernel_id: UUID,
+        agent_id: str,
+    ) -> int:
+        """Set free_at on allocations and decrement agent_resources.used."""
+        return await self._db_source.free_kernel_resources(kernel_id, agent_id)
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(

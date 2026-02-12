@@ -19,6 +19,7 @@ from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTyp
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 from ai.backend.manager.sokovan.data import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
@@ -101,6 +102,17 @@ class RunningTransitionHook(StatusTransitionHook):
             )
         ]
         await self._deps.scheduler_repository.update_sessions_to_running(running_data)
+
+        # Record allocations in normalized resource_allocations / agent_resources tables
+        for kernel_info in session.kernel_infos:
+            agent_id = kernel_info.resource.agent
+            if agent_id and kernel_info.resource.occupied_slots:
+                quantities = resource_slot_to_quantities(kernel_info.resource.occupied_slots)
+                if quantities:
+                    await self._deps.scheduler_repository.allocate_kernel_resources(
+                        kernel_info.id, agent_id, quantities
+                    )
+
         log.debug(
             "Updated occupied_slots for session {} transitioning to RUNNING",
             session.session_info.identity.id,

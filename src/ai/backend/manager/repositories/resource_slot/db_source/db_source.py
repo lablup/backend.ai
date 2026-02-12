@@ -23,7 +23,9 @@ from ai.backend.manager.repositories.base import (
     BulkUpserter,
     execute_bulk_upserter,
 )
-from ai.backend.manager.repositories.resource_slot.types import AgentOccupiedSlots
+from ai.backend.manager.repositories.resource_slot.types import (
+    AgentOccupiedSlots,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
