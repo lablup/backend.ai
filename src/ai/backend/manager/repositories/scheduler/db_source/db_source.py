@@ -1976,6 +1976,7 @@ class ScheduleDBSource:
         """
         Update kernel status to CANCELLED.
         Uses UPDATE WHERE to ensure atomic state transition.
+        Also marks resource allocations as freed (PENDING~CREATING kernels have no used value).
 
         :param kernel_id: Kernel ID to update
         :param reason: Cancellation reason
@@ -2010,7 +2011,18 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount > 0
+            updated = cast(CursorResult[Any], result).rowcount > 0
+
+            if updated:
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                )
+        return updated
 
     async def update_kernel_status_terminated(
         self, kernel_id: UUID, reason: str, exit_code: int | None = None
@@ -2018,6 +2030,7 @@ class ScheduleDBSource:
         """
         Update kernel status to TERMINATED.
         Uses UPDATE WHERE to ensure atomic state transition.
+        Also frees normalized resource allocations and decrements agent_resources.used.
 
         :param kernel_id: Kernel ID to update
         :param reason: Termination reason
@@ -2047,9 +2060,38 @@ class ScheduleDBSource:
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
                 )
+                .returning(KernelRow.agent)
             )
             result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount > 0
+            row = result.first()
+            if row is None:
+                return False
+            agent_id: str | None = row[0]
+
+            # Free resource allocations in the same transaction
+            ar = AgentResourceRow.__table__
+            released = (
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                )
+            ).all()
+            if agent_id and released:
+                for r in released:
+                    if r.used is None:
+                        continue
+                    new_used = ar.c.used - r.used
+                    await db_sess.execute(
+                        sa.update(ar)
+                        .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                        .values(used=new_used)
+                    )
+        return True
 
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -2943,6 +2985,19 @@ class ScheduleDBSource:
                 )
             )
             await db_sess.execute(kernel_stmt)
+
+            # Mark resource allocations as freed for all kernels in this session
+            kernel_ids_subq = (
+                sa.select(KernelRow.id).where(KernelRow.session_id == session_id).scalar_subquery()
+            )
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id.in_(kernel_ids_subq),
+                    ResourceAllocationRow.free_at.is_(None),
+                )
+                .values(free_at=sa.func.now())
+            )
 
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo

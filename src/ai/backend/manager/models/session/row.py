@@ -7,7 +7,6 @@ from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -124,6 +123,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.types import (
     QueryCondition,
@@ -1715,23 +1715,32 @@ class SessionLifecycleManager:
             session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
             transited = session_row.determine_and_set_status(status_changed_at=now)
 
-            def _calculate_session_occupied_slots(session_row: SessionRow) -> None:
-                session_occupying_slots = ResourceSlot()
-                for row in session_row.kernels:
-                    kernel_row = row
-                    kernel_allocs = kernel_row.occupied_slots
-                    session_occupying_slots.sync_keys(kernel_allocs)
-                    for key, val in session_occupying_slots.items():
-                        session_occupying_slots[key] = str(
-                            Decimal(val) + Decimal(kernel_allocs[key])
-                        )
-                session_row.occupying_slots = session_occupying_slots
+            async def _calculate_session_occupied_slots(
+                db_session: SASession,
+                session_row: SessionRow,
+            ) -> None:
+                kernel_ids = [k.id for k in session_row.kernels]
+                if not kernel_ids:
+                    session_row.occupying_slots = ResourceSlot()
+                    return
+                ra = ResourceAllocationRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
+                stmt = (
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .where(
+                        ra.c.kernel_id.in_(kernel_ids),
+                        ra.c.free_at.is_(None),
+                    )
+                    .group_by(ra.c.slot_name)
+                )
+                rows = (await db_session.execute(stmt)).all()
+                session_row.occupying_slots = ResourceSlot({r.slot_name: r.total for r in rows})
 
             match session_row.status:
                 case SessionStatus.CREATING:
-                    _calculate_session_occupied_slots(session_row)
+                    await _calculate_session_occupied_slots(db_session, session_row)
                 case SessionStatus.RUNNING if transited:
-                    _calculate_session_occupied_slots(session_row)
+                    await _calculate_session_occupied_slots(db_session, session_row)
 
             return session_row, transited
 

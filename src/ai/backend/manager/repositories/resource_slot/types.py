@@ -2,22 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from decimal import Decimal
 
 from ai.backend.common.types import (
-    AgentId,
     ResourceSlot,
     SlotQuantity,
 )
-
-
-@dataclass(frozen=True)
-class AgentOccupiedSlots:
-    """Per-agent occupied slot quantities."""
-
-    agent_id: AgentId
-    slots: list[SlotQuantity] = field(default_factory=list)
 
 
 def resource_slot_to_quantities(slot: ResourceSlot) -> list[SlotQuantity]:

@@ -1067,18 +1067,23 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.user_uuid == user_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
+                query = (
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+                    .where(
+                        k.c.user_uuid == user_id,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
+                    )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                user_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
+                rows = (await _sess.execute(query)).all()
                 return ResourceSlot({
-                    key: val for key, val in user_occupied.items() if key in known_slot_types
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
                 })
 
         return await execute_with_retry(_query)
@@ -1090,84 +1095,80 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.access_key == access_key)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.access_key == access_key,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
     async def get_domain_occupancy(
         self, domain_name: str, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
-        # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.domain_name == domain_name)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.domain_name == domain_name,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
     async def get_group_occupancy(
         self, group_id: uuid.UUID, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
-        # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.group_id == group_id)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.group_id == group_id,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
