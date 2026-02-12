@@ -38,10 +38,10 @@ from ai.backend.manager.repositories.scheduler.options import KernelConditions, 
 
 
 @strawberry.enum(
-    name="KernelStatus",
+    name="KernelV2Status",
     description="Added in 26.2.0. Status of a kernel in its lifecycle.",
 )
-class KernelStatusGQL(StrEnum):
+class KernelV2StatusGQL(StrEnum):
     """GraphQL enum for kernel status."""
 
     PENDING = "PENDING"
@@ -55,7 +55,7 @@ class KernelStatusGQL(StrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def from_internal(cls, internal_status: KernelStatus) -> KernelStatusGQL:
+    def from_internal(cls, internal_status: KernelStatus) -> KernelV2StatusGQL:
         """Convert internal KernelStatus to GraphQL enum."""
         match internal_status:
             case KernelStatus.PENDING:
@@ -87,23 +87,23 @@ class KernelStatusGQL(StrEnum):
     def to_internal(self) -> KernelStatus:
         """Convert GraphQL enum to internal KernelStatus."""
         match self:
-            case KernelStatusGQL.PENDING:
+            case KernelV2StatusGQL.PENDING:
                 return KernelStatus.PENDING
-            case KernelStatusGQL.SCHEDULED:
+            case KernelV2StatusGQL.SCHEDULED:
                 return KernelStatus.SCHEDULED
-            case KernelStatusGQL.PREPARING:
+            case KernelV2StatusGQL.PREPARING:
                 return KernelStatus.PREPARING
-            case KernelStatusGQL.PREPARED:
+            case KernelV2StatusGQL.PREPARED:
                 return KernelStatus.PREPARED
-            case KernelStatusGQL.CREATING:
+            case KernelV2StatusGQL.CREATING:
                 return KernelStatus.CREATING
-            case KernelStatusGQL.RUNNING:
+            case KernelV2StatusGQL.RUNNING:
                 return KernelStatus.RUNNING
-            case KernelStatusGQL.TERMINATING:
+            case KernelV2StatusGQL.TERMINATING:
                 return KernelStatus.TERMINATING
-            case KernelStatusGQL.TERMINATED:
+            case KernelV2StatusGQL.TERMINATED:
                 return KernelStatus.TERMINATED
-            case KernelStatusGQL.CANCELLED:
+            case KernelV2StatusGQL.CANCELLED:
                 return KernelStatus.CANCELLED
 
 
@@ -116,9 +116,9 @@ class KernelStatusInMatchSpec:
 
 
 @strawberry.enum(
-    name="KernelOrderField", description="Added in 26.2.0. Fields available for ordering kernels."
+    name="KernelV2OrderField", description="Added in 26.2.0. Fields available for ordering kernels."
 )
-class KernelOrderFieldGQL(StrEnum):
+class KernelV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     TERMINATED_AT = "terminated_at"
     STATUS = "status"
@@ -128,11 +128,11 @@ class KernelOrderFieldGQL(StrEnum):
 
 
 @strawberry.input(
-    name="KernelStatusFilter", description="Added in 26.2.0. Filter for kernel status."
+    name="KernelV2StatusFilter", description="Added in 26.2.0. Filter for kernel status."
 )
-class KernelStatusFilterGQL:
-    in_: list[KernelStatusGQL] | None = strawberry.field(name="in", default=None)
-    not_in: list[KernelStatusGQL] | None = None
+class KernelV2StatusFilterGQL:
+    in_: list[KernelV2StatusGQL] | None = strawberry.field(name="in", default=None)
+    not_in: list[KernelV2StatusGQL] | None = None
 
     def build_query_condition(
         self,
@@ -164,11 +164,11 @@ class KernelStatusFilterGQL:
 
 
 @strawberry.input(
-    name="KernelFilter", description="Added in 26.2.0. Filter criteria for querying kernels."
+    name="KernelV2Filter", description="Added in 26.2.0. Filter criteria for querying kernels."
 )
-class KernelFilterGQL(GQLFilter):
+class KernelV2FilterGQL(GQLFilter):
     id: UUIDFilter | None = None
-    status: KernelStatusFilterGQL | None = None
+    status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
@@ -197,39 +197,39 @@ class KernelFilterGQL(GQLFilter):
 
 
 @strawberry.input(
-    name="KernelOrderBy", description="Added in 26.2.0. Ordering specification for kernels."
+    name="KernelV2OrderBy", description="Added in 26.2.0. Ordering specification for kernels."
 )
-class KernelOrderByGQL(GQLOrderBy):
-    field: KernelOrderFieldGQL
+class KernelV2OrderByGQL(GQLOrderBy):
+    field: KernelV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
     def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
         match self.field:
-            case KernelOrderFieldGQL.CREATED_AT:
+            case KernelV2OrderFieldGQL.CREATED_AT:
                 return KernelOrders.created_at(ascending)
-            case KernelOrderFieldGQL.TERMINATED_AT:
+            case KernelV2OrderFieldGQL.TERMINATED_AT:
                 return KernelOrders.terminated_at(ascending)
-            case KernelOrderFieldGQL.STATUS:
+            case KernelV2OrderFieldGQL.STATUS:
                 return KernelOrders.status(ascending)
-            case KernelOrderFieldGQL.CLUSTER_MODE:
+            case KernelV2OrderFieldGQL.CLUSTER_MODE:
                 return KernelOrders.cluster_mode(ascending)
-            case KernelOrderFieldGQL.CLUSTER_HOSTNAME:
+            case KernelV2OrderFieldGQL.CLUSTER_HOSTNAME:
                 return KernelOrders.cluster_hostname(ascending)
-            case KernelOrderFieldGQL.CLUSTER_IDX:
+            case KernelV2OrderFieldGQL.CLUSTER_IDX:
                 return KernelOrders.cluster_idx(ascending)
             case _:
-                raise ValueError(f"Unhandled KernelOrderFieldGQL value: {self.field!r}")
+                raise ValueError(f"Unhandled KernelV2OrderFieldGQL value: {self.field!r}")
 
 
 # ========== Kernel Sub-Info Types ==========
 
 
 @strawberry.type(
-    name="KernelSessionInfo",
+    name="KernelV2SessionInfo",
     description="Added in 26.2.0. Information about the session this kernel belongs to.",
 )
-class KernelSessionInfoGQL:
+class KernelV2SessionInfoGQL:
     session_id: UUID = strawberry.field(
         description="The unique identifier of the session this kernel belongs to."
     )
@@ -243,10 +243,10 @@ class KernelSessionInfoGQL:
 
 
 @strawberry.type(
-    name="KernelClusterInfo",
+    name="KernelV2ClusterInfo",
     description="Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.",
 )
-class KernelClusterInfoGQL:
+class KernelV2ClusterInfoGQL:
     cluster_role: str = strawberry.field(
         description="The role of this kernel in the cluster (e.g., main, sub)."
     )
@@ -262,10 +262,10 @@ class KernelClusterInfoGQL:
 
 
 @strawberry.type(
-    name="KernelUserInfo",
+    name="KernelV2UserInfo",
     description="Added in 26.2.0. User and ownership information for a kernel.",
 )
-class KernelUserInfoGQL:
+class KernelV2UserInfoGQL:
     user_id: UUID | None = strawberry.field(
         description="The UUID of the user who owns this kernel."
     )
@@ -292,10 +292,10 @@ class ResourceAllocationGQL:
 
 
 @strawberry.type(
-    name="KernelResourceInfo",
+    name="KernelV2ResourceInfo",
     description="Added in 26.2.0. Resource allocation information for a kernel.",
 )
-class KernelResourceInfoGQL:
+class KernelV2ResourceInfoGQL:
     agent_id: str | None = strawberry.field(
         description="The ID of the agent running this kernel. Null if not yet assigned or hidden."
     )
@@ -317,10 +317,10 @@ class KernelResourceInfoGQL:
 
 
 @strawberry.type(
-    name="KernelNetworkInfo",
+    name="KernelV2NetworkInfo",
     description="Added in 26.2.0. Network configuration for a kernel.",
 )
-class KernelNetworkInfoGQL:
+class KernelV2NetworkInfoGQL:
     service_ports: ServicePortsGQL | None = strawberry.field(
         description="Collection of service ports exposed by this kernel."
     )
@@ -330,11 +330,11 @@ class KernelNetworkInfoGQL:
 
 
 @strawberry.type(
-    name="KernelLifecycleInfo",
+    name="KernelV2LifecycleInfo",
     description="Added in 26.2.0. Lifecycle and status information for a kernel.",
 )
-class KernelLifecycleInfoGQL:
-    status: KernelStatusGQL = strawberry.field(
+class KernelV2LifecycleInfoGQL:
+    status: KernelV2StatusGQL = strawberry.field(
         description=dedent_strip("""
             Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
             Indicates the kernel's position in its lifecycle.
@@ -372,20 +372,20 @@ class KernelV2GQL(Node):
     )
 
     # Sub-info types
-    session: KernelSessionInfoGQL = strawberry.field(
+    session: KernelV2SessionInfoGQL = strawberry.field(
         description="Information about the session this kernel belongs to."
     )
-    user_info: KernelUserInfoGQL = strawberry.field(description="User and ownership information.")
-    network: KernelNetworkInfoGQL = strawberry.field(
+    user_info: KernelV2UserInfoGQL = strawberry.field(description="User and ownership information.")
+    network: KernelV2NetworkInfoGQL = strawberry.field(
         description="Network configuration and exposed ports."
     )
-    cluster: KernelClusterInfoGQL = strawberry.field(
+    cluster: KernelV2ClusterInfoGQL = strawberry.field(
         description="Cluster configuration for distributed computing."
     )
-    resource: KernelResourceInfoGQL = strawberry.field(
+    resource: KernelV2ResourceInfoGQL = strawberry.field(
         description="Resource allocation and agent information."
     )
-    lifecycle: KernelLifecycleInfoGQL = strawberry.field(
+    lifecycle: KernelV2LifecycleInfoGQL = strawberry.field(
         description="Lifecycle status and timestamps."
     )
 
@@ -491,29 +491,29 @@ class KernelV2GQL(Node):
         return cls(
             id=ID(str(kernel_info.id)),
             startup_command=kernel_info.runtime.startup_command,
-            session=KernelSessionInfoGQL(
+            session=KernelV2SessionInfoGQL(
                 session_id=UUID(kernel_info.session.session_id),
                 creation_id=kernel_info.session.creation_id,
                 name=kernel_info.session.name,
                 session_type=SessionTypes(kernel_info.session.session_type),
             ),
-            user_info=KernelUserInfoGQL(
+            user_info=KernelV2UserInfoGQL(
                 user_id=kernel_info.user_permission.user_uuid,
                 access_key=kernel_info.user_permission.access_key,
                 domain_name=kernel_info.user_permission.domain_name,
                 group_id=kernel_info.user_permission.group_id,
             ),
-            network=KernelNetworkInfoGQL(
+            network=KernelV2NetworkInfoGQL(
                 service_ports=service_ports,
                 preopen_ports=kernel_info.network.preopen_ports,
             ),
-            cluster=KernelClusterInfoGQL(
+            cluster=KernelV2ClusterInfoGQL(
                 cluster_role=kernel_info.cluster.cluster_role,
                 cluster_idx=kernel_info.cluster.cluster_idx,
                 local_rank=kernel_info.cluster.local_rank,
                 cluster_hostname=kernel_info.cluster.cluster_hostname,
             ),
-            resource=KernelResourceInfoGQL(
+            resource=KernelV2ResourceInfoGQL(
                 agent_id=kernel_info.resource.agent if not hide_agents else None,
                 resource_group_name=kernel_info.resource.scaling_group,
                 container_id=kernel_info.resource.container_id if not hide_agents else None,
@@ -524,8 +524,8 @@ class KernelV2GQL(Node):
                 shares=shares,
                 resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
             ),
-            lifecycle=KernelLifecycleInfoGQL(
-                status=KernelStatusGQL.from_internal(kernel_info.lifecycle.status),
+            lifecycle=KernelV2LifecycleInfoGQL(
+                status=KernelV2StatusGQL.from_internal(kernel_info.lifecycle.status),
                 result=SessionResult(kernel_info.lifecycle.result),
                 created_at=kernel_info.lifecycle.created_at,
                 terminated_at=kernel_info.lifecycle.terminated_at,
@@ -534,14 +534,14 @@ class KernelV2GQL(Node):
         )
 
 
-KernelEdgeGQL = Edge[KernelV2GQL]
+KernelV2EdgeGQL = Edge[KernelV2GQL]
 
 
 @strawberry.type(
-    name="KernelConnectionV2",
+    name="KernelV2Connection",
     description="Added in 26.2.0. Connection type for paginated kernel results.",
 )
-class KernelConnectionV2GQL(Connection[KernelV2GQL]):
+class KernelV2ConnectionGQL(Connection[KernelV2GQL]):
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:

@@ -8,10 +8,10 @@ from strawberry import Info
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernel, fetch_kernels
 from ai.backend.manager.api.gql.kernel.types import (
-    KernelConnectionV2GQL,
-    KernelFilterGQL,
-    KernelOrderByGQL,
+    KernelV2ConnectionGQL,
+    KernelV2FilterGQL,
     KernelV2GQL,
+    KernelV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -32,15 +32,15 @@ async def kernel_v2(
 )  # type: ignore[misc]
 async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
+    filter: KernelV2FilterGQL | None = None,
+    order_by: list[KernelV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelConnectionV2GQL:
+) -> KernelV2ConnectionGQL:
     check_admin_only()
     return await fetch_kernels(
         info,
@@ -62,15 +62,15 @@ async def admin_kernels_v2(
 async def session_kernels_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScope,
-    filter: KernelFilterGQL | None = None,
-    order_by: list[KernelOrderByGQL] | None = None,
+    filter: KernelV2FilterGQL | None = None,
+    order_by: list[KernelV2OrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KernelConnectionV2GQL:
+) -> KernelV2ConnectionGQL:
     base_conditions = [KernelConditions.by_session_ids([SessionId(scope.session_id)])]
     return await fetch_kernels(
         info,
